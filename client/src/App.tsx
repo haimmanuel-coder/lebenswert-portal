@@ -1,38 +1,55 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
-import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import Home from "./pages/Home";
+import { PortalAuthProvider, usePortalAuth } from "./contexts/PortalAuthContext";
+import { TimerProvider } from "./contexts/TimerContext";
+import Login from "./pages/Login";
+import PortalApp from "./pages/PortalApp";
+import ErrorBoundary from "./components/ErrorBoundary";
 
-function Router() {
-  // make sure to consider if you need authentication for certain routes
+function PortalRouter() {
+  const { mitarbeiter, isLoading } = usePortalAuth();
+
+  if (isLoading) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "100vh",
+          background: "linear-gradient(150deg, #4a8c3f, #2a9d8f)",
+        }}
+      >
+        <div style={{ textAlign: "center", color: "#fff" }}>
+          <div style={{ fontSize: 52, marginBottom: 16 }}>🌿</div>
+          <div style={{ fontSize: 16, fontWeight: 600 }}>Lebensnah Betreuung</div>
+          <div style={{ fontSize: 13, opacity: 0.8, marginTop: 4 }}>Wird geladen…</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!mitarbeiter) {
+    return <Login />;
+  }
+
   return (
-    <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
-      <Route component={NotFound} />
-    </Switch>
+    <TimerProvider>
+      <PortalApp />
+    </TimerProvider>
   );
 }
-
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
 
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="light"
-        // switchable
-      >
+      <ThemeProvider defaultTheme="light">
         <TooltipProvider>
-          <Toaster />
-          <Router />
+          <Toaster position="bottom-center" />
+          <PortalAuthProvider>
+            <PortalRouter />
+          </PortalAuthProvider>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

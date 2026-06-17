@@ -1,0 +1,176 @@
+import { useState, useRef } from "react";
+import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
+import BottomSheet from "@/components/BottomSheet";
+import SignatureCanvas from "@/components/SignatureCanvas";
+
+function fmtMonat(m: string) {
+  if (!m) return "–";
+  const [y, mo] = m.split("-");
+  const n = ["", "Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
+  return `${n[parseInt(mo)]} ${y}`;
+}
+
+const statusColors: Record<string, { bg: string; color: string }> = {
+  offen: { bg: "#fef3c7", color: "#92400e" },
+  pruefung: { bg: "#e0f2f0", color: "#2a9d8f" },
+  freigegeben: { bg: "#e8f5e4", color: "#4a8c3f" },
+  versendet: { bg: "#f3f4f6", color: "#4b5563" },
+};
+
+export default function Leistungsnachweise() {
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const today = new Date().toISOString().split("T")[0];
+  const [monat, setMonat] = useState(today.slice(0, 7));
+  const [kundenId, setKundenId] = useState("");
+  const [para, setPara] = useState<"45b" | "45a" | "39">("45b");
+  const [stunden, setStunden] = useState("8");
+  const [anzahl, setAnzahl] = useState("4");
+  const [bemerkung, setBemerkung] = useState("");
+  const sigRef = useRef<import("@/components/SignatureCanvas").SignatureCanvasRef>(null);
+
+  const { data: kunden = [] } = trpc.kunden.list.useQuery();
+  const { data: leistungen = [], refetch } = trpc.leistungen.list.useQuery();
+  const createLeistung = trpc.leistungen.create.useMutation({
+    onSuccess: () => {
+      refetch();
+      toast.success("✅ Nachweis eingereicht");
+      setSheetOpen(false);
+      setKundenId(""); setStunden("8"); setAnzahl("4"); setBemerkung("");
+      sigRef.current?.clear();
+    },
+    onError: (e) => toast.error("❌ " + e.message),
+  });
+
+  const rate = para === "39" ? 50 : 39;
+  const betragPreview = ((parseFloat(stunden) || 0) * rate + (parseInt(anzahl) || 0) * 6).toFixed(2);
+
+  const saveLnw = () => {
+    if (!monat || !kundenId) { toast.error("Bitte alle Felder ausfüllen!"); return; }
+    createLeistung.mutate({
+      kundenId: parseInt(kundenId),
+      monat,
+      paragraph: para,
+      stunden: parseFloat(stunden) || 0,
+      anzahlEinsaetze: parseInt(anzahl) || 1,
+      bemerkung,
+      unterschriftLeister: sigRef.current?.toDataURL() ?? undefined,
+    });
+  };
+
+  const sorted = [...leistungen].sort((a, b) => b.monat.localeCompare(a.monat));
+
+  return (
+    <div className="page-enter">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 800 }}>Leistungsnachweise</div>
+          <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>§§ 39, 45a, 45b SGB XI</div>
+        </div>
+        <button
+          onClick={() => setSheetOpen(true)}
+          style={{ padding: "9px 16px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+        >
+          + Neu
+        </button>
+      </div>
+
+      {sorted.length === 0 ? (
+        <p style={{ color: "#6b7280", fontSize: 13 }}>Noch keine Leistungsnachweise.</p>
+      ) : (
+        sorted.map((l) => {
+          const sc = statusColors[l.status] || statusColors.versendet;
+          return (
+            <div key={l.id} style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 10px rgba(0,0,0,.08)", padding: 14, marginBottom: 10 }}>
+              <div className="list-item" style={{ padding: 0, border: "none" }}>
+                <div className={`li-icon ${l.status === "freigegeben" ? "teal" : ""}`}>
+                  {l.status === "freigegeben" ? "✅" : l.status === "offen" ? "📋" : "📄"}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{l.kundeName || "–"}</div>
+                  <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                    {fmtMonat(l.monat)} · {l.stunden}h · §{l.paragraph}
+                  </div>
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>{parseFloat(String(l.betrag || 0)).toFixed(2)} €</div>
+                  <span style={{ display: "inline-block", padding: "3px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: sc.bg, color: sc.color }}>
+                    {l.status}
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })
+      )}
+
+      {/* Einreich-Sheet */}
+      <BottomSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Leistungsnachweis einreichen">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>Monat</label>
+            <input type="month" value={monat} onChange={(e) => setMonat(e.target.value)}
+              style={{ width: "100%", padding: "12px 13px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 15, outline: "none", boxSizing: "border-box" }} />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>Kunde</label>
+            <select value={kundenId} onChange={(e) => setKundenId(e.target.value)}
+              style={{ width: "100%", padding: "12px 13px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 15, outline: "none", background: "#fff", boxSizing: "border-box" }}>
+              <option value="">Wählen...</option>
+              {kunden.map((k) => (
+                <option key={k.id} value={k.id}>{k.vorname} {k.nachname}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>Paragraph</label>
+            <select value={para} onChange={(e) => setPara(e.target.value as typeof para)}
+              style={{ width: "100%", padding: "12px 13px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 15, outline: "none", background: "#fff", boxSizing: "border-box" }}>
+              <option value="45b">§45b SGB XI</option>
+              <option value="45a">§45a SGB XI</option>
+              <option value="39">§39 SGB XI</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>Stunden</label>
+            <input type="number" value={stunden} onChange={(e) => setStunden(e.target.value)} min="0.5" step="0.5" inputMode="decimal"
+              style={{ width: "100%", padding: "12px 13px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 15, outline: "none", boxSizing: "border-box" }} />
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>Anzahl Einsätze</label>
+          <input type="number" value={anzahl} onChange={(e) => setAnzahl(e.target.value)} min="1" inputMode="numeric"
+            style={{ width: "100%", padding: "12px 13px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 15, outline: "none", boxSizing: "border-box" }} />
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>Bemerkung</label>
+          <textarea value={bemerkung} onChange={(e) => setBemerkung(e.target.value)} placeholder="Optional..."
+            style={{ width: "100%", padding: "12px 13px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 15, outline: "none", resize: "none", minHeight: 60, fontFamily: "inherit", boxSizing: "border-box" }} />
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>Unterschrift</label>
+          <SignatureCanvas ref={sigRef} height={140} />
+          <button onClick={() => sigRef.current?.clear()} style={{ marginTop: 8, padding: "7px 12px", background: "#f4f6f3", color: "#6b7280", border: "2px solid #e5e7eb", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Löschen</button>
+        </div>
+
+        {/* Betragsvorschau */}
+        <div style={{ background: "#dbeafe", border: "1px solid #93c5fd", color: "#1e40af", padding: "11px 13px", borderRadius: 10, fontSize: 13, marginBottom: 14 }}>
+          Geschätzter Betrag: {betragPreview} € ({stunden}h × {rate} € + {anzahl} × 6 € Pauschale)
+        </div>
+
+        <div style={{ display: "flex", gap: 10, marginTop: 20, paddingTop: 16, borderTop: "1px solid #e5e7eb" }}>
+          <button onClick={() => setSheetOpen(false)} style={{ flex: 1, padding: 13, background: "#f4f6f3", color: "#6b7280", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>Abbrechen</button>
+          <button onClick={saveLnw} disabled={createLeistung.isPending} style={{ flex: 1, padding: 13, background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+            {createLeistung.isPending ? "Einreichen…" : "Einreichen"}
+          </button>
+        </div>
+      </BottomSheet>
+    </div>
+  );
+}
