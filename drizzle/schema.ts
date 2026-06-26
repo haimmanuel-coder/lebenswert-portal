@@ -8,6 +8,7 @@ import {
   decimal,
   date,
   time,
+  boolean,
 } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
@@ -34,6 +35,8 @@ export const mitarbeiter = mysqlTable("mitarbeiter", {
   passwortHash: varchar("passwortHash", { length: 255 }).notNull(),
   rolle: mysqlEnum("rolle", ["mitarbeiter", "admin"]).default("mitarbeiter").notNull(),
   aktiv: int("aktiv").default(1).notNull(),
+  telefon: varchar("telefon", { length: 50 }),
+  adresse: text("adresse"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -47,12 +50,24 @@ export const kunden = mysqlTable("kunden", {
   nachname: varchar("nachname", { length: 100 }).notNull(),
   adresse: text("adresse"),
   telefon: varchar("telefon", { length: 50 }),
+  pflegegrad: int("pflegegrad").default(2),
+  paragraph: mysqlEnum("paragraph", ["45b", "45a", "39", "privat"]).default("45b"),
   aktiv: int("aktiv").default(1).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
 export type Kunde = typeof kunden.$inferSelect;
 export type InsertKunde = typeof kunden.$inferInsert;
+
+// Kunden-Zuordnung zu Mitarbeitern
+export const kundenZuordnung = mysqlTable("kundenZuordnung", {
+  id: int("id").autoincrement().primaryKey(),
+  mitarbeiterId: int("mitarbeiterId").notNull(),
+  kundenId: int("kundenId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type KundenZuordnung = typeof kundenZuordnung.$inferSelect;
 
 // Einsätze
 export const einsaetze = mysqlTable("einsaetze", {
@@ -112,3 +127,33 @@ export const fahrten = mysqlTable("fahrten", {
 
 export type Fahrt = typeof fahrten.$inferSelect;
 export type InsertFahrt = typeof fahrten.$inferInsert;
+
+// Audit-Log
+export const auditLogs = mysqlTable("auditLogs", {
+  id: int("id").autoincrement().primaryKey(),
+  mitarbeiterId: int("mitarbeiterId"),
+  action: varchar("action", { length: 50 }).notNull(), // LOGIN, LOGOUT, CREATE, UPDATE, DELETE, EXPORT, ADMIN
+  ressource: varchar("ressource", { length: 100 }),
+  details: text("details"),
+  status: mysqlEnum("status", ["success", "failure", "partial"]).default("success").notNull(),
+  ipAddress: varchar("ipAddress", { length: 45 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = typeof auditLogs.$inferInsert;
+
+// Monatsabschlüsse
+export const monatsabschluesse = mysqlTable("monatsabschluesse", {
+  id: int("id").autoincrement().primaryKey(),
+  monat: varchar("monat", { length: 7 }).notNull(), // YYYY-MM
+  adminId: int("adminId").notNull(),
+  gesamtStunden: decimal("gesamtStunden", { precision: 7, scale: 2 }).default("0"),
+  gesamtEinsaetze: int("gesamtEinsaetze").default(0),
+  gesamtKm: decimal("gesamtKm", { precision: 8, scale: 1 }).default("0"),
+  gesamtVerguetung: decimal("gesamtVerguetung", { precision: 10, scale: 2 }).default("0"),
+  csvExport: text("csvExport"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Monatsabschluss = typeof monatsabschluesse.$inferSelect;

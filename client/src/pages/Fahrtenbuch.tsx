@@ -39,8 +39,8 @@ export default function Fahrtenbuch() {
     const fd = typeof f.datum === "string" ? f.datum : (f.datum as Date).toISOString().split("T")[0];
     return fd?.slice(0, 7) === monat;
   });
-  const totalKm = monFahrten.reduce((s, f) => s + (f.kilometer ?? 0), 0);
-  const totalEur = monFahrten.reduce((s, f) => s + (f.verguetung ?? 0), 0);
+  const totalKm = monFahrten.reduce((s, f) => s + parseFloat(String(f.kilometer ?? 0)), 0);
+  const totalEur = monFahrten.reduce((s, f) => s + parseFloat(String(f.verguetung ?? 0)), 0);
 
   const rate = typ === "sonder" ? 0.35 : 0.30;
   const eurPreview = ((parseFloat(km) || 0) * rate).toFixed(2);
@@ -120,8 +120,8 @@ export default function Fahrtenbuch() {
                   </div>
                 </div>
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700 }}>{(f.kilometer ?? 0).toFixed(1)} km</div>
-                  <div style={{ fontSize: 11, color: "#6b7280" }}>{(f.verguetung ?? 0).toFixed(2)} €</div>
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>{parseFloat(String(f.kilometer ?? 0)).toFixed(1)} km</div>
+                  <div style={{ fontSize: 11, color: "#6b7280" }}>{parseFloat(String(f.verguetung ?? 0)).toFixed(2)} €</div>
                 </div>
               </div>
             </div>

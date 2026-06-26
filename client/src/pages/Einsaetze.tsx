@@ -35,6 +35,8 @@ export default function Einsaetze() {
   const sigRef = useRef<import("@/components/SignatureCanvas").SignatureCanvasRef>(null);
 
   const { data: einsaetze = [], refetch } = trpc.einsaetze.list.useQuery();
+  const { data: kunden = [] } = trpc.kunden.list.useQuery();
+  const getKundeName = (id: number) => { const k = kunden.find((c) => c.id === id); return k ? `${k.vorname} ${k.nachname}` : `Kunde #${id}`; };
   const updateStatus = trpc.einsaetze.updateStatus.useMutation({
     onSuccess: () => { refetch(); toast.success("✅ Einsatz abgeschlossen"); setAbschlussOpen(false); },
     onError: (e) => toast.error("❌ " + e.message),
@@ -119,7 +121,7 @@ export default function Einsaetze() {
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {e.kundeName || "–"}
+                    {getKundeName(e.kundenId)}
                   </div>
                   <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2, display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
                     {fmtDate(datum)} · {(e.startzeit || "").slice(0, 5)} Uhr · {e.dauerStunden}h
@@ -135,7 +137,7 @@ export default function Einsaetze() {
                   {e.status === "geplant" && (
                     <div>
                       <button
-                        onClick={() => handleAbschluss(e.id, e.kundeName || "–", fmtDate(datum))}
+                        onClick={() => handleAbschluss(e.id, getKundeName(e.kundenId), fmtDate(datum))}
                         style={{
                           marginTop: 6, padding: "7px 12px", background: "#4a8c3f", color: "#fff",
                           border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer",

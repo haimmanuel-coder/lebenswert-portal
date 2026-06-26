@@ -15,6 +15,13 @@
       "when": 1781713012174,
       "tag": "0001_shiny_bullseye",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1782478599669,
+      "tag": "0002_left_stardust",
+      "breakpoints": true
     }
   ]
 }

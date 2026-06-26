@@ -51,7 +51,7 @@ export default function Login() {
         <div style={{ textAlign: "center", marginBottom: 28 }}>
           <span style={{ fontSize: 52, display: "block", marginBottom: 10 }}>🌿</span>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: "#4a8c3f", margin: 0 }}>
-            Lebensnah Betreuung
+            Lebenswert Betreuung
           </h1>
           <p style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>Mitarbeiter-Portal</p>
         </div>
@@ -178,7 +178,7 @@ export default function Login() {
         </p>
 
         <p style={{ textAlign: "center", fontSize: 11, color: "#9ca3af", marginTop: 8 }}>
-          Demo: anna.mueller@lebensnah.de · Passwort: password
+          Demo: anna.mueller@lebenswert.de · Passwort: password
         </p>
       </div>
     </div>

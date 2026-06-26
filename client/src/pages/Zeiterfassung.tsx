@@ -21,6 +21,7 @@ export default function Zeiterfassung() {
   const [para, setPara] = useState<"45b" | "45a" | "39">("45b");
 
   const { data: kunden = [] } = trpc.kunden.list.useQuery();
+  const getKundeName = (id: number) => { const k = kunden.find((c) => c.id === id); return k ? `${k.vorname} ${k.nachname}` : `Kunde #${id}`; };
   const { data: einsaetze = [], refetch } = trpc.einsaetze.list.useQuery();
   const createEinsatz = trpc.einsaetze.create.useMutation({
     onSuccess: () => {
@@ -149,7 +150,7 @@ export default function Zeiterfassung() {
             <div key={e.id} className="list-item">
               <div className="li-icon teal">⏱</div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>{e.kundeName || "–"}</div>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{getKundeName(e.kundenId)}</div>
                 <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
                   {(e.startzeit || "").slice(0, 5)} Uhr · {e.dauerStunden}h · §{e.paragraph}
                 </div>

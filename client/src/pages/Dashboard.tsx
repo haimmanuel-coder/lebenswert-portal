@@ -37,6 +37,8 @@ export default function Dashboard() {
   const sigRef = useRef<import("@/components/SignatureCanvas").SignatureCanvasRef>(null);
 
   const { data: einsaetze = [], refetch } = trpc.einsaetze.list.useQuery();
+  const { data: kunden = [] } = trpc.kunden.list.useQuery();
+  const getKundeName = (id: number) => { const k = kunden.find((c) => c.id === id); return k ? `${k.vorname} ${k.nachname}` : `Kunde #${id}`; };
   const updateStatus = trpc.einsaetze.updateStatus.useMutation({
     onSuccess: () => { refetch(); toast.success("✅ Einsatz abgeschlossen"); setAbschlussOpen(false); },
     onError: (e) => toast.error("❌ " + e.message),
@@ -60,7 +62,7 @@ export default function Dashboard() {
   const { data: fahrten = [] } = trpc.fahrten.list.useQuery();
   const kmMonth = fahrten.reduce((s, f) => {
     const fd = typeof f.datum === "string" ? f.datum : (f.datum as Date).toISOString().split("T")[0];
-    if (fd?.slice(0, 7) === today.slice(0, 7)) s += f.kilometer ?? 0;
+    if (fd?.slice(0, 7) === today.slice(0, 7)) s += parseFloat(String(f.kilometer ?? 0));
     return s;
   }, 0);
 
@@ -182,7 +184,7 @@ export default function Dashboard() {
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {e.kundeName || "–"}
+                    {getKundeName(e.kundenId)}
                   </div>
                   <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2, display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
                     {fmtDate(datum)} · {(e.startzeit || "").slice(0, 5)} Uhr · {e.dauerStunden}h
@@ -198,7 +200,7 @@ export default function Dashboard() {
                   {e.status === "geplant" && (
                     <div>
                       <button
-                        onClick={() => handleAbschluss(e.id, e.kundeName || "–", fmtDate(datum))}
+                        onClick={() => handleAbschluss(e.id, getKundeName(e.kundenId), fmtDate(datum))}
                         style={{
                           marginTop: 6, padding: "7px 12px", background: "#4a8c3f", color: "#fff",
                           border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer",
@@ -228,7 +230,7 @@ export default function Dashboard() {
               <div key={e.id} className="list-item">
                 <div className="li-icon">📅</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>{e.kundeName || "–"}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{getKundeName(e.kundenId)}</div>
                   <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}>
                     {fmtDate(datum)} · {(e.startzeit || "").slice(0, 5)} Uhr · {e.dauerStunden}h
                     <span className={pb.cls} style={{ display: "inline-block", padding: "2px 6px", borderRadius: 20, fontSize: 10, fontWeight: 700 }}>

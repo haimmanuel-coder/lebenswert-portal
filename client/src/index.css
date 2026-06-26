@@ -4,7 +4,7 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Lebensnah Grün-Palette */
+  /* Lebenswert Grün-Palette */
   --g: #4a8c3f;
   --g2: #3a7030;
   --gl: #e8f5e4;

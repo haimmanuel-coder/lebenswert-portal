@@ -1,4 +1,4 @@
-# Lebensnah Betreuung – Mitarbeiter-Portal TODO
+# Lebenswert Betreuung – Mitarbeiter-Portal TODO
 
 ## Datenbank & Backend
 - [x] Datenbankschema: mitarbeiter, kunden, einsaetze, leistungen, fahrten
@@ -36,3 +36,21 @@
 
 ## Tests
 - [x] Vitest-Tests für tRPC-Router (auth, portal.me, portal.logout, portal.login)
+
+## Phase 4 – Admin-Bereich & Management (Todo-Liste)
+- [x] Branding: "Lebensnah" → "Lebenswert" in allen Dateien
+- [x] Admin-Panel: Mitarbeiterverwaltung (Anlegen, Bearbeiten, Aktivieren/Deaktivieren)
+- [x] Admin-Panel: Kundenverwaltung (Anlegen, Bearbeiten mit Pflegegrad & Paragraph)
+- [x] Admin-Panel: Kunden-Zuordnung zu Mitarbeitern
+- [x] Admin-Panel: Monatsabschluss mit CSV-Export
+- [x] Management-Dashboard: 6 KPI-Karten (Mitarbeiter, Kunden, Einsätze, Stunden, km, Vergütung)
+- [x] Management-Dashboard: Balkendiagramm Einsätze letzte 6 Monate (Recharts)
+- [x] Management-Dashboard: Liniendiagramm Stunden letzte 6 Monate (Recharts)
+- [x] Management-Dashboard: Kreisdiagramme §-Verteilung und Einsatz-Status (Recharts)
+- [x] Management-Dashboard: Audit-Log mit Filter (25/50/100/200 Einträge)
+- [x] Kunden-Detailseite mit allen Einsätzen, Leistungsnachweisen und Fahrten
+- [x] Admin-Menü im TopBar (nur für Admin-Rolle sichtbar, ⚙️-Icon)
+- [x] PWA-Manifest (manifest.json) mit grünem Theme
+- [x] Apple-Touch-Icon Meta-Tags und Inter-Font
+- [x] 21 Vitest-Tests bestanden (0 Fehler)
+- [x] TypeScript: 0 Fehler

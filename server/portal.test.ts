@@ -172,3 +172,41 @@ describe("fahrten – protected", () => {
     ).rejects.toThrow();
   });
 });
+
+// ── kunden – protected route ──────────────────────────
+describe("kunden – protected", () => {
+  it("throws when not authenticated", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    await expect(caller.kunden.list()).rejects.toThrow("Nicht angemeldet");
+  });
+
+  it("detail throws when not authenticated", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    await expect(caller.kunden.detail({ id: 1 })).rejects.toThrow("Nicht angemeldet");
+  });
+});
+
+// ── admin – access control ────────────────────────────
+describe("admin – access control", () => {
+  it("mitarbeiterList throws when not authenticated", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    await expect(caller.admin.mitarbeiterList()).rejects.toThrow("Nicht angemeldet");
+  });
+
+  it("auditLogs throws when not authenticated", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    await expect(caller.admin.auditLogs({ limit: 50 })).rejects.toThrow("Nicht angemeldet");
+  });
+
+  it("statistik throws when not authenticated", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    await expect(caller.admin.statistik({ monat: "2025-01" })).rejects.toThrow("Nicht angemeldet");
+  });
+
+  it("monatsabschluss throws on invalid monat format", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    await expect(
+      caller.admin.monatsabschluss({ monat: "01-2025" })
+    ).rejects.toThrow();
+  });
+});

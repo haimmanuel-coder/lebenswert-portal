@@ -23,7 +23,7 @@ function PortalRouter() {
       >
         <div style={{ textAlign: "center", color: "#fff" }}>
           <div style={{ fontSize: 52, marginBottom: 16 }}>🌿</div>
-          <div style={{ fontSize: 16, fontWeight: 600 }}>Lebensnah Betreuung</div>
+          <div style={{ fontSize: 16, fontWeight: 600 }}>Lebenswert Betreuung</div>
           <div style={{ fontSize: 13, opacity: 0.8, marginTop: 4 }}>Wird geladen…</div>
         </div>
       </div>

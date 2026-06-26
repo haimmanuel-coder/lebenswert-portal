@@ -30,6 +30,7 @@ export default function Leistungsnachweise() {
   const sigRef = useRef<import("@/components/SignatureCanvas").SignatureCanvasRef>(null);
 
   const { data: kunden = [] } = trpc.kunden.list.useQuery();
+  const getKundeName = (id: number) => { const k = kunden.find((c) => c.id === id); return k ? `${k.vorname} ${k.nachname}` : `Kunde #${id}`; };
   const { data: leistungen = [], refetch } = trpc.leistungen.list.useQuery();
   const createLeistung = trpc.leistungen.create.useMutation({
     onSuccess: () => {
@@ -87,7 +88,7 @@ export default function Leistungsnachweise() {
                   {l.status === "freigegeben" ? "✅" : l.status === "offen" ? "📋" : "📄"}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>{l.kundeName || "–"}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{getKundeName(l.kundenId)}</div>
                   <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
                     {fmtMonat(l.monat)} · {l.stunden}h · §{l.paragraph}
                   </div>
