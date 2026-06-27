@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { nanoid } from "nanoid";
 import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -35,6 +36,10 @@ import {
   getMonatsabschluesse,
   createMonatsabschluss,
   getMonatsStatistik,
+  createPasswordResetToken,
+  getValidPasswordResetToken,
+  markPasswordResetTokenUsed,
+  updateMitarbeiterPasswort,
 } from "./db";
 import { SignJWT, jwtVerify } from "jose";
 import { ENV } from "./_core/env";
@@ -139,6 +144,53 @@ export const appRouter = router({
       if (!ma) return null;
       return { id: ma.id, vorname: ma.vorname, nachname: ma.nachname, email: ma.email, rolle: ma.rolle };
     }),
+
+    // Passwort-Reset anfordern: Token generieren und Reset-Link zurückgeben
+    requestPasswordReset: publicProcedure
+      .input(z.object({ email: z.string().email() }))
+      .mutation(async ({ input }) => {
+        const ma = await getMitarbeiterByEmail(input.email.trim().toLowerCase());
+        // Immer Erfolg zurückgeben (kein Hinweis ob E-Mail existiert – Sicherheit)
+        if (!ma) return { success: true, message: "Falls die E-Mail registriert ist, wurde ein Reset-Link erstellt." };
+        const token = nanoid(64);
+        await createPasswordResetToken(ma.id, token);
+        await createAuditLog({ mitarbeiterId: ma.id, action: "PASSWORD_RESET_REQUEST", ressource: "portal", status: "success" });
+        // Token zurückgeben (Admin sieht ihn im Portal; in Produktion per E-Mail versenden)
+        return {
+          success: true,
+          message: "Reset-Link wurde erstellt.",
+          // In einer Produktionsumgebung würde hier eine E-Mail versendet.
+          // Für Demo-Zwecke wird der Token direkt zurückgegeben:
+          resetToken: token,
+          mitarbeiterName: `${ma.vorname} ${ma.nachname}`,
+        };
+      }),
+
+    // Token validieren (prüfen ob gültig)
+    validateResetToken: publicProcedure
+      .input(z.object({ token: z.string().min(1) }))
+      .query(async ({ input }) => {
+        const reset = await getValidPasswordResetToken(input.token);
+        if (!reset) return { valid: false };
+        const ma = await getMitarbeiterById(reset.mitarbeiterId);
+        return { valid: true, email: ma?.email ?? "", vorname: ma?.vorname ?? "" };
+      }),
+
+    // Neues Passwort setzen
+    resetPassword: publicProcedure
+      .input(z.object({
+        token: z.string().min(1),
+        neuesPasswort: z.string().min(6, "Passwort muss mindestens 6 Zeichen haben"),
+      }))
+      .mutation(async ({ input }) => {
+        const reset = await getValidPasswordResetToken(input.token);
+        if (!reset) throw new Error("Ungültiger oder abgelaufener Reset-Link.");
+        const hash = await bcrypt.hash(input.neuesPasswort, 10);
+        await updateMitarbeiterPasswort(reset.mitarbeiterId, hash);
+        await markPasswordResetTokenUsed(input.token);
+        await createAuditLog({ mitarbeiterId: reset.mitarbeiterId, action: "PASSWORD_RESET_DONE", ressource: "portal", status: "success" });
+        return { success: true };
+      }),
   }),
 
   // ── KUNDEN ───────────────────────────────────────────

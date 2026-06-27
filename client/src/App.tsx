@@ -5,10 +5,17 @@ import { PortalAuthProvider, usePortalAuth } from "./contexts/PortalAuthContext"
 import { TimerProvider } from "./contexts/TimerContext";
 import Login from "./pages/Login";
 import PortalApp from "./pages/PortalApp";
+import ResetPasswort from "./pages/ResetPasswort";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { Route, Switch } from "wouter";
 
 function PortalRouter() {
   const { mitarbeiter, isLoading } = usePortalAuth();
+
+  // Passwort-Reset-Seite ist immer zugänglich (auch ohne Login)
+  if (window.location.pathname === "/reset-passwort") {
+    return <ResetPasswort />;
+  }
 
   if (isLoading) {
     return (
@@ -48,7 +55,10 @@ function App() {
         <TooltipProvider>
           <Toaster position="bottom-center" />
           <PortalAuthProvider>
-            <PortalRouter />
+            <Switch>
+              <Route path="/reset-passwort" component={ResetPasswort} />
+              <Route component={PortalRouter} />
+            </Switch>
           </PortalAuthProvider>
         </TooltipProvider>
       </ThemeProvider>

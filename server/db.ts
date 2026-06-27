@@ -1,6 +1,6 @@
 import { and, eq, gte, lte, desc, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, mitarbeiter, kunden, einsaetze, leistungen, fahrten, auditLogs, kundenZuordnung, monatsabschluesse } from "../drizzle/schema";
+import { InsertUser, users, mitarbeiter, kunden, einsaetze, leistungen, fahrten, auditLogs, kundenZuordnung, monatsabschluesse, passwordResets } from "../drizzle/schema";
 import type { InsertMitarbeiter, InsertKunde, InsertEinsatz, InsertLeistung, InsertFahrt, InsertAuditLog } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -327,4 +327,41 @@ export async function getMonatsStatistik(monat: string) {
     verguetung: fahr.reduce((s, f) => s + parseFloat(String(f.verguetung ?? 0)), 0),
     leistungen: leis.length,
   };
+}
+
+// ── PASSWORD RESET ────────────────────────────────────
+export async function createPasswordResetToken(mitarbeiterId: number, token: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  // Alte ungenutzte Tokens für diesen Mitarbeiter löschen
+  await db.delete(passwordResets).where(
+    and(eq(passwordResets.mitarbeiterId, mitarbeiterId), eq(passwordResets.used, false))
+  );
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 Stunde gültig
+  await db.insert(passwordResets).values({ mitarbeiterId, token, expiresAt, used: false });
+}
+
+export async function getValidPasswordResetToken(token: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(passwordResets).where(
+    and(
+      eq(passwordResets.token, token),
+      eq(passwordResets.used, false),
+      gte(passwordResets.expiresAt, new Date())
+    )
+  ).limit(1);
+  return result[0] ?? null;
+}
+
+export async function markPasswordResetTokenUsed(token: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(passwordResets).set({ used: true }).where(eq(passwordResets.token, token));
+}
+
+export async function updateMitarbeiterPasswort(mitarbeiterId: number, passwortHash: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(mitarbeiter).set({ passwortHash }).where(eq(mitarbeiter.id, mitarbeiterId));
 }

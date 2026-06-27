@@ -157,3 +157,16 @@ export const monatsabschluesse = mysqlTable("monatsabschluesse", {
 });
 
 export type Monatsabschluss = typeof monatsabschluesse.$inferSelect;
+
+// Passwort-Reset-Tokens
+export const passwordResets = mysqlTable("passwordResets", {
+  id: int("id").autoincrement().primaryKey(),
+  mitarbeiterId: int("mitarbeiterId").notNull(),
+  token: varchar("token", { length: 128 }).notNull().unique(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  used: boolean("used").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type PasswordReset = typeof passwordResets.$inferSelect;
+export type InsertPasswordReset = typeof passwordResets.$inferInsert;
