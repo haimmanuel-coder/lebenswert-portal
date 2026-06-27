@@ -61,7 +61,15 @@ async function verifyPortalToken(token: string): Promise<number | null> {
 
 // ── PORTAL PROCEDURE (JWT-Cookie) ─────────────────────
 const portalProcedure = publicProcedure.use(async ({ ctx, next }) => {
-  const token = ctx.req.cookies?.[PORTAL_COOKIE];
+  // 1. Try cookie first
+  let token = ctx.req.cookies?.[PORTAL_COOKIE];
+  // 2. Fallback: Authorization header (Bearer <token>) for localStorage-based auth
+  if (!token) {
+    const authHeader = ctx.req.headers?.['authorization'] as string | undefined;
+    if (authHeader?.startsWith('Bearer ')) {
+      token = authHeader.slice(7);
+    }
+  }
   let mitarbeiterId: number | null = null;
   if (token) mitarbeiterId = await verifyPortalToken(token);
   return next({ ctx: { ...ctx, mitarbeiterId } });
@@ -101,15 +109,18 @@ export const appRouter = router({
         const valid = await bcrypt.compare(input.passwort, ma.passwortHash);
         if (!valid) throw new Error("E-Mail oder Passwort ungültig.");
         const token = await signPortalToken(ma.id);
+        // Set cookie (best-effort) AND return token for localStorage fallback
+        const isSecure = ctx.req.secure || ctx.req.headers['x-forwarded-proto'] === 'https';
         ctx.res.cookie(PORTAL_COOKIE, token, {
           httpOnly: true,
-          secure: ctx.req.protocol === "https",
-          sameSite: "none",
-          path: "/",
+          secure: isSecure,
+          sameSite: isSecure ? 'none' : 'lax',
+          path: '/',
           maxAge: 8 * 60 * 60 * 1000,
         });
         await createAuditLog({ mitarbeiterId: ma.id, action: "LOGIN", ressource: "portal", status: "success" });
-        return { id: ma.id, vorname: ma.vorname, nachname: ma.nachname, email: ma.email, rolle: ma.rolle };
+        // Return token so frontend can store it in localStorage as fallback
+        return { id: ma.id, vorname: ma.vorname, nachname: ma.nachname, email: ma.email, rolle: ma.rolle, token };
       }),
 
     logout: publicProcedure.mutation(async ({ ctx }) => {

@@ -1,5 +1,17 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext } from "react";
 import { trpc } from "@/lib/trpc";
+
+const TOKEN_KEY = "lb_portal_token";
+
+export function getStoredToken(): string | null {
+  try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
+}
+export function setStoredToken(token: string) {
+  try { localStorage.setItem(TOKEN_KEY, token); } catch {}
+}
+export function clearStoredToken() {
+  try { localStorage.removeItem(TOKEN_KEY); } catch {}
+}
 
 interface MitarbeiterInfo {
   id: number;
@@ -14,26 +26,36 @@ interface PortalAuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   logout: () => void;
-  refetch: () => void;
+  refetch: () => Promise<unknown>;
 }
 
 const PortalAuthContext = createContext<PortalAuthContextType | null>(null);
 
 export function PortalAuthProvider({ children }: { children: React.ReactNode }) {
+  const utils = trpc.useUtils();
+
   const { data, isLoading, refetch } = trpc.portal.me.useQuery(undefined, {
     retry: false,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
+    refetchOnMount: true,
   });
 
   const logoutMutation = trpc.portal.logout.useMutation({
-    onSuccess: () => {
-      refetch();
+    onSuccess: async () => {
+      clearStoredToken();
+      await utils.portal.me.invalidate();
+      await refetch();
     },
   });
 
   const logout = useCallback(() => {
     logoutMutation.mutate();
   }, [logoutMutation]);
+
+  const doRefetch = useCallback(async () => {
+    await utils.portal.me.invalidate();
+    return refetch();
+  }, [refetch, utils.portal.me]);
 
   return (
     <PortalAuthContext.Provider
@@ -42,7 +64,7 @@ export function PortalAuthProvider({ children }: { children: React.ReactNode }) 
         isLoading,
         isAuthenticated: !!data,
         logout,
-        refetch,
+        refetch: doRefetch,
       }}
     >
       {children}

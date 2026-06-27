@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { usePortalAuth } from "@/contexts/PortalAuthContext";
+import { setStoredToken } from "@/contexts/PortalAuthContext";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -9,8 +10,14 @@ export default function Login() {
   const { refetch } = usePortalAuth();
 
   const loginMutation = trpc.portal.login.useMutation({
-    onSuccess: () => {
-      refetch();
+    onSuccess: async (data) => {
+      // Store token in localStorage so Authorization header is sent on all requests
+      if (data.token) {
+        setStoredToken(data.token);
+      }
+      // Small delay then refetch – token is now in localStorage
+      await new Promise((r) => setTimeout(r, 100));
+      await refetch();
     },
     onError: (e) => {
       setError(e.message || "E-Mail oder Passwort ungültig.");
