@@ -195,3 +195,22 @@
 - [x] Monats-Statistik (Gesamt, Erledigt, Geplant, Verpasst)
 - [x] Tages-Detail-Karte beim Klick auf einen Tag
 - [x] Navigation: Menüpunkt "Einsatz-Kalender" im Admin-Menü (blau)
+
+## Phase 13 – Kundendaten CRUD & Onboarding-Tour
+
+### Kundendaten CRUD (Frontend-Lücken)
+- [x] Kundenliste.tsx komplett neu: Anlegen-Sheet (4 Abschnitte: Stammdaten, Adresse, Kontakt, Pflege/Kostentraeger)
+- [x] Bearbeiten-Sheet mit Budget-Feldern (§45b, §45a, §39)
+- [x] Deaktivieren-Button (Admin-only, Bestätigungsdialog)
+- [x] KPI-Karten (Gesamt, Budget §45b, Budget §39, Kritisch)
+- [x] Suche, Filter (PG, Paragraph) und Sortierung (A-Z, PG, Budget)
+- [x] Loading/Error-States mit Retry-Button
+
+### Onboarding-Tour
+- [x] OnboardingTour.tsx mit 8 Schritten (Willkommen, Navigation, Einsatz, Leistungsnachweis, Unterschrift, Fahrt, Offline, Hilfe)
+- [x] Fortschrittsbalken, Schritt-Punkte, Zurueck/Weiter-Navigation
+- [x] Tipp-Box (gelb) und Aktion-Box (gruen) pro Schritt
+- [x] Automatischer Start beim ersten Login (localStorage-Flag)
+- [x] '?'-Hilfe-Button in TopBar zum manuellen Neustart
+- [x] useOnboardingTour-Hook fuer programmatischen Zugriff
+- [x] Integration in PortalApp.tsx

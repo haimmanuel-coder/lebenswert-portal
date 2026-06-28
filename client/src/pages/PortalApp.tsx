@@ -18,6 +18,7 @@ import NeukundenAufnahme from "./NeukundenAufnahme";
 import Kalender from "./Kalender";
 import BottomSheet from "@/components/BottomSheet";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
+import OnboardingTour, { useOnboardingTour } from "@/components/OnboardingTour";
 
 type PageId = "home" | "einsaetze" | "zeit" | "lnw" | "fahrt" | "admin" | "management" | "kunden" | "kostentraeger" | "textbausteine" | "export" | "fuehrerschein" | "neukundenaufnahme" | "kalender";
 
@@ -41,6 +42,7 @@ export default function PortalApp() {
 
   const isAdmin = mitarbeiter?.rolle === "admin";
   const { isOnline, offlineCount } = useOfflineSync();
+  const { show: showTour, startTour, closeTour } = useOnboardingTour();
 
   const initials = mitarbeiter
     ? (mitarbeiter.vorname[0] + mitarbeiter.nachname[0]).toUpperCase()
@@ -136,6 +138,14 @@ export default function PortalApp() {
               ⚙️
             </button>
           )}
+          {/* Hilfe / Tour-Button */}
+          <button
+            onClick={startTour}
+            title="Hilfe & Onboarding-Tour starten"
+            style={{ background: "none", border: "1.5px solid #e5e7eb", fontSize: 14, cursor: "pointer", padding: "4px 8px", borderRadius: 8, color: "#6b7280", fontWeight: 700 }}
+          >
+            ?
+          </button>
           <button
             onClick={logout}
             title="Abmelden"
@@ -437,6 +447,9 @@ export default function PortalApp() {
           </div>
         </BottomSheet>
       )}
+
+      {/* Onboarding-Tour */}
+      <OnboardingTour forceShow={showTour} onClose={closeTour} />
     </div>
   );
 }
