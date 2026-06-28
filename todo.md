@@ -159,3 +159,17 @@
 - [x] Frontend: useOfflineSync-Hook für Online/Offline-Erkennung
 - [x] Offline-Fallback-Seite (offline.html)
 - [x] SW-Registrierung in index.html
+
+## Phase 11 – VAPID-Secrets & Kunden-Unterschrift
+
+### Feature 1: VAPID-Keys als Umgebungsvariablen
+- [x] VAPID_PUBLIC_KEY und VAPID_PRIVATE_KEY als Secrets hinterlegen
+- [x] Hartcodierte Keys aus server/webpush.ts entfernen (ENV.vapidPublicKey/vapidPrivateKey)
+- [x] Fehler-Handling wenn Keys fehlen (graceful disable)
+- [x] 4 neue Vitest-Tests für VAPID-Key-Validierung
+
+### Feature 2: Kunden-Unterschrift beim Einsatz-Abschluss
+- [x] Zweites SignatureCanvas (grüner Rahmen) im Einsatz-Abschluss-Sheet
+- [x] unterschriftKunde-Wert an updateStatus-Mutation übergeben
+- [x] Kunden-Unterschrift auch im Leistungsnachweis-Einreich-Sheet
+- [x] pdfGenerator.ts: Kunden-Unterschrift bereits im PDF-Layout integriert

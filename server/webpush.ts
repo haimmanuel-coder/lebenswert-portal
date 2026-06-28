@@ -1,16 +1,30 @@
 import webpush from "web-push";
+import { ENV } from "./_core/env";
 
-// VAPID-Keys (generiert für Lebenswert Betreuung)
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || "BJ1QN3XM_zQi3_CFlurX4QE_qYMKfwNXhUHgUphp3EM_SnuSF5LINkeZyHv-iEX5_mf1qWbm7orrB9w4cHXYd80";
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || "rLLaOCihvWZlg5LUCNTfoqQiM7anP2_HQ5ew56m6UPY";
+// VAPID-Keys aus Umgebungsvariablen (niemals hartcodiert)
+const VAPID_PUBLIC_KEY = ENV.vapidPublicKey;
+const VAPID_PRIVATE_KEY = ENV.vapidPrivateKey;
 
-webpush.setVapidDetails(
-  "mailto:admin@lebenswert-betreuung.de",
-  VAPID_PUBLIC_KEY,
-  VAPID_PRIVATE_KEY
-);
+let webpushReady = false;
+
+if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+  try {
+    webpush.setVapidDetails(
+      "mailto:admin@lebenswert-betreuung.de",
+      VAPID_PUBLIC_KEY,
+      VAPID_PRIVATE_KEY
+    );
+    webpushReady = true;
+    console.log("[WebPush] VAPID-Keys erfolgreich geladen");
+  } catch (err) {
+    console.error("[WebPush] Ungültige VAPID-Keys:", err);
+  }
+} else {
+  console.warn("[WebPush] VAPID_PUBLIC_KEY oder VAPID_PRIVATE_KEY fehlen – Push-Benachrichtigungen deaktiviert");
+}
 
 export const VAPID_PUBLIC = VAPID_PUBLIC_KEY;
+export const IS_PUSH_READY = webpushReady;
 
 export interface PushSubscriptionData {
   endpoint: string;
@@ -22,6 +36,10 @@ export async function sendPushNotification(
   subscription: PushSubscriptionData,
   payload: { title: string; body: string; icon?: string; badge?: string; url?: string }
 ): Promise<boolean> {
+  if (!webpushReady) {
+    console.warn("[WebPush] Push nicht verfügbar – VAPID-Keys fehlen");
+    return false;
+  }
   try {
     await webpush.sendNotification(
       {
@@ -41,7 +59,7 @@ export async function sendPushNotification(
     );
     return true;
   } catch (err: any) {
-    console.warn("[WebPush] Failed to send:", err?.statusCode, err?.message);
+    console.warn("[WebPush] Senden fehlgeschlagen:", err?.statusCode, err?.message);
     return false;
   }
 }
@@ -52,6 +70,7 @@ export async function sendBudgetWarnungPush(
   paragraph: string,
   restBudget: number
 ): Promise<number> {
+  if (!webpushReady) return 0;
   let sent = 0;
   for (const sub of subscriptions) {
     const ok = await sendPushNotification(sub, {

@@ -30,6 +30,7 @@ export default function Leistungsnachweise() {
   const [anzahl, setAnzahl] = useState("4");
   const [bemerkung, setBemerkung] = useState("");
   const sigRef = useRef<import("@/components/SignatureCanvas").SignatureCanvasRef>(null);
+  const sigKundeRef = useRef<import("@/components/SignatureCanvas").SignatureCanvasRef>(null);
 
   const { data: kunden = [] } = trpc.kunden.list.useQuery();
   const getKundeName = (id: number) => { const k = kunden.find((c) => c.id === id); return k ? `${k.vorname} ${k.nachname}` : `Kunde #${id}`; };
@@ -41,6 +42,7 @@ export default function Leistungsnachweise() {
       setSheetOpen(false);
       setKundenId(""); setStunden("8"); setAnzahl("4"); setBemerkung("");
       sigRef.current?.clear();
+      sigKundeRef.current?.clear();
     },
     onError: (e) => toast.error("❌ " + e.message),
   });
@@ -57,7 +59,8 @@ export default function Leistungsnachweise() {
       stunden: parseFloat(stunden) || 0,
       anzahlEinsaetze: parseInt(anzahl) || 1,
       bemerkung,
-      unterschriftLeister: sigRef.current?.toDataURL() ?? undefined,
+      unterschriftLeister: (sigRef.current?.isEmpty() ? undefined : sigRef.current?.toDataURL()) ?? undefined,
+      unterschriftKunde: (sigKundeRef.current?.isEmpty() ? undefined : sigKundeRef.current?.toDataURL()) ?? undefined,
     });
   };
 
@@ -194,9 +197,20 @@ export default function Leistungsnachweise() {
         </div>
 
         <div style={{ marginBottom: 14 }}>
-          <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>Unterschrift</label>
-          <SignatureCanvas ref={sigRef} height={140} />
-          <button onClick={() => sigRef.current?.clear()} style={{ marginTop: 8, padding: "7px 12px", background: "#f4f6f3", color: "#6b7280", border: "2px solid #e5e7eb", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Löschen</button>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>Unterschrift Mitarbeiter</label>
+          <SignatureCanvas ref={sigRef} height={120} />
+          <button onClick={() => sigRef.current?.clear()} style={{ marginTop: 6, padding: "6px 12px", background: "#f4f6f3", color: "#6b7280", border: "2px solid #e5e7eb", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Löschen</button>
+        </div>
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>
+            Unterschrift Kunde
+            <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 400, color: "#9ca3af", textTransform: "none" }}>(optional)</span>
+          </label>
+          <div style={{ background: "#f0fdf4", border: "2px solid #86efac", borderRadius: 10, padding: "10px 10px 6px", marginBottom: 2 }}>
+            <div style={{ fontSize: 11, color: "#166534", marginBottom: 6, fontWeight: 600 }}>Bitte Kunden hier unterschreiben lassen:</div>
+            <SignatureCanvas ref={sigKundeRef} height={120} />
+          </div>
+          <button onClick={() => sigKundeRef.current?.clear()} style={{ marginTop: 6, padding: "6px 12px", background: "#f4f6f3", color: "#6b7280", border: "2px solid #e5e7eb", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Löschen</button>
         </div>
 
         {/* Betragsvorschau */}
