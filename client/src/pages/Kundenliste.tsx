@@ -273,8 +273,28 @@ function KundenDetailSheet({ k, onClose }: { k: KundeDetail; onClose: () => void
 }
 
 export default function Kundenliste() {
-  const { data: kundenRaw = [] } = trpc.kunden.list.useQuery();
+  const { data: kundenRaw = [], isLoading, isError } = trpc.kunden.list.useQuery();
   const kunden = kundenRaw as KundeDetail[];
+
+  if (isLoading) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 300, gap: 16 }}>
+        <div style={{ width: 48, height: 48, border: "4px solid #e5e7eb", borderTopColor: "#4a8c3f", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+        <div style={{ fontSize: 14, color: "#6b7280" }}>Kundenliste wird geladen...</div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div style={{ textAlign: "center", padding: "40px 20px" }}>
+        <div style={{ fontSize: 40, marginBottom: 8 }}>⚠️</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: "#ef4444" }}>Fehler beim Laden</div>
+        <div style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>Bitte Seite neu laden oder Administrator kontaktieren.</div>
+      </div>
+    );
+  }
 
   const [suche, setSuche] = useState("");
   const [filterPG, setFilterPG] = useState<string>("alle");

@@ -56,9 +56,9 @@
 - [x] TypeScript: 0 Fehler
 
 ## Phase 5 – Kundenliste aus PDF
-- [ ] Kundendatenbank: Felder für Versicherungsnummer, Kostenträger, Geburtsdatum, Telefon, Mobil erweitern
-- [ ] Kundendatenbank: Budget-Felder §45b, §45a, §39 mit letzter Abrechnung ergänzen
-- [ ] Alle 60 Kunden aus PDF-Kundenliste in Datenbank importieren
-- [ ] Budget-Daten (§45b, §45a, §39) aus PDF-Budgetliste importieren
-- [ ] Kunden-Seite in WebApp mit vollständigen Stammdaten und aktuellem Budget anzeigen
-- [ ] Budget-Übersicht: Verbrauchtes vs. verfügbares Budget je Paragraph
+- [x] Kundendatenbank: Felder für Versicherungsnummer, Kostenträger, Geburtsdatum, Telefon, Mobil erweitern
+- [x] Kundendatenbank: Budget-Felder §45b, §45a, §39 mit letzter Abrechnung ergänzen
+- [x] Alle 70 Kunden aus PDF-Kundenliste in Datenbank importiert
+- [x] Budget-Daten (§45b, §45a, §39) aus PDF-Budgetliste importiert
+- [x] Kunden-Seite in WebApp mit vollständigen Stammdaten und aktuellem Budget anzeigen
+- [x] Budget-Übersicht: Verbrauchtes vs. verfügbares Budget je Paragraph mit Balken-Anzeige
