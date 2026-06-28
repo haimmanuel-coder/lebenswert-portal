@@ -210,7 +210,12 @@ export default function Einsaetze() {
         <div style={{ marginBottom: 14 }}>
           <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>Unterschrift Mitarbeiter</label>
           <SignatureCanvas ref={sigRef} height={130} />
-          <button onClick={() => sigRef.current?.clear()} style={{ marginTop: 6, padding: "6px 12px", background: "#f4f6f3", color: "#6b7280", border: "2px solid #e5e7eb", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Löschen</button>
+          <button
+            onClick={() => { sigRef.current?.clear(); }}
+            style={{ marginTop: 8, padding: "7px 14px", background: "#fff", color: "#dc2626", border: "2px solid #fca5a5", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}
+          >
+            <span style={{ fontSize: 14 }}>↺</span> Zurücksetzen
+          </button>
         </div>
         <div style={{ marginBottom: 14 }}>
           <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>
@@ -221,7 +226,12 @@ export default function Einsaetze() {
             <div style={{ fontSize: 11, color: "#166534", marginBottom: 6, fontWeight: 600 }}>Bitte Kunden hier unterschreiben lassen:</div>
             <SignatureCanvas ref={sigKundeRef} height={130} />
           </div>
-          <button onClick={() => sigKundeRef.current?.clear()} style={{ marginTop: 6, padding: "6px 12px", background: "#f4f6f3", color: "#6b7280", border: "2px solid #e5e7eb", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Löschen</button>
+          <button
+            onClick={() => { sigKundeRef.current?.clear(); }}
+            style={{ marginTop: 8, padding: "7px 14px", background: "#fff", color: "#dc2626", border: "2px solid #fca5a5", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}
+          >
+            <span style={{ fontSize: 14 }}>↺</span> Zurücksetzen
+          </button>
         </div>
         <div style={{ display: "flex", gap: 10, marginTop: 20, paddingTop: 16, borderTop: "1px solid #e5e7eb" }}>
           <button onClick={() => setAbschlussOpen(false)} style={{ flex: 1, padding: 13, background: "#f4f6f3", color: "#6b7280", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>Abbrechen</button>
