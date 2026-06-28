@@ -54,3 +54,11 @@
 - [x] Apple-Touch-Icon Meta-Tags und Inter-Font
 - [x] 21 Vitest-Tests bestanden (0 Fehler)
 - [x] TypeScript: 0 Fehler
+
+## Phase 5 – Kundenliste aus PDF
+- [ ] Kundendatenbank: Felder für Versicherungsnummer, Kostenträger, Geburtsdatum, Telefon, Mobil erweitern
+- [ ] Kundendatenbank: Budget-Felder §45b, §45a, §39 mit letzter Abrechnung ergänzen
+- [ ] Alle 60 Kunden aus PDF-Kundenliste in Datenbank importieren
+- [ ] Budget-Daten (§45b, §45a, §39) aus PDF-Budgetliste importieren
+- [ ] Kunden-Seite in WebApp mit vollständigen Stammdaten und aktuellem Budget anzeigen
+- [ ] Budget-Übersicht: Verbrauchtes vs. verfügbares Budget je Paragraph

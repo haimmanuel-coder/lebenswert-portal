@@ -9,9 +9,10 @@ import Fahrtenbuch from "./Fahrtenbuch";
 import AdminPanel from "./AdminPanel";
 import ManagementDashboard from "./ManagementDashboard";
 import KundenDetail from "./KundenDetail";
+import Kundenliste from "./Kundenliste";
 import BottomSheet from "@/components/BottomSheet";
 
-type PageId = "home" | "einsaetze" | "zeit" | "lnw" | "fahrt" | "admin" | "management";
+type PageId = "home" | "einsaetze" | "zeit" | "lnw" | "fahrt" | "admin" | "management" | "kunden";
 
 const pages: { id: PageId; icon: string; label: string }[] = [
   { id: "home", icon: "🏠", label: "Home" },
@@ -49,6 +50,7 @@ export default function PortalApp() {
       case "fahrt": return <Fahrtenbuch />;
       case "admin": return <AdminPanel />;
       case "management": return <ManagementDashboard />;
+      case "kunden": return <Kundenliste />;
       default: return <Dashboard />;
     }
   };
@@ -231,6 +233,16 @@ export default function PortalApp() {
               <div style={{ textAlign: "left" }}>
                 <div>Management-Dashboard</div>
                 <div style={{ fontSize: 11, opacity: 0.85 }}>KPIs, Diagramme, Audit-Log</div>
+              </div>
+            </button>
+            <button
+              onClick={() => { setMenuOpen(false); navTo("kunden"); }}
+              style={{ padding: 13, background: "#e8f5e4", color: "#4a8c3f", border: "2px solid #4a8c3f", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
+            >
+              <span>👥</span>
+              <div style={{ textAlign: "left" }}>
+                <div>Kundenliste</div>
+                <div style={{ fontSize: 11, opacity: 0.8 }}>Alle Kunden mit Budget-Übersicht</div>
               </div>
             </button>
             <button

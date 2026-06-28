@@ -64,7 +64,7 @@ export default function KundenDetail({ kundenId, onBack }: Props) {
       <div style={{ background: "linear-gradient(135deg, #4a8c3f, #2a9d8f)", borderRadius: 16, padding: 20, marginBottom: 16, color: "#fff" }}>
         <div style={{ fontSize: 36, marginBottom: 8 }}>🏠</div>
         <div style={{ fontSize: 20, fontWeight: 800 }}>{kunde.vorname} {kunde.nachname}</div>
-        {kunde.adresse && <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>📍 {kunde.adresse}</div>}
+        {(kunde.strasse || kunde.ort) && <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>📍 {[kunde.strasse, kunde.plz, kunde.ort].filter(Boolean).join(', ')}</div>}
         {kunde.telefon && <div style={{ fontSize: 13, opacity: 0.9, marginTop: 2 }}>📞 {kunde.telefon}</div>}
         <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
           {kunde.pflegegrad && (

@@ -47,7 +47,7 @@ export default function AdminPanel() {
 
   // ── Kunden ───────────────────────────────────────────
   const [kdSheet, setKdSheet] = useState(false);
-  const [editKd, setEditKd] = useState<{ id: number; vorname: string; nachname: string; adresse?: string | null; telefon?: string | null; pflegegrad?: number | null; paragraph?: string | null } | null>(null);
+  const [editKd, setEditKd] = useState<{ id: number; vorname: string; nachname: string; strasse?: string | null; plz?: string | null; ort?: string | null; telefon?: string | null; pflegegrad?: number | null; paragraph?: string | null } | null>(null);
   const [kdVorname, setKdVorname] = useState("");
   const [kdNachname, setKdNachname] = useState("");
   const [kdAdresse, setKdAdresse] = useState("");
@@ -68,14 +68,14 @@ export default function AdminPanel() {
   const resetKdForm = () => { setEditKd(null); setKdVorname(""); setKdNachname(""); setKdAdresse(""); setKdTelefon(""); setKdPflegegrad("2"); setKdParagraph("45b"); };
   const openEditKd = (k: typeof kundenList[0]) => {
     setEditKd(k);
-    setKdVorname(k.vorname); setKdNachname(k.nachname); setKdAdresse(k.adresse || "");
+    setKdVorname(k.vorname); setKdNachname(k.nachname); setKdAdresse(k.strasse || "");
     setKdTelefon(k.telefon || ""); setKdPflegegrad(String(k.pflegegrad || 2));
     setKdParagraph((k.paragraph as "45b" | "45a" | "39" | "privat") || "45b");
     setKdSheet(true);
   };
   const saveKd = () => {
     if (!kdVorname || !kdNachname) { toast.error("Pflichtfelder ausfüllen!"); return; }
-    const data = { vorname: kdVorname, nachname: kdNachname, adresse: kdAdresse, telefon: kdTelefon, pflegegrad: parseInt(kdPflegegrad), paragraph: kdParagraph };
+    const data = { vorname: kdVorname, nachname: kdNachname, strasse: kdAdresse, telefon: kdTelefon, pflegegrad: parseInt(kdPflegegrad), paragraph: kdParagraph };
     if (editKd) updateKd.mutate({ id: editKd.id, ...data });
     else createKd.mutate(data);
   };
@@ -196,7 +196,7 @@ export default function AdminPanel() {
                 <div style={{ width: 42, height: 42, borderRadius: "50%", background: "#e8f5e4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>🏠</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 700 }}>{k.vorname} {k.nachname}</div>
-                  {k.adresse && <div style={{ fontSize: 12, color: "#6b7280", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>📍 {k.adresse}</div>}
+                  {(k.strasse || k.ort) && <div style={{ fontSize: 12, color: "#6b7280", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>📍 {[k.strasse, k.plz, k.ort].filter(Boolean).join(', ')}</div>}
                   <div style={{ fontSize: 12, color: "#6b7280", display: "flex", gap: 6, flexWrap: "wrap", marginTop: 2 }}>
                     {k.pflegegrad && <span style={{ padding: "1px 6px", borderRadius: 10, background: "#e0f2f0", color: "#2a9d8f", fontWeight: 700 }}>PG {k.pflegegrad}</span>}
                     {k.paragraph && <span style={{ padding: "1px 6px", borderRadius: 10, background: "#e8f5e4", color: "#4a8c3f", fontWeight: 700 }}>§{k.paragraph}</span>}
