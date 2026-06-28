@@ -187,7 +187,66 @@ export async function updateEinsatzStatus(
 ) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
+  // Einsatz aktualisieren
   await db.update(einsaetze).set({ ...data }).where(and(eq(einsaetze.id, id), eq(einsaetze.mitarbeiterId, mitarbeiterId)));
+  // Bei Abschluss: Budget des Kunden automatisch aktualisieren
+  if (data.status === "abgeschlossen") {
+    const result = await db.select().from(einsaetze).where(eq(einsaetze.id, id)).limit(1);
+    const einsatz = result[0];
+    if (einsatz && einsatz.kundenId && einsatz.dauerStunden) {
+      const stunden = parseFloat(String(einsatz.dauerStunden));
+      const stundensatz = 28; // €/Stunde Standardsatz
+      const betrag = stunden * stundensatz;
+      const paragraph = einsatz.paragraph;
+      const kundeResult = await db.select().from(kunden).where(eq(kunden.id, einsatz.kundenId)).limit(1);
+      const kunde = kundeResult[0];
+      if (kunde) {
+        if (paragraph === "45b") {
+          const neu = parseFloat(String(kunde.verbraucht45b ?? 0)) + betrag;
+          await db.update(kunden).set({ verbraucht45b: String(Math.round(neu * 100) / 100) }).where(eq(kunden.id, einsatz.kundenId));
+        } else if (paragraph === "45a") {
+          const neu = parseFloat(String(kunde.verbraucht45a ?? 0)) + betrag;
+          await db.update(kunden).set({ verbraucht45a: String(Math.round(neu * 100) / 100) }).where(eq(kunden.id, einsatz.kundenId));
+        } else if (paragraph === "39") {
+          const neu = parseFloat(String(kunde.verbraucht39 ?? 0)) + betrag;
+          await db.update(kunden).set({ verbraucht39: String(Math.round(neu * 100) / 100) }).where(eq(kunden.id, einsatz.kundenId));
+        }
+      }
+    }
+  }
+}
+
+// Budget eines Kunden manuell aktualisieren (Admin)
+export async function updateKundeBudget(
+  id: number,
+  data: {
+    budget45b?: string; verbraucht45b?: string; letzteAbrechnung45b?: string;
+    budget45a?: string; verbraucht45a?: string; letzteAbrechnung45a?: string;
+    budget39?: string; verbraucht39?: string; letzteAbrechnung39?: string;
+  }
+) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(kunden).set(data).where(eq(kunden.id, id));
+}
+
+// Kunden mit kritischem Budget (< 10% verfügbar in mind. einem Paragraph)
+export async function getKundenMitBudgetWarnung() {
+  const db = await getDb();
+  if (!db) return [];
+  const alle = await db.select().from(kunden).where(eq(kunden.aktiv, 1));
+  return alle.filter(k => {
+    const b45b = parseFloat(String(k.budget45b ?? 0));
+    const v45b = parseFloat(String(k.verbraucht45b ?? 0));
+    const b45a = parseFloat(String(k.budget45a ?? 0));
+    const v45a = parseFloat(String(k.verbraucht45a ?? 0));
+    const b39 = parseFloat(String(k.budget39 ?? 0));
+    const v39 = parseFloat(String(k.verbraucht39 ?? 0));
+    const kritisch45b = b45b > 0 && (b45b - v45b) / b45b < 0.10;
+    const kritisch45a = b45a > 0 && (b45a - v45a) / b45a < 0.10;
+    const kritisch39 = b39 > 0 && (b39 - v39) / b39 < 0.10;
+    return kritisch45b || kritisch45a || kritisch39;
+  });
 }
 
 // ── LEISTUNGEN ───────────────────────────────────────

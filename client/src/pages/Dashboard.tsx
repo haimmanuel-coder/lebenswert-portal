@@ -39,8 +39,18 @@ export default function Dashboard() {
   const { data: einsaetze = [], refetch } = trpc.einsaetze.list.useQuery();
   const { data: kunden = [] } = trpc.kunden.list.useQuery();
   const getKundeName = (id: number) => { const k = kunden.find((c) => c.id === id); return k ? `${k.vorname} ${k.nachname}` : `Kunde #${id}`; };
+  const utils = trpc.useUtils();
+  const { data: budgetWarnungenRaw = [] } = trpc.kunden.budgetWarnungen.useQuery();
+  const anzahlBudgetWarnungen = (budgetWarnungenRaw as { id: number }[]).length;
   const updateStatus = trpc.einsaetze.updateStatus.useMutation({
-    onSuccess: () => { refetch(); toast.success("✅ Einsatz abgeschlossen"); setAbschlussOpen(false); },
+    onSuccess: () => {
+      refetch();
+      // Budget-Daten nach Einsatz-Abschluss aktualisieren
+      utils.kunden.list.invalidate();
+      utils.kunden.budgetWarnungen.invalidate();
+      toast.success("✅ Einsatz abgeschlossen – Budget aktualisiert");
+      setAbschlussOpen(false);
+    },
     onError: (e) => toast.error("❌ " + e.message),
   });
 
@@ -160,6 +170,15 @@ export default function Dashboard() {
           <div className="kpi-value">{kmMonth.toFixed(0)}</div>
           <div className="kpi-label">km diesen Monat</div>
         </div>
+        {anzahlBudgetWarnungen > 0 && (
+          <div style={{ gridColumn: "1 / -1", background: "linear-gradient(135deg, #ef4444, #dc2626)", borderRadius: 12, padding: "12px 16px", color: "#fff", display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ fontSize: 28 }}>⚠️</div>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 900 }}>{anzahlBudgetWarnungen} Kunden mit kritischem Budget</div>
+              <div style={{ fontSize: 12, opacity: 0.9, marginTop: 2 }}>Weniger als 10 % des Jahresbudgets verfügbar – bitte prüfen</div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Heute */}

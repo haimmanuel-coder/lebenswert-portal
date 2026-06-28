@@ -69,7 +69,7 @@ function BudgetBar({ budget, verbraucht, label }: { budget: number; verbraucht: 
   );
 }
 
-function KundenKarte({ k, onClick }: { k: KundeDetail; onClick: () => void }) {
+function KundenKarte({ k, onClick, istKritisch }: { k: KundeDetail; onClick: () => void; istKritisch?: boolean }) {
   const b45b = toNum(k.budget45b);
   const v45b = toNum(k.verbraucht45b);
   const b45a = toNum(k.budget45a);
@@ -99,7 +99,10 @@ function KundenKarte({ k, onClick }: { k: KundeDetail; onClick: () => void }) {
     >
       {/* Kopfzeile */}
       <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: hasBudget ? 12 : 0 }}>
-        <div style={{ width: 44, height: 44, borderRadius: "50%", background: `${pgColors[pg]}22`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>🏠</div>
+        <div style={{ position: "relative", flexShrink: 0 }}>
+          <div style={{ width: 44, height: 44, borderRadius: "50%", background: `${pgColors[pg]}22`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>🏠</div>
+          {istKritisch && <div style={{ position: "absolute", top: -4, right: -4, width: 16, height: 16, background: "#ef4444", borderRadius: "50%", border: "2px solid #fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#fff", fontWeight: 900 }}>!</div>}
+        </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 15, fontWeight: 800, color: "#1f2937" }}>{k.vorname} {k.nachname}</div>
           {k.geburtsdatum && (
@@ -275,6 +278,8 @@ function KundenDetailSheet({ k, onClose }: { k: KundeDetail; onClose: () => void
 export default function Kundenliste() {
   const { data: kundenRaw = [], isLoading, isError } = trpc.kunden.list.useQuery();
   const kunden = kundenRaw as KundeDetail[];
+  const { data: warnungenRaw = [] } = trpc.kunden.budgetWarnungen.useQuery();
+  const kritischeKundenIds = new Set((warnungenRaw as { id: number }[]).map(k => k.id));
 
   if (isLoading) {
     return (
@@ -327,6 +332,7 @@ export default function Kundenliste() {
   const gesamtVerbraucht45b = kunden.reduce((s, k) => s + toNum(k.verbraucht45b), 0);
   const gesamtBudget39 = kunden.reduce((s, k) => s + toNum(k.budget39), 0);
   const mitBudget = kunden.filter(k => toNum(k.budget45b) > 0 || toNum(k.budget45a) > 0 || toNum(k.budget39) > 0).length;
+  const anzahlKritisch = kritischeKundenIds.size;
 
   const inputStyle: React.CSSProperties = { width: "100%", padding: "10px 12px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, outline: "none", boxSizing: "border-box", background: "#fff" };
   const selectStyle: React.CSSProperties = { padding: "8px 10px", border: "2px solid #e5e7eb", borderRadius: 8, fontSize: 13, outline: "none", background: "#fff", cursor: "pointer" };
@@ -355,9 +361,10 @@ export default function Kundenliste() {
           <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600 }}>Budget §39 gesamt</div>
           <div style={{ fontSize: 18, fontWeight: 900, color: "#2a9d8f", marginTop: 2 }}>{formatEuro(gesamtBudget39)}</div>
         </div>
-        <div style={{ background: "#fff", borderRadius: 12, padding: 14, boxShadow: "0 2px 10px rgba(0,0,0,.08)" }}>
-          <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600 }}>Angezeigt</div>
-          <div style={{ fontSize: 26, fontWeight: 900, color: "#1f2937", marginTop: 2 }}>{gefiltert.length}</div>
+        <div style={{ background: anzahlKritisch > 0 ? "linear-gradient(135deg, #ef4444, #dc2626)" : "#fff", borderRadius: 12, padding: 14, boxShadow: "0 2px 10px rgba(0,0,0,.08)", color: anzahlKritisch > 0 ? "#fff" : "inherit" }}>
+          <div style={{ fontSize: 11, fontWeight: 600, opacity: anzahlKritisch > 0 ? 0.9 : undefined, color: anzahlKritisch > 0 ? undefined : "#6b7280" }}>⚠️ Budget kritisch</div>
+          <div style={{ fontSize: 26, fontWeight: 900, marginTop: 2 }}>{anzahlKritisch}</div>
+          <div style={{ fontSize: 11, marginTop: 2, opacity: 0.85 }}>{anzahlKritisch > 0 ? "Kunden unter 10 %" : "Alle im grünen Bereich"}</div>
           <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>von {kunden.length}</div>
         </div>
       </div>
@@ -401,7 +408,7 @@ export default function Kundenliste() {
         </div>
       ) : (
         gefiltert.map(k => (
-          <KundenKarte key={k.id} k={k} onClick={() => setSelectedKunde(k)} />
+          <KundenKarte key={k.id} k={k} onClick={() => setSelectedKunde(k)} istKritisch={kritischeKundenIds.has(k.id)} />
         ))
       )}
 

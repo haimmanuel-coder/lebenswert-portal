@@ -40,6 +40,8 @@ import {
   getValidPasswordResetToken,
   markPasswordResetTokenUsed,
   updateMitarbeiterPasswort,
+  updateKundeBudget,
+  getKundenMitBudgetWarnung,
 } from "./db";
 import { SignJWT, jwtVerify } from "jose";
 import { ENV } from "./_core/env";
@@ -243,6 +245,44 @@ export const appRouter = router({
         await updateKunde(id, data);
         return { success: true };
       }),
+
+    // Budget eines Kunden manuell aktualisieren (Admin)
+    updateBudget: adminProcedure
+      .input(z.object({
+        id: z.number().int().positive(),
+        budget45b: z.string().optional(),
+        verbraucht45b: z.string().optional(),
+        letzteAbrechnung45b: z.string().optional(),
+        budget45a: z.string().optional(),
+        verbraucht45a: z.string().optional(),
+        letzteAbrechnung45a: z.string().optional(),
+        budget39: z.string().optional(),
+        verbraucht39: z.string().optional(),
+        letzteAbrechnung39: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const { id, ...data } = input;
+        await updateKundeBudget(id, data);
+        await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "UPDATE", ressource: "budget", details: `kundenId=${id}`, status: "success" });
+        return { success: true };
+      }),
+
+    // Kunden mit kritischem Budget (< 10% verfügbar)
+    budgetWarnungen: portalProtected.query(async () => {
+      const warnungen = await getKundenMitBudgetWarnung();
+      return warnungen.map(k => ({
+        id: k.id,
+        vorname: k.vorname,
+        nachname: k.nachname,
+        pflegegrad: k.pflegegrad,
+        budget45b: k.budget45b,
+        verbraucht45b: k.verbraucht45b,
+        budget45a: k.budget45a,
+        verbraucht45a: k.verbraucht45a,
+        budget39: k.budget39,
+        verbraucht39: k.verbraucht39,
+      }));
+    }),
   }),
 
   // ── EINSÄTZE ─────────────────────────────────────────

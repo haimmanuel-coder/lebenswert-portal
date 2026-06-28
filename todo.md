@@ -62,3 +62,12 @@
 - [x] Budget-Daten (§45b, §45a, §39) aus PDF-Budgetliste importiert
 - [x] Kunden-Seite in WebApp mit vollständigen Stammdaten und aktuellem Budget anzeigen
 - [x] Budget-Übersicht: Verbrauchtes vs. verfügbares Budget je Paragraph mit Balken-Anzeige
+
+## Phase 6 – Budget-Features
+- [x] Backend: tRPC-Route kunden.updateBudget (Admin-only)
+- [x] Backend: tRPC-Route kunden.budgetWarnungen (Kunden mit < 10% Restbudget)
+- [x] Backend: Einsatz-Abschluss aktualisiert Budget automatisch (verbraucht45b/45a/39)
+- [x] Admin-Panel: Budget-Bearbeitungs-Sheet je Kunde (§45b, §45a, §39 editierbar)
+- [x] Kundenliste: Roter Badge bei < 10% Restbudget
+- [x] Dashboard: Budget-Warnungs-Karte mit Anzahl kritischer Kunden
+- [x] Tests für alle neuen Routen (21 Tests bestanden)

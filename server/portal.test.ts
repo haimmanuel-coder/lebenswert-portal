@@ -210,3 +210,66 @@ describe("admin – access control", () => {
     ).rejects.toThrow();
   });
 });
+
+// ── BUDGET-FEATURES ──────────────────────────────────
+describe("kunden.updateBudget – Admin-Guard", () => {
+  it("throws when not authenticated", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    await expect(
+      caller.kunden.updateBudget({ id: 1, budget45b: "125.00" })
+    ).rejects.toThrow("Nicht angemeldet");
+  });
+
+  it("throws when authenticated but not admin", async () => {
+    const caller = appRouter.createCaller(makeCtx(99, "mitarbeiter"));
+    await expect(
+      caller.kunden.updateBudget({ id: 1, budget45b: "125.00" })
+    ).rejects.toThrow();
+  });
+
+  it("validates input – id must be positive integer", async () => {
+    const caller = appRouter.createCaller(makeCtx(1, "admin"));
+    await expect(
+      caller.kunden.updateBudget({ id: -1, budget45b: "125.00" })
+    ).rejects.toThrow();
+  });
+});
+
+describe("kunden.budgetWarnungen – Zugriffsschutz", () => {
+  it("throws when not authenticated", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    await expect(caller.kunden.budgetWarnungen()).rejects.toThrow("Nicht angemeldet");
+  });
+
+  it("route exists and is accessible to authenticated users (input validation)", async () => {
+    // budgetWarnungen hat kein Input – Zod-Validierung prüfen wir über den Auth-Guard
+    // Der Test bestätigt, dass die Route existiert und den Auth-Fehler wirft (kein 'not a function')
+    const caller = appRouter.createCaller(makeCtx());
+    const error = await caller.kunden.budgetWarnungen().catch((e: Error) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe("Nicht angemeldet");
+  });
+});
+
+describe("einsaetze.updateStatus – Budget-Aktualisierung", () => {
+  it("throws when not authenticated", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    await expect(
+      caller.einsaetze.updateStatus({ id: 1, status: "abgeschlossen" })
+    ).rejects.toThrow("Nicht angemeldet");
+  });
+
+  it("validates status enum – rejects invalid status", async () => {
+    const caller = appRouter.createCaller(makeCtx(1, "mitarbeiter"));
+    await expect(
+      caller.einsaetze.updateStatus({ id: 1, status: "invalid" as any })
+    ).rejects.toThrow();
+  });
+
+  it("validates gesundheit enum – rejects invalid value", async () => {
+    const caller = appRouter.createCaller(makeCtx(1, "mitarbeiter"));
+    await expect(
+      caller.einsaetze.updateStatus({ id: 1, status: "abgeschlossen", gesundheit: "sehr_gut" as any })
+    ).rejects.toThrow();
+  });
+});

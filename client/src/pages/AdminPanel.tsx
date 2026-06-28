@@ -65,6 +65,42 @@ export default function AdminPanel() {
     onError: (e) => toast.error("❌ " + e.message),
   });
 
+  // Budget-States
+  const [budgetSheet, setBudgetSheet] = useState(false);
+  const [budgetKunde, setBudgetKunde] = useState<{ id: number; vorname: string; nachname: string } | null>(null);
+  const [b45b, setB45b] = useState("");
+  const [v45b, setV45b] = useState("");
+  const [la45b, setLa45b] = useState("");
+  const [b45a, setB45a] = useState("");
+  const [v45a, setV45a] = useState("");
+  const [la45a, setLa45a] = useState("");
+  const [b39, setB39] = useState("");
+  const [v39, setV39] = useState("");
+  const [la39, setLa39] = useState("");
+
+  const updateBudget = trpc.kunden.updateBudget.useMutation({
+    onSuccess: () => { refetchKd(); toast.success("✅ Budget aktualisiert"); setBudgetSheet(false); },
+    onError: (e) => toast.error("❌ " + e.message),
+  });
+
+  const openBudgetSheet = (k: typeof kundenList[0]) => {
+    setBudgetKunde({ id: k.id, vorname: k.vorname, nachname: k.nachname });
+    setB45b(String(k.budget45b ?? "0")); setV45b(String(k.verbraucht45b ?? "0")); setLa45b(k.letzteAbrechnung45b ?? "");
+    setB45a(String(k.budget45a ?? "0")); setV45a(String(k.verbraucht45a ?? "0")); setLa45a(k.letzteAbrechnung45a ?? "");
+    setB39(String(k.budget39 ?? "0")); setV39(String(k.verbraucht39 ?? "0")); setLa39(k.letzteAbrechnung39 ?? "");
+    setBudgetSheet(true);
+  };
+
+  const saveBudget = () => {
+    if (!budgetKunde) return;
+    updateBudget.mutate({
+      id: budgetKunde.id,
+      budget45b: b45b, verbraucht45b: v45b, letzteAbrechnung45b: la45b,
+      budget45a: b45a, verbraucht45a: v45a, letzteAbrechnung45a: la45a,
+      budget39: b39, verbraucht39: v39, letzteAbrechnung39: la39,
+    });
+  };
+
   const resetKdForm = () => { setEditKd(null); setKdVorname(""); setKdNachname(""); setKdAdresse(""); setKdTelefon(""); setKdPflegegrad("2"); setKdParagraph("45b"); };
   const openEditKd = (k: typeof kundenList[0]) => {
     setEditKd(k);
@@ -202,7 +238,10 @@ export default function AdminPanel() {
                     {k.paragraph && <span style={{ padding: "1px 6px", borderRadius: 10, background: "#e8f5e4", color: "#4a8c3f", fontWeight: 700 }}>§{k.paragraph}</span>}
                   </div>
                 </div>
-                <button onClick={() => openEditKd(k)} style={{ padding: "6px 12px", background: "#f3f4f6", color: "#4b5563", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>Bearbeiten</button>
+                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                  <button onClick={() => openBudgetSheet(k)} style={{ padding: "6px 10px", background: "#fef3c7", color: "#92400e", border: "none", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>€ Budget</button>
+                  <button onClick={() => openEditKd(k)} style={{ padding: "6px 12px", background: "#f3f4f6", color: "#4b5563", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Bearbeiten</button>
+                </div>
               </div>
             </div>
           ))}
@@ -387,6 +426,67 @@ export default function AdminPanel() {
         </div>
         <button onClick={saveKd} disabled={createKd.isPending || updateKd.isPending} style={btnGreen}>
           {createKd.isPending || updateKd.isPending ? "Speichern…" : editKd ? "Änderungen speichern" : "Kunde anlegen"}
+        </button>
+      </BottomSheet>
+
+      {/* ── Budget-Sheet ── */}
+      <BottomSheet open={budgetSheet} onClose={() => setBudgetSheet(false)} title={budgetKunde ? `Budget: ${budgetKunde.vorname} ${budgetKunde.nachname}` : "Budget bearbeiten"}>
+        {/* §45b */}
+        <div style={{ background: "#f0fdf4", borderRadius: 10, padding: 12, marginBottom: 10 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#4a8c3f", marginBottom: 8 }}>§45b SGB XI – Entlastungsleistungen</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+            <div>
+              <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 600 }}>Jahresbudget (€)</label>
+              <input type="number" value={b45b} onChange={(e) => setB45b(e.target.value)} style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1fae5", borderRadius: 8, fontSize: 13, boxSizing: "border-box" as const }} placeholder="125.00" />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 600 }}>Verbraucht (€)</label>
+              <input type="number" value={v45b} onChange={(e) => setV45b(e.target.value)} style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1fae5", borderRadius: 8, fontSize: 13, boxSizing: "border-box" as const }} placeholder="0.00" />
+            </div>
+          </div>
+          <div>
+            <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 600 }}>Letzte Abrechnung</label>
+            <input type="date" value={la45b} onChange={(e) => setLa45b(e.target.value)} style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1fae5", borderRadius: 8, fontSize: 13, boxSizing: "border-box" as const }} />
+          </div>
+        </div>
+        {/* §45a */}
+        <div style={{ background: "#eff6ff", borderRadius: 10, padding: 12, marginBottom: 10 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#1d4ed8", marginBottom: 8 }}>§45a SGB XI – Angebote zur Unterstützung</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+            <div>
+              <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 600 }}>Jahresbudget (€)</label>
+              <input type="number" value={b45a} onChange={(e) => setB45a(e.target.value)} style={{ width: "100%", padding: "8px 10px", border: "1px solid #bfdbfe", borderRadius: 8, fontSize: 13, boxSizing: "border-box" as const }} placeholder="0.00" />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 600 }}>Verbraucht (€)</label>
+              <input type="number" value={v45a} onChange={(e) => setV45a(e.target.value)} style={{ width: "100%", padding: "8px 10px", border: "1px solid #bfdbfe", borderRadius: 8, fontSize: 13, boxSizing: "border-box" as const }} placeholder="0.00" />
+            </div>
+          </div>
+          <div>
+            <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 600 }}>Letzte Abrechnung</label>
+            <input type="date" value={la45a} onChange={(e) => setLa45a(e.target.value)} style={{ width: "100%", padding: "8px 10px", border: "1px solid #bfdbfe", borderRadius: 8, fontSize: 13, boxSizing: "border-box" as const }} />
+          </div>
+        </div>
+        {/* §39 */}
+        <div style={{ background: "#fdf4ff", borderRadius: 10, padding: 12, marginBottom: 14 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#7c3aed", marginBottom: 8 }}>§39 SGB XI – Verhinderungspflege</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+            <div>
+              <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 600 }}>Jahresbudget (€)</label>
+              <input type="number" value={b39} onChange={(e) => setB39(e.target.value)} style={{ width: "100%", padding: "8px 10px", border: "1px solid #e9d5ff", borderRadius: 8, fontSize: 13, boxSizing: "border-box" as const }} placeholder="0.00" />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 600 }}>Verbraucht (€)</label>
+              <input type="number" value={v39} onChange={(e) => setV39(e.target.value)} style={{ width: "100%", padding: "8px 10px", border: "1px solid #e9d5ff", borderRadius: 8, fontSize: 13, boxSizing: "border-box" as const }} placeholder="0.00" />
+            </div>
+          </div>
+          <div>
+            <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 600 }}>Letzte Abrechnung</label>
+            <input type="date" value={la39} onChange={(e) => setLa39(e.target.value)} style={{ width: "100%", padding: "8px 10px", border: "1px solid #e9d5ff", borderRadius: 8, fontSize: 13, boxSizing: "border-box" as const }} />
+          </div>
+        </div>
+        <button onClick={saveBudget} disabled={updateBudget.isPending} style={{ width: "100%", padding: "13px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+          {updateBudget.isPending ? "Speichern…" : "✅ Budget speichern"}
         </button>
       </BottomSheet>
     </div>
