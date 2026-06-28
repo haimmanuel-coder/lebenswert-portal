@@ -14,6 +14,7 @@ import Kostentraeger from "./Kostentraeger";
 import Textbausteine from "./Textbausteine";
 import ExportCenter from "./ExportCenter";
 import BottomSheet from "@/components/BottomSheet";
+import { useOfflineSync } from "@/hooks/useOfflineSync";
 
 type PageId = "home" | "einsaetze" | "zeit" | "lnw" | "fahrt" | "admin" | "management" | "kunden" | "kostentraeger" | "textbausteine" | "export";
 
@@ -36,6 +37,7 @@ export default function PortalApp() {
   const offenCount = leistungen.filter((l) => l.status === "offen").length;
 
   const isAdmin = mitarbeiter?.rolle === "admin";
+  const { isOnline, offlineCount } = useOfflineSync();
 
   const initials = mitarbeiter
     ? (mitarbeiter.vorname[0] + mitarbeiter.nachname[0]).toUpperCase()
@@ -99,6 +101,16 @@ export default function PortalApp() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+          {/* Offline-Indikator */}
+          {!isOnline && (
+            <div
+              title={offlineCount > 0 ? `${offlineCount} Einsatz/Einsätze offline gespeichert` : "Offline-Modus aktiv"}
+              style={{ background: "#fef3c7", border: "1.5px solid #f59e0b", borderRadius: 8, padding: "3px 8px", display: "flex", alignItems: "center", gap: 4 }}
+            >
+              <span style={{ fontSize: 13 }}>📡</span>
+              <span style={{ fontSize: 10, fontWeight: 700, color: "#92400e" }}>OFFLINE{offlineCount > 0 ? ` (${offlineCount})` : ""}</span>
+            </div>
+          )}
           {/* Budget-Warnung Indikator */}
           {warnungen.length > 0 && (
             <button

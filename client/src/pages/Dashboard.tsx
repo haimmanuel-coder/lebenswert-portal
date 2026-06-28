@@ -2,10 +2,10 @@ import { usePortalAuth } from "@/contexts/PortalAuthContext";
 import { useTimer } from "@/contexts/TimerContext";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import BottomSheet from "@/components/BottomSheet";
 import SignatureCanvas from "@/components/SignatureCanvas";
-import { useRef } from "react";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 function fmtDate(d: string | Date | null) {
   if (!d) return "–";
@@ -41,6 +41,7 @@ export default function Dashboard() {
   const getKundeName = (id: number) => { const k = kunden.find((c) => c.id === id); return k ? `${k.vorname} ${k.nachname}` : `Kunde #${id}`; };
   const utils = trpc.useUtils();
   const { data: budgetWarnungenRaw = [] } = trpc.kunden.budgetWarnungen.useQuery();
+  const push = usePushNotifications();
   const anzahlBudgetWarnungen = (budgetWarnungenRaw as { id: number }[]).length;
   const updateStatus = trpc.einsaetze.updateStatus.useMutation({
     onSuccess: () => {
@@ -180,6 +181,31 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* Push-Benachrichtigungen Opt-In */}
+      {push.isSupported && !push.isSubscribed && push.permission !== "denied" && (
+        <div style={{ background: "linear-gradient(135deg, #4a8c3f, #2d6a27)", borderRadius: 12, padding: "14px 16px", marginBottom: 12, display: "flex", alignItems: "center", gap: 12, color: "#fff" }}>
+          <div style={{ fontSize: 26 }}>🔔</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 800 }}>Push-Benachrichtigungen</div>
+            <div style={{ fontSize: 12, opacity: 0.9, marginTop: 2 }}>Erhalte sofort Alarm bei kritischen Budget-Warnungen</div>
+          </div>
+          <button
+            onClick={push.subscribe}
+            disabled={push.isLoading}
+            style={{ background: "#fff", color: "#4a8c3f", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700, cursor: push.isLoading ? "wait" : "pointer", whiteSpace: "nowrap" }}
+          >
+            {push.isLoading ? "..." : "Aktivieren"}
+          </button>
+        </div>
+      )}
+      {push.isSupported && push.isSubscribed && (
+        <div style={{ background: "#e8f5e4", borderRadius: 12, padding: "10px 16px", marginBottom: 12, display: "flex", alignItems: "center", gap: 10, border: "1.5px solid #4a8c3f" }}>
+          <span style={{ fontSize: 18 }}>✅</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#4a8c3f", flex: 1 }}>Push-Benachrichtigungen aktiv</span>
+          <button onClick={push.unsubscribe} style={{ background: "none", border: "none", fontSize: 12, color: "#6b7280", cursor: "pointer" }}>Deaktivieren</button>
+        </div>
+      )}
 
       {/* Heute */}
       <div className="card" style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 10px rgba(0,0,0,.08)", padding: 16, marginBottom: 12 }}>

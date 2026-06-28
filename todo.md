@@ -133,3 +133,29 @@
 - [x] PortalApp.tsx: navTo("ebrief") → navTo("export") korrigiert
 - [x] 0 TypeScript-Fehler (npx tsc --noEmit)
 - [x] 29 Tests bestanden (pnpm test)
+
+## Phase 10 – Push-Benachrichtigungen, PDF-Export, Offline-Modus
+
+### Feature 1: Push-Benachrichtigungen für Budget-Warnungen
+- [x] Backend: Web Push VAPID-Keys generieren und speichern
+- [x] Backend: pushSubscriptions-Tabelle in DB anlegen
+- [x] Backend: tRPC-Route push.subscribe (Subscription speichern)
+- [x] Backend: tRPC-Route push.sendBudgetWarnung (Admin-only, sendet Push an alle)
+- [x] Backend: Automatischer Push beim Einsatz-Abschluss wenn Budget < 10%
+- [x] Frontend: Push-Berechtigung anfordern (Notification API)
+- [x] Frontend: Service Worker für Push-Empfang registrieren (push-sw.js)
+- [x] Frontend: Push-Opt-In-Karte im Dashboard
+
+### Feature 2: PDF-Export mit Unterschrift und Stempel
+- [x] Frontend: pdfGenerator.ts mit jsPDF (kein Backend nötig)
+- [x] Frontend: PDF-Download-Button in jedem Leistungsnachweis
+- [x] PDF enthält: Kunden-Stammdaten, Paragraph, Stunden, Datum, Unterschrift-Bild, Lebenswert-Stempel
+
+### Feature 3: Offline-Modus mit Service Worker (PWA)
+- [x] Service Worker: sw.js mit Cache-First für Assets, Network-First für API
+- [x] Service Worker: IndexedDB Queue für Offline-Einsätze
+- [x] Service Worker: Background Sync beim nächsten Online-Gang
+- [x] Frontend: Offline-Indikator (gelbes Badge) in TopBar
+- [x] Frontend: useOfflineSync-Hook für Online/Offline-Erkennung
+- [x] Offline-Fallback-Seite (offline.html)
+- [x] SW-Registrierung in index.html

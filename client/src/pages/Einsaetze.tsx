@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import BottomSheet from "@/components/BottomSheet";
 import SignatureCanvas from "@/components/SignatureCanvas";
+import { saveOfflineEinsatz } from "@/hooks/useOfflineSync";
 
 function fmtDate(d: string | Date | null) {
   if (!d) return "–";
@@ -39,7 +40,26 @@ export default function Einsaetze() {
   const getKundeName = (id: number) => { const k = kunden.find((c) => c.id === id); return k ? `${k.vorname} ${k.nachname}` : `Kunde #${id}`; };
   const updateStatus = trpc.einsaetze.updateStatus.useMutation({
     onSuccess: () => { refetch(); toast.success("✅ Einsatz abgeschlossen"); setAbschlussOpen(false); },
-    onError: (e) => toast.error("❌ " + e.message),
+    onError: async (e) => {
+      // Bei Netzwerkfehler: Offline-Queue nutzen
+      if (!navigator.onLine && activeEinsatz) {
+        try {
+          const kunde = kunden.find((k) => k.id === activeEinsatz.id);
+          await saveOfflineEinsatz({
+            kundenId: activeEinsatz.id,
+            datum: activeEinsatz.datum,
+            paragraph: "45b",
+            bericht,
+          });
+          toast.warning("📡 Offline gespeichert – wird beim nächsten Online-Gang synchronisiert");
+          setAbschlussOpen(false);
+        } catch {
+          toast.error("❌ " + e.message);
+        }
+      } else {
+        toast.error("❌ " + e.message);
+      }
+    },
   });
 
   const filtered = filter === "alle" ? einsaetze : einsaetze.filter((e) => e.status === filter);

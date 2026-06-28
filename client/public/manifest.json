@@ -23,5 +23,8 @@
   ],
   "categories": ["health", "productivity", "business"],
   "lang": "de",
-  "dir": "ltr"
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "scope": "/",
+  "id": "/"
 }

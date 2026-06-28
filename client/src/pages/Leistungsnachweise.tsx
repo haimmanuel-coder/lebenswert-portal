@@ -1,8 +1,10 @@
 import { useState, useRef } from "react";
+import { usePortalAuth } from "@/contexts/PortalAuthContext";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import BottomSheet from "@/components/BottomSheet";
 import SignatureCanvas from "@/components/SignatureCanvas";
+import { generateLeistungsnachweisPdf } from "@/lib/pdfGenerator";
 
 function fmtMonat(m: string) {
   if (!m) return "–";
@@ -59,6 +61,36 @@ export default function Leistungsnachweise() {
     });
   };
 
+  const { mitarbeiter } = usePortalAuth();
+
+  const handlePdfDownload = (l: typeof leistungen[0]) => {
+    const kunde = kunden.find((k) => k.id === l.kundenId);
+    if (!kunde) { toast.error("Kundendaten nicht gefunden"); return; }
+    generateLeistungsnachweisPdf({
+      kundeVorname: kunde.vorname,
+      kundeNachname: kunde.nachname,
+      kundeGeburtsdatum: (kunde as any).geburtsdatum,
+      kundeStrasse: kunde.strasse,
+      kundePlz: kunde.plz,
+      kundeOrt: kunde.ort,
+      kundeVersicherungsnummer: (kunde as any).versicherungsnummer,
+      kundeKostentraeger: (kunde as any).kostentraeger,
+      kundePflegegrad: kunde.pflegegrad,
+      monat: l.monat,
+      paragraph: l.paragraph,
+      stunden: parseFloat(String(l.stunden || 0)),
+      anzahlEinsaetze: l.anzahlEinsaetze || 1,
+      betrag: parseFloat(String(l.betrag || 0)),
+      status: l.status,
+      createdAt: l.createdAt,
+      unterschriftMitarbeiter: (l as any).unterschriftLeister,
+      unterschriftKunde: (l as any).unterschriftKunde,
+      mitarbeiterName: mitarbeiter ? `${mitarbeiter.vorname} ${mitarbeiter.nachname}` : "Mitarbeiter",
+      mitarbeiterPosition: (mitarbeiter as any)?.position,
+    });
+    toast.success("📄 PDF wird heruntergeladen...");
+  };
+
   const sorted = [...leistungen].sort((a, b) => b.monat.localeCompare(a.monat));
 
   return (
@@ -98,6 +130,13 @@ export default function Leistungsnachweise() {
                   <span style={{ display: "inline-block", padding: "3px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: sc.bg, color: sc.color }}>
                     {l.status}
                   </span>
+                  <button
+                    onClick={() => handlePdfDownload(l)}
+                    title="PDF herunterladen"
+                    style={{ display: "block", marginTop: 6, padding: "4px 10px", background: "#e8f5e4", color: "#4a8c3f", border: "1.5px solid #4a8c3f", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer" }}
+                  >
+                    📄 PDF
+                  </button>
                 </div>
               </div>
             </div>

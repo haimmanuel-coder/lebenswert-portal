@@ -64,6 +64,13 @@ import {
 } from "./db";
 import { SignJWT, jwtVerify } from "jose";
 import { ENV } from "./_core/env";
+import { VAPID_PUBLIC, sendBudgetWarnungPush } from "./webpush";
+import {
+  savePushSubscription,
+  deletePushSubscription,
+  getAllPushSubscriptions,
+  getPushSubscriptionsByMitarbeiter,
+} from "./db";
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "lebenswert-secret-key");
 const PORTAL_COOKIE = "lb_portal_token";
@@ -326,6 +333,29 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         await updateEinsatzStatus(input.id, ctx.mitarbeiterId, input);
         await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "UPDATE", ressource: "einsatz", details: `id=${input.id} status=${input.status}`, status: "success" });
+
+        // Automatischer Push bei Budget-Warnung nach Einsatz-Abschluss
+        if (input.status === "abgeschlossen") {
+          try {
+            const warnungen = await getKundenMitBudgetWarnung();
+            if (warnungen.length > 0) {
+              const subs = await getAllPushSubscriptions();
+              if (subs.length > 0) {
+                for (const kunde of warnungen) {
+                  await sendBudgetWarnungPush(
+                    subs as any[],
+                    `${kunde.vorname} ${kunde.nachname}`,
+                    (kunde as any).paragraph || "45b",
+                    parseFloat(String((kunde as any).restbudget || 0))
+                  );
+                }
+              }
+            }
+          } catch (pushErr) {
+            console.warn("[Push] Budget-Warnung fehlgeschlagen:", pushErr);
+          }
+        }
+
         return { success: true };
       }),
   }),
@@ -994,6 +1024,55 @@ export const appRouter = router({
           fahrenCsv: input.typ !== "leistungen" ? fahrenCsv : null,
           stats: { leistungen: leis.length, fahrten: fahr.length },
         };
+      }),
+  }),
+
+  // ── PUSH-BENACHRICHTIGUNGEN ───────────────────────────
+  push: router({
+    // VAPID Public Key für Frontend
+    vapidKey: publicProcedure.query(() => ({ publicKey: VAPID_PUBLIC })),
+
+    // Subscription speichern
+    subscribe: portalProtected
+      .input(z.object({
+        endpoint: z.string().url(),
+        p256dh: z.string().min(1),
+        auth: z.string().min(1),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await savePushSubscription({
+          mitarbeiterId: ctx.mitarbeiterId,
+          endpoint: input.endpoint,
+          p256dh: input.p256dh,
+          auth: input.auth,
+        });
+        return { success: true };
+      }),
+
+    // Subscription entfernen
+    unsubscribe: portalProtected
+      .input(z.object({ endpoint: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        await deletePushSubscription(ctx.mitarbeiterId, input.endpoint);
+        return { success: true };
+      }),
+
+    // Budget-Warnung manuell an alle senden (Admin)
+    sendBudgetWarnung: adminProcedure
+      .input(z.object({
+        kundenName: z.string(),
+        paragraph: z.string(),
+        restBudget: z.number(),
+      }))
+      .mutation(async ({ input }) => {
+        const subs = await getAllPushSubscriptions();
+        const sent = await sendBudgetWarnungPush(
+          subs.map(s => ({ endpoint: s.endpoint, p256dh: s.p256dh, auth: s.auth })),
+          input.kundenName,
+          input.paragraph,
+          input.restBudget
+        );
+        return { success: true, sent };
       }),
   }),
 });

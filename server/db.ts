@@ -1,7 +1,7 @@
 import { and, eq, gte, lte, desc, sql, like, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, mitarbeiter, kunden, einsaetze, leistungen, fahrten, auditLogs, kundenZuordnung, monatsabschluesse, passwordResets, kostentraeger, textbausteine, ebriefLog } from "../drizzle/schema";
-import type { InsertMitarbeiter, InsertKunde, InsertEinsatz, InsertLeistung, InsertFahrt, InsertAuditLog, InsertKostentraeger, InsertTextbaustein, InsertEbriefLog } from "../drizzle/schema";
+import { InsertUser, users, mitarbeiter, kunden, einsaetze, leistungen, fahrten, auditLogs, kundenZuordnung, monatsabschluesse, passwordResets, kostentraeger, textbausteine, ebriefLog, pushSubscriptions } from "../drizzle/schema";
+import type { InsertMitarbeiter, InsertKunde, InsertEinsatz, InsertLeistung, InsertFahrt, InsertAuditLog, InsertKostentraeger, InsertTextbaustein, InsertEbriefLog, InsertPushSubscription } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -593,4 +593,39 @@ export async function getFahrtenFuerExport(monat: string, mitarbeiterId?: number
   const conditions = [sql`DATE_FORMAT(${fahrten.datum}, '%Y-%m') = ${monat}`];
   if (mitarbeiterId) conditions.push(eq(fahrten.mitarbeiterId, mitarbeiterId));
   return db.select().from(fahrten).where(and(...conditions)).orderBy(fahrten.datum);
+}
+
+// ── PUSH-SUBSCRIPTIONS ────────────────────────────────
+export async function savePushSubscription(data: InsertPushSubscription) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  // Vorhandene Subscription für diesen Mitarbeiter+Endpoint ersetzen
+  await db.delete(pushSubscriptions)
+    .where(and(
+      eq(pushSubscriptions.mitarbeiterId, data.mitarbeiterId),
+      eq(pushSubscriptions.endpoint, data.endpoint)
+    ));
+  await db.insert(pushSubscriptions).values(data);
+}
+
+export async function deletePushSubscription(mitarbeiterId: number, endpoint: string) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(pushSubscriptions)
+    .where(and(
+      eq(pushSubscriptions.mitarbeiterId, mitarbeiterId),
+      eq(pushSubscriptions.endpoint, endpoint)
+    ));
+}
+
+export async function getAllPushSubscriptions() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(pushSubscriptions);
+}
+
+export async function getPushSubscriptionsByMitarbeiter(mitarbeiterId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(pushSubscriptions).where(eq(pushSubscriptions.mitarbeiterId, mitarbeiterId));
 }
