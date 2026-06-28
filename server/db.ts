@@ -1,7 +1,14 @@
-import { and, eq, gte, lte, desc, sql } from "drizzle-orm";
+import { and, eq, gte, lte, desc, sql, like, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, mitarbeiter, kunden, einsaetze, leistungen, fahrten, auditLogs, kundenZuordnung, monatsabschluesse, passwordResets } from "../drizzle/schema";
-import type { InsertMitarbeiter, InsertKunde, InsertEinsatz, InsertLeistung, InsertFahrt, InsertAuditLog } from "../drizzle/schema";
+import {
+  InsertUser, users, mitarbeiter, kunden, einsaetze, leistungen, fahrten,
+  auditLogs, kundenZuordnung, monatsabschluesse, passwordResets,
+  kostentraeger, textbausteine, ebriefLog,
+} from "../drizzle/schema";
+import type {
+  InsertMitarbeiter, InsertKunde, InsertEinsatz, InsertLeistung, InsertFahrt,
+  InsertAuditLog, InsertKostentraeger, InsertTextbaustein, InsertEbriefLog,
+} from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -198,19 +205,25 @@ export async function createEinsatz(data: InsertEinsatz & { mitarbeiterId: numbe
 export async function updateEinsatzStatus(
   id: number,
   mitarbeiterId: number,
-  data: { status: "abgeschlossen" | "abgesagt"; bericht?: string; gesundheit?: "gut" | "stabil" | "auffaellig" | "kritisch"; bemerkung?: string; unterschriftMitarbeiter?: string }
+  data: {
+    status: "abgeschlossen" | "abgesagt";
+    bericht?: string;
+    gesundheit?: "gut" | "stabil" | "auffaellig" | "kritisch";
+    bemerkung?: string;
+    unterschriftMitarbeiter?: string;
+    unterschriftKunde?: string;
+    textbausteinIds?: string;
+  }
 ) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  // Einsatz aktualisieren
   await db.update(einsaetze).set({ ...data }).where(and(eq(einsaetze.id, id), eq(einsaetze.mitarbeiterId, mitarbeiterId)));
-  // Bei Abschluss: Budget des Kunden automatisch aktualisieren
   if (data.status === "abgeschlossen") {
     const result = await db.select().from(einsaetze).where(eq(einsaetze.id, id)).limit(1);
     const einsatz = result[0];
     if (einsatz && einsatz.kundenId && einsatz.dauerStunden) {
       const stunden = parseFloat(String(einsatz.dauerStunden));
-      const stundensatz = 28; // €/Stunde Standardsatz
+      const stundensatz = 28;
       const betrag = stunden * stundensatz;
       const paragraph = einsatz.paragraph;
       const kundeResult = await db.select().from(kunden).where(eq(kunden.id, einsatz.kundenId)).limit(1);
@@ -299,7 +312,14 @@ export async function createLeistung(data: InsertLeistung & { mitarbeiterId: num
     status: "offen",
     bemerkung: data.bemerkung,
     unterschriftLeister: data.unterschriftLeister,
+    unterschriftKunde: (data as any).unterschriftKunde,
   });
+}
+
+export async function updateLeistungStatus(id: number, status: "offen" | "pruefung" | "freigegeben" | "versendet") {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(leistungen).set({ status }).where(eq(leistungen.id, id));
 }
 
 // ── FAHRTEN ──────────────────────────────────────────
@@ -321,11 +341,18 @@ export async function getFahrtenByKunde(kundenId: number) {
   return db.select().from(fahrten).where(eq(fahrten.kundenId, kundenId)).orderBy(desc(fahrten.datum));
 }
 
+export async function getFahrtenByMonat(monat: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(fahrten).where(eq(fahrten.monat, monat)).orderBy(desc(fahrten.datum));
+}
+
 export async function createFahrt(data: InsertFahrt & { mitarbeiterId: number }) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   const rate = data.typ === "sonder" ? 0.35 : 0.30;
   const verguetung = (parseFloat(String(data.kilometer)) * rate).toFixed(2);
+  const monat = (data.datum as unknown as string).slice(0, 7);
   await db.insert(fahrten).values({
     mitarbeiterId: data.mitarbeiterId,
     kundenId: data.kundenId ?? null,
@@ -333,10 +360,112 @@ export async function createFahrt(data: InsertFahrt & { mitarbeiterId: number })
     vonOrt: data.vonOrt,
     nachOrt: data.nachOrt,
     kilometer: String(data.kilometer),
+    kilometerHin: (data as any).kilometerHin ? String((data as any).kilometerHin) : null,
+    kilometerRueck: (data as any).kilometerRueck ? String((data as any).kilometerRueck) : null,
     typ: data.typ,
     zweck: data.zweck,
     verguetung,
+    abrechnungsStatus: "offen",
+    monat,
   });
+}
+
+export async function updateFahrtStatus(id: number, status: "offen" | "eingereicht" | "erstattet") {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(fahrten).set({ abrechnungsStatus: status }).where(eq(fahrten.id, id));
+}
+
+// ── MODUL 1: KOSTENTRÄGER ────────────────────────────
+export async function getAllKostentraeger() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(kostentraeger).where(eq(kostentraeger.aktiv, 1)).orderBy(kostentraeger.name);
+}
+
+export async function getKostentraegerById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(kostentraeger).where(eq(kostentraeger.id, id)).limit(1);
+  return result[0] ?? null;
+}
+
+export async function searchKostentraeger(query: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(kostentraeger).where(
+    and(
+      eq(kostentraeger.aktiv, 1),
+      or(
+        like(kostentraeger.name, `%${query}%`),
+        like(kostentraeger.ikNummer, `%${query}%`),
+        like(kostentraeger.ort, `%${query}%`)
+      )
+    )
+  ).orderBy(kostentraeger.name).limit(20);
+}
+
+export async function createKostentraeger(data: InsertKostentraeger) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.insert(kostentraeger).values(data);
+}
+
+export async function updateKostentraeger(id: number, data: Partial<InsertKostentraeger>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(kostentraeger).set(data).where(eq(kostentraeger.id, id));
+}
+
+// ── MODUL 3: TEXTBAUSTEINE ───────────────────────────
+export async function getAllTextbausteine() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(textbausteine).where(eq(textbausteine.aktiv, 1)).orderBy(textbausteine.kategorie, textbausteine.titel);
+}
+
+export async function getTextbausteinById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(textbausteine).where(eq(textbausteine.id, id)).limit(1);
+  return result[0] ?? null;
+}
+
+export async function createTextbaustein(data: InsertTextbaustein) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.insert(textbausteine).values(data);
+}
+
+export async function updateTextbaustein(id: number, data: Partial<InsertTextbaustein>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(textbausteine).set(data).where(eq(textbausteine.id, id));
+}
+
+export async function deleteTextbaustein(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(textbausteine).set({ aktiv: 0 }).where(eq(textbausteine.id, id));
+}
+
+// ── MODUL 5: E-BRIEF LOG ─────────────────────────────
+export async function createEbriefLog(data: InsertEbriefLog) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.insert(ebriefLog).values(data);
+}
+
+export async function getEbriefLog(limit = 100) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(ebriefLog).orderBy(desc(ebriefLog.createdAt)).limit(limit);
+}
+
+export async function getEbriefLogByKunde(kundenId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(ebriefLog).where(eq(ebriefLog.kundenId, kundenId)).orderBy(desc(ebriefLog.createdAt));
 }
 
 // ── AUDIT-LOG ─────────────────────────────────────────
@@ -407,11 +536,10 @@ export async function getMonatsStatistik(monat: string) {
 export async function createPasswordResetToken(mitarbeiterId: number, token: string): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  // Alte ungenutzte Tokens für diesen Mitarbeiter löschen
   await db.delete(passwordResets).where(
     and(eq(passwordResets.mitarbeiterId, mitarbeiterId), eq(passwordResets.used, false))
   );
-  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 Stunde gültig
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
   await db.insert(passwordResets).values({ mitarbeiterId, token, expiresAt, used: false });
 }
 
@@ -419,11 +547,7 @@ export async function getValidPasswordResetToken(token: string) {
   const db = await getDb();
   if (!db) return null;
   const result = await db.select().from(passwordResets).where(
-    and(
-      eq(passwordResets.token, token),
-      eq(passwordResets.used, false),
-      gte(passwordResets.expiresAt, new Date())
-    )
+    and(eq(passwordResets.token, token), eq(passwordResets.used, false), gte(passwordResets.expiresAt, new Date()))
   ).limit(1);
   return result[0] ?? null;
 }

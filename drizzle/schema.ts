@@ -63,7 +63,30 @@ export const mitarbeiter = mysqlTable("mitarbeiter", {
 export type Mitarbeiter = typeof mitarbeiter.$inferSelect;
 export type InsertMitarbeiter = typeof mitarbeiter.$inferInsert;
 
-// Kunden (Pflegebedürftige)
+// ── MODUL 1: KOSTENTRÄGER-SYSTEM ─────────────────────────────────
+export const kostentraeger = mysqlTable("kostentraeger", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 200 }).notNull(),
+  ikNummer: varchar("ikNummer", { length: 20 }),
+  typ: mysqlEnum("typ", ["pflegekasse", "krankenkasse", "beihilfe", "privat", "sonstige"]).default("pflegekasse").notNull(),
+  strasse: varchar("strasse", { length: 200 }),
+  plz: varchar("plz", { length: 10 }),
+  ort: varchar("ort", { length: 100 }),
+  telefon: varchar("telefon", { length: 50 }),
+  email: varchar("email", { length: 320 }),
+  fax: varchar("fax", { length: 50 }),
+  abrechnungsart: mysqlEnum("abrechnungsart", ["dta", "email", "ebrief", "post", "manuell"]).default("email"),
+  abrechnungsstelleId: int("abrechnungsstelleId"),
+  notizen: text("notizen"),
+  aktiv: int("aktiv").default(1).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Kostentraeger = typeof kostentraeger.$inferSelect;
+export type InsertKostentraeger = typeof kostentraeger.$inferInsert;
+
+// Kunden (Pflegebedürftige) – erweitert mit Kostenträger-Verknüpfung
 export const kunden = mysqlTable("kunden", {
   id: int("id").autoincrement().primaryKey(),
   vorname: varchar("vorname", { length: 100 }).notNull(),
@@ -75,8 +98,11 @@ export const kunden = mysqlTable("kunden", {
   telefon: varchar("telefon", { length: 50 }),
   mobil: varchar("mobil", { length: 50 }),
   email: varchar("email", { length: 320 }),
-  kostentraeger: varchar("kostentraeger", { length: 200 }),
+  // Kostenträger-Verknüpfung (Modul 1)
+  kostentraegerId: int("kostentraegerId"),
+  kostentraeger: varchar("kostentraeger", { length: 200 }), // Freitext-Fallback
   versicherungsnummer: varchar("versicherungsnummer", { length: 50 }),
+  // Pflegegrad & Paragraph (Modul 2)
   pflegegrad: int("pflegegrad").default(2),
   paragraph: mysqlEnum("paragraph", ["45b", "45a", "39", "privat"]).default("45b"),
   // Budget §45b SGB XI
@@ -91,6 +117,10 @@ export const kunden = mysqlTable("kunden", {
   budget39: decimal("budget39", { precision: 10, scale: 2 }).default("0"),
   verbraucht39: decimal("verbraucht39", { precision: 10, scale: 2 }).default("0"),
   letzteAbrechnung39: varchar("letzteAbrechnung39", { length: 10 }),
+  // Dauervollmacht (Modul 2)
+  vollmachtErteilt: boolean("vollmachtErteilt").default(false),
+  vollmachtDatum: date("vollmachtDatum"),
+  vollmachtSignatur: text("vollmachtSignatur"),
   aktiv: int("aktiv").default(1).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
@@ -108,7 +138,21 @@ export const kundenZuordnung = mysqlTable("kundenZuordnung", {
 
 export type KundenZuordnung = typeof kundenZuordnung.$inferSelect;
 
-// Einsätze
+// ── MODUL 3: TEXTBAUSTEINE ────────────────────────────────────────
+export const textbausteine = mysqlTable("textbausteine", {
+  id: int("id").autoincrement().primaryKey(),
+  titel: varchar("titel", { length: 200 }).notNull(),
+  inhalt: text("inhalt").notNull(),
+  kategorie: mysqlEnum("kategorie", ["bericht", "gesundheit", "aktivitaet", "bemerkung", "sonstiges"]).default("bericht").notNull(),
+  paragraph: mysqlEnum("paragraph", ["45b", "45a", "39", "alle"]).default("alle"),
+  aktiv: int("aktiv").default(1).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Textbaustein = typeof textbausteine.$inferSelect;
+export type InsertTextbaustein = typeof textbausteine.$inferInsert;
+
+// Einsätze – erweitert mit Kunden-Unterschrift (Modul 3)
 export const einsaetze = mysqlTable("einsaetze", {
   id: int("id").autoincrement().primaryKey(),
   mitarbeiterId: int("mitarbeiterId").notNull(),
@@ -121,7 +165,11 @@ export const einsaetze = mysqlTable("einsaetze", {
   bericht: text("bericht"),
   gesundheit: mysqlEnum("gesundheit", ["gut", "stabil", "auffaellig", "kritisch"]),
   bemerkung: text("bemerkung"),
+  // Unterschriften (Modul 3)
   unterschriftMitarbeiter: text("unterschriftMitarbeiter"),
+  unterschriftKunde: text("unterschriftKunde"),
+  // Textbaustein-Referenz (Modul 3)
+  textbausteinIds: text("textbausteinIds"), // JSON-Array der verwendeten Bausteine
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -129,7 +177,7 @@ export const einsaetze = mysqlTable("einsaetze", {
 export type Einsatz = typeof einsaetze.$inferSelect;
 export type InsertEinsatz = typeof einsaetze.$inferInsert;
 
-// Leistungsnachweise
+// Leistungsnachweise – erweitert mit Kunden-Unterschrift (Modul 3)
 export const leistungen = mysqlTable("leistungen", {
   id: int("id").autoincrement().primaryKey(),
   mitarbeiterId: int("mitarbeiterId").notNull(),
@@ -142,6 +190,7 @@ export const leistungen = mysqlTable("leistungen", {
   status: mysqlEnum("status", ["offen", "pruefung", "freigegeben", "versendet"]).default("offen").notNull(),
   bemerkung: text("bemerkung"),
   unterschriftLeister: text("unterschriftLeister"),
+  unterschriftKunde: text("unterschriftKunde"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -149,7 +198,7 @@ export const leistungen = mysqlTable("leistungen", {
 export type Leistung = typeof leistungen.$inferSelect;
 export type InsertLeistung = typeof leistungen.$inferInsert;
 
-// Fahrtenbuch
+// ── MODUL 4: FAHRTKOSTEN-ABRECHNUNG ──────────────────────────────
 export const fahrten = mysqlTable("fahrten", {
   id: int("id").autoincrement().primaryKey(),
   mitarbeiterId: int("mitarbeiterId").notNull(),
@@ -158,20 +207,46 @@ export const fahrten = mysqlTable("fahrten", {
   vonOrt: varchar("vonOrt", { length: 200 }).notNull(),
   nachOrt: varchar("nachOrt", { length: 200 }).notNull(),
   kilometer: decimal("kilometer", { precision: 6, scale: 1 }).notNull(),
+  // Automatisch berechnete Felder (Modul 4)
+  kilometerHin: decimal("kilometerHin", { precision: 6, scale: 1 }),
+  kilometerRueck: decimal("kilometerRueck", { precision: 6, scale: 1 }),
   typ: mysqlEnum("typ", ["normal", "sonder"]).default("normal").notNull(),
   zweck: varchar("zweck", { length: 255 }),
   verguetung: decimal("verguetung", { precision: 7, scale: 2 }).default("0"),
+  // Abrechnungsstatus (Modul 4)
+  abrechnungsStatus: mysqlEnum("abrechnungsStatus", ["offen", "eingereicht", "erstattet"]).default("offen"),
+  monat: varchar("monat", { length: 7 }), // YYYY-MM für Monatsabrechnung
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
 export type Fahrt = typeof fahrten.$inferSelect;
 export type InsertFahrt = typeof fahrten.$inferInsert;
 
+// ── MODUL 5: E-BRIEF LOG ──────────────────────────────────────────
+export const ebriefLog = mysqlTable("ebriefLog", {
+  id: int("id").autoincrement().primaryKey(),
+  mitarbeiterId: int("mitarbeiterId").notNull(),
+  kundenId: int("kundenId"),
+  kostentraegerId: int("kostentraegerId"),
+  betreff: varchar("betreff", { length: 300 }).notNull(),
+  inhalt: text("inhalt"),
+  empfaenger: varchar("empfaenger", { length: 320 }).notNull(),
+  typ: mysqlEnum("typ", ["leistungsnachweis", "protokoll", "kostenvoranschlag", "sonstiges"]).default("sonstiges").notNull(),
+  versandart: mysqlEnum("versandart", ["email", "ebrief", "post"]).default("email").notNull(),
+  status: mysqlEnum("status", ["entwurf", "versendet", "fehler"]).default("entwurf").notNull(),
+  referenzId: int("referenzId"), // ID des Leistungsnachweises / Einsatzes
+  referenzTyp: varchar("referenzTyp", { length: 50 }), // "leistung" | "einsatz"
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type EbriefLog = typeof ebriefLog.$inferSelect;
+export type InsertEbriefLog = typeof ebriefLog.$inferInsert;
+
 // Audit-Log
 export const auditLogs = mysqlTable("auditLogs", {
   id: int("id").autoincrement().primaryKey(),
   mitarbeiterId: int("mitarbeiterId"),
-  action: varchar("action", { length: 50 }).notNull(), // LOGIN, LOGOUT, CREATE, UPDATE, DELETE, EXPORT, ADMIN
+  action: varchar("action", { length: 50 }).notNull(),
   ressource: varchar("ressource", { length: 100 }),
   details: text("details"),
   status: mysqlEnum("status", ["success", "failure", "partial"]).default("success").notNull(),
@@ -185,7 +260,7 @@ export type InsertAuditLog = typeof auditLogs.$inferInsert;
 // Monatsabschlüsse
 export const monatsabschluesse = mysqlTable("monatsabschluesse", {
   id: int("id").autoincrement().primaryKey(),
-  monat: varchar("monat", { length: 7 }).notNull(), // YYYY-MM
+  monat: varchar("monat", { length: 7 }).notNull(),
   adminId: int("adminId").notNull(),
   gesamtStunden: decimal("gesamtStunden", { precision: 7, scale: 2 }).default("0"),
   gesamtEinsaetze: int("gesamtEinsaetze").default(0),

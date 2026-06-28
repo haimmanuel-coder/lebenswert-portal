@@ -10,9 +10,18 @@ import AdminPanel from "./AdminPanel";
 import ManagementDashboard from "./ManagementDashboard";
 import KundenDetail from "./KundenDetail";
 import Kundenliste from "./Kundenliste";
+// Neue Module
+import Kostentraeger from "./Kostentraeger";
+import BudgetDashboard from "./BudgetDashboard";
+import Textbausteine from "./Textbausteine";
+import EBrief from "./EBrief";
+import MassenExport from "./MassenExport";
 import BottomSheet from "@/components/BottomSheet";
 
-type PageId = "home" | "einsaetze" | "zeit" | "lnw" | "fahrt" | "admin" | "management" | "kunden";
+type PageId =
+  | "home" | "einsaetze" | "zeit" | "lnw" | "fahrt"
+  | "admin" | "management" | "kunden"
+  | "kostentraeger" | "budget" | "textbausteine" | "ebrief" | "export";
 
 const pages: { id: PageId; icon: string; label: string }[] = [
   { id: "home", icon: "🏠", label: "Home" },
@@ -29,6 +38,7 @@ export default function PortalApp() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [kundenDetailId, setKundenDetailId] = useState<number | null>(null);
   const { data: leistungen = [] } = trpc.leistungen.list.useQuery();
+  const { data: warnungen = [] } = trpc.kunden.budgetWarnungen.useQuery();
   const offenCount = leistungen.filter((l) => l.status === "offen").length;
 
   const isAdmin = mitarbeiter?.rolle === "admin";
@@ -38,7 +48,6 @@ export default function PortalApp() {
     : "MA";
 
   const renderPage = () => {
-    // Kunden-Detail-Overlay
     if (kundenDetailId !== null) {
       return <KundenDetail kundenId={kundenDetailId} onBack={() => setKundenDetailId(null)} />;
     }
@@ -51,6 +60,12 @@ export default function PortalApp() {
       case "admin": return <AdminPanel />;
       case "management": return <ManagementDashboard />;
       case "kunden": return <Kundenliste />;
+      // Neue Module
+      case "kostentraeger": return <Kostentraeger />;
+      case "budget": return <BudgetDashboard />;
+      case "textbausteine": return <Textbausteine />;
+      case "ebrief": return <EBrief />;
+      case "export": return <MassenExport />;
       default: return <Dashboard />;
     }
   };
@@ -92,7 +107,17 @@ export default function PortalApp() {
             </div>
           </div>
         </div>
-        <div style={{ display: "flex", gap: 4 }}>
+        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+          {/* Budget-Warnung Indikator */}
+          {warnungen.length > 0 && (
+            <button
+              onClick={() => { navTo("budget"); setMenuOpen(false); }}
+              title={`${warnungen.length} Budget-Warnung(en)`}
+              style={{ background: "#fee2e2", border: "none", borderRadius: 8, padding: "4px 8px", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ fontSize: 14 }}>⚠️</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#dc2626" }}>{warnungen.length}</span>
+            </button>
+          )}
           {isAdmin && (
             <button
               onClick={() => setMenuOpen(true)}
@@ -213,6 +238,12 @@ export default function PortalApp() {
             ⏱ Zeit manuell erfassen
           </button>
           <button
+            onClick={() => { setFabOpen(false); navTo("ebrief"); }}
+            style={{ padding: 13, background: "#6366f1", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}
+          >
+            📮 Brief / E-Mail an Kasse senden
+          </button>
+          <button
             onClick={() => setFabOpen(false)}
             style={{ padding: 13, background: "#f4f6f3", color: "#6b7280", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}
           >
@@ -221,10 +252,13 @@ export default function PortalApp() {
         </div>
       </BottomSheet>
 
-      {/* Admin-Menü Sheet */}
+      {/* Admin-Menü Sheet – erweitert mit allen 6 Modulen */}
       {isAdmin && (
         <BottomSheet open={menuOpen} onClose={() => setMenuOpen(false)} title="Admin-Bereich">
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+
+            {/* Bestehende Module */}
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 1, paddingLeft: 4 }}>Bestehend</div>
             <button
               onClick={() => { setMenuOpen(false); navTo("management"); }}
               style={{ padding: 13, background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
@@ -255,6 +289,70 @@ export default function PortalApp() {
                 <div style={{ fontSize: 11, opacity: 0.85 }}>Mitarbeiter, Kunden, Zuordnung</div>
               </div>
             </button>
+
+            {/* Neue Module */}
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 1, paddingLeft: 4, marginTop: 4 }}>Neue Module</div>
+
+            <button
+              onClick={() => { setMenuOpen(false); navTo("kostentraeger"); }}
+              style={{ padding: 13, background: "#fff", color: "#374151", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
+            >
+              <span>🏥</span>
+              <div style={{ textAlign: "left" }}>
+                <div>Kostenträger</div>
+                <div style={{ fontSize: 11, color: "#6b7280" }}>Krankenkassen mit IK-Nummern</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => { setMenuOpen(false); navTo("budget"); }}
+              style={{ padding: 13, background: "#fff", color: "#374151", border: `2px solid ${warnungen.length > 0 ? "#fca5a5" : "#e5e7eb"}`, borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
+            >
+              <span>📊</span>
+              <div style={{ textAlign: "left", flex: 1 }}>
+                <div>Budget-Dashboard</div>
+                <div style={{ fontSize: 11, color: "#6b7280" }}>Pflegegrade & Budgets aller Kunden</div>
+              </div>
+              {warnungen.length > 0 && (
+                <span style={{ background: "#dc2626", color: "#fff", fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>
+                  ⚠️ {warnungen.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => { setMenuOpen(false); navTo("textbausteine"); }}
+              style={{ padding: 13, background: "#fff", color: "#374151", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
+            >
+              <span>📝</span>
+              <div style={{ textAlign: "left" }}>
+                <div>Textbausteine</div>
+                <div style={{ fontSize: 11, color: "#6b7280" }}>Vorlagen für Einsatz-Dokumentation</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => { setMenuOpen(false); navTo("ebrief"); }}
+              style={{ padding: 13, background: "#fff", color: "#374151", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
+            >
+              <span>📮</span>
+              <div style={{ textAlign: "left" }}>
+                <div>E-Brief / Korrespondenz</div>
+                <div style={{ fontSize: 11, color: "#6b7280" }}>Briefe & E-Mails an Kassen senden</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => { setMenuOpen(false); navTo("export"); }}
+              style={{ padding: 13, background: "#1f2937", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
+            >
+              <span>📦</span>
+              <div style={{ textAlign: "left" }}>
+                <div>Massen-Export</div>
+                <div style={{ fontSize: 11, opacity: 0.85 }}>Alle Daten als CSV herunterladen</div>
+              </div>
+            </button>
+
             <button
               onClick={() => setMenuOpen(false)}
               style={{ padding: 13, background: "#f4f6f3", color: "#6b7280", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}
