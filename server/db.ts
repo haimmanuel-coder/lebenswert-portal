@@ -629,3 +629,84 @@ export async function getPushSubscriptionsByMitarbeiter(mitarbeiterId: number) {
   if (!db) return [];
   return db.select().from(pushSubscriptions).where(eq(pushSubscriptions.mitarbeiterId, mitarbeiterId));
 }
+
+// ── FÜHRERSCHEIN-CHECKS ───────────────────────────────
+export async function getFuehrerscheinChecks(mitarbeiterId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  if (mitarbeiterId) {
+    const r = await db.execute(sql`SELECT * FROM fuehrerschein_checks WHERE mitarbeiter_id = ${mitarbeiterId} ORDER BY pruef_datum DESC`);
+    return (r as any)[0] as any[];
+  }
+  const r = await db.execute(sql`SELECT * FROM fuehrerschein_checks ORDER BY naechstes_pruef_datum ASC`);
+  return (r as any)[0] as any[];
+}
+
+export async function createFuehrerscheinCheck(data: {
+  mitarbeiterId: number;
+  fotoKey?: string;
+  fotoUrl?: string;
+  pruefDatum: string;
+  naechstesPruefDatum: string;
+  status: 'gueltig' | 'faellig' | 'ueberfaellig';
+  bemerkung?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.execute(sql`
+    INSERT INTO fuehrerschein_checks (mitarbeiter_id, foto_key, foto_url, pruef_datum, naechstes_pruef_datum, status, bemerkung)
+    VALUES (${data.mitarbeiterId}, ${data.fotoKey ?? null}, ${data.fotoUrl ?? null}, ${data.pruefDatum}, ${data.naechstesPruefDatum}, ${data.status}, ${data.bemerkung ?? null})
+  `);
+  return result;
+}
+
+export async function updateFuehrerscheinStatus(id: number, status: 'gueltig' | 'faellig' | 'ueberfaellig') {
+  const db = await getDb();
+  if (!db) return;
+  await db.execute(sql`UPDATE fuehrerschein_checks SET status = ${status} WHERE id = ${id}`);
+}
+
+// ── NEUKUNDENAUFNAHMEN ────────────────────────────────
+export async function getAllNeukundenaufnahmen() {
+  const db = await getDb();
+  if (!db) return [];
+  const r = await db.execute(sql`SELECT * FROM neukundenaufnahmen ORDER BY created_at DESC`);
+  return (r as any)[0] as any[];
+}
+
+export async function createNeukundenaufnahme(data: {
+  vorname: string;
+  nachname: string;
+  geburtsdatum?: string;
+  strasse?: string;
+  plz?: string;
+  ort?: string;
+  telefon?: string;
+  email?: string;
+  pflegegrad?: number;
+  kostentraeger?: string;
+  versicherungsnummer?: string;
+  paragraph?: string;
+  vollmachtUnterschrift?: string;
+  kundenUnterschrift?: string;
+  notizen?: string;
+  erstelltVon?: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.execute(sql`
+    INSERT INTO neukundenaufnahmen
+      (vorname, nachname, geburtsdatum, strasse, plz, ort, telefon, email, pflegegrad, kostentraeger, versicherungsnummer, paragraph, vollmacht_unterschrift, kunden_unterschrift, notizen, erstellt_von)
+    VALUES
+      (${data.vorname}, ${data.nachname}, ${data.geburtsdatum ?? null}, ${data.strasse ?? null}, ${data.plz ?? null}, ${data.ort ?? null},
+       ${data.telefon ?? null}, ${data.email ?? null}, ${data.pflegegrad ?? null}, ${data.kostentraeger ?? null}, ${data.versicherungsnummer ?? null},
+       ${data.paragraph ?? '45b'}, ${data.vollmachtUnterschrift ?? null}, ${data.kundenUnterschrift ?? null}, ${data.notizen ?? null}, ${data.erstelltVon ?? null})
+  `);
+  return result;
+}
+
+export async function updateNeukundenaufnahmeStatus(id: number, status: 'aufgenommen' | 'in_bearbeitung' | 'abgeschlossen') {
+  const db = await getDb();
+  if (!db) return;
+  await db.execute(sql`UPDATE neukundenaufnahmen SET status = ${status} WHERE id = ${id}`);
+}

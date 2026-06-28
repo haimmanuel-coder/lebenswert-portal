@@ -61,6 +61,12 @@ import {
   getPflegegradBudgets,
   getLeistungenFuerExport,
   getFahrtenFuerExport,
+  getFuehrerscheinChecks,
+  createFuehrerscheinCheck,
+  updateFuehrerscheinStatus,
+  getAllNeukundenaufnahmen,
+  createNeukundenaufnahme,
+  updateNeukundenaufnahmeStatus,
 } from "./db";
 import { SignJWT, jwtVerify } from "jose";
 import { ENV } from "./_core/env";
@@ -1073,6 +1079,85 @@ export const appRouter = router({
           input.restBudget
         );
         return { success: true, sent };
+      }),
+  }),
+
+  // ── FÜHRERSCHEIN-CHECKS ─────────────────────────────
+  fuehrerschein: router({
+    list: portalProcedure.query(async ({ ctx }) => {
+      return getFuehrerscheinChecks(ctx.mitarbeiterId ?? undefined);
+    }),
+
+    listAll: adminProcedure.query(async () => {
+      const rows = await getFuehrerscheinChecks();
+      return (rows as any).rows ?? rows;
+    }),
+
+    create: portalProcedure
+      .input(z.object({
+        fotoUrl: z.string().optional(),
+        fotoKey: z.string().optional(),
+        pruefDatum: z.string(),
+        naechstesPruefDatum: z.string(),
+        bemerkung: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await createFuehrerscheinCheck({
+          mitarbeiterId: ctx.mitarbeiterId ?? 0,
+          fotoKey: input.fotoKey,
+          fotoUrl: input.fotoUrl,
+          pruefDatum: input.pruefDatum,
+          naechstesPruefDatum: input.naechstesPruefDatum,
+          status: 'gueltig',
+          bemerkung: input.bemerkung,
+        });
+        return { success: true };
+      }),
+
+    updateStatus: adminProcedure
+      .input(z.object({ id: z.number(), status: z.enum(['gueltig', 'faellig', 'ueberfaellig']) }))
+      .mutation(async ({ input }) => {
+        await updateFuehrerscheinStatus(input.id, input.status);
+        return { success: true };
+      }),
+
+    vapidKey: portalProcedure.query(() => ({ key: VAPID_PUBLIC })),
+  }),
+
+  // ── NEUKUNDENAUFNAHMEN ───────────────────────────────
+  neukundenaufnahme: router({
+    list: adminProcedure.query(async () => {
+      return getAllNeukundenaufnahmen();
+    }),
+
+    create: portalProcedure
+      .input(z.object({
+        vorname: z.string().min(1),
+        nachname: z.string().min(1),
+        geburtsdatum: z.string().optional(),
+        strasse: z.string().optional(),
+        plz: z.string().optional(),
+        ort: z.string().optional(),
+        telefon: z.string().optional(),
+        email: z.string().optional(),
+        pflegegrad: z.number().min(1).max(5).optional(),
+        kostentraeger: z.string().optional(),
+        versicherungsnummer: z.string().optional(),
+        paragraph: z.enum(['45b', '45a', '39']).optional(),
+        vollmachtUnterschrift: z.string().optional(),
+        kundenUnterschrift: z.string().optional(),
+        notizen: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await createNeukundenaufnahme({ ...input, erstelltVon: ctx.mitarbeiterId ?? undefined });
+        return { success: true };
+      }),
+
+    updateStatus: adminProcedure
+      .input(z.object({ id: z.number(), status: z.enum(['aufgenommen', 'in_bearbeitung', 'abgeschlossen']) }))
+      .mutation(async ({ input }) => {
+        await updateNeukundenaufnahmeStatus(input.id, input.status);
+        return { success: true };
       }),
   }),
 });

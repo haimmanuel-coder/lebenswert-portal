@@ -13,10 +13,13 @@ import Kundenliste from "./Kundenliste";
 import Kostentraeger from "./Kostentraeger";
 import Textbausteine from "./Textbausteine";
 import ExportCenter from "./ExportCenter";
+import Fuehrerschein from "./Fuehrerschein";
+import NeukundenAufnahme from "./NeukundenAufnahme";
+import Kalender from "./Kalender";
 import BottomSheet from "@/components/BottomSheet";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 
-type PageId = "home" | "einsaetze" | "zeit" | "lnw" | "fahrt" | "admin" | "management" | "kunden" | "kostentraeger" | "textbausteine" | "export";
+type PageId = "home" | "einsaetze" | "zeit" | "lnw" | "fahrt" | "admin" | "management" | "kunden" | "kostentraeger" | "textbausteine" | "export" | "fuehrerschein" | "neukundenaufnahme" | "kalender";
 
 const pages: { id: PageId; icon: string; label: string }[] = [
   { id: "home", icon: "🏠", label: "Home" },
@@ -59,6 +62,9 @@ export default function PortalApp() {
       case "kostentraeger": return <Kostentraeger />;
       case "textbausteine": return <Textbausteine />;
       case "export": return <ExportCenter />;
+      case "fuehrerschein": return <Fuehrerschein />;
+      case "neukundenaufnahme": return <NeukundenAufnahme />;
+      case "kalender": return <Kalender />;
       default: return <Dashboard />;
     }
   };
@@ -386,6 +392,42 @@ export default function PortalApp() {
                 <div style={{ fontSize: 11, opacity: 0.8 }}>CSV-Export, Pflegegrad-Rechner, E-Brief</div>
               </div>
             </button>
+            {/* Neue Module Phase 12 */}
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 1, paddingLeft: 4, marginTop: 4 }}>Compliance & Aufnahme</div>
+
+            <button
+              onClick={() => { setMenuOpen(false); navTo("kalender"); }}
+              style={{ padding: 13, background: "#f0f9ff", color: "#0369a1", border: "2px solid #7dd3fc", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
+            >
+              <span>📅</span>
+              <div style={{ textAlign: "left" }}>
+                <div>Einsatz-Kalender</div>
+                <div style={{ fontSize: 11, opacity: 0.8 }}>Monatsübersicht mit Farbcodierung</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => { setMenuOpen(false); navTo("fuehrerschein"); }}
+              style={{ padding: 13, background: "#fff7ed", color: "#c2410c", border: "2px solid #fdba74", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
+            >
+              <span>🪪</span>
+              <div style={{ textAlign: "left" }}>
+                <div>Führerschein-Kontrolle</div>
+                <div style={{ fontSize: 11, opacity: 0.8 }}>Halbjährliche Prüfung & Archiv</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => { setMenuOpen(false); navTo("neukundenaufnahme"); }}
+              style={{ padding: 13, background: "#fdf4ff", color: "#7e22ce", border: "2px solid #d8b4fe", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
+            >
+              <span>👤</span>
+              <div style={{ textAlign: "left" }}>
+                <div>Neukundenaufnahme</div>
+                <div style={{ fontSize: 11, opacity: 0.8 }}>Stammdaten, Vollmacht & PDF</div>
+              </div>
+            </button>
+
             <button
               onClick={() => setMenuOpen(false)}
               style={{ padding: 13, background: "#f4f6f3", color: "#6b7280", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}

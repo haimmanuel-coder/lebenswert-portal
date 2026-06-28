@@ -173,3 +173,25 @@
 - [x] unterschriftKunde-Wert an updateStatus-Mutation übergeben
 - [x] Kunden-Unterschrift auch im Leistungsnachweis-Einreich-Sheet
 - [x] pdfGenerator.ts: Kunden-Unterschrift bereits im PDF-Layout integriert
+
+## Phase 12 – Führerschein, Neukundenaufnahme, Kalender
+
+### Feature 1: Führerschein-Kontrollmodul
+- [x] DB: fuehrerschein_checks-Tabelle (mitarbeiter_id, foto_key, foto_url, pruef_datum, naechstes_pruef_datum, status)
+- [x] Backend: tRPC fuehrerschein.list, fuehrerschein.listAll, fuehrerschein.create, fuehrerschein.updateStatus
+- [x] Frontend: Seite Fuehrerschein.tsx mit Kamera-Upload, Archiv, Fälligkeitsanzeige, Gesetzeshinweis
+- [x] Navigation: Menüpunkt "Führerschein-Kontrolle" im Admin-Menü (orange)
+
+### Feature 2: Neukundenaufnahme-Modul
+- [x] DB: neukundenaufnahmen-Tabelle (alle Stammdaten, Pflegegrad, Kostenträger, Vollmacht-Unterschriften)
+- [x] Backend: tRPC neukundenaufnahme.create, neukundenaufnahme.list, neukundenaufnahme.updateStatus
+- [x] Frontend: Seite NeukundenAufnahme.tsx mit 4-stufigem Formular (Stammdaten → Adresse → Kostenträger → Unterschriften)
+- [x] PDF: Vollmacht-Generierung mit jsPDF (Stammdaten + Dauervollmacht-Text + Unterschriften)
+- [x] Navigation: Menüpunkt "Neukundenaufnahme" im Admin-Menü (lila)
+
+### Feature 3: Einsatz-Kalenderansicht
+- [x] Frontend: Seite Kalender.tsx mit Monatskalender (CSS Grid, 7 Spalten)
+- [x] Farbcodierung: geplant=grau, abgeschlossen=grün, verpasst=rot, unterwegs=blau
+- [x] Monats-Statistik (Gesamt, Erledigt, Geplant, Verpasst)
+- [x] Tages-Detail-Karte beim Klick auf einen Tag
+- [x] Navigation: Menüpunkt "Einsatz-Kalender" im Admin-Menü (blau)
