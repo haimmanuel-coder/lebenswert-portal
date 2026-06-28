@@ -27,10 +27,13 @@ import {
   getAllLeistungen,
   getLeistungenByKunde,
   createLeistung,
+  updateLeistungStatus,
   getFahrtenByMitarbeiter,
   getAllFahrten,
   getFahrtenByKunde,
+  getFahrtenByMonat,
   createFahrt,
+  updateFahrtStatus,
   createAuditLog,
   getAuditLogs,
   getMonatsabschluesse,
@@ -61,7 +64,6 @@ import { ENV } from "./_core/env";
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "lebenswert-secret-key");
 const PORTAL_COOKIE = "lb_portal_token";
 
-// ── PORTAL AUTH HELPER ────────────────────────────────
 async function signPortalToken(mitarbeiterId: number) {
   return new SignJWT({ mitarbeiterId })
     .setProtectedHeader({ alg: "HS256" })
@@ -78,11 +80,8 @@ async function verifyPortalToken(token: string): Promise<number | null> {
   }
 }
 
-// ── PORTAL PROCEDURE (JWT-Cookie) ─────────────────────
 const portalProcedure = publicProcedure.use(async ({ ctx, next }) => {
-  // 1. Try cookie first
   let token = ctx.req.cookies?.[PORTAL_COOKIE];
-  // 2. Fallback: Authorization header (Bearer <token>) for localStorage-based auth
   if (!token) {
     const authHeader = ctx.req.headers?.['authorization'] as string | undefined;
     if (authHeader?.startsWith('Bearer ')) {
@@ -105,7 +104,6 @@ const adminProcedure = portalProtected.use(async ({ ctx, next }) => {
   return next({ ctx: { ...ctx, adminId: ctx.mitarbeiterId } });
 });
 
-// ── ROUTER ────────────────────────────────────────────
 export const appRouter = router({
   system: systemRouter,
 
@@ -118,7 +116,6 @@ export const appRouter = router({
     }),
   }),
 
-  // ── PORTAL AUTH ──────────────────────────────────────
   portal: router({
     login: publicProcedure
       .input(z.object({ email: z.string().email(), passwort: z.string().min(1) }))
@@ -128,7 +125,6 @@ export const appRouter = router({
         const valid = await bcrypt.compare(input.passwort, ma.passwortHash);
         if (!valid) throw new Error("E-Mail oder Passwort ungültig.");
         const token = await signPortalToken(ma.id);
-        // Set cookie (best-effort) AND return token for localStorage fallback
         const isSecure = ctx.req.secure || ctx.req.headers['x-forwarded-proto'] === 'https';
         ctx.res.cookie(PORTAL_COOKIE, token, {
           httpOnly: true,
@@ -138,7 +134,6 @@ export const appRouter = router({
           maxAge: 8 * 60 * 60 * 1000,
         });
         await createAuditLog({ mitarbeiterId: ma.id, action: "LOGIN", ressource: "portal", status: "success" });
-        // Return token so frontend can store it in localStorage as fallback
         return { id: ma.id, vorname: ma.vorname, nachname: ma.nachname, email: ma.email, rolle: ma.rolle, token };
       }),
 
@@ -159,28 +154,22 @@ export const appRouter = router({
       return { id: ma.id, vorname: ma.vorname, nachname: ma.nachname, email: ma.email, rolle: ma.rolle };
     }),
 
-    // Passwort-Reset anfordern: Token generieren und Reset-Link zurückgeben
     requestPasswordReset: publicProcedure
       .input(z.object({ email: z.string().email() }))
       .mutation(async ({ input }) => {
         const ma = await getMitarbeiterByEmail(input.email.trim().toLowerCase());
-        // Immer Erfolg zurückgeben (kein Hinweis ob E-Mail existiert – Sicherheit)
         if (!ma) return { success: true, message: "Falls die E-Mail registriert ist, wurde ein Reset-Link erstellt." };
         const token = nanoid(64);
         await createPasswordResetToken(ma.id, token);
         await createAuditLog({ mitarbeiterId: ma.id, action: "PASSWORD_RESET_REQUEST", ressource: "portal", status: "success" });
-        // Token zurückgeben (Admin sieht ihn im Portal; in Produktion per E-Mail versenden)
         return {
           success: true,
           message: "Reset-Link wurde erstellt.",
-          // In einer Produktionsumgebung würde hier eine E-Mail versendet.
-          // Für Demo-Zwecke wird der Token direkt zurückgegeben:
           resetToken: token,
           mitarbeiterName: `${ma.vorname} ${ma.nachname}`,
         };
       }),
 
-    // Token validieren (prüfen ob gültig)
     validateResetToken: publicProcedure
       .input(z.object({ token: z.string().min(1) }))
       .query(async ({ input }) => {
@@ -190,7 +179,6 @@ export const appRouter = router({
         return { valid: true, email: ma?.email ?? "", vorname: ma?.vorname ?? "" };
       }),
 
-    // Neues Passwort setzen
     resetPassword: publicProcedure
       .input(z.object({
         token: z.string().min(1),
@@ -209,11 +197,7 @@ export const appRouter = router({
 
   // ── KUNDEN ───────────────────────────────────────────
   kunden: router({
-    list: portalProtected.query(async ({ ctx }) => {
-      const ma = await getMitarbeiterById(ctx.mitarbeiterId);
-      if (ma?.rolle === "admin") return getAllKunden();
-      return getAllKunden(); // alle sehen alle Kunden (Zuordnung nur für Filter)
-    }),
+    list: portalProtected.query(async () => getAllKunden()),
 
     detail: portalProtected
       .input(z.object({ id: z.number().int().positive() }))
@@ -235,6 +219,8 @@ export const appRouter = router({
         telefon: z.string().optional(),
         pflegegrad: z.number().int().min(1).max(5).optional(),
         paragraph: z.enum(["45b", "45a", "39", "privat"]).optional(),
+        kostentraegerId: z.number().int().positive().optional().nullable(),
+        versicherungsnummer: z.string().optional(),
       }))
       .mutation(async ({ input }) => {
         await createKunde({ ...input, aktiv: 1 });
@@ -251,14 +237,18 @@ export const appRouter = router({
         pflegegrad: z.number().int().min(1).max(5).optional(),
         paragraph: z.enum(["45b", "45a", "39", "privat"]).optional(),
         aktiv: z.number().int().optional(),
+        kostentraegerId: z.number().int().positive().optional().nullable(),
+        versicherungsnummer: z.string().optional(),
+        vollmachtErteilt: z.boolean().optional(),
+        vollmachtDatum: z.string().optional(),
+        vollmachtSignatur: z.string().optional(),
       }))
       .mutation(async ({ input }) => {
         const { id, ...data } = input;
-        await updateKunde(id, data);
+        await updateKunde(id, data as any);
         return { success: true };
       }),
 
-    // Budget eines Kunden manuell aktualisieren (Admin)
     updateBudget: adminProcedure
       .input(z.object({
         id: z.number().int().positive(),
@@ -279,7 +269,6 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    // Kunden mit kritischem Budget (< 10% verfügbar)
     budgetWarnungen: portalProtected.query(async () => {
       const warnungen = await getKundenMitBudgetWarnung();
       return warnungen.map(k => ({
@@ -327,6 +316,8 @@ export const appRouter = router({
         gesundheit: z.enum(["gut", "stabil", "auffaellig", "kritisch"]).optional(),
         bemerkung: z.string().optional(),
         unterschriftMitarbeiter: z.string().optional(),
+        unterschriftKunde: z.string().optional(),
+        textbausteinIds: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         await updateEinsatzStatus(input.id, ctx.mitarbeiterId, input);
@@ -352,10 +343,22 @@ export const appRouter = router({
         anzahlEinsaetze: z.number().int().min(1),
         bemerkung: z.string().optional(),
         unterschriftLeister: z.string().optional(),
+        unterschriftKunde: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         await createLeistung({ ...input, mitarbeiterId: ctx.mitarbeiterId } as any);
         await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "CREATE", ressource: "leistung", status: "success" });
+        return { success: true };
+      }),
+
+    updateStatus: adminProcedure
+      .input(z.object({
+        id: z.number().int().positive(),
+        status: z.enum(["offen", "pruefung", "freigegeben", "versendet"]),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await updateLeistungStatus(input.id, input.status);
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "UPDATE", ressource: "leistung", details: `id=${input.id} status=${input.status}`, status: "success" });
         return { success: true };
       }),
   }),
@@ -368,6 +371,10 @@ export const appRouter = router({
       return getFahrtenByMitarbeiter(ctx.mitarbeiterId);
     }),
 
+    byMonat: adminProcedure
+      .input(z.object({ monat: z.string().regex(/^\d{4}-\d{2}$/) }))
+      .query(async ({ input }) => getFahrtenByMonat(input.monat)),
+
     create: portalProtected
       .input(z.object({
         datum: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -377,17 +384,244 @@ export const appRouter = router({
         typ: z.enum(["normal", "sonder"]),
         kundenId: z.number().int().positive().optional().nullable(),
         zweck: z.string().optional(),
+        kilometerHin: z.number().optional(),
+        kilometerRueck: z.number().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         await createFahrt({ ...input, mitarbeiterId: ctx.mitarbeiterId } as any);
         await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "CREATE", ressource: "fahrt", status: "success" });
         return { success: true };
       }),
+
+    updateStatus: adminProcedure
+      .input(z.object({
+        id: z.number().int().positive(),
+        status: z.enum(["offen", "eingereicht", "erstattet"]),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await updateFahrtStatus(input.id, input.status);
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "UPDATE", ressource: "fahrt", details: `id=${input.id} status=${input.status}`, status: "success" });
+        return { success: true };
+      }),
+  }),
+
+  // ── MODUL 1: KOSTENTRÄGER ─────────────────────────────
+  kostentraeger: router({
+    list: portalProtected.query(async () => getAllKostentraeger()),
+
+    search: portalProtected
+      .input(z.object({ query: z.string().min(1) }))
+      .query(async ({ input }) => searchKostentraeger(input.query)),
+
+    detail: portalProtected
+      .input(z.object({ id: z.number().int().positive() }))
+      .query(async ({ input }) => getKostentraegerById(input.id)),
+
+    create: adminProcedure
+      .input(z.object({
+        name: z.string().min(1),
+        ikNummer: z.string().optional(),
+        typ: z.enum(["pflegekasse", "krankenkasse", "beihilfe", "privat", "sonstige"]).default("pflegekasse"),
+        strasse: z.string().optional(),
+        plz: z.string().optional(),
+        ort: z.string().optional(),
+        telefon: z.string().optional(),
+        email: z.string().email().optional().or(z.literal("")),
+        fax: z.string().optional(),
+        abrechnungsart: z.enum(["dta", "email", "ebrief", "post", "manuell"]).optional(),
+        notizen: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await createKostentraeger({ ...input, aktiv: 1 });
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "CREATE", ressource: "kostentraeger", details: `name=${input.name}`, status: "success" });
+        return { success: true };
+      }),
+
+    update: adminProcedure
+      .input(z.object({
+        id: z.number().int().positive(),
+        name: z.string().min(1).optional(),
+        ikNummer: z.string().optional(),
+        typ: z.enum(["pflegekasse", "krankenkasse", "beihilfe", "privat", "sonstige"]).optional(),
+        strasse: z.string().optional(),
+        plz: z.string().optional(),
+        ort: z.string().optional(),
+        telefon: z.string().optional(),
+        email: z.string().optional(),
+        fax: z.string().optional(),
+        abrechnungsart: z.enum(["dta", "email", "ebrief", "post", "manuell"]).optional(),
+        notizen: z.string().optional(),
+        aktiv: z.number().int().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const { id, ...data } = input;
+        await updateKostentraeger(id, data as any);
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "UPDATE", ressource: "kostentraeger", details: `id=${id}`, status: "success" });
+        return { success: true };
+      }),
+  }),
+
+  // ── MODUL 3: TEXTBAUSTEINE ────────────────────────────
+  textbausteine: router({
+    list: portalProtected.query(async () => getAllTextbausteine()),
+
+    create: adminProcedure
+      .input(z.object({
+        titel: z.string().min(1),
+        inhalt: z.string().min(1),
+        kategorie: z.enum(["bericht", "gesundheit", "aktivitaet", "bemerkung", "sonstiges"]).default("bericht"),
+        paragraph: z.enum(["45b", "45a", "39", "alle"]).default("alle"),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await createTextbaustein({ ...input, aktiv: 1 });
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "CREATE", ressource: "textbaustein", status: "success" });
+        return { success: true };
+      }),
+
+    update: adminProcedure
+      .input(z.object({
+        id: z.number().int().positive(),
+        titel: z.string().min(1).optional(),
+        inhalt: z.string().min(1).optional(),
+        kategorie: z.enum(["bericht", "gesundheit", "aktivitaet", "bemerkung", "sonstiges"]).optional(),
+        paragraph: z.enum(["45b", "45a", "39", "alle"]).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const { id, ...data } = input;
+        await updateTextbaustein(id, data as any);
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "UPDATE", ressource: "textbaustein", details: `id=${id}`, status: "success" });
+        return { success: true };
+      }),
+
+    delete: adminProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(async ({ input, ctx }) => {
+        await deleteTextbaustein(input.id);
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "DELETE", ressource: "textbaustein", details: `id=${input.id}`, status: "success" });
+        return { success: true };
+      }),
+  }),
+
+  // ── MODUL 5: E-BRIEF ─────────────────────────────────
+  ebrief: router({
+    list: adminProcedure
+      .input(z.object({ limit: z.number().int().min(1).max(500).default(100) }))
+      .query(async ({ input }) => getEbriefLog(input.limit)),
+
+    byKunde: portalProtected
+      .input(z.object({ kundenId: z.number().int().positive() }))
+      .query(async ({ input }) => getEbriefLogByKunde(input.kundenId)),
+
+    send: portalProtected
+      .input(z.object({
+        kundenId: z.number().int().positive().optional(),
+        kostentraegerId: z.number().int().positive().optional(),
+        betreff: z.string().min(1),
+        inhalt: z.string().min(1),
+        empfaenger: z.string().min(1),
+        typ: z.enum(["leistungsnachweis", "protokoll", "kostenvoranschlag", "sonstiges"]).default("sonstiges"),
+        versandart: z.enum(["email", "ebrief", "post"]).default("email"),
+        referenzId: z.number().int().positive().optional(),
+        referenzTyp: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await createEbriefLog({
+          ...input,
+          mitarbeiterId: ctx.mitarbeiterId,
+          status: "versendet",
+        } as any);
+        await createAuditLog({
+          mitarbeiterId: ctx.mitarbeiterId,
+          action: "EXPORT",
+          ressource: "ebrief",
+          details: `empfaenger=${input.empfaenger} betreff=${input.betreff}`,
+          status: "success",
+        });
+        return { success: true };
+      }),
+  }),
+
+  // ── MODUL 6: MASSEN-EXPORT ────────────────────────────
+  export: router({
+    monatspaket: adminProcedure
+      .input(z.object({ monat: z.string().regex(/^\d{4}-\d{2}$/) }))
+      .query(async ({ input }) => {
+        const [eis, leis, fahr, maList, kundenList] = await Promise.all([
+          getAllEinsaetze(),
+          getAllLeistungen(),
+          getAllFahrten(),
+          getAllMitarbeiter(),
+          getAllKunden(),
+        ]);
+
+        const monEis = eis.filter((e) => {
+          const d = typeof e.datum === "string" ? e.datum : (e.datum as Date).toISOString().split("T")[0];
+          return d?.slice(0, 7) === input.monat;
+        });
+        const monLeis = leis.filter((l) => l.monat === input.monat);
+        const monFahr = fahr.filter((f) => {
+          const d = typeof f.datum === "string" ? f.datum : (f.datum as Date).toISOString().split("T")[0];
+          return d?.slice(0, 7) === input.monat;
+        });
+
+        // Einsätze CSV
+        const einsaetzeCsv = [
+          "Mitarbeiter;Datum;Kunde;Paragraph;Stunden;Status;Gesundheit;Bericht",
+          ...monEis.map((e) => {
+            const ma = maList.find((m) => m.id === e.mitarbeiterId);
+            const k = kundenList.find((c) => c.id === e.kundenId);
+            const d = typeof e.datum === "string" ? e.datum : (e.datum as Date).toISOString().split("T")[0];
+            return `${ma?.nachname ?? ""} ${ma?.vorname ?? ""};${d};${k?.nachname ?? ""} ${k?.vorname ?? ""};§${e.paragraph} SGB XI;${e.dauerStunden ?? 0};${e.status};${e.gesundheit ?? ""};${(e.bericht ?? "").replace(/;/g, ",")}`;
+          }),
+        ].join("\n");
+
+        // Leistungsnachweise CSV
+        const leistungenCsv = [
+          "Mitarbeiter;Kunde;Monat;Paragraph;Stunden;Einsätze;Betrag (€);Status",
+          ...monLeis.map((l) => {
+            const ma = maList.find((m) => m.id === l.mitarbeiterId);
+            const k = kundenList.find((c) => c.id === l.kundenId);
+            return `${ma?.nachname ?? ""} ${ma?.vorname ?? ""};${k?.nachname ?? ""} ${k?.vorname ?? ""};${l.monat};§${l.paragraph} SGB XI;${l.stunden ?? 0};${l.anzahlEinsaetze ?? 0};${l.betrag ?? 0};${l.status}`;
+          }),
+        ].join("\n");
+
+        // Fahrtkosten CSV
+        const fahrenCsv = [
+          "Mitarbeiter;Datum;Von;Nach;Kilometer;Typ;Vergütung (€);Status",
+          ...monFahr.map((f) => {
+            const ma = maList.find((m) => m.id === f.mitarbeiterId);
+            const d = typeof f.datum === "string" ? f.datum : (f.datum as Date).toISOString().split("T")[0];
+            return `${ma?.nachname ?? ""} ${ma?.vorname ?? ""};${d};${f.vonOrt};${f.nachOrt};${f.kilometer};${f.typ};${f.verguetung ?? 0};${(f as any).abrechnungsStatus ?? "offen"}`;
+          }),
+        ].join("\n");
+
+        const gesamtStunden = monEis.reduce((s, e) => s + parseFloat(String(e.dauerStunden ?? 0)), 0);
+        const gesamtKm = monFahr.reduce((s, f) => s + parseFloat(String(f.kilometer ?? 0)), 0);
+        const gesamtVerguetung = monFahr.reduce((s, f) => s + parseFloat(String(f.verguetung ?? 0)), 0);
+        const gesamtBetrag = monLeis.reduce((s, l) => s + parseFloat(String(l.betrag ?? 0)), 0);
+
+        return {
+          monat: input.monat,
+          stats: {
+            einsaetze: monEis.length,
+            stunden: Math.round(gesamtStunden * 100) / 100,
+            leistungen: monLeis.length,
+            betrag: Math.round(gesamtBetrag * 100) / 100,
+            fahrten: monFahr.length,
+            km: Math.round(gesamtKm * 10) / 10,
+            verguetung: Math.round(gesamtVerguetung * 100) / 100,
+          },
+          csv: {
+            einsaetze: einsaetzeCsv,
+            leistungen: leistungenCsv,
+            fahrten: fahrenCsv,
+          },
+        };
+      }),
   }),
 
   // ── ADMIN ─────────────────────────────────────────────
   admin: router({
-    // Mitarbeiter-Verwaltung
     mitarbeiterList: adminProcedure.query(async () => getAllMitarbeiter()),
 
     mitarbeiterCreate: adminProcedure
@@ -426,7 +660,6 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    // Kunden-Zuordnung
     getZuordnung: adminProcedure
       .input(z.object({ mitarbeiterId: z.number().int().positive() }))
       .query(async ({ input }) => getZuordnungenForMitarbeiter(input.mitarbeiterId)),
@@ -442,12 +675,10 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    // Statistiken
     statistik: adminProcedure
       .input(z.object({ monat: z.string().regex(/^\d{4}-\d{2}$/) }))
       .query(async ({ input }) => getMonatsStatistik(input.monat)),
 
-    // Monatsabschluss
     monatsabschluesse: adminProcedure.query(async () => getMonatsabschluesse()),
 
     monatsabschluss: adminProcedure
@@ -474,7 +705,6 @@ export const appRouter = router({
         const gesamtKm = monFahr.reduce((s, f) => s + parseFloat(String(f.kilometer ?? 0)), 0);
         const gesamtVerguetung = monFahr.reduce((s, f) => s + parseFloat(String(f.verguetung ?? 0)), 0);
 
-        // CSV generieren
         const csvRows = [
           "Mitarbeiter;Datum;Kunde;Paragraph;Stunden;Status",
           ...monEis.map((e) => {
@@ -499,12 +729,10 @@ export const appRouter = router({
         return { success: true, csvExport, stats: { einsaetze: monEis.length, stunden: gesamtStunden, km: gesamtKm, verguetung: gesamtVerguetung } };
       }),
 
-    // Mitarbeiter-Detail (alle Felder)
     mitarbeiterDetail: adminProcedure
       .input(z.object({ id: z.number().int().positive() }))
       .query(async ({ input }) => getMitarbeiterById(input.id)),
 
-    // Zertifikat-Status aktualisieren
     updateZertifikat: adminProcedure
       .input(z.object({
         id: z.number().int().positive(),
@@ -520,7 +748,6 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    // Vollständige Mitarbeiter-Stammdaten aktualisieren (inkl. Beschäftigungsart, Adresse, etc.)
     updateStammdaten: adminProcedure
       .input(z.object({
         id: z.number().int().positive(),
@@ -550,7 +777,6 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    // Arbeitsvertrag hinterlegen (URL nach S3-Upload)
     updateArbeitsvertrag: adminProcedure
       .input(z.object({
         id: z.number().int().positive(),
@@ -565,7 +791,6 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    // Arbeitsvertrag-Upload-URL generieren (S3 presigned)
     getUploadUrl: adminProcedure
       .input(z.object({
         mitarbeiterId: z.number().int().positive(),
@@ -575,13 +800,11 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         const { storagePut } = await import("./storage");
         const key = `arbeitsvertraege/ma-${input.mitarbeiterId}/${Date.now()}-${input.dateiname}`;
-        // Dummy-Upload mit leerem Buffer um URL zu generieren
         const { url } = await storagePut(key, Buffer.from(""), input.contentType);
         await createAuditLog({ mitarbeiterId: ctx.adminId, action: "ADMIN", ressource: "arbeitsvertrag", details: `upload-url ma=${input.mitarbeiterId}`, status: "success" });
         return { uploadUrl: url, key };
       }),
 
-    // Audit-Log
     auditLogs: adminProcedure
       .input(z.object({ limit: z.number().int().min(1).max(500).default(200) }))
       .query(async ({ input }) => getAuditLogs(input.limit)),
