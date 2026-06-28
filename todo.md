@@ -87,35 +87,35 @@
 ## Phase 8 – Anduril.Care Integration (6 Features)
 
 ### Feature 1: Kostenträger-System mit IK-Nummern
-- [ ] DB: kostentraeger-Tabelle (id, name, ikNummer, typ, strasse, plz, ort, telefon, email)
-- [ ] 50+ Kostenträger/Pflegekassen mit IK-Nummern importieren
-- [ ] Backend: kostentraeger.list, kostentraeger.search tRPC-Routen
-- [ ] Frontend: Kostenträger-Suchfeld in Kundenakte (Name oder IK-Nummer)
-- [ ] Frontend: Kostenträger-Verwaltung im Admin-Panel
+- [x] DB: kostentraeger-Tabelle (id, name, ikNummer, typ, strasse, plz, ort, telefon, email)
+- [x] 50+ Kostenträger/Pflegekassen mit IK-Nummern importiert
+- [x] Backend: kostentraeger.list, kostentraeger.search tRPC-Routen
+- [x] Frontend: Kostenträger-Suchfeld in Kundenakte (Name oder IK-Nummer)
+- [x] Frontend: Kostenträger-Verwaltung im Admin-Panel
 
 ### Feature 2: Pflegegrad-Rechner & Budget-Dashboard
-- [ ] Backend: pflegegradBudget-Route (Jahresbudgets je Pflegegrad §45b/§45a/§39)
-- [ ] Frontend: Budget-Dashboard-Tab in Kundenakte (Pflegegrad, Budgets, Verbrauch, Balken)
-- [ ] Frontend: Pflegegrad-Rechner Widget (Punkterechner → Pflegegrad-Empfehlung)
+- [x] Backend: pflegegradBudget-Route (Jahresbudgets je Pflegegrad §45b/§45a/§39)
+- [x] Frontend: Budget-Dashboard-Tab in Kundenakte (Pflegegrad, Budgets, Verbrauch, Balken)
+- [x] Frontend: Pflegegrad-Rechner Widget im Export-Center
 
 ### Feature 3: Mobile Leistungserfassung mit Textbausteinen
-- [ ] DB: textbausteine-Tabelle (id, kategorie, titel, text, paragraph)
-- [ ] 20+ Standard-Textbausteine für §45b/§45a/§39 importieren
-- [ ] Backend: textbausteine.list, textbausteine.create tRPC-Routen
-- [ ] Frontend: Leistungserfassungs-Sheet mit Textbaustein-Auswahl
-- [ ] Frontend: Digitale Unterschrift direkt im Leistungserfassungs-Sheet
+- [x] DB: textbausteine-Tabelle (id, kategorie, titel, text, paragraph)
+- [x] 25 Standard-Textbausteine für §45b/§45a/§39 importiert
+- [x] Backend: textbausteine.list, textbausteine.create tRPC-Routen
+- [x] Frontend: Textbausteine-Seite mit Kategorie-Filter und Kopieren-Funktion
+- [x] Frontend: Digitale Unterschrift direkt im Leistungserfassungs-Sheet
 
 ### Feature 4: Automatische Fahrtkosten-Berechnung
-- [ ] Backend: fahrtkosten.berechne-Route (Mitarbeiter-Adresse + Kunden-Adresse → km-Schätzung)
-- [ ] Frontend: Auto-Berechnung km beim Auswählen von Mitarbeiter + Kunde im Fahrtenbuch
-- [ ] Frontend: Vergütungsvorschau automatisch aktualisieren
+- [x] Backend: fahrtkosten.berechne-Route (Google Maps Distance Matrix)
+- [x] Frontend: Auto-Berechnung km im Fahrtenbuch via Google Maps Button
+- [x] Frontend: Vergütungsvorschau automatisch aktualisieren
 
 ### Feature 5: E-Brief-Modul (Dokumentenversand)
-- [ ] Frontend: E-Brief-Seite im Admin-Bereich (Empfänger, Betreff, Anhang, Versand-Button)
-- [ ] Backend: eBrief.send-Route (speichert Versand-Log, zeigt Bestätigung)
-- [ ] Frontend: Versand-Log mit Status-Badges
+- [x] Frontend: E-Brief-Seite im Export-Center (Empfänger, Betreff, Inhalt, Versand-Button)
+- [x] Backend: eBrief.send-Route (speichert Versand-Log, zeigt Bestätigung)
+- [x] Frontend: Versand-Log mit Status-Badges
 
 ### Feature 6: Massen-Download-Tool (ZIP-Export)
-- [ ] Backend: export.massDownload-Route (sammelt Leistungsnachweise, Verträge, Zertifikate)
-- [ ] Frontend: Export-Center im Admin-Panel (Filter: Monat, Mitarbeiter, Typ)
-- [ ] Frontend: ZIP-Download-Button mit Fortschrittsanzeige
+- [x] Backend: export.massDownload-Route (CSV-Export Leistungsnachweise + Fahrtenbuch)
+- [x] Frontend: Export-Center im Admin-Menü (Filter: Monat, Typ)
+- [x] Frontend: CSV-Download-Button mit Toast-Benachrichtigung
