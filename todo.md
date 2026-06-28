@@ -73,13 +73,49 @@
 - [x] Tests für alle neuen Routen (21 Tests bestanden)
 
 ## Phase 7 – Mitarbeiter-Erweiterung
-- [ ] Mitarbeiter-Tabelle: Felder für Beschäftigungsart, Position, Eintrittsdatum, Telefon, Adresse
-- [ ] Mitarbeiter-Tabelle: Felder für Zertifikats-Status (erhalten/angemeldet/nicht angemeldet)
-- [ ] Mitarbeiter-Tabelle: Felder für Arbeitsvertrag (Datei-URL, Datum)
-- [ ] Alle 9 Mitarbeiter aus Bild importieren
-- [ ] Backend: Zertifikat-Update-Route (Admin)
-- [ ] Backend: Beschäftigungsart-Update-Route (Admin)
-- [ ] Backend: Arbeitsvertrag-Upload-Route (S3)
-- [ ] Frontend: Mitarbeiter-Detailseite mit Tabs (Stammdaten, Zertifikate, Vertrag)
-- [ ] Frontend: Zertifikats-Status-Badge in Mitarbeiterliste
-- [ ] Frontend: Beschäftigungsart-Badge (Minijob/Teilzeit/Vollzeit)
+- [x] Mitarbeiter-Tabelle: Felder für Beschäftigungsart, Position, Eintrittsdatum, Telefon, Adresse
+- [x] Mitarbeiter-Tabelle: Felder für Zertifikats-Status (erhalten/angemeldet/nicht angemeldet)
+- [x] Mitarbeiter-Tabelle: Felder für Arbeitsvertrag (Datei-URL, Datum)
+- [x] Alle 9 Mitarbeiter aus Bild importieren
+- [x] Backend: Zertifikat-Update-Route (Admin)
+- [x] Backend: Beschäftigungsart-Update-Route (Admin)
+- [x] Backend: Arbeitsvertrag-Upload-Route (S3)
+- [x] Frontend: Mitarbeiter-Detailseite mit Tabs (Stammdaten, Zertifikate, Vertrag)
+- [x] Frontend: Zertifikats-Status-Badge in Mitarbeiterliste
+- [x] Frontend: Beschäftigungsart-Badge (Minijob/Teilzeit/Vollzeit)
+
+## Phase 8 – Anduril.Care Integration (6 Features)
+
+### Feature 1: Kostenträger-System mit IK-Nummern
+- [ ] DB: kostentraeger-Tabelle (id, name, ikNummer, typ, strasse, plz, ort, telefon, email)
+- [ ] 50+ Kostenträger/Pflegekassen mit IK-Nummern importieren
+- [ ] Backend: kostentraeger.list, kostentraeger.search tRPC-Routen
+- [ ] Frontend: Kostenträger-Suchfeld in Kundenakte (Name oder IK-Nummer)
+- [ ] Frontend: Kostenträger-Verwaltung im Admin-Panel
+
+### Feature 2: Pflegegrad-Rechner & Budget-Dashboard
+- [ ] Backend: pflegegradBudget-Route (Jahresbudgets je Pflegegrad §45b/§45a/§39)
+- [ ] Frontend: Budget-Dashboard-Tab in Kundenakte (Pflegegrad, Budgets, Verbrauch, Balken)
+- [ ] Frontend: Pflegegrad-Rechner Widget (Punkterechner → Pflegegrad-Empfehlung)
+
+### Feature 3: Mobile Leistungserfassung mit Textbausteinen
+- [ ] DB: textbausteine-Tabelle (id, kategorie, titel, text, paragraph)
+- [ ] 20+ Standard-Textbausteine für §45b/§45a/§39 importieren
+- [ ] Backend: textbausteine.list, textbausteine.create tRPC-Routen
+- [ ] Frontend: Leistungserfassungs-Sheet mit Textbaustein-Auswahl
+- [ ] Frontend: Digitale Unterschrift direkt im Leistungserfassungs-Sheet
+
+### Feature 4: Automatische Fahrtkosten-Berechnung
+- [ ] Backend: fahrtkosten.berechne-Route (Mitarbeiter-Adresse + Kunden-Adresse → km-Schätzung)
+- [ ] Frontend: Auto-Berechnung km beim Auswählen von Mitarbeiter + Kunde im Fahrtenbuch
+- [ ] Frontend: Vergütungsvorschau automatisch aktualisieren
+
+### Feature 5: E-Brief-Modul (Dokumentenversand)
+- [ ] Frontend: E-Brief-Seite im Admin-Bereich (Empfänger, Betreff, Anhang, Versand-Button)
+- [ ] Backend: eBrief.send-Route (speichert Versand-Log, zeigt Bestätigung)
+- [ ] Frontend: Versand-Log mit Status-Badges
+
+### Feature 6: Massen-Download-Tool (ZIP-Export)
+- [ ] Backend: export.massDownload-Route (sammelt Leistungsnachweise, Verträge, Zertifikate)
+- [ ] Frontend: Export-Center im Admin-Panel (Filter: Monat, Mitarbeiter, Typ)
+- [ ] Frontend: ZIP-Download-Button mit Fortschrittsanzeige

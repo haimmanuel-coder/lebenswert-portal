@@ -1,7 +1,7 @@
 import { and, eq, gte, lte, desc, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, mitarbeiter, kunden, einsaetze, leistungen, fahrten, auditLogs, kundenZuordnung, monatsabschluesse, passwordResets } from "../drizzle/schema";
-import type { InsertMitarbeiter, InsertKunde, InsertEinsatz, InsertLeistung, InsertFahrt, InsertAuditLog } from "../drizzle/schema";
+import { InsertUser, users, mitarbeiter, kunden, einsaetze, leistungen, fahrten, auditLogs, kundenZuordnung, monatsabschluesse, passwordResets, kostentraeger, textbausteine, eBriefLog } from "../drizzle/schema";
+import type { InsertMitarbeiter, InsertKunde, InsertEinsatz, InsertLeistung, InsertFahrt, InsertAuditLog, InsertKostentraeger, InsertTextbaustein, InsertEBriefLog } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -438,4 +438,105 @@ export async function updateMitarbeiterPasswort(mitarbeiterId: number, passwortH
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   await db.update(mitarbeiter).set({ passwortHash }).where(eq(mitarbeiter.id, mitarbeiterId));
+}
+
+// ── KOSTENTRÄGER ─────────────────────────────────────
+export async function getAllKostentraeger() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(kostentraeger).where(eq(kostentraeger.aktiv, 1)).orderBy(kostentraeger.name);
+}
+
+export async function searchKostentraeger(query: string) {
+  const db = await getDb();
+  if (!db) return [];
+  const like = `%${query}%`;
+  return db.select().from(kostentraeger)
+    .where(and(
+      eq(kostentraeger.aktiv, 1),
+      sql`(${kostentraeger.name} LIKE ${like} OR ${kostentraeger.ikNummer} LIKE ${like} OR ${kostentraeger.kurzname} LIKE ${like})`
+    ))
+    .orderBy(kostentraeger.name)
+    .limit(20);
+}
+
+export async function createKostentraeger(data: InsertKostentraeger) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.insert(kostentraeger).values(data);
+}
+
+export async function updateKostentraeger(id: number, data: Partial<InsertKostentraeger>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(kostentraeger).set(data as any).where(eq(kostentraeger.id, id));
+}
+
+// ── TEXTBAUSTEINE ─────────────────────────────────────
+export async function getAllTextbausteine(paragraph?: string, kategorie?: string) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [eq(textbausteine.aktiv, 1)];
+  if (paragraph && paragraph !== "alle") {
+    conditions.push(sql`(${textbausteine.paragraph} = ${paragraph} OR ${textbausteine.paragraph} = 'alle')`);
+  }
+  if (kategorie) {
+    conditions.push(eq(textbausteine.kategorie, kategorie as any));
+  }
+  return db.select().from(textbausteine).where(and(...conditions)).orderBy(textbausteine.kategorie, textbausteine.titel);
+}
+
+export async function createTextbaustein(data: InsertTextbaustein) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.insert(textbausteine).values(data);
+}
+
+export async function updateTextbaustein(id: number, data: Partial<InsertTextbaustein>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(textbausteine).set(data as any).where(eq(textbausteine.id, id));
+}
+
+// ── E-BRIEF LOG ───────────────────────────────────────
+export async function createEBriefLog(data: InsertEBriefLog) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.insert(eBriefLog).values(data);
+}
+
+export async function getEBriefLogs(limit = 100) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(eBriefLog).orderBy(desc(eBriefLog.createdAt)).limit(limit);
+}
+
+// ── PFLEGEGRAD-BUDGET-TABELLE ─────────────────────────
+// Gesetzliche Jahresbudgets nach SGB XI (Stand 2024)
+export function getPflegegradBudgets(pflegegrad: number) {
+  const budgets: Record<number, { b45b: number; b45a: number; b39: number; label: string }> = {
+    1: { b45b: 125,   b45a: 0,    b39: 0,    label: "Pflegegrad 1" },
+    2: { b45b: 689,   b45a: 0,    b39: 1612, label: "Pflegegrad 2" },
+    3: { b45b: 689,   b45a: 0,    b39: 1995, label: "Pflegegrad 3" },
+    4: { b45b: 689,   b45a: 0,    b39: 1612, label: "Pflegegrad 4" },
+    5: { b45b: 689,   b45a: 0,    b39: 1995, label: "Pflegegrad 5" },
+  };
+  return budgets[pflegegrad] ?? budgets[2];
+}
+
+// ── EXPORT: Alle Leistungsnachweise eines Monats ──────
+export async function getLeistungenFuerExport(monat: string, mitarbeiterId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [sql`${leistungen.monat} = ${monat}`];
+  if (mitarbeiterId) conditions.push(eq(leistungen.mitarbeiterId, mitarbeiterId));
+  return db.select().from(leistungen).where(and(...conditions)).orderBy(leistungen.createdAt);
+}
+
+export async function getFahrtenFuerExport(monat: string, mitarbeiterId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [sql`DATE_FORMAT(${fahrten.datum}, '%Y-%m') = ${monat}`];
+  if (mitarbeiterId) conditions.push(eq(fahrten.mitarbeiterId, mitarbeiterId));
+  return db.select().from(fahrten).where(and(...conditions)).orderBy(fahrten.datum);
 }

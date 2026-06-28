@@ -45,6 +45,29 @@ export default function Fahrtenbuch() {
   const rate = typ === "sonder" ? 0.35 : 0.30;
   const eurPreview = ((parseFloat(km) || 0) * rate).toFixed(2);
 
+  // Auto-Berechnung via Google Maps
+  const [autoBerechnung, setAutoBerechnung] = useState<{ km: number; verguetung: number; distanzText: string | null; dauerText: string | null } | null>(null);
+  const [autoLoading, setAutoLoading] = useState(false);
+  const fahrtkostenMut = trpc.admin.fahrtkostenBerechne.useMutation({
+    onSuccess: (data) => {
+      setAutoBerechnung(data);
+      if (data.km > 0) {
+        setKm(String(data.km));
+        toast.success(`📍 ${data.distanzText} – ${data.dauerText}`);
+      } else {
+        toast.error("Adresse nicht gefunden");
+      }
+      setAutoLoading(false);
+    },
+    onError: () => { toast.error("Berechnung fehlgeschlagen"); setAutoLoading(false); },
+  });
+
+  function berechneKm() {
+    if (!vonOrt.trim() || !nachOrt.trim()) { toast.error("Von- und Zielort eingeben"); return; }
+    setAutoLoading(true);
+    fahrtkostenMut.mutate({ vonAdresse: vonOrt, nachAdresse: nachOrt });
+  }
+
   const saveFahrt = () => {
     if (!datum || !vonOrt || !nachOrt || !km) { toast.error("Bitte alle Pflichtfelder ausfüllen!"); return; }
     createFahrt.mutate({
@@ -158,6 +181,22 @@ export default function Fahrtenbuch() {
             <input type="text" value={nachOrt} onChange={(e) => setNachOrt(e.target.value)} placeholder="Zielort"
               style={{ width: "100%", padding: "12px 13px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 15, outline: "none", boxSizing: "border-box" }} />
           </div>
+        </div>
+
+        {/* Auto-Berechnen Button */}
+        <div style={{ marginBottom: 10 }}>
+          <button
+            onClick={berechneKm}
+            disabled={autoLoading || !vonOrt.trim() || !nachOrt.trim()}
+            style={{ width: "100%", padding: "11px 13px", background: autoLoading ? "#9ca3af" : "#1d4ed8", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: autoLoading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+          >
+            {autoLoading ? "⏳ Berechne..." : "📍 km automatisch berechnen (Google Maps)"}
+          </button>
+          {autoBerechnung && autoBerechnung.km > 0 && (
+            <div style={{ background: "#dbeafe", border: "1px solid #93c5fd", color: "#1e40af", padding: "8px 12px", borderRadius: 8, fontSize: 12, marginTop: 6 }}>
+              🗺️ {autoBerechnung.distanzText} · ⏱️ {autoBerechnung.dauerText}
+            </div>
+          )}
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>

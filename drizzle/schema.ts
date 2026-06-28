@@ -209,3 +209,52 @@ export const passwordResets = mysqlTable("passwordResets", {
 
 export type PasswordReset = typeof passwordResets.$inferSelect;
 export type InsertPasswordReset = typeof passwordResets.$inferInsert;
+
+// Kostenträger (Pflegekassen) mit IK-Nummern
+export const kostentraeger = mysqlTable("kostentraeger", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 200 }).notNull(),
+  kurzname: varchar("kurzname", { length: 50 }),
+  ikNummer: varchar("ikNummer", { length: 20 }),
+  typ: mysqlEnum("typ", ["pflegekasse", "krankenkasse", "privat", "sonstige"]).default("pflegekasse"),
+  strasse: varchar("strasse", { length: 200 }),
+  plz: varchar("plz", { length: 10 }),
+  ort: varchar("ort", { length: 100 }),
+  telefon: varchar("telefon", { length: 50 }),
+  fax: varchar("fax", { length: 50 }),
+  email: varchar("email", { length: 320 }),
+  aktiv: int("aktiv").default(1).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Kostentraeger = typeof kostentraeger.$inferSelect;
+export type InsertKostentraeger = typeof kostentraeger.$inferInsert;
+
+// Textbausteine für mobile Leistungserfassung
+export const textbausteine = mysqlTable("textbausteine", {
+  id: int("id").autoincrement().primaryKey(),
+  kategorie: mysqlEnum("kategorie", ["alltagsbegleitung", "haushalt", "mobilisierung", "soziales", "transport", "sonstiges"]).default("alltagsbegleitung"),
+  paragraph: mysqlEnum("paragraph", ["45b", "45a", "39", "alle"]).default("alle"),
+  titel: varchar("titel", { length: 100 }).notNull(),
+  text: text("text").notNull(),
+  aktiv: int("aktiv").default(1).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Textbaustein = typeof textbausteine.$inferSelect;
+export type InsertTextbaustein = typeof textbausteine.$inferInsert;
+
+// E-Brief Versand-Log
+export const eBriefLog = mysqlTable("eBriefLog", {
+  id: int("id").autoincrement().primaryKey(),
+  mitarbeiterId: int("mitarbeiterId"),
+  empfaenger: varchar("empfaenger", { length: 200 }).notNull(),
+  betreff: varchar("betreff", { length: 300 }).notNull(),
+  inhalt: text("inhalt"),
+  anhangName: varchar("anhangName", { length: 255 }),
+  status: mysqlEnum("status", ["gesendet", "fehler", "ausstehend"]).default("ausstehend"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type EBriefLog = typeof eBriefLog.$inferSelect;
+export type InsertEBriefLog = typeof eBriefLog.$inferInsert;

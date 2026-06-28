@@ -10,9 +10,12 @@ import AdminPanel from "./AdminPanel";
 import ManagementDashboard from "./ManagementDashboard";
 import KundenDetail from "./KundenDetail";
 import Kundenliste from "./Kundenliste";
+import Kostentraeger from "./Kostentraeger";
+import Textbausteine from "./Textbausteine";
+import ExportCenter from "./ExportCenter";
 import BottomSheet from "@/components/BottomSheet";
 
-type PageId = "home" | "einsaetze" | "zeit" | "lnw" | "fahrt" | "admin" | "management" | "kunden";
+type PageId = "home" | "einsaetze" | "zeit" | "lnw" | "fahrt" | "admin" | "management" | "kunden" | "kostentraeger" | "textbausteine" | "export";
 
 const pages: { id: PageId; icon: string; label: string }[] = [
   { id: "home", icon: "🏠", label: "Home" },
@@ -51,6 +54,9 @@ export default function PortalApp() {
       case "admin": return <AdminPanel />;
       case "management": return <ManagementDashboard />;
       case "kunden": return <Kundenliste />;
+      case "kostentraeger": return <Kostentraeger />;
+      case "textbausteine": return <Textbausteine />;
+      case "export": return <ExportCenter />;
       default: return <Dashboard />;
     }
   };
@@ -253,6 +259,36 @@ export default function PortalApp() {
               <div style={{ textAlign: "left" }}>
                 <div>Admin-Panel</div>
                 <div style={{ fontSize: 11, opacity: 0.85 }}>Mitarbeiter, Kunden, Zuordnung</div>
+              </div>
+            </button>
+            <button
+              onClick={() => { setMenuOpen(false); navTo("kostentraeger"); }}
+              style={{ padding: 13, background: "#eff6ff", color: "#1d4ed8", border: "2px solid #93c5fd", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
+            >
+              <span>🏥</span>
+              <div style={{ textAlign: "left" }}>
+                <div>Kostenträger</div>
+                <div style={{ fontSize: 11, opacity: 0.8 }}>Pflegekassen mit IK-Nummern</div>
+              </div>
+            </button>
+            <button
+              onClick={() => { setMenuOpen(false); navTo("textbausteine"); }}
+              style={{ padding: 13, background: "#f0fdf4", color: "#15803d", border: "2px solid #86efac", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
+            >
+              <span>📝</span>
+              <div style={{ textAlign: "left" }}>
+                <div>Textbausteine</div>
+                <div style={{ fontSize: 11, opacity: 0.8 }}>Dokumentations-Vorlagen</div>
+              </div>
+            </button>
+            <button
+              onClick={() => { setMenuOpen(false); navTo("export"); }}
+              style={{ padding: 13, background: "#fef3c7", color: "#92400e", border: "2px solid #fcd34d", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
+            >
+              <span>📦</span>
+              <div style={{ textAlign: "left" }}>
+                <div>Export-Center</div>
+                <div style={{ fontSize: 11, opacity: 0.8 }}>CSV-Export, Pflegegrad-Rechner, E-Brief</div>
               </div>
             </button>
             <button

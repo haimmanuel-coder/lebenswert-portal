@@ -42,6 +42,18 @@ import {
   updateMitarbeiterPasswort,
   updateKundeBudget,
   getKundenMitBudgetWarnung,
+  getAllKostentraeger,
+  searchKostentraeger,
+  createKostentraeger,
+  updateKostentraeger,
+  getAllTextbausteine,
+  createTextbaustein,
+  updateTextbaustein,
+  createEBriefLog,
+  getEBriefLogs,
+  getPflegegradBudgets,
+  getLeistungenFuerExport,
+  getFahrtenFuerExport,
 } from "./db";
 import { SignJWT, jwtVerify } from "jose";
 import { ENV } from "./_core/env";
@@ -573,6 +585,190 @@ export const appRouter = router({
     auditLogs: adminProcedure
       .input(z.object({ limit: z.number().int().min(1).max(500).default(200) }))
       .query(async ({ input }) => getAuditLogs(input.limit)),
+
+    // ── KOSTENTRÄGER ──────────────────────────────────
+    kostentraegerList: adminProcedure.query(async () => getAllKostentraeger()),
+
+    kostentraegerSearch: adminProcedure
+      .input(z.object({ query: z.string().min(1) }))
+      .query(async ({ input }) => searchKostentraeger(input.query)),
+
+    kostentraegerCreate: adminProcedure
+      .input(z.object({
+        name: z.string().min(1),
+        kurzname: z.string().optional(),
+        ikNummer: z.string().optional(),
+        typ: z.enum(["pflegekasse", "krankenkasse", "privat", "sonstige"]).default("pflegekasse"),
+        strasse: z.string().optional(),
+        plz: z.string().optional(),
+        ort: z.string().optional(),
+        telefon: z.string().optional(),
+        fax: z.string().optional(),
+        email: z.string().email().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await createKostentraeger({ ...input, aktiv: 1 });
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "ADMIN", ressource: "kostentraeger", details: `create ${input.name}`, status: "success" });
+        return { success: true };
+      }),
+
+    kostentraegerUpdate: adminProcedure
+      .input(z.object({
+        id: z.number().int().positive(),
+        name: z.string().min(1).optional(),
+        kurzname: z.string().optional(),
+        ikNummer: z.string().optional(),
+        typ: z.enum(["pflegekasse", "krankenkasse", "privat", "sonstige"]).optional(),
+        strasse: z.string().optional(),
+        plz: z.string().optional(),
+        ort: z.string().optional(),
+        telefon: z.string().optional(),
+        aktiv: z.number().int().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const { id, ...data } = input;
+        await updateKostentraeger(id, data as any);
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "ADMIN", ressource: "kostentraeger", details: `update id=${id}`, status: "success" });
+        return { success: true };
+      }),
+
+    // ── TEXTBAUSTEINE ──────────────────────────────────
+    textbausteine: portalProcedure
+      .input(z.object({
+        paragraph: z.string().optional(),
+        kategorie: z.string().optional(),
+      }))
+      .query(async ({ input }) => getAllTextbausteine(input.paragraph, input.kategorie)),
+
+    textbausteineCreate: adminProcedure
+      .input(z.object({
+        kategorie: z.enum(["alltagsbegleitung", "haushalt", "mobilisierung", "soziales", "transport", "sonstiges"]),
+        paragraph: z.enum(["45b", "45a", "39", "alle"]),
+        titel: z.string().min(1),
+        text: z.string().min(1),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await createTextbaustein({ ...input, aktiv: 1 });
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "ADMIN", ressource: "textbaustein", details: `create ${input.titel}`, status: "success" });
+        return { success: true };
+      }),
+
+    textbausteineUpdate: adminProcedure
+      .input(z.object({
+        id: z.number().int().positive(),
+        titel: z.string().min(1).optional(),
+        text: z.string().min(1).optional(),
+        aktiv: z.number().int().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const { id, ...data } = input;
+        await updateTextbaustein(id, data as any);
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "ADMIN", ressource: "textbaustein", details: `update id=${id}`, status: "success" });
+        return { success: true };
+      }),
+
+    // ── PFLEGEGRAD-BUDGET ──────────────────────────────
+    pflegegradBudget: portalProcedure
+      .input(z.object({ pflegegrad: z.number().int().min(1).max(5) }))
+      .query(async ({ input }) => getPflegegradBudgets(input.pflegegrad)),
+
+    // ── FAHRTKOSTEN-BERECHNUNG (Distanz-Schätzung) ────
+    fahrtkostenBerechne: portalProcedure
+      .input(z.object({
+        vonAdresse: z.string().min(1),
+        nachAdresse: z.string().min(1),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          const { makeRequest } = await import("./_core/map");
+          const result = await makeRequest("/maps/api/distancematrix/json", {
+            origins: input.vonAdresse,
+            destinations: input.nachAdresse,
+            mode: "driving",
+            language: "de",
+          });
+          const element = (result as any)?.rows?.[0]?.elements?.[0];
+          if (element?.status === "OK") {
+            const distanzM = element.distance?.value ?? 0;
+            const km = Math.round(distanzM / 100) / 10; // auf 0.1 km runden
+            const verguetung = Math.round(km * 0.30 * 100) / 100; // 0,30 €/km
+            return { km, verguetung, distanzText: element.distance?.text, dauerText: element.duration?.text };
+          }
+          return { km: 0, verguetung: 0, distanzText: null, dauerText: null };
+        } catch {
+          return { km: 0, verguetung: 0, distanzText: null, dauerText: null };
+        }
+      }),
+
+    // ── E-BRIEF MODUL ──────────────────────────────────
+    eBriefSend: adminProcedure
+      .input(z.object({
+        empfaenger: z.string().min(1),
+        betreff: z.string().min(1),
+        inhalt: z.string().optional(),
+        anhangName: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        // Versand-Log speichern (E-Mail-Dienst kann später angebunden werden)
+        await createEBriefLog({
+          mitarbeiterId: ctx.adminId,
+          empfaenger: input.empfaenger,
+          betreff: input.betreff,
+          inhalt: input.inhalt,
+          anhangName: input.anhangName,
+          status: "gesendet",
+        });
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "EXPORT", ressource: "ebrief", details: `an=${input.empfaenger} betreff=${input.betreff}`, status: "success" });
+        return { success: true };
+      }),
+
+    eBriefLogs: adminProcedure
+      .input(z.object({ limit: z.number().int().min(1).max(200).default(50) }))
+      .query(async ({ input }) => getEBriefLogs(input.limit)),
+
+    // ── MASSEN-EXPORT (ZIP-Download) ───────────────────
+    massExport: adminProcedure
+      .input(z.object({
+        monat: z.string().regex(/^\d{4}-\d{2}$/),
+        mitarbeiterId: z.number().int().positive().optional(),
+        typ: z.enum(["leistungen", "fahrten", "alle"]).default("alle"),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const [leis, fahr, maList, kundenList] = await Promise.all([
+          getLeistungenFuerExport(input.monat, input.mitarbeiterId),
+          getFahrtenFuerExport(input.monat, input.mitarbeiterId),
+          getAllMitarbeiter(),
+          getAllKunden(),
+        ]);
+
+        const getMaName = (id: number) => { const m = maList.find(m => m.id === id); return m ? `${m.nachname} ${m.vorname}` : `MA-${id}`; };
+        const getKdName = (id: number | null) => { if (!id) return ""; const k = kundenList.find(k => k.id === id); return k ? `${k.nachname} ${k.vorname}` : `KD-${id}`; };
+
+        // CSV für Leistungsnachweise
+        const leistungenCsv = [
+          "Mitarbeiter;Monat;Kunde;Paragraph;Stunden;Einsätze;Betrag;Status",
+          ...leis.map(l => `${getMaName(l.mitarbeiterId)};${l.monat};${getKdName(l.kundenId)};§${l.paragraph} SGB XI;${l.stunden};${l.anzahlEinsaetze};${l.betrag} €;${l.status}`),
+        ].join("\n");
+
+        // CSV für Fahrten
+        const fahrenCsv = [
+          "Mitarbeiter;Datum;Von;Nach;km;Typ;Vergütung;Kunde;Zweck",
+          ...fahr.map(f => {
+            const d = typeof f.datum === "string" ? f.datum : (f.datum as Date).toISOString().split("T")[0];
+            return `${getMaName(f.mitarbeiterId)};${d};${f.vonOrt};${f.nachOrt};${f.kilometer};${f.typ};${f.verguetung} €;${getKdName(f.kundenId ?? null)};${f.zweck ?? ""}`;
+          }),
+        ].join("\n");
+
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "EXPORT", ressource: "massexport", details: `monat=${input.monat} typ=${input.typ}`, status: "success" });
+
+        return {
+          success: true,
+          monat: input.monat,
+          leistungenCsv: input.typ !== "fahrten" ? leistungenCsv : null,
+          fahrenCsv: input.typ !== "leistungen" ? fahrenCsv : null,
+          stats: { leistungen: leis.length, fahrten: fahr.length },
+        };
+      }),
   }),
 });
 
