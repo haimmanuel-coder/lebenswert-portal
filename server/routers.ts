@@ -487,6 +487,88 @@ export const appRouter = router({
         return { success: true, csvExport, stats: { einsaetze: monEis.length, stunden: gesamtStunden, km: gesamtKm, verguetung: gesamtVerguetung } };
       }),
 
+    // Mitarbeiter-Detail (alle Felder)
+    mitarbeiterDetail: adminProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .query(async ({ input }) => getMitarbeiterById(input.id)),
+
+    // Zertifikat-Status aktualisieren
+    updateZertifikat: adminProcedure
+      .input(z.object({
+        id: z.number().int().positive(),
+        zertifikatStatus: z.enum(["erhalten", "angemeldet", "nicht_angemeldet"]),
+        zertifikatDatum: z.string().optional(),
+        zertifikatAblauf: z.string().optional(),
+        zertifikatBemerkung: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const { id, ...data } = input;
+        await updateMitarbeiter(id, data as any);
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "ADMIN", ressource: "zertifikat", details: `ma=${id} status=${data.zertifikatStatus}`, status: "success" });
+        return { success: true };
+      }),
+
+    // Vollständige Mitarbeiter-Stammdaten aktualisieren (inkl. Beschäftigungsart, Adresse, etc.)
+    updateStammdaten: adminProcedure
+      .input(z.object({
+        id: z.number().int().positive(),
+        vorname: z.string().min(1).optional(),
+        nachname: z.string().min(1).optional(),
+        email: z.string().email().optional(),
+        telefon: z.string().optional(),
+        mobil: z.string().optional(),
+        strasse: z.string().optional(),
+        plz: z.string().optional(),
+        ort: z.string().optional(),
+        geburtsdatum: z.string().optional(),
+        eintrittsdatum: z.string().optional(),
+        position: z.string().optional(),
+        beschaeftigungsart: z.enum(["minijob", "teilzeit", "vollzeit"]).optional(),
+        rolle: z.enum(["mitarbeiter", "admin"]).optional(),
+        aktiv: z.number().int().optional(),
+        notizen: z.string().optional(),
+        neuesPasswort: z.string().min(6).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const { id, neuesPasswort, ...data } = input;
+        const updateData: Record<string, unknown> = { ...data };
+        if (neuesPasswort) updateData.passwortHash = await bcrypt.hash(neuesPasswort, 10);
+        await updateMitarbeiter(id, updateData as any);
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "ADMIN", ressource: "mitarbeiter", details: `stammdaten update id=${id}`, status: "success" });
+        return { success: true };
+      }),
+
+    // Arbeitsvertrag hinterlegen (URL nach S3-Upload)
+    updateArbeitsvertrag: adminProcedure
+      .input(z.object({
+        id: z.number().int().positive(),
+        arbeitsvertragUrl: z.string().url(),
+        arbeitsvertragDateiname: z.string(),
+        arbeitsvertragDatum: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const { id, ...data } = input;
+        await updateMitarbeiter(id, data as any);
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "ADMIN", ressource: "arbeitsvertrag", details: `ma=${id} datei=${data.arbeitsvertragDateiname}`, status: "success" });
+        return { success: true };
+      }),
+
+    // Arbeitsvertrag-Upload-URL generieren (S3 presigned)
+    getUploadUrl: adminProcedure
+      .input(z.object({
+        mitarbeiterId: z.number().int().positive(),
+        dateiname: z.string().min(1),
+        contentType: z.string().default("application/pdf"),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const { storagePut } = await import("./storage");
+        const key = `arbeitsvertraege/ma-${input.mitarbeiterId}/${Date.now()}-${input.dateiname}`;
+        // Dummy-Upload mit leerem Buffer um URL zu generieren
+        const { url } = await storagePut(key, Buffer.from(""), input.contentType);
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "ADMIN", ressource: "arbeitsvertrag", details: `upload-url ma=${input.mitarbeiterId}`, status: "success" });
+        return { uploadUrl: url, key };
+      }),
+
     // Audit-Log
     auditLogs: adminProcedure
       .input(z.object({ limit: z.number().int().min(1).max(500).default(200) }))

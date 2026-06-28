@@ -2,8 +2,21 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import BottomSheet from "@/components/BottomSheet";
+import MitarbeiterDetail from "./MitarbeiterDetail";
 
 type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss";
+
+const ZERT_BADGE: Record<string, { label: string; bg: string; color: string }> = {
+  erhalten: { label: "✅ Zertifikat erhalten", bg: "#e8f5e4", color: "#4a8c3f" },
+  angemeldet: { label: "⏳ Zur Schulung angemeldet", bg: "#fef9c3", color: "#92400e" },
+  nicht_angemeldet: { label: "❌ Nicht angemeldet", bg: "#fee2e2", color: "#991b1b" },
+};
+
+const BESCHAEFT_BADGE: Record<string, { label: string; bg: string; color: string }> = {
+  minijob: { label: "Minijob", bg: "#f3e8ff", color: "#7e22ce" },
+  teilzeit: { label: "Teilzeit", bg: "#dbeafe", color: "#1d4ed8" },
+  vollzeit: { label: "Vollzeit", bg: "#e8f5e4", color: "#4a8c3f" },
+};
 
 export default function AdminPanel() {
   const [tab, setTab] = useState<AdminTab>("mitarbeiter");
@@ -157,6 +170,13 @@ export default function AdminPanel() {
     onError: (e) => toast.error("❌ " + e.message),
   });
 
+  const [detailMaId, setDetailMaId] = useState<number | null>(null);
+
+  // Wenn Mitarbeiter-Detail geöffnet
+  if (detailMaId !== null) {
+    return <MitarbeiterDetail mitarbeiterId={detailMaId} onBack={() => setDetailMaId(null)} />;
+  }
+
   const tabStyle = (t: AdminTab) => ({
     padding: "8px 16px", borderRadius: 20, fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer",
     ...(tab === t ? { background: "#4a8c3f", color: "#fff" } : { background: "#f3f4f6", color: "#4b5563" }),
@@ -193,21 +213,39 @@ export default function AdminPanel() {
             <span style={{ fontSize: 14, fontWeight: 600 }}>{maList.length} Mitarbeiter</span>
             <button onClick={() => { resetMaForm(); setMaSheet(true); }} style={{ padding: "8px 14px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>+ Neu</button>
           </div>
-          {maList.map((ma) => (
+          {maList.map((ma) => {
+            const zert = (ma as any).zertifikatStatus as string ?? "nicht_angemeldet";
+            const beschaeft = (ma as any).beschaeftigungsart as string ?? "minijob";
+            const zertBadge = ZERT_BADGE[zert] ?? ZERT_BADGE.nicht_angemeldet;
+            const beschBadge = BESCHAEFT_BADGE[beschaeft] ?? BESCHAEFT_BADGE.minijob;
+            return (
             <div key={ma.id} style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 10px rgba(0,0,0,.08)", padding: 14, marginBottom: 10 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
                 <div style={{ width: 42, height: 42, borderRadius: "50%", background: ma.rolle === "admin" ? "#4a8c3f" : "#e8f5e4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
                   {ma.rolle === "admin" ? "👑" : "👤"}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 700 }}>{ma.vorname} {ma.nachname}</div>
-                  <div style={{ fontSize: 12, color: "#6b7280" }}>{ma.email}</div>
-                  {ma.telefon && <div style={{ fontSize: 12, color: "#6b7280" }}>📞 {ma.telefon}</div>}
+                  <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 2 }}>{(ma as any).position ?? ma.email}</div>
+                  <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 6 }}>{ma.email}</div>
+                  {/* Badges */}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                    <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700, background: beschBadge.bg, color: beschBadge.color }}>
+                      {beschBadge.label}
+                    </span>
+                    <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700, background: zertBadge.bg, color: zertBadge.color }}>
+                      {zertBadge.label}
+                    </span>
+                    {(ma as any).arbeitsvertragUrl && (
+                      <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700, background: "#e8f5e4", color: "#4a8c3f" }}>📄 Vertrag vorhanden</span>
+                    )}
+                  </div>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end", flexShrink: 0 }}>
                   <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: ma.aktiv ? "#e8f5e4" : "#fee2e2", color: ma.aktiv ? "#4a8c3f" : "#991b1b" }}>
                     {ma.aktiv ? "Aktiv" : "Inaktiv"}
                   </span>
+                  <button onClick={() => setDetailMaId(ma.id)} style={{ padding: "4px 10px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Details</button>
                   <button onClick={() => openEditMa(ma)} style={{ padding: "4px 10px", background: "#f3f4f6", color: "#4b5563", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Bearbeiten</button>
                   <button onClick={() => { updateMa.mutate({ id: ma.id, aktiv: ma.aktiv ? 0 : 1 }); }} style={{ padding: "4px 10px", background: ma.aktiv ? "#fee2e2" : "#e8f5e4", color: ma.aktiv ? "#991b1b" : "#4a8c3f", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                     {ma.aktiv ? "Deaktivieren" : "Aktivieren"}
@@ -215,7 +253,7 @@ export default function AdminPanel() {
                 </div>
               </div>
             </div>
-          ))}
+          );})}
         </div>
       )}
 

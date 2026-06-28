@@ -71,3 +71,15 @@
 - [x] Kundenliste: Roter Badge bei < 10% Restbudget
 - [x] Dashboard: Budget-Warnungs-Karte mit Anzahl kritischer Kunden
 - [x] Tests für alle neuen Routen (21 Tests bestanden)
+
+## Phase 7 – Mitarbeiter-Erweiterung
+- [ ] Mitarbeiter-Tabelle: Felder für Beschäftigungsart, Position, Eintrittsdatum, Telefon, Adresse
+- [ ] Mitarbeiter-Tabelle: Felder für Zertifikats-Status (erhalten/angemeldet/nicht angemeldet)
+- [ ] Mitarbeiter-Tabelle: Felder für Arbeitsvertrag (Datei-URL, Datum)
+- [ ] Alle 9 Mitarbeiter aus Bild importieren
+- [ ] Backend: Zertifikat-Update-Route (Admin)
+- [ ] Backend: Beschäftigungsart-Update-Route (Admin)
+- [ ] Backend: Arbeitsvertrag-Upload-Route (S3)
+- [ ] Frontend: Mitarbeiter-Detailseite mit Tabs (Stammdaten, Zertifikate, Vertrag)
+- [ ] Frontend: Zertifikats-Status-Badge in Mitarbeiterliste
+- [ ] Frontend: Beschäftigungsart-Badge (Minijob/Teilzeit/Vollzeit)

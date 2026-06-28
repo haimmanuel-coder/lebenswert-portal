@@ -35,8 +35,28 @@ export const mitarbeiter = mysqlTable("mitarbeiter", {
   passwortHash: varchar("passwortHash", { length: 255 }).notNull(),
   rolle: mysqlEnum("rolle", ["mitarbeiter", "admin"]).default("mitarbeiter").notNull(),
   aktiv: int("aktiv").default(1).notNull(),
+  // Stammdaten
   telefon: varchar("telefon", { length: 50 }),
-  adresse: text("adresse"),
+  mobil: varchar("mobil", { length: 50 }),
+  strasse: varchar("strasse", { length: 200 }),
+  plz: varchar("plz", { length: 10 }),
+  ort: varchar("ort", { length: 100 }),
+  geburtsdatum: date("geburtsdatum"),
+  eintrittsdatum: date("eintrittsdatum"),
+  // Position & Beschäftigungsart
+  position: varchar("position", { length: 100 }),
+  beschaeftigungsart: mysqlEnum("beschaeftigungsart", ["minijob", "teilzeit", "vollzeit"]).default("minijob"),
+  // Zertifikate & Schulungen
+  zertifikatStatus: mysqlEnum("zertifikatStatus", ["erhalten", "angemeldet", "nicht_angemeldet"]).default("nicht_angemeldet"),
+  zertifikatDatum: date("zertifikatDatum"),
+  zertifikatAblauf: date("zertifikatAblauf"),
+  zertifikatBemerkung: text("zertifikatBemerkung"),
+  // Arbeitsvertrag
+  arbeitsvertragUrl: text("arbeitsvertragUrl"),
+  arbeitsvertragDatum: date("arbeitsvertragDatum"),
+  arbeitsvertragDateiname: varchar("arbeitsvertragDateiname", { length: 255 }),
+  // Notizen
+  notizen: text("notizen"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
