@@ -119,3 +119,17 @@
 - [x] Backend: export.massDownload-Route (CSV-Export Leistungsnachweise + Fahrtenbuch)
 - [x] Frontend: Export-Center im Admin-Menü (Filter: Monat, Typ)
 - [x] Frontend: CSV-Download-Button mit Toast-Benachrichtigung
+
+## Phase 9 – Merge-Konflikt-Fixes
+- [x] routers.ts: fehlende Imports ergänzt (getKostentraegerById, deleteTextbaustein, getEbriefLog, getEbriefLogByKunde)
+- [x] routers.ts: createEbriefLog → createEBriefLog korrigiert
+- [x] routers.ts: getAllTextbausteine in db.ts um optionale Parameter (paragraph, kategorie) erweitert
+- [x] routers.ts: textbausteineCreate Kategorie-Enum korrigiert (bericht|gesundheit|aktivitaet|bemerkung|sonstiges)
+- [x] routers.ts: textbausteineCreate text-Feld → inhalt-Feld korrigiert
+- [x] routers.ts: textbausteineUpdate text-Feld → inhalt-Feld korrigiert
+- [x] routers.ts: status "gesendet" → "versendet" korrigiert
+- [x] Textbausteine.tsx: alle text-Felder auf inhalt umgestellt
+- [x] PortalApp.tsx: navTo("budget") → navTo("kunden") korrigiert
+- [x] PortalApp.tsx: navTo("ebrief") → navTo("export") korrigiert
+- [x] 0 TypeScript-Fehler (npx tsc --noEmit)
+- [x] 29 Tests bestanden (pnpm test)

@@ -1,7 +1,7 @@
 import { and, eq, gte, lte, desc, sql, like, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, mitarbeiter, kunden, einsaetze, leistungen, fahrten, auditLogs, kundenZuordnung, monatsabschluesse, passwordResets, kostentraeger, textbausteine, eBriefLog } from "../drizzle/schema";
-import type { InsertMitarbeiter, InsertKunde, InsertEinsatz, InsertLeistung, InsertFahrt, InsertAuditLog, InsertKostentraeger, InsertTextbaustein, InsertEBriefLog } from "../drizzle/schema";
+import { InsertUser, users, mitarbeiter, kunden, einsaetze, leistungen, fahrten, auditLogs, kundenZuordnung, monatsabschluesse, passwordResets, kostentraeger, textbausteine, ebriefLog } from "../drizzle/schema";
+import type { InsertMitarbeiter, InsertKunde, InsertEinsatz, InsertLeistung, InsertFahrt, InsertAuditLog, InsertKostentraeger, InsertTextbaustein, InsertEbriefLog } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -411,10 +411,13 @@ export async function updateKostentraeger(id: number, data: Partial<InsertKosten
 }
 
 // ── MODUL 3: TEXTBAUSTEINE ───────────────────────────
-export async function getAllTextbausteine() {
+export async function getAllTextbausteine(paragraph?: string, kategorie?: string) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(textbausteine).where(eq(textbausteine.aktiv, 1)).orderBy(textbausteine.kategorie, textbausteine.titel);
+  const conditions = [eq(textbausteine.aktiv, 1)];
+  if (paragraph) conditions.push(eq(textbausteine.paragraph, paragraph as any));
+  if (kategorie) conditions.push(eq(textbausteine.kategorie, kategorie as any));
+  return db.select().from(textbausteine).where(and(...conditions)).orderBy(textbausteine.kategorie, textbausteine.titel);
 }
 
 export async function getTextbausteinById(id: number) {
@@ -460,6 +463,10 @@ export async function getEbriefLogByKunde(kundenId: number) {
   if (!db) return [];
   return db.select().from(ebriefLog).where(eq(ebriefLog.kundenId, kundenId)).orderBy(desc(ebriefLog.createdAt));
 }
+
+// Aliases für Kompatibilität
+export const createEBriefLog = createEbriefLog;
+export const getEBriefLogs = getEbriefLog;
 
 // ── AUDIT-LOG ─────────────────────────────────────────
 export async function createAuditLog(data: InsertAuditLog) {
@@ -557,76 +564,6 @@ export async function updateMitarbeiterPasswort(mitarbeiterId: number, passwortH
   await db.update(mitarbeiter).set({ passwortHash }).where(eq(mitarbeiter.id, mitarbeiterId));
 }
 
-// ── KOSTENTRÄGER ─────────────────────────────────────
-export async function getAllKostentraeger() {
-  const db = await getDb();
-  if (!db) return [];
-  return db.select().from(kostentraeger).where(eq(kostentraeger.aktiv, 1)).orderBy(kostentraeger.name);
-}
-
-export async function searchKostentraeger(query: string) {
-  const db = await getDb();
-  if (!db) return [];
-  const like = `%${query}%`;
-  return db.select().from(kostentraeger)
-    .where(and(
-      eq(kostentraeger.aktiv, 1),
-      sql`(${kostentraeger.name} LIKE ${like} OR ${kostentraeger.ikNummer} LIKE ${like} OR ${kostentraeger.kurzname} LIKE ${like})`
-    ))
-    .orderBy(kostentraeger.name)
-    .limit(20);
-}
-
-export async function createKostentraeger(data: InsertKostentraeger) {
-  const db = await getDb();
-  if (!db) throw new Error("DB not available");
-  await db.insert(kostentraeger).values(data);
-}
-
-export async function updateKostentraeger(id: number, data: Partial<InsertKostentraeger>) {
-  const db = await getDb();
-  if (!db) throw new Error("DB not available");
-  await db.update(kostentraeger).set(data as any).where(eq(kostentraeger.id, id));
-}
-
-// ── TEXTBAUSTEINE ─────────────────────────────────────
-export async function getAllTextbausteine(paragraph?: string, kategorie?: string) {
-  const db = await getDb();
-  if (!db) return [];
-  const conditions = [eq(textbausteine.aktiv, 1)];
-  if (paragraph && paragraph !== "alle") {
-    conditions.push(sql`(${textbausteine.paragraph} = ${paragraph} OR ${textbausteine.paragraph} = 'alle')`);
-  }
-  if (kategorie) {
-    conditions.push(eq(textbausteine.kategorie, kategorie as any));
-  }
-  return db.select().from(textbausteine).where(and(...conditions)).orderBy(textbausteine.kategorie, textbausteine.titel);
-}
-
-export async function createTextbaustein(data: InsertTextbaustein) {
-  const db = await getDb();
-  if (!db) throw new Error("DB not available");
-  await db.insert(textbausteine).values(data);
-}
-
-export async function updateTextbaustein(id: number, data: Partial<InsertTextbaustein>) {
-  const db = await getDb();
-  if (!db) throw new Error("DB not available");
-  await db.update(textbausteine).set(data as any).where(eq(textbausteine.id, id));
-}
-
-// ── E-BRIEF LOG ───────────────────────────────────────
-export async function createEBriefLog(data: InsertEBriefLog) {
-  const db = await getDb();
-  if (!db) throw new Error("DB not available");
-  await db.insert(eBriefLog).values(data);
-}
-
-export async function getEBriefLogs(limit = 100) {
-  const db = await getDb();
-  if (!db) return [];
-  return db.select().from(eBriefLog).orderBy(desc(eBriefLog.createdAt)).limit(limit);
-}
 
 // ── PFLEGEGRAD-BUDGET-TABELLE ─────────────────────────
 // Gesetzliche Jahresbudgets nach SGB XI (Stand 2024)

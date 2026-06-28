@@ -102,7 +102,7 @@ export default function PortalApp() {
           {/* Budget-Warnung Indikator */}
           {warnungen.length > 0 && (
             <button
-              onClick={() => { navTo("budget"); setMenuOpen(false); }}
+              onClick={() => { navTo("kunden"); setMenuOpen(false); }}
               title={`${warnungen.length} Budget-Warnung(en)`}
               style={{ background: "#fee2e2", border: "none", borderRadius: 8, padding: "4px 8px", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
               <span style={{ fontSize: 14 }}>⚠️</span>
@@ -229,7 +229,7 @@ export default function PortalApp() {
             ⏱ Zeit manuell erfassen
           </button>
           <button
-            onClick={() => { setFabOpen(false); navTo("ebrief"); }}
+            onClick={() => { setFabOpen(false); navTo("export"); }}
             style={{ padding: 13, background: "#6366f1", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}
           >
             📮 Brief / E-Mail an Kasse senden
@@ -296,7 +296,7 @@ export default function PortalApp() {
             </button>
 
             <button
-              onClick={() => { setMenuOpen(false); navTo("budget"); }}
+              onClick={() => { setMenuOpen(false); navTo("kunden"); }}
               style={{ padding: 13, background: "#fff", color: "#374151", border: `2px solid ${warnungen.length > 0 ? "#fca5a5" : "#e5e7eb"}`, borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
             >
               <span>📊</span>
@@ -323,7 +323,7 @@ export default function PortalApp() {
             </button>
 
             <button
-              onClick={() => { setMenuOpen(false); navTo("ebrief"); }}
+              onClick={() => { setMenuOpen(false); navTo("export"); }}
               style={{ padding: 13, background: "#fff", color: "#374151", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
             >
               <span>📮</span>

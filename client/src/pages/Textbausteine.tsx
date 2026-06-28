@@ -40,7 +40,7 @@ export default function Textbausteine() {
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState<any>(null);
   const [kopiert, setKopiert] = useState<number | null>(null);
-  const [form, setForm] = useState({ titel: "", text: "", kategorie: "alltagsbegleitung", paragraph: "45b" });
+  const [form, setForm] = useState({ titel: "", inhalt: "", kategorie: "bericht", paragraph: "45b" });
 
   const { data: liste = [], refetch } = trpc.admin.textbausteine.useQuery(
     { paragraph: filterPara !== "alle" ? filterPara : undefined },
@@ -48,7 +48,7 @@ export default function Textbausteine() {
   );
 
   const createMut = trpc.admin.textbausteineCreate.useMutation({
-    onSuccess: () => { toast.success("Textbaustein angelegt"); setShowForm(false); refetch(); setForm({ titel: "", text: "", kategorie: "alltagsbegleitung", paragraph: "45b" }); },
+    onSuccess: () => { toast.success("Textbaustein angelegt"); setShowForm(false); refetch(); setForm({ titel: "", inhalt: "", kategorie: "bericht", paragraph: "45b" }); },
     onError: (e) => toast.error(e.message),
   });
   const updateMut = trpc.admin.textbausteineUpdate.useMutation({
@@ -61,13 +61,13 @@ export default function Textbausteine() {
     if (filterKat !== "alle") result = result.filter((t: any) => t.kategorie === filterKat);
     if (suche.trim()) {
       const q = suche.toLowerCase();
-      result = result.filter((t: any) => t.titel?.toLowerCase().includes(q) || t.text?.toLowerCase().includes(q));
+      result = result.filter((t: any) => t.titel?.toLowerCase().includes(q) || t.inhalt?.toLowerCase().includes(q));
     }
     return result;
   }, [liste, filterKat, suche]);
 
   function kopieren(t: any) {
-    navigator.clipboard.writeText(t.text).then(() => {
+    navigator.clipboard.writeText(t.inhalt).then(() => {
       setKopiert(t.id);
       toast.success("Text kopiert!");
       setTimeout(() => setKopiert(null), 2000);
@@ -145,7 +145,7 @@ export default function Textbausteine() {
                       {PARA_LABEL[t.paragraph] ?? t.paragraph}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-600 leading-relaxed line-clamp-3">{t.text}</p>
+                  <p className="text-xs text-gray-600 leading-relaxed line-clamp-3">{t.inhalt}</p>
                 </div>
                 <div className="flex flex-col gap-1 flex-shrink-0">
                   <button
@@ -226,8 +226,8 @@ export default function Textbausteine() {
                 <textarea
                   className="w-full border rounded-lg px-3 py-2 text-sm min-h-[120px] resize-none"
                   placeholder="Vollständiger Dokumentationstext..."
-                  value={editItem ? editItem.text : form.text}
-                  onChange={(e) => editItem ? setEditItem({ ...editItem, text: e.target.value }) : setForm({ ...form, text: e.target.value })}
+                  value={editItem ? editItem.inhalt : form.inhalt}
+                  onChange={(e) => editItem ? setEditItem({ ...editItem, inhalt: e.target.value }) : setForm({ ...form, inhalt: e.target.value })}
                 />
               </div>
               <Button
@@ -235,10 +235,10 @@ export default function Textbausteine() {
                 disabled={createMut.isPending || updateMut.isPending}
                 onClick={() => {
                   if (editItem) {
-                    updateMut.mutate({ id: editItem.id, titel: editItem.titel, text: editItem.text });
+                    updateMut.mutate({ id: editItem.id, titel: editItem.titel, inhalt: editItem.inhalt });
                   } else {
-                    if (!form.titel.trim() || !form.text.trim()) { toast.error("Titel und Text sind erforderlich"); return; }
-                    createMut.mutate({ titel: form.titel, text: form.text, kategorie: form.kategorie as any, paragraph: form.paragraph as any });
+                    if (!form.titel.trim() || !form.inhalt.trim()) { toast.error("Titel und Text sind erforderlich"); return; }
+                    createMut.mutate({ titel: form.titel, inhalt: form.inhalt, kategorie: form.kategorie as any, paragraph: form.paragraph as any });
                   }
                 }}
               >

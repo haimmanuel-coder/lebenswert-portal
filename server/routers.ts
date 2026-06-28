@@ -47,13 +47,17 @@ import {
   getKundenMitBudgetWarnung,
   getAllKostentraeger,
   searchKostentraeger,
+  getKostentraegerById,
   createKostentraeger,
   updateKostentraeger,
   getAllTextbausteine,
   createTextbaustein,
   updateTextbaustein,
+  deleteTextbaustein,
   createEBriefLog,
   getEBriefLogs,
+  getEbriefLog,
+  getEbriefLogByKunde,
   getPflegegradBudgets,
   getLeistungenFuerExport,
   getFahrtenFuerExport,
@@ -525,7 +529,7 @@ export const appRouter = router({
         referenzTyp: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
-        await createEbriefLog({
+        await createEBriefLog({
           ...input,
           mitarbeiterId: ctx.mitarbeiterId,
           status: "versendet",
@@ -865,10 +869,10 @@ export const appRouter = router({
 
     textbausteineCreate: adminProcedure
       .input(z.object({
-        kategorie: z.enum(["alltagsbegleitung", "haushalt", "mobilisierung", "soziales", "transport", "sonstiges"]),
+        kategorie: z.enum(["bericht", "gesundheit", "aktivitaet", "bemerkung", "sonstiges"]),
         paragraph: z.enum(["45b", "45a", "39", "alle"]),
         titel: z.string().min(1),
-        text: z.string().min(1),
+        inhalt: z.string().min(1),
       }))
       .mutation(async ({ input, ctx }) => {
         await createTextbaustein({ ...input, aktiv: 1 });
@@ -880,7 +884,7 @@ export const appRouter = router({
       .input(z.object({
         id: z.number().int().positive(),
         titel: z.string().min(1).optional(),
-        text: z.string().min(1).optional(),
+        inhalt: z.string().min(1).optional(),
         aktiv: z.number().int().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
@@ -938,8 +942,7 @@ export const appRouter = router({
           empfaenger: input.empfaenger,
           betreff: input.betreff,
           inhalt: input.inhalt,
-          anhangName: input.anhangName,
-          status: "gesendet",
+          status: "versendet",
         });
         await createAuditLog({ mitarbeiterId: ctx.adminId, action: "EXPORT", ressource: "ebrief", details: `an=${input.empfaenger} betreff=${input.betreff}`, status: "success" });
         return { success: true };
