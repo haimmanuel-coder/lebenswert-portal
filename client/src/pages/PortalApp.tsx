@@ -17,11 +17,18 @@ import Fuehrerschein from "./Fuehrerschein";
 import NeukundenAufnahme from "./NeukundenAufnahme";
 import Kalender from "./Kalender";
 import Kassenanfrage from "./Kassenanfrage";
+import Urlaubsverwaltung from "./Urlaubsverwaltung";
+import Krankmeldung from "./Krankmeldung";
+import Tourenplanung from "./Tourenplanung";
+import Benachrichtigungen from "./Benachrichtigungen";
+import MeinProfil from "./MeinProfil";
+import LeistungsFreigabe from "./LeistungsFreigabe";
+import BuchhaltungsExport from "./BuchhaltungsExport";
 import BottomSheet from "@/components/BottomSheet";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 import OnboardingTour, { useOnboardingTour } from "@/components/OnboardingTour";
 
-type PageId = "home" | "einsaetze" | "zeit" | "lnw" | "fahrt" | "admin" | "management" | "kunden" | "kostentraeger" | "textbausteine" | "export" | "fuehrerschein" | "neukundenaufnahme" | "kalender" | "kassenanfrage";
+type PageId = "home" | "einsaetze" | "zeit" | "lnw" | "fahrt" | "admin" | "management" | "kunden" | "kostentraeger" | "textbausteine" | "export" | "fuehrerschein" | "neukundenaufnahme" | "kalender" | "kassenanfrage" | "urlaub" | "krank" | "touren" | "benachrichtigungen" | "profil" | "leistungsfreigabe" | "buchhaltung";
 
 const pages: { id: PageId; icon: string; label: string }[] = [
   { id: "home", icon: "🏠", label: "Home" },
@@ -39,7 +46,9 @@ export default function PortalApp() {
   const [kundenDetailId, setKundenDetailId] = useState<number | null>(null);
   const { data: leistungen = [] } = trpc.leistungen.list.useQuery();
   const { data: warnungen = [] } = trpc.kunden.budgetWarnungen.useQuery();
+  const { data: unreadNotifs = [] } = trpc.notifications.list.useQuery();
   const offenCount = leistungen.filter((l) => l.status === "offen").length;
+  const unreadCount = (unreadNotifs as any[]).filter((n: any) => !n.gelesenAt).length;
 
   const isAdmin = mitarbeiter?.rolle === "admin";
   const { isOnline, offlineCount } = useOfflineSync();
@@ -69,6 +78,13 @@ export default function PortalApp() {
       case "neukundenaufnahme": return <NeukundenAufnahme />;
       case "kalender": return <Kalender />;
       case "kassenanfrage": return <Kassenanfrage />;
+      case "urlaub": return <Urlaubsverwaltung />;
+      case "krank": return <Krankmeldung />;
+      case "touren": return <Tourenplanung />;
+      case "benachrichtigungen": return <Benachrichtigungen />;
+      case "profil": return <MeinProfil />;
+      case "leistungsfreigabe": return <LeistungsFreigabe />;
+      case "buchhaltung": return <BuchhaltungsExport />;
       default: return <Dashboard />;
     }
   };
@@ -140,6 +156,34 @@ export default function PortalApp() {
               ⚙️
             </button>
           )}
+          {/* Benachrichtigungs-Button mit Badge */}
+          <button
+            onClick={() => navTo("benachrichtigungen")}
+            title="Benachrichtigungen"
+            style={{ position: "relative", background: "none", border: "1.5px solid #e5e7eb", fontSize: 16, cursor: "pointer", padding: "4px 8px", borderRadius: 8, color: "#374151" }}
+          >
+            🔔
+            {unreadCount > 0 && (
+              <span style={{
+                position: "absolute", top: -4, right: -4,
+                background: "#dc2626", color: "#fff",
+                fontSize: 9, fontWeight: 800,
+                width: 16, height: 16, borderRadius: "50%",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                lineHeight: 1,
+              }}>
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </button>
+          {/* Profil-Button */}
+          <button
+            onClick={() => navTo("profil")}
+            title="Mein Profil"
+            style={{ background: "none", border: "1.5px solid #e5e7eb", fontSize: 14, cursor: "pointer", padding: "4px 8px", borderRadius: 8, color: "#374151" }}
+          >
+            👤
+          </button>
           {/* Hilfe / Tour-Button */}
           <button
             onClick={startTour}
@@ -448,6 +492,64 @@ export default function PortalApp() {
               <div style={{ textAlign: "left" }}>
                 <div>Kassenanfragen</div>
                 <div style={{ fontSize: 11, opacity: 0.8 }}>Vollmacht zur Budget-Abfrage</div>
+              </div>
+            </button>
+
+            {/* Phase 15 – Neue Module */}
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 1, paddingLeft: 4, marginTop: 4 }}>Personal & Planung</div>
+
+            <button
+              onClick={() => { setMenuOpen(false); navTo("urlaub"); }}
+              style={{ padding: 13, background: "#f0fdf4", color: "#15803d", border: "2px solid #86efac", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
+            >
+              <span>🏖️</span>
+              <div style={{ textAlign: "left" }}>
+                <div>Urlaubsverwaltung</div>
+                <div style={{ fontSize: 11, opacity: 0.8 }}>Anträge stellen & genehmigen</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => { setMenuOpen(false); navTo("krank"); }}
+              style={{ padding: 13, background: "#fef2f2", color: "#b91c1c", border: "2px solid #fca5a5", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
+            >
+              <span>🤒</span>
+              <div style={{ textAlign: "left" }}>
+                <div>Krankmeldungen</div>
+                <div style={{ fontSize: 11, opacity: 0.8 }}>Krank melden & Übersicht</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => { setMenuOpen(false); navTo("touren"); }}
+              style={{ padding: 13, background: "#eff6ff", color: "#1d4ed8", border: "2px solid #93c5fd", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
+            >
+              <span>🗺️</span>
+              <div style={{ textAlign: "left" }}>
+                <div>Tourenplanung</div>
+                <div style={{ fontSize: 11, opacity: 0.8 }}>Wochenansicht & Tour-Verwaltung</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => { setMenuOpen(false); navTo("leistungsfreigabe"); }}
+              style={{ padding: 13, background: "#f0fdf4", color: "#065f46", border: "2px solid #6ee7b7", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
+            >
+              <span>✅</span>
+              <div style={{ textAlign: "left" }}>
+                <div>Leistungsnachweis-Freigabe</div>
+                <div style={{ fontSize: 11, opacity: 0.8 }}>Prüfen & freigeben</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => { setMenuOpen(false); navTo("buchhaltung"); }}
+              style={{ padding: 13, background: "#faf5ff", color: "#6b21a8", border: "2px solid #c4b5fd", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
+            >
+              <span>📊</span>
+              <div style={{ textAlign: "left" }}>
+                <div>Buchhaltungs-Export</div>
+                <div style={{ fontSize: 11, opacity: 0.8 }}>DATEV, Lexware, CSV-Export</div>
               </div>
             </button>
 

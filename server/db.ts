@@ -1,7 +1,7 @@
 import { and, eq, gte, lte, desc, sql, like, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, mitarbeiter, kunden, einsaetze, leistungen, fahrten, auditLogs, kundenZuordnung, monatsabschluesse, passwordResets, kostentraeger, textbausteine, ebriefLog, pushSubscriptions } from "../drizzle/schema";
-import type { InsertMitarbeiter, InsertKunde, InsertEinsatz, InsertLeistung, InsertFahrt, InsertAuditLog, InsertKostentraeger, InsertTextbaustein, InsertEbriefLog, InsertPushSubscription } from "../drizzle/schema";
+import { InsertUser, users, mitarbeiter, kunden, einsaetze, leistungen, fahrten, auditLogs, kundenZuordnung, monatsabschluesse, passwordResets, kostentraeger, textbausteine, ebriefLog, pushSubscriptions, urlaubsantraege, krankmeldungen, touren, tourEinsaetze, notifications, refreshTokens } from "../drizzle/schema";
+import type { InsertMitarbeiter, InsertKunde, InsertEinsatz, InsertLeistung, InsertFahrt, InsertAuditLog, InsertKostentraeger, InsertTextbaustein, InsertEbriefLog, InsertPushSubscription, InsertUrlaubsantrag, InsertKrankmeldung, InsertTour, InsertNotification, InsertRefreshToken } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -791,4 +791,230 @@ export async function updateKassenanfrageStatus(id: number, status: 'offen' | 'g
   } else {
     await db.execute(sql`UPDATE kassenanfragen SET status = ${status} WHERE id = ${id}`);
   }
+}
+
+// ── URLAUBSVERWALTUNG ──────────────────────────────────────────────────
+export async function getAllUrlaubsantraege() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(urlaubsantraege).orderBy(desc(urlaubsantraege.createdAt));
+}
+
+export async function getUrlaubsantraegeByMitarbeiter(mitarbeiterId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(urlaubsantraege)
+    .where(eq(urlaubsantraege.mitarbeiterId, mitarbeiterId))
+    .orderBy(desc(urlaubsantraege.createdAt));
+}
+
+export async function createUrlaubsantrag(data: InsertUrlaubsantrag) {
+  const db = await getDb();
+  if (!db) throw new Error('DB not available');
+  await db.insert(urlaubsantraege).values(data);
+}
+
+export async function updateUrlaubsantragStatus(
+  id: number,
+  status: 'beantragt' | 'genehmigt' | 'abgelehnt',
+  adminNotiz?: string
+) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(urlaubsantraege)
+    .set({ status, adminNotiz: adminNotiz ?? null })
+    .where(eq(urlaubsantraege.id, id));
+}
+
+// ── KRANKMELDUNGEN ───────────────────────────────────────────────────────
+export async function getAllKrankmeldungen() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(krankmeldungen).orderBy(desc(krankmeldungen.createdAt));
+}
+
+export async function getKrankmeldungenByMitarbeiter(mitarbeiterId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(krankmeldungen)
+    .where(eq(krankmeldungen.mitarbeiterId, mitarbeiterId))
+    .orderBy(desc(krankmeldungen.createdAt));
+}
+
+export async function createKrankmeldung(data: InsertKrankmeldung) {
+  const db = await getDb();
+  if (!db) throw new Error('DB not available');
+  await db.insert(krankmeldungen).values(data);
+}
+
+// ── TOURENPLANUNG ──────────────────────────────────────────────────────────
+export async function getAllTouren() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(touren).orderBy(desc(touren.datum));
+}
+
+export async function getTourenByMitarbeiter(mitarbeiterId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(touren)
+    .where(eq(touren.mitarbeiterId, mitarbeiterId))
+    .orderBy(desc(touren.datum));
+}
+
+export async function getTourenByDatum(datum: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(touren).where(sql`DATE(${touren.datum}) = ${datum}`);
+}
+
+export async function createTour(data: InsertTour) {
+  const db = await getDb();
+  if (!db) throw new Error('DB not available');
+  const result = await db.insert(touren).values(data);
+  return result;
+}
+
+export async function updateTourStatus(id: number, status: 'geplant' | 'aktiv' | 'abgeschlossen') {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(touren).set({ status }).where(eq(touren.id, id));
+}
+
+export async function getTourEinsaetze(tourId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(tourEinsaetze)
+    .where(eq(tourEinsaetze.tourId, tourId))
+    .orderBy(tourEinsaetze.reihenfolge);
+}
+
+export async function addEinsatzToTour(tourId: number, einsatzId: number, reihenfolge: number) {
+  const db = await getDb();
+  if (!db) throw new Error('DB not available');
+  await db.insert(tourEinsaetze).values({ tourId, einsatzId, reihenfolge });
+}
+
+export async function removeEinsatzFromTour(tourId: number, einsatzId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(tourEinsaetze)
+    .where(and(eq(tourEinsaetze.tourId, tourId), eq(tourEinsaetze.einsatzId, einsatzId)));
+}
+
+// ── IN-APP-BENACHRICHTIGUNGEN ─────────────────────────────────────────────
+export async function getNotificationsByMitarbeiter(mitarbeiterId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(notifications)
+    .where(eq(notifications.empfaengerId, mitarbeiterId))
+    .orderBy(desc(notifications.createdAt))
+    .limit(50);
+}
+
+export async function getUnreadNotificationCount(mitarbeiterId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const result = await db.select({ count: sql<number>`COUNT(*)` })
+    .from(notifications)
+    .where(and(eq(notifications.empfaengerId, mitarbeiterId), eq(notifications.gelesen, false)));
+  return Number(result[0]?.count ?? 0);
+}
+
+export async function createNotification(data: InsertNotification) {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(notifications).values(data);
+}
+
+export async function markNotificationRead(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(notifications).set({ gelesen: true }).where(eq(notifications.id, id));
+}
+
+export async function markAllNotificationsRead(mitarbeiterId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(notifications)
+    .set({ gelesen: true })
+    .where(eq(notifications.empfaengerId, mitarbeiterId));
+}
+
+// ── REFRESH TOKENS ────────────────────────────────────────────────────────────
+export async function createRefreshToken(data: InsertRefreshToken) {
+  const db = await getDb();
+  if (!db) throw new Error('DB not available');
+  await db.insert(refreshTokens).values(data);
+}
+
+export async function getValidRefreshToken(token: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(refreshTokens)
+    .where(and(
+      eq(refreshTokens.token, token),
+      eq(refreshTokens.used, false),
+      gte(refreshTokens.expiresAt, new Date())
+    ))
+    .limit(1);
+  return result[0] ?? null;
+}
+
+export async function invalidateRefreshToken(token: string) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(refreshTokens).set({ used: true }).where(eq(refreshTokens.token, token));
+}
+
+export async function invalidateAllRefreshTokensForMitarbeiter(mitarbeiterId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(refreshTokens).set({ used: true }).where(eq(refreshTokens.mitarbeiterId, mitarbeiterId));
+}
+
+// ── EINSATZ-KONFLIKTPRÜFUNG (Doppelbelegung) ───────────────────────────────
+export async function checkDoppelbelegung(params: {
+  datum: string;
+  startzeit: string;
+  dauerStunden: number;
+  mitarbeiterId: number;
+  kundenId: number;
+  excludeId?: number;
+}): Promise<{ mitarbeiterKonflikt: boolean; kundenKonflikt: boolean }> {
+  const db = await getDb();
+  if (!db) return { mitarbeiterKonflikt: false, kundenKonflikt: false };
+
+  // Berechne Endzeit in Minuten
+  const [h, m] = params.startzeit.split(':').map(Number);
+  const startMin = h * 60 + m;
+  const endMin = startMin + Math.round(params.dauerStunden * 60);
+  const endzeit = `${String(Math.floor(endMin / 60)).padStart(2, '0')}:${String(endMin % 60).padStart(2, '0')}`;
+
+  // Alle Einsätze am selben Datum laden
+  const vorhandene = await db.select().from(einsaetze)
+    .where(and(
+      sql`DATE(${einsaetze.datum}) = ${params.datum}`,
+      sql`${einsaetze.status} != 'abgesagt'`
+    ));
+
+  const filtered = vorhandene.filter(e => e.id !== params.excludeId);
+
+  let mitarbeiterKonflikt = false;
+  let kundenKonflikt = false;
+
+  for (const e of filtered) {
+    if (!e.startzeit || !e.dauerStunden) continue;
+    const [eh, em] = String(e.startzeit).split(':').map(Number);
+    const eStartMin = eh * 60 + em;
+    const eEndMin = eStartMin + Math.round(Number(e.dauerStunden) * 60);
+
+    const overlap = startMin < eEndMin && endMin > eStartMin;
+    if (!overlap) continue;
+
+    if (e.mitarbeiterId === params.mitarbeiterId) mitarbeiterKonflikt = true;
+    if (e.kundenId === params.kundenId) kundenKonflikt = true;
+  }
+
+  return { mitarbeiterKonflikt, kundenKonflikt };
 }

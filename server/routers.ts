@@ -80,6 +80,32 @@ import {
   getKassenanfragenByKunde,
   createKassenanfrage,
   updateKassenanfrageStatus,
+  // Phase 15
+  getAllUrlaubsantraege,
+  getUrlaubsantraegeByMitarbeiter,
+  createUrlaubsantrag,
+  updateUrlaubsantragStatus,
+  getAllKrankmeldungen,
+  getKrankmeldungenByMitarbeiter,
+  createKrankmeldung,
+  getAllTouren,
+  getTourenByMitarbeiter,
+  getTourenByDatum,
+  createTour,
+  updateTourStatus,
+  getTourEinsaetze,
+  addEinsatzToTour,
+  removeEinsatzFromTour,
+  getNotificationsByMitarbeiter,
+  getUnreadNotificationCount,
+  createNotification,
+  markNotificationRead,
+  markAllNotificationsRead,
+  createRefreshToken,
+  getValidRefreshToken,
+  invalidateRefreshToken,
+  invalidateAllRefreshTokensForMitarbeiter,
+  checkDoppelbelegung,
 } from "./db";
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "lebenswert-secret-key");
@@ -125,8 +151,164 @@ const adminProcedure = portalProtected.use(async ({ ctx, next }) => {
   return next({ ctx: { ...ctx, adminId: ctx.mitarbeiterId } });
 });
 
+
+
+export const urlaubRouter = router({
+  list: portalProtected.query(async ({ ctx }) => {
+    const ma = await getMitarbeiterById(ctx.mitarbeiterId);
+    if (ma?.rolle === 'admin') return getAllUrlaubsantraege();
+    return getUrlaubsantraegeByMitarbeiter(ctx.mitarbeiterId);
+  }),
+  create: portalProtected
+    .input(z.object({
+      von: z.string(),
+      bis: z.string(),
+      tage: z.number().int().min(1),
+      notizen: z.string().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      await createUrlaubsantrag({ mitarbeiterId: ctx.mitarbeiterId, von: new Date(input.von), bis: new Date(input.bis), tage: input.tage, notizen: input.notizen, status: 'beantragt' });
+      // Benachrichtigung an Admin
+      const allMa = await getAllMitarbeiter();
+      const admins = allMa.filter((m: { rolle: string }) => m.rolle === 'admin');
+      const antragsteller = await getMitarbeiterById(ctx.mitarbeiterId);
+      for (const admin of admins) {
+        await createNotification({
+          empfaengerId: admin.id,
+          titel: 'Urlaubsantrag eingegangen',
+          nachricht: `${antragsteller?.vorname} ${antragsteller?.nachname} hat Urlaub vom ${input.von} bis ${input.bis} (${input.tage} Tage) beantragt.`,
+          typ: 'info',
+        });
+      }
+      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'CREATE', ressource: 'urlaub', status: 'success' });
+      return { success: true };
+    }),
+  updateStatus: adminProcedure
+    .input(z.object({
+      id: z.number().int().positive(),
+      status: z.enum(['beantragt', 'genehmigt', 'abgelehnt']),
+      adminNotiz: z.string().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      await updateUrlaubsantragStatus(input.id, input.status, input.adminNotiz);
+      await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'UPDATE', ressource: 'urlaub', details: `id=${input.id} status=${input.status}`, status: 'success' });
+      return { success: true };
+    }),
+});
+
+export const krankRouter = router({
+  list: portalProtected.query(async ({ ctx }) => {
+    const ma = await getMitarbeiterById(ctx.mitarbeiterId);
+    if (ma?.rolle === 'admin') return getAllKrankmeldungen();
+    return getKrankmeldungenByMitarbeiter(ctx.mitarbeiterId);
+  }),
+  create: portalProtected
+    .input(z.object({
+      von: z.string(),
+      bis: z.string().optional(),
+      tage: z.number().int().min(1).optional(),
+      notizen: z.string().optional(),
+      auAttest: z.boolean().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      await createKrankmeldung({ mitarbeiterId: ctx.mitarbeiterId, von: new Date(input.von), bis: input.bis ? new Date(input.bis) : undefined, tage: input.tage, notizen: input.notizen, auAttest: input.auAttest });
+      const allMa = await getAllMitarbeiter();
+      const admins = allMa.filter((m: { rolle: string }) => m.rolle === 'admin');
+      const meldender = await getMitarbeiterById(ctx.mitarbeiterId);
+      for (const admin of admins) {
+        await createNotification({
+          empfaengerId: admin.id,
+          titel: 'Krankmeldung eingegangen',
+          nachricht: `${meldender?.vorname} ${meldender?.nachname} hat sich krank gemeldet (ab ${input.von}).`,
+          typ: 'warnung',
+        });
+      }
+      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'CREATE', ressource: 'krankmeldung', status: 'success' });
+      return { success: true };
+    }),
+});
+
+export const tourenRouter = router({
+  list: portalProtected.query(async ({ ctx }) => {
+    const ma = await getMitarbeiterById(ctx.mitarbeiterId);
+    if (ma?.rolle === 'admin') return getAllTouren();
+    return getTourenByMitarbeiter(ctx.mitarbeiterId);
+  }),
+  byDatum: portalProtected
+    .input(z.object({ datum: z.string() }))
+    .query(async ({ input }) => getTourenByDatum(input.datum)),
+  create: portalProtected
+    .input(z.object({
+      mitarbeiterId: z.number().int().positive(),
+      datum: z.string(),
+      notizen: z.string().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      await createTour({ mitarbeiterId: input.mitarbeiterId, datum: new Date(input.datum), notizen: input.notizen, status: 'geplant' });
+      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'CREATE', ressource: 'tour', status: 'success' });
+      return { success: true };
+    }),
+  updateStatus: portalProtected
+    .input(z.object({
+      id: z.number().int().positive(),
+      status: z.enum(['geplant', 'aktiv', 'abgeschlossen']),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      await updateTourStatus(input.id, input.status);
+      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'UPDATE', ressource: 'tour', details: `id=${input.id} status=${input.status}`, status: 'success' });
+      return { success: true };
+    }),
+  getEinsaetze: portalProtected
+    .input(z.object({ tourId: z.number().int().positive() }))
+    .query(async ({ input }) => getTourEinsaetze(input.tourId)),
+  addEinsatz: portalProtected
+    .input(z.object({
+      tourId: z.number().int().positive(),
+      einsatzId: z.number().int().positive(),
+      reihenfolge: z.number().int().min(0).default(0),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      await addEinsatzToTour(input.tourId, input.einsatzId, input.reihenfolge);
+      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'UPDATE', ressource: 'tour', details: `addEinsatz einsatzId=${input.einsatzId}`, status: 'success' });
+      return { success: true };
+    }),
+  removeEinsatz: portalProtected
+    .input(z.object({
+      tourId: z.number().int().positive(),
+      einsatzId: z.number().int().positive(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      await removeEinsatzFromTour(input.tourId, input.einsatzId);
+      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'UPDATE', ressource: 'tour', details: `removeEinsatz einsatzId=${input.einsatzId}`, status: 'success' });
+      return { success: true };
+    }),
+});
+
+export const notificationsRouter = router({
+  list: portalProtected.query(async ({ ctx }) =>
+    getNotificationsByMitarbeiter(ctx.mitarbeiterId)
+  ),
+  unreadCount: portalProtected.query(async ({ ctx }) =>
+    getUnreadNotificationCount(ctx.mitarbeiterId)
+  ),
+  markRead: portalProtected
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      await markNotificationRead(input.id);
+      return { success: true };
+    }),
+  markAllRead: portalProtected.mutation(async ({ ctx }) => {
+    await markAllNotificationsRead(ctx.mitarbeiterId);
+    return { success: true };
+  }),
+});
+
 export const appRouter = router({
   system: systemRouter,
+  urlaub: urlaubRouter,
+  krank: krankRouter,
+  touren: tourenRouter,
+  notifications: notificationsRouter,
 
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
@@ -322,8 +504,51 @@ export const appRouter = router({
         startzeit: z.string().optional(),
         dauerStunden: z.number().min(0.5).optional(),
         paragraph: z.enum(["45b", "45a", "39"]),
+        adminOverride: z.boolean().optional(), // Admin kann Budget-Sperre übersteuern
       }))
       .mutation(async ({ input, ctx }) => {
+        // ── GESCHÄFTSREGEL 1: Mindestdauer 1,5 Stunden ──
+        if (input.dauerStunden !== undefined && input.dauerStunden < 1.5) {
+          throw new Error("Mindestdauer: Jeder Einsatz muss mindestens 1,5 Stunden (90 Minuten) dauern.");
+        }
+
+        // ── GESCHÄFTSREGEL 2: Doppelbelegungsprüfung ──
+        if (input.startzeit && input.dauerStunden) {
+          const { mitarbeiterKonflikt, kundenKonflikt } = await checkDoppelbelegung({
+            datum: input.datum,
+            startzeit: input.startzeit,
+            dauerStunden: input.dauerStunden,
+            mitarbeiterId: ctx.mitarbeiterId,
+            kundenId: input.kundenId,
+          });
+          if (mitarbeiterKonflikt) {
+            throw new Error("Doppelbelegung: Sie haben zu diesem Zeitpunkt bereits einen anderen Einsatz eingetragen.");
+          }
+          if (kundenKonflikt) {
+            throw new Error("Doppelbelegung: Der Kunde hat zu diesem Zeitpunkt bereits einen anderen Einsatz.");
+          }
+        }
+
+        // ── GESCHÄFTSREGEL 3: Budget-Sperre bei Überschreitung ──
+        if (input.dauerStunden && !input.adminOverride) {
+          const ma = await getMitarbeiterById(ctx.mitarbeiterId);
+          const isAdmin = ma?.rolle === 'admin';
+          if (!isAdmin) {
+            const kunde = await getKundeById(input.kundenId);
+            if (kunde) {
+              const stundensatz = input.paragraph === '45b' ? 28 : input.paragraph === '45a' ? 28 : 25;
+              const kosten = input.dauerStunden * stundensatz;
+              const para = input.paragraph as '45b' | '45a' | '39';
+              const budget = parseFloat(String(para === '45b' ? kunde.budget45b : para === '45a' ? kunde.budget45a : kunde.budget39) || '0');
+              const verbraucht = parseFloat(String(para === '45b' ? kunde.verbraucht45b : para === '45a' ? kunde.verbraucht45a : kunde.verbraucht39) || '0');
+              const restbudget = budget - verbraucht;
+              if (kosten > restbudget) {
+                throw new Error(`Budgetüberschreitung: Dieser Einsatz kostet ca. ${kosten.toFixed(2)}€, aber das Restbudget (\u00a7${para} SGB XI) beträgt nur ${restbudget.toFixed(2)}€. Bitte Admin kontaktieren.`);
+              }
+            }
+          }
+        }
+
         await createEinsatz({ ...input, mitarbeiterId: ctx.mitarbeiterId } as any);
         await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "CREATE", ressource: "einsatz", status: "success" });
         return { success: true };
@@ -1034,6 +1259,78 @@ export const appRouter = router({
           fahrenCsv: input.typ !== "leistungen" ? fahrenCsv : null,
           stats: { leistungen: leis.length, fahrten: fahr.length },
         };
+      }),
+    // ── DATEV-EXPORT ──────────────────────────────────
+    datevExport: adminProcedure
+      .input(z.object({ monat: z.string().regex(/^\d{4}-\d{2}$/) }))
+      .mutation(async ({ input, ctx }) => {
+        const [leis, maList, kundenList] = await Promise.all([
+          getLeistungenFuerExport(input.monat),
+          getAllMitarbeiter(),
+          getAllKunden(),
+        ]);
+        const getMaName = (id: number) => { const m = maList.find(m => m.id === id); return m ? `${m.nachname} ${m.vorname}` : `MA-${id}`; };
+        const getKdName = (id: number | null) => { if (!id) return ''; const k = kundenList.find(k => k.id === id); return k ? `${k.nachname} ${k.vorname}` : `KD-${id}`; };
+        // DATEV LODAS-Format (vereinfacht): Personalnummer;Lohnart;Betrag;Kostenstelle
+        const header = 'Personalnummer;Nachname;Vorname;Lohnart;Betrag;Monat;Kostenstelle;Bemerkung';
+        const rows = leis.map(l => {
+          const ma = maList.find(m => m.id === l.mitarbeiterId);
+          const pnr = String(l.mitarbeiterId).padStart(6, '0');
+          const lohnart = l.paragraph === '45b' ? '1001' : l.paragraph === '45a' ? '1002' : '1003';
+          const betrag = (parseFloat(String(l.betrag || 0))).toFixed(2).replace('.', ',');
+          return `${pnr};${ma?.nachname || ''};${ma?.vorname || ''};${lohnart};${betrag};${input.monat};${l.paragraph};${getKdName(l.kundenId || null)}`;
+        });
+        const csv = [header, ...rows].join('\r\n');
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'EXPORT', ressource: 'datev', details: `monat=${input.monat} zeilen=${rows.length}`, status: 'success' });
+        return { csv, dateiname: `DATEV_LODAS_${input.monat}.csv`, zeilen: rows.length };
+      }),
+
+    // ── LEXWARE-EXPORT ──────────────────────────────────
+    lexwareExport: adminProcedure
+      .input(z.object({ monat: z.string().regex(/^\d{4}-\d{2}$/) }))
+      .mutation(async ({ input, ctx }) => {
+        const [leis, fahr, maList, kundenList] = await Promise.all([
+          getLeistungenFuerExport(input.monat),
+          getFahrtenFuerExport(input.monat),
+          getAllMitarbeiter(),
+          getAllKunden(),
+        ]);
+        const getMaName = (id: number) => { const m = maList.find(m => m.id === id); return m ? `${m.nachname}, ${m.vorname}` : `MA-${id}`; };
+        const getKdName = (id: number | null) => { if (!id) return ''; const k = kundenList.find(k => k.id === id); return k ? `${k.nachname}, ${k.vorname}` : `KD-${id}`; };
+        // Lexware-Lohnabrechnung CSV
+        const leistungenHeader = 'Mitarbeiter;Monat;Paragraph;Stunden;Einsaetze;Betrag;Status';
+        const leistungenRows = leis.map(l =>
+          `${getMaName(l.mitarbeiterId)};${input.monat};${l.paragraph};${parseFloat(String(l.stunden || 0)).toFixed(2).replace('.', ',')};${l.anzahlEinsaetze};${parseFloat(String(l.betrag || 0)).toFixed(2).replace('.', ',')};${l.status}`
+        );
+        const fahrtenHeader = 'Mitarbeiter;Monat;Km;Betrag';
+        const fahrtenRows = fahr.map(f =>
+          `${getMaName(f.mitarbeiterId)};${input.monat};${parseFloat(String(f.kilometer || 0)).toFixed(1).replace('.', ',')};${(parseFloat(String(f.kilometer || 0)) * 0.30).toFixed(2).replace('.', ',')}`
+        );
+        const leistungenCsv = [leistungenHeader, ...leistungenRows].join('\r\n');
+        const fahrtenCsv = [fahrtenHeader, ...fahrtenRows].join('\r\n');
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'EXPORT', ressource: 'lexware', details: `monat=${input.monat}`, status: 'success' });
+        return { leistungenCsv, fahrtenCsv, dateiname: `Lexware_${input.monat}.csv`, zeilen: leistungenRows.length + fahrtenRows.length };
+      }),
+
+    // ── LEISTUNGSNACHWEIS-FREIGABE ───────────────────────
+    leistungenFreigabe: adminProcedure
+      .input(z.object({ limit: z.number().int().min(1).max(200).default(100) }))
+      .query(async ({ input }) => {
+        const alle = await getAllLeistungen();
+        return alle.filter((l: any) => l.status === 'pruefung' || l.status === 'offen').slice(0, input.limit);
+      }),
+
+    leistungFreigeben: adminProcedure
+      .input(z.object({
+        id: z.number().int().positive(),
+        aktion: z.enum(['freigeben', 'ablehnen']),
+        adminNotiz: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const neuerStatus = input.aktion === 'freigeben' ? 'freigegeben' : 'offen';
+        await updateLeistungStatus(input.id, neuerStatus as any);
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'UPDATE', ressource: 'leistung', details: `id=${input.id} aktion=${input.aktion}`, status: 'success' });
+        return { success: true };
       }),
   }),
 

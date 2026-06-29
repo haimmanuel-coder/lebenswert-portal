@@ -234,3 +234,41 @@
 - [x] Frontend: Kassenanfrage.tsx mit Vollmacht-Formular, Unterschriften, PDF-Export, Archiv
 - [x] Navigation: Menüpunkt "Kassenanfragen" im Admin-Menü (teal)
 - [x] 0 TypeScript-Fehler, 33/33 Tests bestanden
+
+## Phase 15 – Pflichtenheft-Lücken schließen
+
+### Datenbank
+- [x] DB: urlaubsantraege-Tabelle (mitarbeiterId, von, bis, tage, status, notizen, createdAt)
+- [x] DB: krankmeldungen-Tabelle (mitarbeiterId, von, bis, tage, notizen, createdAt)
+- [x] DB: touren-Tabelle (mitarbeiterId, datum, status, notizen)
+- [x] DB: tour_einsaetze-Tabelle (tourId, einsatzId, reihenfolge)
+- [x] DB: notifications-Tabelle (empfaengerId, titel, nachricht, gelesen, createdAt)
+- [x] DB: refreshTokens-Tabelle (mitarbeiterId, token, expiresAt)
+
+### Backend – Geschäftsregeln
+- [x] Backend: Mindestdauer 1,5h Validierung in einsaetze.create und einsaetze.updateStatus
+- [x] Backend: Doppelbelegungsprüfung (Mitarbeiter + Kunde) in einsaetze.create
+- [x] Backend: Budget-Sperre bei Überschreitung in einsaetze.create (Ausnahme: Admin)
+
+### Backend – Neue Module
+- [x] Backend: urlaub.create, urlaub.list, urlaub.updateStatus (Admin-Genehmigung)
+- [x] Backend: krank.create, krank.list (Admin kann alle sehen)
+- [x] Backend: touren.create, touren.list, touren.addEinsatz, touren.removeEinsatz, touren.reorder
+- [x] Backend: notifications.list, notifications.markRead, notifications.markAllRead
+- [x] Backend: Leistungsnachweis-Freigabe: leistungen.updateStatus mit Admin-Prüf-UI
+- [x] Backend: export.datev (DATEV-kompatibles Format)
+- [x] Backend: export.lexware (Lexware-kompatibles CSV)
+- [x] Backend: Refresh Token Mechanismus (refreshTokens-Tabelle, /refresh-Route)
+
+### Frontend – Neue Seiten
+- [x] Frontend: Urlaub.tsx – Urlaubsantrag stellen, Status verfolgen, Admin-Genehmigung
+- [x] Frontend: Krankmeldung.tsx – Krankmeldung einreichen, Admin-Übersicht
+- [x] Frontend: Tourenplanung.tsx – Wochenansicht, Drag & Drop, Einssätze zuweisen
+- [x] Frontend: Profil.tsx – Eigene Stammdaten, Passwort ändern
+- [x] Frontend: Benachrichtigungen.tsx – In-App-Inbox mit gelesen/ungelesen
+- [x] Frontend: Leistungsnachweis-Freigabe in AdminPanel.tsx einbauen (eigene Seite LeistungsFreigabe.tsx)
+- [x] Frontend: DATEV/Lexware-Export im ExportCenter.tsx ergänzen
+
+### Navigation
+- [x] Navigation: Urlaub, Krankmeldung, Tourenplanung, Profil, Benachrichtigungen in PortalApp.tsx einbinden
+- [x] Navigation: Benachrichtigungs-Badge (Anzahl ungelesener) in TopBar

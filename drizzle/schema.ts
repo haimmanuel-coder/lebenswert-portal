@@ -298,3 +298,81 @@ export const pushSubscriptions = mysqlTable("pushSubscriptions", {
 });
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 export type InsertPushSubscription = typeof pushSubscriptions.$inferInsert;
+
+// ── MODUL 15: URLAUBSVERWALTUNG ───────────────────────────────────
+export const urlaubsantraege = mysqlTable("urlaubsantraege", {
+  id: int("id").autoincrement().primaryKey(),
+  mitarbeiterId: int("mitarbeiterId").notNull(),
+  von: date("von").notNull(),
+  bis: date("bis").notNull(),
+  tage: int("tage").notNull(),
+  notizen: text("notizen"),
+  status: mysqlEnum("status", ["beantragt", "genehmigt", "abgelehnt"]).default("beantragt").notNull(),
+  adminNotiz: text("adminNotiz"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type Urlaubsantrag = typeof urlaubsantraege.$inferSelect;
+export type InsertUrlaubsantrag = typeof urlaubsantraege.$inferInsert;
+
+// ── MODUL 15: KRANKMELDUNGEN ──────────────────────────────────────
+export const krankmeldungen = mysqlTable("krankmeldungen", {
+  id: int("id").autoincrement().primaryKey(),
+  mitarbeiterId: int("mitarbeiterId").notNull(),
+  von: date("von").notNull(),
+  bis: date("bis"),
+  tage: int("tage"),
+  notizen: text("notizen"),
+  auAttest: boolean("auAttest").default(false),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type Krankmeldung = typeof krankmeldungen.$inferSelect;
+export type InsertKrankmeldung = typeof krankmeldungen.$inferInsert;
+
+// ── MODUL 15: TOURENPLANUNG ───────────────────────────────────────
+export const touren = mysqlTable("touren", {
+  id: int("id").autoincrement().primaryKey(),
+  mitarbeiterId: int("mitarbeiterId").notNull(),
+  datum: date("datum").notNull(),
+  status: mysqlEnum("status", ["geplant", "aktiv", "abgeschlossen"]).default("geplant").notNull(),
+  notizen: text("notizen"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type Tour = typeof touren.$inferSelect;
+export type InsertTour = typeof touren.$inferInsert;
+
+export const tourEinsaetze = mysqlTable("tourEinsaetze", {
+  id: int("id").autoincrement().primaryKey(),
+  tourId: int("tourId").notNull(),
+  einsatzId: int("einsatzId").notNull(),
+  reihenfolge: int("reihenfolge").default(0).notNull(),
+});
+export type TourEinsatz = typeof tourEinsaetze.$inferSelect;
+
+// ── MODUL 15: IN-APP-BENACHRICHTIGUNGEN ───────────────────────────
+export const notifications = mysqlTable("notifications", {
+  id: int("id").autoincrement().primaryKey(),
+  empfaengerId: int("empfaengerId").notNull(), // mitarbeiterId
+  titel: varchar("titel", { length: 200 }).notNull(),
+  nachricht: text("nachricht").notNull(),
+  typ: mysqlEnum("typ", ["info", "warnung", "erfolg", "fehler"]).default("info").notNull(),
+  gelesen: boolean("gelesen").default(false).notNull(),
+  linkUrl: varchar("linkUrl", { length: 500 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = typeof notifications.$inferInsert;
+
+// ── MODUL 15: REFRESH TOKENS ──────────────────────────────────────
+export const refreshTokens = mysqlTable("refreshTokens", {
+  id: int("id").autoincrement().primaryKey(),
+  mitarbeiterId: int("mitarbeiterId").notNull(),
+  token: varchar("token", { length: 128 }).notNull().unique(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  used: boolean("used").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type RefreshToken = typeof refreshTokens.$inferSelect;
+export type InsertRefreshToken = typeof refreshTokens.$inferInsert;
