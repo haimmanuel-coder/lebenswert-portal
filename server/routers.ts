@@ -84,7 +84,7 @@ const PORTAL_COOKIE = "lb_portal_token";
 async function signPortalToken(mitarbeiterId: number) {
   return new SignJWT({ mitarbeiterId })
     .setProtectedHeader({ alg: "HS256" })
-    .setExpirationTime("8h")
+    .setExpirationTime("30d")
     .sign(JWT_SECRET);
 }
 
@@ -148,7 +148,7 @@ export const appRouter = router({
           secure: isSecure,
           sameSite: isSecure ? 'none' : 'lax',
           path: '/',
-          maxAge: 8 * 60 * 60 * 1000,
+          maxAge: 30 * 24 * 60 * 60 * 1000,
         });
         await createAuditLog({ mitarbeiterId: ma.id, action: "LOGIN", ressource: "portal", status: "success" });
         return { id: ma.id, vorname: ma.vorname, nachname: ma.nachname, email: ma.email, rolle: ma.rolle, token };

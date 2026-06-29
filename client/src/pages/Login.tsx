@@ -20,7 +20,14 @@ export default function Login() {
       await new Promise((r) => setTimeout(r, 100));
       await refetch();
     },
-    onError: (e) => setError(e.message || "E-Mail oder Passwort ungültig."),
+    onError: (e) => {
+      const msg = e.message || "";
+      if (msg.includes("JSON") || msg.includes("token") || msg.includes("html")) {
+        setError("Verbindungsfehler – bitte Seite neu laden und erneut versuchen.");
+      } else {
+        setError(msg || "E-Mail oder Passwort ungültig.");
+      }
+    },
   });
 
   const doLogin = () => {

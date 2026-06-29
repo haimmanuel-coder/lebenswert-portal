@@ -34,11 +34,16 @@ const PortalAuthContext = createContext<PortalAuthContextType | null>(null);
 export function PortalAuthProvider({ children }: { children: React.ReactNode }) {
   const utils = trpc.useUtils();
 
-  const { data, isLoading, refetch } = trpc.portal.me.useQuery(undefined, {
+  const { data, isLoading, refetch, isError } = trpc.portal.me.useQuery(undefined, {
     retry: false,
     staleTime: 0,
     refetchOnMount: true,
   });
+
+  // Abgelaufener oder ungültiger Token – automatisch löschen
+  React.useEffect(() => {
+    if (isError) clearStoredToken();
+  }, [isError]);
 
   const logoutMutation = trpc.portal.logout.useMutation({
     onSuccess: async () => {
