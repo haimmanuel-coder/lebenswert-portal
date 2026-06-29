@@ -25,7 +25,7 @@ type PageId = "home" | "einsaetze" | "zeit" | "lnw" | "fahrt" | "admin" | "manag
 const pages: { id: PageId; icon: string; label: string }[] = [
   { id: "home", icon: "🏠", label: "Home" },
   { id: "einsaetze", icon: "📅", label: "Einsätze" },
-  { id: "zeit", icon: "⏱", label: "Zeit" },
+  { id: "kunden", icon: "👥", label: "Kunden" },
   { id: "lnw", icon: "📋", label: "Nachweise" },
   { id: "fahrt", icon: "🚗", label: "Fahrten" },
 ];
