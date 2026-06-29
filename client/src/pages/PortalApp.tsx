@@ -16,11 +16,12 @@ import ExportCenter from "./ExportCenter";
 import Fuehrerschein from "./Fuehrerschein";
 import NeukundenAufnahme from "./NeukundenAufnahme";
 import Kalender from "./Kalender";
+import Kassenanfrage from "./Kassenanfrage";
 import BottomSheet from "@/components/BottomSheet";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 import OnboardingTour, { useOnboardingTour } from "@/components/OnboardingTour";
 
-type PageId = "home" | "einsaetze" | "zeit" | "lnw" | "fahrt" | "admin" | "management" | "kunden" | "kostentraeger" | "textbausteine" | "export" | "fuehrerschein" | "neukundenaufnahme" | "kalender";
+type PageId = "home" | "einsaetze" | "zeit" | "lnw" | "fahrt" | "admin" | "management" | "kunden" | "kostentraeger" | "textbausteine" | "export" | "fuehrerschein" | "neukundenaufnahme" | "kalender" | "kassenanfrage";
 
 const pages: { id: PageId; icon: string; label: string }[] = [
   { id: "home", icon: "🏠", label: "Home" },
@@ -67,6 +68,7 @@ export default function PortalApp() {
       case "fuehrerschein": return <Fuehrerschein />;
       case "neukundenaufnahme": return <NeukundenAufnahme />;
       case "kalender": return <Kalender />;
+      case "kassenanfrage": return <Kassenanfrage />;
       default: return <Dashboard />;
     }
   };
@@ -435,6 +437,17 @@ export default function PortalApp() {
               <div style={{ textAlign: "left" }}>
                 <div>Neukundenaufnahme</div>
                 <div style={{ fontSize: 11, opacity: 0.8 }}>Stammdaten, Vollmacht & PDF</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => { setMenuOpen(false); navTo("kassenanfrage"); }}
+              style={{ padding: 13, background: "#f0fdfa", color: "#0f766e", border: "2px solid #5eead4", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
+            >
+              <span>📋</span>
+              <div style={{ textAlign: "left" }}>
+                <div>Kassenanfragen</div>
+                <div style={{ fontSize: 11, opacity: 0.8 }}>Vollmacht zur Budget-Abfrage</div>
               </div>
             </button>
 

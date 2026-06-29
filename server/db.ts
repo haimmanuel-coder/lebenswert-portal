@@ -710,3 +710,85 @@ export async function updateNeukundenaufnahmeStatus(id: number, status: 'aufgeno
   if (!db) return;
   await db.execute(sql`UPDATE neukundenaufnahmen SET status = ${status} WHERE id = ${id}`);
 }
+
+// ── KASSENANFRAGEN ────────────────────────────────────────────────
+export async function getAllKassenanfragen(mitarbeiterId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  if (mitarbeiterId) {
+    const rows = await db.execute(sql`
+      SELECT ka.*, 
+        k.vorname, k.nachname, k.versicherungsnummer, k.pflegegrad,
+        kt.name as kasseName, kt.ikNummer,
+        m.vorname as mitarbeiterVorname, m.nachname as mitarbeiterNachname
+      FROM kassenanfragen ka
+      LEFT JOIN kunden k ON ka.kundenId = k.id
+      LEFT JOIN kostentraeger kt ON ka.kostentraegerId = kt.id
+      LEFT JOIN mitarbeiter m ON ka.mitarbeiterId = m.id
+      WHERE ka.mitarbeiterId = ${mitarbeiterId}
+      ORDER BY ka.createdAt DESC
+    `);
+    return (rows as any)[0] as any[];
+  }
+  const rows = await db.execute(sql`
+    SELECT ka.*, 
+      k.vorname, k.nachname, k.versicherungsnummer, k.pflegegrad,
+      kt.name as kasseName, kt.ikNummer,
+      m.vorname as mitarbeiterVorname, m.nachname as mitarbeiterNachname
+    FROM kassenanfragen ka
+    LEFT JOIN kunden k ON ka.kundenId = k.id
+    LEFT JOIN kostentraeger kt ON ka.kostentraegerId = kt.id
+    LEFT JOIN mitarbeiter m ON ka.mitarbeiterId = m.id
+    ORDER BY ka.createdAt DESC
+  `);
+  return (rows as any)[0] as any[];
+}
+
+export async function getKassenanfragenByKunde(kundenId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.execute(sql`
+    SELECT ka.*, 
+      kt.name as kasseName, kt.ikNummer,
+      m.vorname as mitarbeiterVorname, m.nachname as mitarbeiterNachname
+    FROM kassenanfragen ka
+    LEFT JOIN kostentraeger kt ON ka.kostentraegerId = kt.id
+    LEFT JOIN mitarbeiter m ON ka.mitarbeiterId = m.id
+    WHERE ka.kundenId = ${kundenId}
+    ORDER BY ka.createdAt DESC
+  `);
+  return (rows as any)[0] as any[];
+}
+
+export async function createKassenanfrage(data: {
+  mitarbeiterId: number;
+  kundenId: number;
+  kostentraegerId?: number;
+  anfrageTyp: string;
+  vollmachtText?: string;
+  unterschriftKunde?: string;
+  unterschriftMitarbeiter?: string;
+  notizen?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.execute(sql`
+    INSERT INTO kassenanfragen
+      (mitarbeiterId, kundenId, kostentraegerId, anfrageTyp, vollmachtText, unterschriftKunde, unterschriftMitarbeiter, notizen, status)
+    VALUES
+      (${data.mitarbeiterId}, ${data.kundenId}, ${data.kostentraegerId ?? null}, ${data.anfrageTyp},
+       ${data.vollmachtText ?? null}, ${data.unterschriftKunde ?? null}, ${data.unterschriftMitarbeiter ?? null},
+       ${data.notizen ?? null}, 'offen')
+  `);
+  return result;
+}
+
+export async function updateKassenanfrageStatus(id: number, status: 'offen' | 'gesendet' | 'beantwortet' | 'abgelehnt', antwort?: string) {
+  const db = await getDb();
+  if (!db) return;
+  if (antwort) {
+    await db.execute(sql`UPDATE kassenanfragen SET status = ${status}, antwort = ${antwort}, antwortDatum = NOW() WHERE id = ${id}`);
+  } else {
+    await db.execute(sql`UPDATE kassenanfragen SET status = ${status} WHERE id = ${id}`);
+  }
+}

@@ -214,3 +214,23 @@
 - [x] '?'-Hilfe-Button in TopBar zum manuellen Neustart
 - [x] useOnboardingTour-Hook fuer programmatischen Zugriff
 - [x] Integration in PortalApp.tsx
+
+## Phase 14 – Kassenanfrage-Modul (Vollmacht Budget-Abfrage bei Kassen)
+
+### Datenbank & Backend
+- [x] DB: kassenanfragen-Tabelle (mitarbeiterId, kundenId, kostentraegerId, anfrageTyp, vollmachtText, unterschriftKunde, unterschriftMitarbeiter, status, antwort, createdAt)
+- [x] Backend: tRPC kassenanfrage.create, kassenanfrage.list, kassenanfrage.getByKunde, kassenanfrage.updateStatus
+
+### Frontend
+- [x] KassenAnfrage.tsx: Vollmacht-Formular (Kunde wählen, Kasse wählen, Anfragetyp, Vollmacht-Text)
+- [x] Unterschriftenfelder: Mitarbeiter + Kunde mit Vorschau und Zurücksetzen
+- [x] PDF-Generator: Vollmacht-PDF mit Briefkopf, Vollmacht-Text, Kunden-/Mitarbeiter-Unterschrift
+- [x] Archiv-Ansicht: alle gestellten Anfragen mit Status (offen/beantwortet/abgelehnt)
+- [x] Navigation: Menüpunkt in PortalApp.tsx
+
+## Phase 14 – Abgeschlossen ✅
+- [x] DB: kassenanfragen-Tabelle angelegt
+- [x] Backend: tRPC kassenanfrage.create, kassenanfrage.list, kassenanfrage.getByKunde, kassenanfrage.updateStatus
+- [x] Frontend: Kassenanfrage.tsx mit Vollmacht-Formular, Unterschriften, PDF-Export, Archiv
+- [x] Navigation: Menüpunkt "Kassenanfragen" im Admin-Menü (teal)
+- [x] 0 TypeScript-Fehler, 33/33 Tests bestanden

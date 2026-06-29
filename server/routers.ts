@@ -76,6 +76,10 @@ import {
   deletePushSubscription,
   getAllPushSubscriptions,
   getPushSubscriptionsByMitarbeiter,
+  getAllKassenanfragen,
+  getKassenanfragenByKunde,
+  createKassenanfrage,
+  updateKassenanfrageStatus,
 } from "./db";
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "lebenswert-secret-key");
@@ -1157,6 +1161,48 @@ export const appRouter = router({
       .input(z.object({ id: z.number(), status: z.enum(['aufgenommen', 'in_bearbeitung', 'abgeschlossen']) }))
       .mutation(async ({ input }) => {
         await updateNeukundenaufnahmeStatus(input.id, input.status);
+        return { success: true };
+      }),
+  }),
+
+  // ── KASSENANFRAGEN ───────────────────────────────────
+  kassenanfrage: router({
+    list: portalProtected
+      .input(z.object({ kundenId: z.number().optional() }).optional())
+      .query(async ({ ctx, input }) => {
+        if (input?.kundenId) {
+          return getKassenanfragenByKunde(input.kundenId);
+        }
+        const ma = await getMitarbeiterById(ctx.mitarbeiterId);
+        if (ma?.rolle === 'admin') return getAllKassenanfragen();
+        return getAllKassenanfragen(ctx.mitarbeiterId);
+      }),
+
+    create: portalProtected
+      .input(z.object({
+        kundenId: z.number().int().positive(),
+        kostentraegerId: z.number().int().positive().optional(),
+        anfrageTyp: z.enum(['budget_45b', 'budget_45a', 'budget_39', 'alle_budgets', 'pflegegrad', 'sonstiges']),
+        vollmachtText: z.string().optional(),
+        unterschriftKunde: z.string().optional(),
+        unterschriftMitarbeiter: z.string().optional(),
+        notizen: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await createKassenanfrage({ ...input, mitarbeiterId: ctx.mitarbeiterId });
+        await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'CREATE', ressource: 'kassenanfrage', status: 'success' });
+        return { success: true };
+      }),
+
+    updateStatus: portalProtected
+      .input(z.object({
+        id: z.number().int().positive(),
+        status: z.enum(['offen', 'gesendet', 'beantwortet', 'abgelehnt']),
+        antwort: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await updateKassenanfrageStatus(input.id, input.status, input.antwort);
+        await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'UPDATE', ressource: 'kassenanfrage', details: `id=${input.id} status=${input.status}`, status: 'success' });
         return { success: true };
       }),
   }),
