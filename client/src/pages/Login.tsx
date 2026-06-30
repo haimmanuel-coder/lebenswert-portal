@@ -183,9 +183,7 @@ export default function Login() {
             <p style={{ textAlign: "center", fontSize: 11, color: "#6b7280", marginTop: 16 }}>
               🔒 SSL-verschlüsselt · DSGVO-konform
             </p>
-            <p style={{ textAlign: "center", fontSize: 11, color: "#9ca3af", marginTop: 8 }}>
-              Admin: admin@lebenswert.de · Passwort: password
-            </p>
+
           </>
         )}
 
