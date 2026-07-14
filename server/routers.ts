@@ -75,6 +75,15 @@ import {
   getAllNeukundenaufnahmen,
   createNeukundenaufnahme,
   updateNeukundenaufnahmeStatus,
+  createNeukundenPushEintraege,
+  getOffeneNeukundenPushFuerMitarbeiter,
+  bestaetigeNeukundenPush,
+  getAlleOffenenNeukundenPush,
+  createVertretungsUebernahme,
+  hatVertretungsVollzugriff,
+  getAktiveVertretungenFuerMitarbeiter,
+  getVertretungsKundenFuerUrlaub,
+  getUnterschreitungsZaehler,
 } from "./db";
 import { SignJWT, jwtVerify } from "jose";
 import { ENV } from "./_core/env";
@@ -204,6 +213,33 @@ export const urlaubRouter = router({
     .mutation(async ({ input, ctx }) => {
       await updateUrlaubsantragStatus(input.id, input.status, input.adminNotiz);
       await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'UPDATE', ressource: 'urlaub', details: `id=${input.id} status=${input.status}`, status: 'success' });
+
+      // P2: Bei Genehmigung → DSGVO-Mindestdaten-Push an alle anderen Mitarbeiter
+      if (input.status === 'genehmigt') {
+        try {
+          const kundenDsgvo = await getVertretungsKundenFuerUrlaub(input.id);
+          if (kundenDsgvo.length > 0) {
+            const alleMa = await getAllMitarbeiter();
+            const urlaubsRows = await (await import('./db')).getDb().then(async (db) => {
+              if (!db) return [];
+              const { urlaubsantraege } = await import('../drizzle/schema');
+              const { eq } = await import('drizzle-orm');
+              return db.select().from(urlaubsantraege).where(eq(urlaubsantraege.id, input.id)).limit(1);
+            });
+            const urlaubMitarbeiterId = (urlaubsRows as any[])[0]?.mitarbeiterId;
+            const andereMA = alleMa.filter((m: { id: number }) => m.id !== urlaubMitarbeiterId);
+            const kundenNamen = kundenDsgvo.map((k: { vorname: string; nachname: string }) => `${k.vorname} ${k.nachname}`).join(', ');
+            for (const ma of andereMA) {
+              await createNotification({
+                empfaengerId: ma.id,
+                titel: 'Vertretung benötigt – DSGVO-Mindestdaten',
+                nachricht: `Ein Kollege ist im Urlaub. Folgende Kunden benötigen Vertretung: ${kundenNamen}. Bitte Übernahme bestätigen.`,
+                typ: 'warnung',
+              });
+            }
+          }
+        } catch (e) { console.warn('[P2] Vertretungs-Push fehlgeschlagen:', e); }
+      }
       return { success: true };
     }),
   delete: portalProtected
@@ -695,7 +731,11 @@ export const appRouter = router({
         versicherungsnummer: z.string().optional(),
       }))
       .mutation(async ({ input }) => {
-        await createKunde({ ...input, aktiv: 1 });
+        const newId = await createKunde({ ...input, aktiv: 1 });
+        // P1: Neukunden-Push an alle Mitarbeiter senden
+        if (newId) {
+          try { await createNeukundenPushEintraege(newId); } catch (e) { console.warn('[P1] Neukunden-Push fehlgeschlagen:', e); }
+        }
         return { success: true };
       }),
 
@@ -854,7 +894,31 @@ export const appRouter = router({
           }
         }
 
-        await createEinsatz({ ...input, mitarbeiterId: ctx.mitarbeiterId } as any);
+        // P3: Anfahrtspauschale 6€ automatisch setzen
+        const einsatzData: any = { ...input, mitarbeiterId: ctx.mitarbeiterId, anfahrtPauschale: '6.00' };
+
+        // P3: Mindestzeit-Eskalation (< 1,5h → Zähler erhöhen, ab 3× → Admin-Alert)
+        if (input.dauerStunden !== undefined && input.dauerStunden < 1.5) {
+          einsatzData.unterschreitungEskaliert = true;
+          try {
+            const zaehler = await getUnterschreitungsZaehler(ctx.mitarbeiterId);
+            if (zaehler >= 2) { // 3. Unterschreitung (0-indexed: 0,1,2)
+              const alleMa = await getAllMitarbeiter();
+              const admins = alleMa.filter((m: { rolle: string }) => m.rolle === 'admin');
+              const ma = await getMitarbeiterById(ctx.mitarbeiterId);
+              for (const admin of admins) {
+                await createNotification({
+                  empfaengerId: admin.id,
+                  titel: '⚠️ Mindestzeit-Eskalation',
+                  nachricht: `${ma?.vorname} ${ma?.nachname} hat die Mindestbetreuungszeit (1,5h) in den letzten 30 Tagen bereits 3× unterschritten!`,
+                  typ: 'warnung',
+                });
+              }
+            }
+          } catch (e) { console.warn('[P3] Eskalation fehlgeschlagen:', e); }
+        }
+
+        await createEinsatz(einsatzData);
         await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "CREATE", ressource: "einsatz", status: "success" });
         return { success: true };
       }),
@@ -974,7 +1038,13 @@ export const appRouter = router({
         kilometerRueck: z.number().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
-        await createFahrt({ ...input, mitarbeiterId: ctx.mitarbeiterId } as any);
+        // P3: Dienstwagen-Prüfung – Mitarbeiter mit Dienstwagen erhalten keine km-Erstattung
+        const fahrtData: any = { ...input, mitarbeiterId: ctx.mitarbeiterId };
+        const ma = await getMitarbeiterById(ctx.mitarbeiterId);
+        if ((ma as any)?.dienstwagen === true || (ma as any)?.dienstwagen === 1) {
+          fahrtData.verguetung = '0.00'; // 1%-Regelung: keine km-Erstattung
+        }
+        await createFahrt(fahrtData);
         await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "CREATE", ressource: "fahrt", status: "success" });
         return { success: true };
       }),
@@ -1892,6 +1962,84 @@ export const appRouter = router({
         return { success: true };
       }),
   }),
+
+  // ── P1: NEUKUNDEN-PUSH-BESTÄTIGUNGEN ─────────────────────────────────────────
+  neukundenPush: router({
+    // Mitarbeiter: eigene offene Bestätigungen abrufen
+    meineOffenen: portalProtected.query(async ({ ctx }) => {
+      return getOffeneNeukundenPushFuerMitarbeiter(ctx.mitarbeiterId);
+    }),
+
+    // Mitarbeiter: Bestätigung abgeben
+    bestaetigen: portalProtected
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(async ({ input, ctx }) => {
+        await bestaetigeNeukundenPush(input.id, ctx.mitarbeiterId);
+        await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'UPDATE', ressource: 'neukunden_push', details: `id=${input.id}`, status: 'success' });
+        return { success: true };
+      }),
+
+    // Admin: alle unbestätigten Einträge sehen (Eskalations-Übersicht)
+    alleOffen: adminProcedure.query(async () => {
+      return getAlleOffenenNeukundenPush();
+    }),
+  }),
+
+  // ── P2: VERTRETUNGS-ÜBERNAHMEN ────────────────────────────────────────────────
+  vertretungUebernahme: router({
+    // Mitarbeiter: Vertretung für einen Kunden übernehmen
+    uebernahme: portalProtected
+      .input(z.object({
+        urlaubsantragId: z.number().int().positive(),
+        kundenId: z.number().int().positive(),
+        vollzugriffBisDatum: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const vollzugriffBis = new Date(input.vollzugriffBisDatum);
+        await createVertretungsUebernahme({
+          urlaubsantragId: input.urlaubsantragId,
+          kundenId: input.kundenId,
+          vertreterId: ctx.mitarbeiterId,
+          vollzugriffBis,
+        });
+        await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'CREATE', ressource: 'vertretung_uebernahme', details: `kunde=${input.kundenId}`, status: 'success' });
+        return { success: true };
+      }),
+
+    // Mitarbeiter: eigene aktive Vertretungen abrufen
+    meineAktiven: portalProtected.query(async ({ ctx }) => {
+      return getAktiveVertretungenFuerMitarbeiter(ctx.mitarbeiterId);
+    }),
+
+    // Prüfen ob Vollzugriff auf einen Kunden besteht
+    pruefeZugriff: portalProtected
+      .input(z.object({ kundenId: z.number().int().positive() }))
+      .query(async ({ input, ctx }) => {
+        const hatZugriff = await hatVertretungsVollzugriff(ctx.mitarbeiterId, input.kundenId);
+        return { hatZugriff };
+      }),
+  }),
+
+  // ── P3: ADMIN-DIENSTWAGEN-VERWALTUNG ─────────────────────────────────────────
+  dienstwagen: router({
+    // Admin: Dienstwagen-Flag für Mitarbeiter setzen
+    setzen: adminProcedure
+      .input(z.object({
+        mitarbeiterId: z.number().int().positive(),
+        dienstwagen: z.boolean(),
+        fahrzeugTyp: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const db = await getDb();
+        if (!db) throw new Error('DB nicht verfügbar');
+        await db.update(mitarbeiter)
+          .set({ dienstwagen: input.dienstwagen ? 1 : 0, fahrzeugTyp: input.fahrzeugTyp ?? null } as any)
+          .where(eq(mitarbeiter.id, input.mitarbeiterId));
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'ADMIN', ressource: 'dienstwagen', details: `ma=${input.mitarbeiterId} dienstwagen=${input.dienstwagen}`, status: 'success' });
+        return { success: true };
+      }),
+  }),
+
 });
 
 export type AppRouter = typeof appRouter;

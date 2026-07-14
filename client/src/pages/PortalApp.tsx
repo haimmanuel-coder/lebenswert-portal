@@ -66,8 +66,10 @@ export default function PortalApp() {
   const { data: leistungen = [] } = trpc.leistungen.list.useQuery();
   const { data: warnungen = [] } = trpc.kunden.budgetWarnungen.useQuery();
   const { data: unreadNotifs = [] } = trpc.notifications.list.useQuery();
+  const { data: neukundenPushOffen = [] } = (trpc as any).neukundenPush.meineOffenen.useQuery();
   const offenCount = leistungen.filter((l) => l.status === "offen").length;
   const unreadCount = (unreadNotifs as any[]).filter((n: any) => !n.gelesenAt).length;
+  const neukundenPushCount = (neukundenPushOffen as any[]).length;
   const isAdmin = mitarbeiter?.rolle === "admin";
   const { isOnline, offlineCount } = useOfflineSync();
   const { show: showTour, startTour, closeTour } = useOnboardingTour();
@@ -104,7 +106,7 @@ export default function PortalApp() {
         { id: "einsaetze", icon: "📅", label: "Einsätze" },
         { id: "lnw", icon: "📋", label: "Leistungsnachweise", badge: offenCount > 0 ? offenCount : undefined },
         { id: "kassenanfrage", icon: "🏥", label: "Kassenanfragen" },
-        { id: "neukundenaufnahme", icon: "➕", label: "Neukundenaufnahme" },
+        { id: "neukundenaufnahme", icon: "➕", label: "Neukundenaufnahme", badge: neukundenPushCount > 0 ? neukundenPushCount : undefined },
         { id: "kostentraeger", icon: "🏦", label: "Kostenträger" },
       ],
     },

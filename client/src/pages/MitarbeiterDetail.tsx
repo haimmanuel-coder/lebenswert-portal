@@ -21,7 +21,57 @@ import {
   Save,
   X,
   FileDown,
+  Car,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+
+// ── P3: Dienstwagen-Karte (Admin-only) ───────────────────────────────────────
+function DienstwagenCard({ mitarbeiterId, ma }: { mitarbeiterId: number; ma: any }) {
+  const utils = trpc.useUtils();
+  const setDienstwagen = (trpc as any).dienstwagen.setzen.useMutation({
+    onSuccess: () => {
+      toast.success('Dienstwagen-Status gespeichert');
+      utils.admin.mitarbeiterDetail.invalidate({ id: mitarbeiterId });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const [fahrzeugTyp, setFahrzeugTyp] = useState(ma?.fahrzeugTyp ?? '');
+
+  return (
+    <div className="bg-card rounded-xl p-4 border space-y-3">
+      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide flex items-center gap-1">
+        <Car className="w-3 h-3" /> Dienstwagen (P3)
+      </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium">Dienstwagen gestellt</p>
+          <p className="text-xs text-muted-foreground">1%-Regelung – keine km-Erstattung</p>
+        </div>
+        <Switch
+          checked={!!(ma?.dienstwagen)}
+          onCheckedChange={(val) => setDienstwagen.mutate({ mitarbeiterId, dienstwagen: val, fahrzeugTyp: fahrzeugTyp || undefined })}
+          disabled={setDienstwagen.isPending}
+        />
+      </div>
+      {ma?.dienstwagen ? (
+        <div>
+          <label className="text-xs text-muted-foreground">Fahrzeugtyp / Kennzeichen</label>
+          <div className="flex gap-2 mt-1">
+            <input
+              value={fahrzeugTyp}
+              onChange={e => setFahrzeugTyp(e.target.value)}
+              placeholder="z.B. VW Golf · AB-CD 123"
+              className="flex-1 px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <Button size="sm" onClick={() => setDienstwagen.mutate({ mitarbeiterId, dienstwagen: true, fahrzeugTyp: fahrzeugTyp || undefined })} disabled={setDienstwagen.isPending}>
+              <Save className="w-3 h-3" />
+            </Button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 type ZertifikatStatus = "erhalten" | "angemeldet" | "nicht_angemeldet";
 type Beschaeftigungsart = "minijob" | "teilzeit" | "vollzeit";
@@ -501,6 +551,10 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
                 </>
               )}
             </div>
+
+            {/* P3: Dienstwagen-Bereich */}
+            <DienstwagenCard mitarbeiterId={mitarbeiterId} ma={ma} />
+
           </div>
         )}
 

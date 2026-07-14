@@ -1,6 +1,6 @@
 import { and, eq, gte, lte, desc, sql, like, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, mitarbeiter, kunden, einsaetze, leistungen, fahrten, auditLogs, kundenZuordnung, monatsabschluesse, passwordResets, kostentraeger, textbausteine, ebriefLog, pushSubscriptions, urlaubsantraege, krankmeldungen, touren, tourEinsaetze, notifications, refreshTokens, budgetTransaktionen } from "../drizzle/schema";
+import { InsertUser, users, mitarbeiter, kunden, einsaetze, leistungen, fahrten, auditLogs, kundenZuordnung, monatsabschluesse, passwordResets, kostentraeger, textbausteine, ebriefLog, pushSubscriptions, urlaubsantraege, krankmeldungen, touren, tourEinsaetze, notifications, refreshTokens, budgetTransaktionen, neukundenPushBestaetigung, vertretungsUebernahmen } from "../drizzle/schema";
 import type { InsertMitarbeiter, InsertKunde, InsertEinsatz, InsertLeistung, InsertFahrt, InsertAuditLog, InsertKostentraeger, InsertTextbaustein, InsertEbriefLog, InsertPushSubscription, InsertUrlaubsantrag, InsertKrankmeldung, InsertTour, InsertNotification, InsertRefreshToken } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -124,10 +124,11 @@ export async function getKundeById(id: number) {
   return result[0] ?? null;
 }
 
-export async function createKunde(data: InsertKunde) {
+export async function createKunde(data: InsertKunde): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.insert(kunden).values(data);
+  const result = await db.insert(kunden).values(data);
+  return (result as any)[0]?.insertId ?? 0;
 }
 
 export async function updateKunde(id: number, data: Partial<InsertKunde>) {
@@ -1190,4 +1191,142 @@ export async function checkDoppelbelegung(params: {
   }
 
   return { mitarbeiterKonflikt, kundenKonflikt };
+}
+
+// ── P1: NEUKUNDEN-PUSH-BESTÄTIGUNGEN ─────────────────────────────────────────
+
+/** Erstellt Bestätigungs-Einträge für alle aktiven Mitarbeiter beim Neukunden-Anlegen */
+export async function createNeukundenPushEintraege(kundenId: number) {
+  const db = await getDb();
+  if (!db) return;
+  const alleMa = await db.select({ id: mitarbeiter.id }).from(mitarbeiter).where(eq(mitarbeiter.aktiv, 1));
+  if (alleMa.length === 0) return;
+  await db.insert(neukundenPushBestaetigung).values(
+    alleMa.map(ma => ({ kundenId, mitarbeiterId: ma.id }))
+  );
+}
+
+/** Gibt alle unbestätigten Neukunden-Push-Einträge für einen Mitarbeiter zurück */
+export async function getOffeneNeukundenPushFuerMitarbeiter(mitarbeiterId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({
+    id: neukundenPushBestaetigung.id,
+    kundenId: neukundenPushBestaetigung.kundenId,
+    eskalationsstufe: neukundenPushBestaetigung.eskalationsstufe,
+    createdAt: neukundenPushBestaetigung.createdAt,
+  })
+    .from(neukundenPushBestaetigung)
+    .where(and(
+      eq(neukundenPushBestaetigung.mitarbeiterId, mitarbeiterId),
+      sql`${neukundenPushBestaetigung.bestaetigtAt} IS NULL`
+    ))
+    .orderBy(desc(neukundenPushBestaetigung.createdAt));
+}
+
+/** Bestätigt einen Neukunden-Push-Eintrag */
+export async function bestaetigeNeukundenPush(id: number, mitarbeiterId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(neukundenPushBestaetigung)
+    .set({ bestaetigtAt: new Date() })
+    .where(and(
+      eq(neukundenPushBestaetigung.id, id),
+      eq(neukundenPushBestaetigung.mitarbeiterId, mitarbeiterId)
+    ));
+}
+
+/** Gibt alle unbestätigten Einträge zurück (für Admin-Eskalations-Übersicht) */
+export async function getAlleOffenenNeukundenPush() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(neukundenPushBestaetigung)
+    .where(sql`${neukundenPushBestaetigung.bestaetigtAt} IS NULL`)
+    .orderBy(desc(neukundenPushBestaetigung.createdAt));
+}
+
+// ── P2: DSGVO-VERTRETUNGS-ÜBERNAHMEN ─────────────────────────────────────────
+
+/** Erstellt eine Vertretungs-Übernahme (Mitarbeiter übernimmt Kunden während Urlaub) */
+export async function createVertretungsUebernahme(data: {
+  urlaubsantragId: number;
+  kundenId: number;
+  vertreterId: number;
+  vollzugriffBis: Date;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.insert(vertretungsUebernahmen).values(data);
+}
+
+/** Prüft ob ein Mitarbeiter Vollzugriff auf einen Kunden hat (via Vertretung) */
+export async function hatVertretungsVollzugriff(vertreterId: number, kundenId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const jetzt = new Date();
+  const rows = await db.select({ id: vertretungsUebernahmen.id })
+    .from(vertretungsUebernahmen)
+    .where(and(
+      eq(vertretungsUebernahmen.vertreterId, vertreterId),
+      eq(vertretungsUebernahmen.kundenId, kundenId),
+      sql`${vertretungsUebernahmen.vollzugriffBis} > ${jetzt}`
+    ))
+    .limit(1);
+  return rows.length > 0;
+}
+
+/** Gibt alle aktiven Vertretungs-Übernahmen eines Mitarbeiters zurück */
+export async function getAktiveVertretungenFuerMitarbeiter(vertreterId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const jetzt = new Date();
+  return db.select().from(vertretungsUebernahmen)
+    .where(and(
+      eq(vertretungsUebernahmen.vertreterId, vertreterId),
+      sql`${vertretungsUebernahmen.vollzugriffBis} > ${jetzt}`
+    ));
+}
+
+/** Gibt alle Kunden zurück, die während eines Urlaubs vertreten werden müssen (DSGVO-Mindestdaten) */
+export async function getVertretungsKundenFuerUrlaub(urlaubsantragId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  // Kunden des Mitarbeiters laden (nur Mindestdaten für DSGVO-Push)
+  const urlaubRows = await db.select().from(urlaubsantraege).where(eq(urlaubsantraege.id, urlaubsantragId)).limit(1);
+  if (!urlaubRows[0]) return [];
+  const urlaub = urlaubRows[0];
+  const zuordnungen = await db.select({ kundenId: kundenZuordnung.kundenId })
+    .from(kundenZuordnung)
+    .where(eq(kundenZuordnung.mitarbeiterId, urlaub.mitarbeiterId));
+  if (zuordnungen.length === 0) return [];
+  const ids = zuordnungen.map(z => z.kundenId);
+  // Nur Mindestdaten zurückgeben (DSGVO-konform)
+  return db.select({
+    id: kunden.id,
+    vorname: kunden.vorname,
+    nachname: kunden.nachname,
+    geburtsdatum: kunden.geburtsdatum,
+    strasse: kunden.strasse,
+    plz: kunden.plz,
+    ort: kunden.ort,
+    pflegegrad: kunden.pflegegrad,
+  }).from(kunden).where(sql`${kunden.id} IN (${ids.join(",")})`);
+}
+
+// ── P3: MINDESTZEIT-ESKALATION ────────────────────────────────────────────────
+
+/** Zählt wie oft ein Mitarbeiter die Mindestbetreuungszeit unterschritten hat (letzte 30 Tage) */
+export async function getUnterschreitungsZaehler(mitarbeiterId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const vor30Tagen = new Date();
+  vor30Tagen.setDate(vor30Tagen.getDate() - 30);
+  const rows = await db.select({ id: einsaetze.id })
+    .from(einsaetze)
+    .where(and(
+      eq(einsaetze.mitarbeiterId, mitarbeiterId),
+      eq(einsaetze.unterschreitungEskaliert, true),
+      gte(einsaetze.datum, vor30Tagen)
+    ));
+  return rows.length;
 }

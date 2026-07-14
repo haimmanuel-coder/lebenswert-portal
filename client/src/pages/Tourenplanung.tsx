@@ -384,6 +384,21 @@ export default function Tourenplanung() {
                   style={{ width: "100%", padding: "10px 12px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, boxSizing: "border-box", resize: "vertical" }}
                 />
               </div>
+              {/* P4: Abwesenheits-Konflikt-Warnung */}
+              {createMaId && createDatum && (() => {
+                const konflikte = (abwesenheitenByDatum[createDatum] || []).filter(a => {
+                  const ma = (mitarbeiterListe as any[]).find(m => m.id === createMaId);
+                  return ma && a.name === `${ma.vorname} ${ma.nachname}`.trim();
+                });
+                if (konflikte.length === 0) return null;
+                return (
+                  <div style={{ background: "#fef9c3", border: "1px solid #fcd34d", borderRadius: 10, padding: "10px 12px", fontSize: 13, color: "#92400e" }}>
+                    ⚠️ <strong>Achtung:</strong> Der gewählte Mitarbeiter ist am {new Date(createDatum + 'T12:00:00').toLocaleDateString('de-DE')} als{' '}
+                    {konflikte.map(k => k.typ === 'urlaub' ? 'im Urlaub' : 'krank gemeldet').join(', ')} eingetragen.
+                    Die Tour kann trotzdem erstellt werden.
+                  </div>
+                );
+              })()}
               <button
                 onClick={() => {
                   if (!createMaId || !createDatum) { toast.error("Bitte Mitarbeiter und Datum wählen."); return; }

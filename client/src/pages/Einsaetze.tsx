@@ -160,6 +160,18 @@ export default function Einsaetze() {
                     <span className={pb.cls} style={{ display: "inline-block", padding: "2px 6px", borderRadius: 20, fontSize: 10, fontWeight: 700 }}>
                       {pb.label}
                     </span>
+                    {/* P3: Anfahrtspauschale */}
+                    {(e as any).anfahrtPauschale && parseFloat(String((e as any).anfahrtPauschale)) > 0 && (
+                      <span style={{ display: "inline-block", padding: "2px 6px", borderRadius: 20, fontSize: 10, fontWeight: 700, background: "#f0fdf4", color: "#166534", border: "1px solid #bbf7d0" }}>
+                        +{parseFloat(String((e as any).anfahrtPauschale)).toFixed(2)}€ Anfahrt
+                      </span>
+                    )}
+                    {/* P3: Mindestzeit-Warnung */}
+                    {e.dauerStunden !== null && parseFloat(String(e.dauerStunden)) < 1.5 && (
+                      <span style={{ display: "inline-block", padding: "2px 6px", borderRadius: 20, fontSize: 10, fontWeight: 700, background: "#fef9c3", color: "#854d0e", border: "1px solid #fde047" }}>
+                        ⚠️ &lt; 1,5h
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div style={{ textAlign: "right", flexShrink: 0 }}>

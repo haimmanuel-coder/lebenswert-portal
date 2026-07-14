@@ -57,6 +57,8 @@ export const mitarbeiter = mysqlTable("mitarbeiter", {
   arbeitsvertragDateiname: varchar("arbeitsvertragDateiname", { length: 255 }),
   // Notizen
   notizen: text("notizen"),
+  // Fahrzeug (P3: Dienstwagen-Flag)
+  hatDienstwagen: boolean("hatDienstwagen").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -121,6 +123,9 @@ export const kunden = mysqlTable("kunden", {
   vollmachtErteilt: boolean("vollmachtErteilt").default(false),
   vollmachtDatum: date("vollmachtDatum"),
   vollmachtSignatur: text("vollmachtSignatur"),
+  // Wunschtage (P1: Pflichtfeld im Anamnesebogen)
+  wunschtag1: mysqlEnum("wunschtag1", ["montag","dienstag","mittwoch","donnerstag","freitag","samstag"]),
+  wunschtag2: mysqlEnum("wunschtag2", ["montag","dienstag","mittwoch","donnerstag","freitag","samstag"]),
   aktiv: int("aktiv").default(1).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
@@ -182,6 +187,10 @@ export const einsaetze = mysqlTable("einsaetze", {
   // Textbaustein-Referenz (Modul 3)
   textbausteinIds: text("textbausteinIds"), // JSON-Array der verwendeten Bausteine
   createdAt: timestamp("createdAt").defaultNow().notNull(),
+  // Anfahrtspauschale (P3: 6€ pro Einsatz)
+  anfahrtPauschale: decimal("anfahrtPauschale", { precision: 5, scale: 2 }).default("6.00"),
+  // Mindestzeit-Eskalation (P3: nach 3× Unterschreitung Admin-Alert)
+  unterschreitungEskaliert: boolean("unterschreitungEskaliert").default(false),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
@@ -448,3 +457,28 @@ export const budgetTransaktionen = mysqlTable("budgetTransaktionen", {
 });
 export type BudgetTransaktion = typeof budgetTransaktionen.$inferSelect;
 export type InsertBudgetTransaktion = typeof budgetTransaktionen.$inferInsert;
+
+// ── MODUL: NEUKUNDEN-PUSH-BESTÄTIGUNGEN (P1) ─────────────────────────────────
+export const neukundenPushBestaetigung = mysqlTable("neukundenPushBestaetigung", {
+  id: int("id").autoincrement().primaryKey(),
+  kundenId: int("kundenId").notNull(),
+  mitarbeiterId: int("mitarbeiterId").notNull(),
+  bestaetigtAt: timestamp("bestaetigtAt"),          // null = noch nicht bestätigt
+  eskalationsstufe: int("eskalationsstufe").default(0), // 0=initial, 1=24h-Push, 2=48h-Admin-Alert
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type NeukundenPushBestaetigung = typeof neukundenPushBestaetigung.$inferSelect;
+export type InsertNeukundenPushBestaetigung = typeof neukundenPushBestaetigung.$inferInsert;
+
+// ── MODUL: DSGVO-VERTRETUNGS-ÜBERNAHMEN (P2) ─────────────────────────────────
+export const vertretungsUebernahmen = mysqlTable("vertretungsUebernahmen", {
+  id: int("id").autoincrement().primaryKey(),
+  urlaubsantragId: int("urlaubsantragId").notNull(), // Verknüpfung zum Urlaubsantrag
+  kundenId: int("kundenId").notNull(),
+  vertreterId: int("vertreterId").notNull(),          // Übernehmender Mitarbeiter
+  bestaetigtAt: timestamp("bestaetigtAt").defaultNow().notNull(),
+  vollzugriffBis: timestamp("vollzugriffBis"),        // Automatisch: Urlaubsende
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type VertretungsUebernahme = typeof vertretungsUebernahmen.$inferSelect;
+export type InsertVertretungsUebernahme = typeof vertretungsUebernahmen.$inferInsert;

@@ -296,14 +296,51 @@
 
 ## Phase 22 – Kalender-Abwesenheiten, Fahrtenbuch-Filter/Export, Dokument-Upload
 
-- [ ] Tourenkalender: Urlaubsanträge (genehmigt) als gelbe Balken im Kalender anzeigen
-- [ ] Tourenkalender: Krankmeldungen als rote Balken im Kalender anzeigen
-- [ ] Tourenkalender: Legende (Urlaub/Krank/Tour) unter dem Kalender
-- [ ] Tourenkalender: Tooltip bei Hover auf Abwesenheits-Balken (Name, Zeitraum)
-- [ ] Fahrtenbuch: Filter nach Monat, Fahrtyp und Kunde
-- [ ] Fahrtenbuch: CSV-Export der gefilterten Einträge (Datum, Von, Nach, km, Vergütung)
-- [ ] Fahrtenbuch: Monats-Zusammenfassung (Gesamt-km, Gesamt-Vergütung) im Filter-Bereich
-- [ ] MeinProfil: Dokument-Upload-Tab (Qualifikationsnachweise, Zertifikate, sonstige Dokumente)
-- [ ] MeinProfil: Dokumente in S3 speichern, Metadaten in DB (mitarbeiterDokumente-Tabelle)
-- [ ] MeinProfil: Hochgeladene Dokumente auflisten mit Download-Link und Lösch-Option
-- [ ] Personalbogen-PDF: Abschnitt "Hochgeladene Dokumente" mit Dateinamen und Datum
+- [x] Tourenkalender: Urlaubsanträge (genehmigt) als gelbe Balken im Kalender anzeigen
+- [x] Tourenkalender: Krankmeldungen als rote Balken im Kalender anzeigen
+- [x] Tourenkalender: Legende (Urlaub/Krank/Tour) unter dem Kalender
+- [x] Tourenkalender: Tooltip bei Hover auf Abwesenheits-Balken (Name, Zeitraum)
+- [x] Fahrtenbuch: Filter nach Monat, Fahrtyp und Kunde
+- [x] Fahrtenbuch: CSV-Export der gefilterten Einträge (Datum, Von, Nach, km, Vergütung)
+- [x] Fahrtenbuch: Monats-Zusammenfassung (Gesamt-km, Gesamt-Vergütung) im Filter-Bereich
+- [x] MeinProfil: Dokument-Upload-Tab (Qualifikationsnachweise, Zertifikate, sonstige Dokumente)
+- [x] MeinProfil: Dokumente in S3 speichern, Metadaten in DB (mitarbeiterDokumente-Tabelle)
+- [x] MeinProfil: Hochgeladene Dokumente auflisten mit Download-Link und Lösch-Option
+- [x] Personalbogen-PDF: Abschnitt "Hochgeladene Dokumente" mit Dateinamen und Datum
+
+## Phase 23 – Prozessdiagramm-Abgleich (P1–P5)
+
+- [ ] Schema: kunden.wunschtag1 und wunschtag2 (Wochentag-Enum) hinzufügen
+- [ ] Schema: mitarbeiter.hatDienstwagen (boolean) hinzufügen
+- [ ] Schema: neukundenPushBestaetigung Tabelle anlegen
+- [ ] Schema: einsaetze.anfahrtPauschale (decimal) und unterschreitungEskaliert (boolean) hinzufügen
+- [ ] DB-Migration ausführen
+- [ ] Backend: Neukunden-Push-Workflow (Bestätigungspflicht, 24h/48h-Eskalation)
+- [ ] Backend: DSGVO-Vertretungs-Push (Mindestdaten, Übernahme-Bestätigung, Vollzugriff)
+- [ ] Backend: Anfahrtspauschale 6€ automatisch bei Einsatz-Abschluss
+- [ ] Backend: Dienstwagen-Flag → 0€ Erstattung für Mitarbeiter, 0,35€/km für Kunden
+- [ ] Backend: Mindestzeit-Eskalation (3× Unterschreitung → Admin-Alert)
+- [ ] Frontend: Wunschtage im Kunden-Formular (Kundenliste.tsx)
+- [ ] Frontend: Dienstwagen-Flag im Mitarbeiterprofil (MitarbeiterDetail.tsx)
+- [ ] Frontend: Neukunden-Push-Bestätigungs-UI für Mitarbeiter (Dashboard)
+- [ ] Frontend: DSGVO-Vertretungs-Übernahme-UI (neue Seite Vertretung.tsx)
+
+## Phase 23 – Fortschritt (Checkpoint)
+- [x] DB-Schema: neukundenPushBestaetigung, vertretungsUebernahmen Tabellen, dienstwagen/fahrzeugTyp, anfahrtPauschale, unterschreitungEskaliert, wunschtage
+- [x] DB-Migration ausgeführt
+- [x] db.ts: createNeukundenPushEintraege, getOffeneNeukundenPushFuerMitarbeiter, bestaetigeNeukundenPush, getAlleOffenenNeukundenPush
+- [x] db.ts: createVertretungsUebernahme, hatVertretungsVollzugriff, getAktiveVertretungenFuerMitarbeiter, getVertretungsKundenFuerUrlaub
+- [x] db.ts: getUnterschreitungsZaehler
+- [x] routers.ts: kunden.create ruft createNeukundenPushEintraege auf (P1)
+- [x] routers.ts: neukundenPush Sub-Router (meineOffenen, bestaetigen, alleOffen)
+- [x] routers.ts: urlaub.updateStatus – DSGVO-Mindestdaten-Push bei Genehmigung (P2)
+- [x] routers.ts: vertretungUebernahme Sub-Router (uebernahme, meineAktiven, pruefeZugriff)
+- [x] routers.ts: einsaetze.create – Anfahrtspauschale 6€ + Mindestzeit-Eskalation (P3)
+- [x] routers.ts: fahrten.create – Dienstwagen-Prüfung (0€ Erstattung bei 1%-Regelung) (P3)
+- [x] routers.ts: dienstwagen Sub-Router (setzen)
+- [x] Frontend: PortalApp.tsx – Neukunden-Push-Badge auf Neukundenaufnahme-Menüpunkt (P1)
+- [x] Frontend: Einsaetze.tsx – Anfahrtspauschale + Mindestzeit-Warnung in Einsatz-Karte (P3)
+- [x] Frontend: MitarbeiterDetail.tsx – DienstwagenCard mit Toggle + Fahrzeugtyp (P3)
+- [x] Frontend: Tourenplanung.tsx – Abwesenheits-Konflikt-Warnung beim Tour-Erstellen (P4)
+- [x] TypeScript: 0 Fehler
+- [x] Tests: 33/33 bestanden
