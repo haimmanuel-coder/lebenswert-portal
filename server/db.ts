@@ -162,6 +162,49 @@ export async function getZuordnungenForMitarbeiter(mitarbeiterId: number) {
   return db.select({ kundenId: kundenZuordnung.kundenId }).from(kundenZuordnung).where(eq(kundenZuordnung.mitarbeiterId, mitarbeiterId));
 }
 
+// ── MEHRFACH-ZUORDNUNG (max. 3 Mitarbeiter pro Kunde) ─────────────
+
+/** Gibt alle Mitarbeiter-Zuordnungen für einen Kunden zurück (max. 3). */
+export async function getZuordnungenForKunde(kundenId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(kundenZuordnung)
+    .where(eq(kundenZuordnung.kundenId, kundenId))
+    .orderBy(kundenZuordnung.prioritaet);
+}
+
+/**
+ * Setzt die Mitarbeiter-Zuordnung für einen Kunden (Admin-only).
+ * Maximal 3 Mitarbeiter erlaubt. Wirft einen Fehler bei Überschreitung.
+ */
+export async function setZuordnungenForKunde(
+  kundenId: number,
+  zuordnungen: Array<{ mitarbeiterId: number; prioritaet: number; rolle: 'hauptbetreuer' | 'vertretung' }>,
+  zugeordnetVon: number
+) {
+  if (zuordnungen.length > 3) throw new Error('Maximal 3 Mitarbeiter pro Kunde erlaubt.');
+  const db = await getDb();
+  if (!db) throw new Error('DB not available');
+  // Bestehende Zuordnungen für diesen Kunden löschen
+  await db.delete(kundenZuordnung).where(eq(kundenZuordnung.kundenId, kundenId));
+  if (zuordnungen.length > 0) {
+    await db.insert(kundenZuordnung).values(
+      zuordnungen.map(z => ({ kundenId, mitarbeiterId: z.mitarbeiterId, prioritaet: z.prioritaet, rolle: z.rolle, zugeordnetVon }))
+    );
+  }
+}
+
+/** Prüft ob ein Mitarbeiter einem Kunden zugeordnet ist. */
+export async function isMitarbeiterZugeordnet(mitarbeiterId: number, kundenId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const rows = await db.select({ id: kundenZuordnung.id })
+    .from(kundenZuordnung)
+    .where(and(eq(kundenZuordnung.mitarbeiterId, mitarbeiterId), eq(kundenZuordnung.kundenId, kundenId)))
+    .limit(1);
+  return rows.length > 0;
+}
+
 // ── EINSÄTZE ─────────────────────────────────────────
 export async function getEinsaetzeByMitarbeiter(mitarbeiterId: number) {
   const db = await getDb();

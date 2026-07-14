@@ -360,3 +360,20 @@
 - [x] Frontend: Lösch-Button in Urlaubsverwaltung.tsx
 - [x] Frontend: Lösch-Button in Krankmeldung.tsx
 - [x] Frontend: Lösch-Button in Leistungsnachweise.tsx
+
+## Phase 17 – Touren-Vorausplanung, Admin-only Kundendaten, Mehrfach-Zuordnung
+
+- [x] DB: kundenZuordnung um prioritaet (1-3), rolle (hauptbetreuer/vertretung), zugeordnetVon erweitert
+- [x] DB: touren um titel, startzeit, endzeit, angelegtVon erweitert
+- [x] Migration ausgeführt (ALTER TABLE)
+- [x] db.ts: getZuordnungenForKunde – alle Mitarbeiter eines Kunden abrufen
+- [x] db.ts: setZuordnungenForKunde – max. 3 Mitarbeiter pro Kunde setzen (mit Fehler bei Überschreitung)
+- [x] db.ts: isMitarbeiterZugeordnet – Zuordnungsprüfung
+- [x] routers.ts: TRPCError Import hinzugefügt
+- [x] routers.ts: touren.create – 2-Wochen-Validierung (max. 14 Tage in Zukunft)
+- [x] routers.ts: kunden.getZuordnungen – Admin-only Route
+- [x] routers.ts: kunden.setZuordnungen – Admin-only Route mit Max-3-Validierung
+- [x] Frontend: Tourenplanung.tsx – Datum-Input mit min=heute, max=heute+14 Tage
+- [x] Frontend: Kundenliste.tsx – Bearbeiten/Anlegen/Deaktivieren bereits Admin-only
+- [x] Frontend: AdminPanel.tsx – Zuordnungs-Tab auf Kunden-basierte Mehrfach-Zuordnung umgestellt
+- [x] 0 TypeScript-Fehler

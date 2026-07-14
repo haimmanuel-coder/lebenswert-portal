@@ -128,15 +128,26 @@ export const kunden = mysqlTable("kunden", {
 export type Kunde = typeof kunden.$inferSelect;
 export type InsertKunde = typeof kunden.$inferInsert;
 
-// Kunden-Zuordnung zu Mitarbeitern
+// Kunden-Zuordnung zu Mitarbeitern (max. 3 Mitarbeiter pro Kunde)
+// Relationales Design: Ein Kunde kann bis zu 3 Mitarbeitern manuell zugeordnet werden.
+// Die Spalte 'prioritaet' (1–3) bestimmt die Reihenfolge (1 = Hauptbetreuer).
+// Die Spalte 'rolle' unterscheidet Haupt- und Vertretungsbetreuer.
+// Eindeutiger Composite-Index auf (kundenId, mitarbeiterId) verhindert Doppelzuordnungen.
 export const kundenZuordnung = mysqlTable("kundenZuordnung", {
   id: int("id").autoincrement().primaryKey(),
   mitarbeiterId: int("mitarbeiterId").notNull(),
   kundenId: int("kundenId").notNull(),
+  // Priorität 1 = Hauptbetreuer, 2 = erster Vertreter, 3 = zweiter Vertreter
+  prioritaet: int("prioritaet").default(1).notNull(),
+  // Rolle zur semantischen Unterscheidung
+  rolle: mysqlEnum("rolle", ["hauptbetreuer", "vertretung"]).default("hauptbetreuer").notNull(),
+  // Wer hat diese Zuordnung angelegt (immer Admin)
+  zugeordnetVon: int("zugeordnetVon"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
 export type KundenZuordnung = typeof kundenZuordnung.$inferSelect;
+export type InsertKundenZuordnung = typeof kundenZuordnung.$inferInsert;
 
 // ── MODUL 3: TEXTBAUSTEINE ────────────────────────────────────────
 export const textbausteine = mysqlTable("textbausteine", {
@@ -331,12 +342,24 @@ export type Krankmeldung = typeof krankmeldungen.$inferSelect;
 export type InsertKrankmeldung = typeof krankmeldungen.$inferInsert;
 
 // ── MODUL 15: TOURENPLANUNG ───────────────────────────────────────
+// Touren – Vorausplanung bis 14 Tage (2 Wochen) in die Zukunft
+// Das Feld 'planungsHorizont' dokumentiert den erlaubten Vorlauf in Tagen.
+// Die Validierung im Backend (tourenRouter.create) prüft, dass das Datum
+// maximal 14 Tage in der Zukunft liegt.
 export const touren = mysqlTable("touren", {
   id: int("id").autoincrement().primaryKey(),
   mitarbeiterId: int("mitarbeiterId").notNull(),
   datum: date("datum").notNull(),
   status: mysqlEnum("status", ["geplant", "aktiv", "abgeschlossen"]).default("geplant").notNull(),
   notizen: text("notizen"),
+  // Titel/Bezeichnung der Tour (optional, für Übersicht)
+  titel: varchar("titel", { length: 200 }),
+  // Geplante Startzeit
+  startzeit: time("startzeit"),
+  // Geplante Endzeit
+  endzeit: time("endzeit"),
+  // Wer hat die Tour angelegt
+  angelegtVon: int("angelegtVon"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

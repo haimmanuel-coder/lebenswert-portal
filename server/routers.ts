@@ -5,6 +5,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import { TRPCError } from "@trpc/server";
 import { sql, eq, desc } from "drizzle-orm";
 import { getDb } from "./db";
 import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen } from "../drizzle/schema";
@@ -21,6 +22,9 @@ import {
   getKundenByMitarbeiter,
   setKundenZuordnung,
   getZuordnungenForMitarbeiter,
+  getZuordnungenForKunde,
+  setZuordnungenForKunde,
+  isMitarbeiterZugeordnet,
   getEinsaetzeByMitarbeiter,
   getAllEinsaetze,
   getEinsaetzeByKunde,
@@ -271,10 +275,22 @@ export const tourenRouter = router({
       mitarbeiterId: z.number().int().positive(),
       datum: z.string(),
       notizen: z.string().optional(),
+      titel: z.string().max(200).optional(),
+      startzeit: z.string().optional(),
+      endzeit: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      await createTour({ mitarbeiterId: input.mitarbeiterId, datum: new Date(input.datum), notizen: input.notizen, status: 'geplant' });
-      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'CREATE', ressource: 'tour', status: 'success' });
+      // ── 2-Wochen-Vorausplanung: Datum darf maximal 14 Tage in der Zukunft liegen ──
+      const tourDatum = new Date(input.datum);
+      tourDatum.setHours(0, 0, 0, 0);
+      const heute = new Date();
+      heute.setHours(0, 0, 0, 0);
+      const maxDatum = new Date(heute);
+      maxDatum.setDate(maxDatum.getDate() + 14);
+      if (tourDatum < heute) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Touren können nicht in der Vergangenheit angelegt werden.' });
+      if (tourDatum > maxDatum) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Touren können maximal 2 Wochen (14 Tage) im Voraus geplant werden.' });
+      await createTour({ mitarbeiterId: input.mitarbeiterId, datum: new Date(input.datum), notizen: input.notizen, titel: input.titel, startzeit: input.startzeit as any, endzeit: input.endzeit as any, angelegtVon: ctx.mitarbeiterId, status: 'geplant' });
+      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'CREATE', ressource: 'tour', details: `datum=${input.datum}`, status: 'success' });
       return { success: true };
     }),
   updateStatus: portalProtected
@@ -606,6 +622,38 @@ export const appRouter = router({
         verbraucht39: k.verbraucht39,
       }));
     }),
+
+    // ── MEHRFACH-ZUORDNUNG: Bis zu 3 Mitarbeiter pro Kunde (Admin-only) ──
+
+    /** Gibt alle Mitarbeiter-Zuordnungen für einen Kunden zurück. */
+    getZuordnungen: adminProcedure
+      .input(z.object({ kundenId: z.number().int().positive() }))
+      .query(async ({ input }) => getZuordnungenForKunde(input.kundenId)),
+
+    /**
+     * Setzt die Mitarbeiter-Zuordnung für einen Kunden (max. 3).
+     * Nur Admins dürfen Zuordnungen ändern.
+     */
+    setZuordnungen: adminProcedure
+      .input(z.object({
+        kundenId: z.number().int().positive(),
+        zuordnungen: z.array(z.object({
+          mitarbeiterId: z.number().int().positive(),
+          prioritaet: z.number().int().min(1).max(3),
+          rolle: z.enum(['hauptbetreuer', 'vertretung']),
+        })).max(3, 'Maximal 3 Mitarbeiter pro Kunde erlaubt.'),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await setZuordnungenForKunde(input.kundenId, input.zuordnungen, ctx.adminId);
+        await createAuditLog({
+          mitarbeiterId: ctx.adminId,
+          action: 'ADMIN',
+          ressource: 'kundenZuordnung',
+          details: `kundenId=${input.kundenId} mitarbeiter=${input.zuordnungen.map(z => z.mitarbeiterId).join(',')}`,
+          status: 'success',
+        });
+        return { success: true };
+      }),
   }),
 
   // ── EINSÄTZE ─────────────────────────────────────────
