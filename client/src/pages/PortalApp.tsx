@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Toaster } from "@/components/ui/sonner";
 import { usePortalAuth } from "@/contexts/PortalAuthContext";
 import { trpc } from "@/lib/trpc";
 import Dashboard from "./Dashboard";
@@ -24,39 +25,121 @@ import Benachrichtigungen from "./Benachrichtigungen";
 import MeinProfil from "./MeinProfil";
 import LeistungsFreigabe from "./LeistungsFreigabe";
 import BuchhaltungsExport from "./BuchhaltungsExport";
-import BottomSheet from "@/components/BottomSheet";
-import { useOfflineSync } from "@/hooks/useOfflineSync";
+import Mitarbeiterakte from "./Mitarbeiterakte";
+import Logbuch from "./Logbuch";
+import Vertretungen from "./Vertretungen";
+import AdminDashboard from "./AdminDashboard";
+import Rollenverwaltung from "./Rollenverwaltung";
 import OnboardingTour, { useOnboardingTour } from "@/components/OnboardingTour";
+import { useOfflineSync } from "@/hooks/useOfflineSync";
 
-type PageId = "home" | "einsaetze" | "zeit" | "lnw" | "fahrt" | "admin" | "management" | "kunden" | "kostentraeger" | "textbausteine" | "export" | "fuehrerschein" | "neukundenaufnahme" | "kalender" | "kassenanfrage" | "urlaub" | "krank" | "touren" | "benachrichtigungen" | "profil" | "leistungsfreigabe" | "buchhaltung";
+type PageId =
+  | "home" | "einsaetze" | "zeit" | "lnw" | "fahrt"
+  | "admin" | "management" | "kunden" | "kostentraeger"
+  | "textbausteine" | "export" | "fuehrerschein"
+  | "neukundenaufnahme" | "kalender" | "kassenanfrage"
+  | "urlaub" | "krank" | "touren" | "benachrichtigungen"
+  | "profil" | "leistungsfreigabe" | "buchhaltung"
+  | "mitarbeiterakte" | "logbuch" | "vertretungen"
+  | "admindashboard" | "rollenverwaltung";
 
-const pages: { id: PageId; icon: string; label: string }[] = [
-  { id: "home", icon: "🏠", label: "Home" },
-  { id: "einsaetze", icon: "📅", label: "Einsätze" },
-  { id: "kunden", icon: "👥", label: "Kunden" },
-  { id: "lnw", icon: "📋", label: "Nachweise" },
-  { id: "fahrt", icon: "🚗", label: "Fahrten" },
-];
+interface NavItem {
+  id: PageId;
+  icon: string;
+  label: string;
+  badge?: number;
+  adminOnly?: boolean;
+}
+
+interface NavSection {
+  title: string;
+  items: NavItem[];
+}
 
 export default function PortalApp() {
   const { mitarbeiter, logout } = usePortalAuth();
   const [activePage, setActivePage] = useState<PageId>("home");
-  const [fabOpen, setFabOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [kundenDetailId, setKundenDetailId] = useState<number | null>(null);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
   const { data: leistungen = [] } = trpc.leistungen.list.useQuery();
   const { data: warnungen = [] } = trpc.kunden.budgetWarnungen.useQuery();
   const { data: unreadNotifs = [] } = trpc.notifications.list.useQuery();
   const offenCount = leistungen.filter((l) => l.status === "offen").length;
   const unreadCount = (unreadNotifs as any[]).filter((n: any) => !n.gelesenAt).length;
-
   const isAdmin = mitarbeiter?.rolle === "admin";
   const { isOnline, offlineCount } = useOfflineSync();
   const { show: showTour, startTour, closeTour } = useOnboardingTour();
 
   const initials = mitarbeiter
-    ? (mitarbeiter.vorname[0] + mitarbeiter.nachname[0]).toUpperCase()
+    ? `${mitarbeiter.vorname?.[0] ?? ""}${mitarbeiter.nachname?.[0] ?? ""}`.toUpperCase()
     : "MA";
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const navTo = (page: PageId) => {
+    setKundenDetailId(null);
+    setActivePage(page);
+    if (isMobile) setSidebarOpen(false);
+  };
+
+  const sections: NavSection[] = [
+    {
+      title: "Übersicht",
+      items: [
+        { id: "home", icon: "🏠", label: "Dashboard" },
+        { id: "benachrichtigungen", icon: "🔔", label: "Benachrichtigungen", badge: unreadCount },
+        { id: "kalender", icon: "📆", label: "Kalender" },
+      ],
+    },
+    {
+      title: "Kunden & Einsätze",
+      items: [
+        { id: "kunden", icon: "👥", label: "Kundenliste", badge: warnungen.length > 0 ? warnungen.length : undefined },
+        { id: "einsaetze", icon: "📅", label: "Einsätze" },
+        { id: "lnw", icon: "📋", label: "Leistungsnachweise", badge: offenCount > 0 ? offenCount : undefined },
+        { id: "kassenanfrage", icon: "🏥", label: "Kassenanfragen" },
+        { id: "neukundenaufnahme", icon: "➕", label: "Neukundenaufnahme" },
+        { id: "kostentraeger", icon: "🏦", label: "Kostenträger" },
+      ],
+    },
+    {
+      title: "Personal",
+      items: [
+        { id: "zeit", icon: "⏱", label: "Zeiterfassung" },
+        { id: "fahrt", icon: "🚗", label: "Fahrtenbuch" },
+        { id: "urlaub", icon: "🌴", label: "Urlaubsverwaltung" },
+        { id: "krank", icon: "🤒", label: "Krankmeldung" },
+        { id: "touren", icon: "🗺️", label: "Tourenplanung" },
+        { id: "fuehrerschein", icon: "🪪", label: "Führerschein-Check" },
+        { id: "profil", icon: "👤", label: "Mein Profil" },
+      ],
+    },
+    {
+      title: "Verwaltung",
+      items: [
+        ...(isAdmin ? [
+          { id: "admindashboard" as PageId, icon: "📊", label: "Ampel-Dashboard", adminOnly: true },
+          { id: "management" as PageId, icon: "📈", label: "Management", adminOnly: true },
+          { id: "leistungsfreigabe" as PageId, icon: "✅", label: "LNW-Freigabe", adminOnly: true },
+          { id: "mitarbeiterakte" as PageId, icon: "📂", label: "Mitarbeiterakte", adminOnly: true },
+          { id: "rollenverwaltung" as PageId, icon: "🔑", label: "Rollenverwaltung", adminOnly: true },
+          { id: "vertretungen" as PageId, icon: "🔄", label: "Vertretungen", adminOnly: true },
+          { id: "buchhaltung" as PageId, icon: "💼", label: "Buchhaltungs-Export", adminOnly: true },
+          { id: "export" as PageId, icon: "📮", label: "Export & Briefe", adminOnly: true },
+          { id: "textbausteine" as PageId, icon: "📝", label: "Textbausteine", adminOnly: true },
+          { id: "logbuch" as PageId, icon: "🗒️", label: "Logbuch", adminOnly: true },
+        ] : [
+          { id: "export" as PageId, icon: "📮", label: "Export & Briefe" },
+        ]),
+      ],
+    },
+  ];
 
   const renderPage = () => {
     if (kundenDetailId !== null) {
@@ -70,7 +153,7 @@ export default function PortalApp() {
       case "fahrt": return <Fahrtenbuch />;
       case "admin": return <AdminPanel />;
       case "management": return <ManagementDashboard />;
-      case "kunden": return <Kundenliste />;
+      case "kunden": return <Kundenliste onKundeSelect={(id) => setKundenDetailId(id)} />;
       case "kostentraeger": return <Kostentraeger />;
       case "textbausteine": return <Textbausteine />;
       case "export": return <ExportCenter />;
@@ -85,486 +168,236 @@ export default function PortalApp() {
       case "profil": return <MeinProfil />;
       case "leistungsfreigabe": return <LeistungsFreigabe />;
       case "buchhaltung": return <BuchhaltungsExport />;
+      case "mitarbeiterakte": return <Mitarbeiterakte />;
+      case "logbuch": return <Logbuch />;
+      case "vertretungen": return <Vertretungen />;
+      case "admindashboard": return <AdminDashboard />;
+      case "rollenverwaltung": return <Rollenverwaltung />;
       default: return <Dashboard />;
     }
   };
 
-  const navTo = (page: PageId) => {
-    setKundenDetailId(null);
-    setActivePage(page);
-  };
+  const currentPageLabel = sections.flatMap(s => s.items).find(i => i.id === activePage)?.label ?? "Dashboard";
 
-  return (
-    <div className="lb-app" style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>
-      {/* TOP BAR */}
-      <div
-        style={{
-          position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
-          background: "#fff", borderBottom: "1px solid #e5e7eb",
-          padding: "0 16px", height: 56,
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          boxShadow: "0 1px 4px rgba(0,0,0,.06)",
-        }}
-      >
+  const SidebarContent = () => (
+    <aside style={{
+      width: 240, minWidth: 240, height: "100%",
+      background: "#1a2e1a", display: "flex", flexDirection: "column",
+      overflowY: "auto", overflowX: "hidden",
+    }}>
+      {/* Logo */}
+      <div style={{ padding: "20px 16px 12px", borderBottom: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div
-            style={{
-              width: 34, height: 34, borderRadius: "50%", background: "#4a8c3f",
-              color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
-              fontWeight: 800, fontSize: 13, flexShrink: 0,
-            }}
-          >
-            {initials}
-          </div>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 700 }}>
-              {mitarbeiter ? `${mitarbeiter.vorname} ${mitarbeiter.nachname}` : "Mitarbeiter"}
-            </div>
-            <div style={{ fontSize: 11, color: "#6b7280" }}>
-              Lebenswert Betreuung
-              {isAdmin && <span style={{ marginLeft: 6, padding: "1px 5px", borderRadius: 8, background: "#4a8c3f", color: "#fff", fontSize: 9, fontWeight: 700 }}>ADMIN</span>}
-            </div>
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-          {/* Offline-Indikator */}
-          {!isOnline && (
-            <div
-              title={offlineCount > 0 ? `${offlineCount} Einsatz/Einsätze offline gespeichert` : "Offline-Modus aktiv"}
-              style={{ background: "#fef3c7", border: "1.5px solid #f59e0b", borderRadius: 8, padding: "3px 8px", display: "flex", alignItems: "center", gap: 4 }}
-            >
-              <span style={{ fontSize: 13 }}>📡</span>
-              <span style={{ fontSize: 10, fontWeight: 700, color: "#92400e" }}>OFFLINE{offlineCount > 0 ? ` (${offlineCount})` : ""}</span>
-            </div>
-          )}
-          {/* Budget-Warnung Indikator */}
-          {warnungen.length > 0 && (
-            <button
-              onClick={() => { navTo("kunden"); setMenuOpen(false); }}
-              title={`${warnungen.length} Budget-Warnung(en)`}
-              style={{ background: "#fee2e2", border: "none", borderRadius: 8, padding: "4px 8px", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
-              <span style={{ fontSize: 14 }}>⚠️</span>
-              <span style={{ fontSize: 11, fontWeight: 700, color: "#dc2626" }}>{warnungen.length}</span>
-            </button>
-          )}
-          {isAdmin && (
-            <button
-              onClick={() => setMenuOpen(true)}
-              title="Admin-Menü"
-              style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", padding: 6, borderRadius: 8, color: "#4a8c3f" }}
-            >
-              ⚙️
-            </button>
-          )}
-          {/* Benachrichtigungs-Button mit Badge */}
-          <button
-            onClick={() => navTo("benachrichtigungen")}
-            title="Benachrichtigungen"
-            style={{ position: "relative", background: "none", border: "1.5px solid #e5e7eb", fontSize: 16, cursor: "pointer", padding: "4px 8px", borderRadius: 8, color: "#374151" }}
-          >
-            🔔
-            {unreadCount > 0 && (
-              <span style={{
-                position: "absolute", top: -4, right: -4,
-                background: "#dc2626", color: "#fff",
-                fontSize: 9, fontWeight: 800,
-                width: 16, height: 16, borderRadius: "50%",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                lineHeight: 1,
-              }}>
-                {unreadCount > 9 ? "9+" : unreadCount}
-              </span>
-            )}
-          </button>
-          {/* Profil-Button */}
-          <button
-            onClick={() => navTo("profil")}
-            title="Mein Profil"
-            style={{ background: "none", border: "1.5px solid #e5e7eb", fontSize: 14, cursor: "pointer", padding: "4px 8px", borderRadius: 8, color: "#374151" }}
-          >
-            👤
-          </button>
-          {/* Hilfe / Tour-Button */}
-          <button
-            onClick={startTour}
-            title="Hilfe & Onboarding-Tour starten"
-            style={{ background: "none", border: "1.5px solid #e5e7eb", fontSize: 14, cursor: "pointer", padding: "4px 8px", borderRadius: 8, color: "#6b7280", fontWeight: 700 }}
-          >
-            ?
-          </button>
-          <button
-            onClick={logout}
-            title="Abmelden"
-            style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", padding: 6, borderRadius: 8, color: "#6b7280" }}
-          >
-            🚪
-          </button>
-        </div>
-      </div>
-
-      {/* CONTENT */}
-      <div style={{ padding: "72px 16px 80px" }}>
-        {renderPage()}
-      </div>
-
-      {/* FAB */}
-      {kundenDetailId === null && activePage !== "admin" && activePage !== "management" && (
-        <button
-          onClick={() => setFabOpen(true)}
-          style={{
-            position: "fixed", right: 20, bottom: "calc(64px + 20px)",
-            width: 56, height: 56, borderRadius: "50%",
-            background: "#4a8c3f", color: "#fff",
-            border: "none", fontSize: 28, cursor: "pointer",
-            boxShadow: "0 4px 16px rgba(74,140,63,.4)",
+          <div style={{
+            width: 36, height: 36, borderRadius: 10, background: "#4a8c3f",
             display: "flex", alignItems: "center", justifyContent: "center",
-            zIndex: 50, transition: "transform 0.2s",
-          }}
-          onMouseDown={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(0.92)")}
-          onMouseUp={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(1)")}
-        >
-          ＋
-        </button>
-      )}
+            fontSize: 20, fontWeight: 900, color: "#fff", flexShrink: 0,
+          }}>L</div>
+          <div>
+            <div style={{ color: "#fff", fontWeight: 800, fontSize: 13, lineHeight: 1.2 }}>Lebenswert</div>
+            <div style={{ color: "#6ee7b7", fontSize: 10, fontWeight: 600 }}>Betreuung Portal</div>
+          </div>
+        </div>
+      </div>
 
-      {/* BOTTOM NAV */}
-      <nav
-        style={{
-          position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 100,
-          background: "#fff", borderTop: "1px solid #e5e7eb",
-          display: "grid", gridTemplateColumns: "repeat(5, 1fr)",
-          height: 64, paddingBottom: "env(safe-area-inset-bottom)",
-        }}
-      >
-        {pages.map((p) => {
-          const isActive = activePage === p.id && kundenDetailId === null;
-          const hasBadge = p.id === "lnw" && offenCount > 0;
-          return (
-            <button
-              key={p.id}
-              onClick={() => navTo(p.id)}
-              style={{
-                display: "flex", flexDirection: "column", alignItems: "center",
-                justifyContent: "center", gap: 3, cursor: "pointer",
-                border: "none", background: "none", padding: "8px 4px",
-                position: "relative", transition: "all 0.15s",
-              }}
-            >
-              <span style={{ fontSize: 22, lineHeight: 1 }}>{p.icon}</span>
-              <span
-                style={{
-                  fontSize: 10, fontWeight: isActive ? 700 : 500,
-                  color: isActive ? "#4a8c3f" : "#6b7280",
-                }}
-              >
-                {p.label}
-              </span>
-              {isActive && (
-                <span style={{ position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)", width: 20, height: 3, borderRadius: 2, background: "#4a8c3f" }} />
-              )}
-              {hasBadge && (
-                <span
+      {/* Nav */}
+      <nav style={{ flex: 1, padding: "8px 0", overflowY: "auto" }}>
+        {sections.map((section) => (
+          <div key={section.title} style={{ marginBottom: 4 }}>
+            <div style={{
+              fontSize: 9, fontWeight: 800, color: "rgba(255,255,255,0.3)",
+              textTransform: "uppercase", letterSpacing: 1.2,
+              padding: "10px 16px 4px",
+            }}>{section.title}</div>
+            {section.items.map((item) => {
+              const isActive = activePage === item.id && kundenDetailId === null;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => navTo(item.id)}
                   style={{
-                    position: "absolute", top: 6, right: "calc(50% - 18px)",
-                    background: "#dc2626", color: "#fff",
-                    fontSize: 9, fontWeight: 700,
-                    minWidth: 16, height: 16, borderRadius: 8,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    padding: "0 4px",
+                    width: "100%", display: "flex", alignItems: "center", gap: 10,
+                    padding: "8px 16px",
+                    background: isActive ? "rgba(74,140,63,0.25)" : "transparent",
+                    border: "none",
+                    borderLeft: isActive ? "3px solid #4a8c3f" : "3px solid transparent",
+                    cursor: "pointer", textAlign: "left",
+                    transition: "background 0.12s",
                   }}
                 >
-                  {offenCount}
-                </span>
-              )}
-            </button>
-          );
-        })}
+                  <span style={{ fontSize: 15, lineHeight: 1, flexShrink: 0 }}>{item.icon}</span>
+                  <span style={{
+                    fontSize: 12.5, fontWeight: isActive ? 700 : 500, flex: 1,
+                    color: isActive ? "#6ee7b7" : "rgba(255,255,255,0.72)",
+                  }}>{item.label}</span>
+                  {item.badge !== undefined && item.badge > 0 && (
+                    <span style={{
+                      background: item.id === "kunden" ? "#f59e0b" : "#dc2626",
+                      color: "#fff", fontSize: 9, fontWeight: 800,
+                      minWidth: 16, height: 16, borderRadius: 8,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      padding: "0 4px", flexShrink: 0,
+                    }}>{item.badge > 99 ? "99+" : item.badge}</span>
+                  )}
+                  {item.adminOnly && (
+                    <span style={{
+                      fontSize: 8, fontWeight: 700, color: "#4a8c3f",
+                      background: "rgba(74,140,63,0.2)", padding: "1px 4px",
+                      borderRadius: 4, flexShrink: 0,
+                    }}>ADM</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
-      {/* FAB Sheet */}
-      <BottomSheet open={fabOpen} onClose={() => setFabOpen(false)} title="Was möchtest du erfassen?">
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <button
-            onClick={() => { setFabOpen(false); navTo("fahrt"); }}
-            style={{ padding: 13, background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}
-          >
-            🚗 Fahrt erfassen
+      {/* User-Footer */}
+      <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", padding: "12px 16px", flexShrink: 0 }}>
+        {!isOnline && (
+          <div style={{
+            background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.4)",
+            borderRadius: 8, padding: "5px 10px", marginBottom: 8,
+            display: "flex", alignItems: "center", gap: 6,
+          }}>
+            <span style={{ fontSize: 12 }}>📡</span>
+            <span style={{ fontSize: 10, fontWeight: 700, color: "#fbbf24" }}>
+              OFFLINE{offlineCount > 0 ? ` (${offlineCount})` : ""}
+            </span>
+          </div>
+        )}
+        {warnungen.length > 0 && (
+          <button onClick={() => navTo("kunden")} style={{
+            width: "100%", background: "rgba(220,38,38,0.15)", border: "1px solid rgba(220,38,38,0.4)",
+            borderRadius: 8, padding: "5px 10px", marginBottom: 8,
+            display: "flex", alignItems: "center", gap: 6, cursor: "pointer",
+          }}>
+            <span style={{ fontSize: 12 }}>⚠️</span>
+            <span style={{ fontSize: 10, fontWeight: 700, color: "#f87171" }}>
+              {warnungen.length} Budget-Warnung{warnungen.length > 1 ? "en" : ""}
+            </span>
           </button>
-          <button
-            onClick={() => { setFabOpen(false); navTo("lnw"); }}
-            style={{ padding: 13, background: "#2a9d8f", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}
-          >
-            📋 Leistungsnachweis einreichen
-          </button>
-          <button
-            onClick={() => { setFabOpen(false); navTo("zeit"); }}
-            style={{ padding: 13, background: "#e9c46a", color: "#7c5a00", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}
-          >
-            ⏱ Zeit manuell erfassen
-          </button>
-          <button
-            onClick={() => { setFabOpen(false); navTo("export"); }}
-            style={{ padding: 13, background: "#6366f1", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}
-          >
-            📮 Brief / E-Mail an Kasse senden
-          </button>
-          <button
-            onClick={() => setFabOpen(false)}
-            style={{ padding: 13, background: "#f4f6f3", color: "#6b7280", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}
-          >
-            Abbrechen
-          </button>
+        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: "50%", background: "#4a8c3f",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontWeight: 800, fontSize: 12, color: "#fff", flexShrink: 0,
+          }}>{initials}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {mitarbeiter ? `${mitarbeiter.vorname} ${mitarbeiter.nachname}` : "Mitarbeiter"}
+            </div>
+            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>
+              {isAdmin ? "Administrator" : "Mitarbeiter"}
+            </div>
+          </div>
+          <button onClick={logout} title="Abmelden" style={{
+            background: "none", border: "1px solid rgba(255,255,255,0.15)",
+            borderRadius: 6, padding: "4px 7px", cursor: "pointer",
+            color: "rgba(255,255,255,0.5)", fontSize: 14,
+          }}>↩</button>
         </div>
-      </BottomSheet>
+        <button onClick={startTour} style={{
+          width: "100%", marginTop: 8,
+          background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+          borderRadius: 8, padding: "6px 10px", cursor: "pointer",
+          color: "rgba(255,255,255,0.4)", fontSize: 11, fontWeight: 600,
+          display: "flex", alignItems: "center", gap: 6,
+        }}>
+          <span>❓</span> Hilfe & Tour
+        </button>
+      </div>
+    </aside>
+  );
 
-      {/* Admin-Menü Sheet – erweitert mit allen 6 Modulen */}
-      {isAdmin && (
-        <BottomSheet open={menuOpen} onClose={() => setMenuOpen(false)} title="Admin-Bereich">
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+  return (
+    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "#f4f6f3", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>
 
-            {/* Bestehende Module */}
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 1, paddingLeft: 4 }}>Bestehend</div>
-            <button
-              onClick={() => { setMenuOpen(false); navTo("management"); }}
-              style={{ padding: 13, background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
-            >
-              <span>📊</span>
-              <div style={{ textAlign: "left" }}>
-                <div>Management-Dashboard</div>
-                <div style={{ fontSize: 11, opacity: 0.85 }}>KPIs, Diagramme, Audit-Log</div>
-              </div>
-            </button>
-            <button
-              onClick={() => { setMenuOpen(false); navTo("kunden"); }}
-              style={{ padding: 13, background: "#e8f5e4", color: "#4a8c3f", border: "2px solid #4a8c3f", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
-            >
-              <span>👥</span>
-              <div style={{ textAlign: "left" }}>
-                <div>Kundenliste</div>
-                <div style={{ fontSize: 11, opacity: 0.8 }}>Alle Kunden mit Budget-Übersicht</div>
-              </div>
-            </button>
-            <button
-              onClick={() => { setMenuOpen(false); navTo("admin"); }}
-              style={{ padding: 13, background: "#2a9d8f", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
-            >
-              <span>⚙️</span>
-              <div style={{ textAlign: "left" }}>
-                <div>Admin-Panel</div>
-                <div style={{ fontSize: 11, opacity: 0.85 }}>Mitarbeiter, Kunden, Zuordnung</div>
-              </div>
-            </button>
+      {/* Desktop Sidebar */}
+      {!isMobile && (
+        <div style={{ height: "100vh", flexShrink: 0 }}>
+          <SidebarContent />
+        </div>
+      )}
 
-            {/* Neue Module */}
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 1, paddingLeft: 4, marginTop: 4 }}>Neue Module</div>
+      {/* Mobile Sidebar (Drawer) */}
+      {isMobile && (
+        <>
+          {sidebarOpen && (
+            <div
+              onClick={() => setSidebarOpen(false)}
+              style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 199, backdropFilter: "blur(2px)" }}
+            />
+          )}
+          <div style={{
+            position: "fixed", top: 0, left: sidebarOpen ? 0 : -260, bottom: 0,
+            width: 240, zIndex: 200,
+            transition: "left 0.25s cubic-bezier(0.23,1,0.32,1)",
+            boxShadow: sidebarOpen ? "4px 0 24px rgba(0,0,0,0.35)" : "none",
+          }}>
+            <SidebarContent />
+          </div>
+        </>
+      )}
 
-            <button
-              onClick={() => { setMenuOpen(false); navTo("kostentraeger"); }}
-              style={{ padding: 13, background: "#fff", color: "#374151", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
-            >
-              <span>🏥</span>
-              <div style={{ textAlign: "left" }}>
-                <div>Kostenträger</div>
-                <div style={{ fontSize: 11, color: "#6b7280" }}>Krankenkassen mit IK-Nummern</div>
-              </div>
-            </button>
+      {/* Hauptbereich */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
 
-            <button
-              onClick={() => { setMenuOpen(false); navTo("kunden"); }}
-              style={{ padding: 13, background: "#fff", color: "#374151", border: `2px solid ${warnungen.length > 0 ? "#fca5a5" : "#e5e7eb"}`, borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
-            >
-              <span>📊</span>
-              <div style={{ textAlign: "left", flex: 1 }}>
-                <div>Budget-Dashboard</div>
-                <div style={{ fontSize: 11, color: "#6b7280" }}>Pflegegrade & Budgets aller Kunden</div>
-              </div>
-              {warnungen.length > 0 && (
-                <span style={{ background: "#dc2626", color: "#fff", fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>
-                  ⚠️ {warnungen.length}
+        {/* TopBar */}
+        <div style={{
+          height: 52, background: "#fff", borderBottom: "1px solid #e5e7eb",
+          display: "flex", alignItems: "center", padding: "0 16px",
+          gap: 10, flexShrink: 0, boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+        }}>
+          {isMobile && (
+            <button onClick={() => setSidebarOpen(true)} style={{
+              background: "none", border: "none", cursor: "pointer",
+              color: "#1a2e1a", fontSize: 22, padding: 4, lineHeight: 1,
+            }}>☰</button>
+          )}
+          <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
+            {!isMobile && <span style={{ fontSize: 12, color: "#9ca3af" }}>Lebenswert Betreuung /</span>}
+            <span style={{ fontSize: 14, fontWeight: 700, color: "#1f2937" }}>{currentPageLabel}</span>
+          </div>
+          {!isOnline && (
+            <div style={{ background: "#fef3c7", border: "1px solid #f59e0b", borderRadius: 8, padding: "3px 10px", fontSize: 11, fontWeight: 700, color: "#92400e" }}>
+              📡 OFFLINE
+            </div>
+          )}
+          {isAdmin && !isMobile && (
+            <div style={{ background: "#f0fdf4", border: "1px solid #4a8c3f", borderRadius: 8, padding: "3px 10px", fontSize: 11, fontWeight: 700, color: "#14532d" }}>
+              🔑 Administrator
+            </div>
+          )}
+          {isMobile && (
+            <button onClick={() => navTo("benachrichtigungen")} style={{ position: "relative", background: "none", border: "none", cursor: "pointer", fontSize: 20, padding: 4 }}>
+              🔔
+              {unreadCount > 0 && (
+                <span style={{ position: "absolute", top: 0, right: 0, background: "#dc2626", color: "#fff", fontSize: 8, fontWeight: 800, width: 14, height: 14, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {unreadCount > 9 ? "9+" : unreadCount}
                 </span>
               )}
             </button>
+          )}
+        </div>
 
-            <button
-              onClick={() => { setMenuOpen(false); navTo("textbausteine"); }}
-              style={{ padding: 13, background: "#fff", color: "#374151", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
-            >
-              <span>📝</span>
-              <div style={{ textAlign: "left" }}>
-                <div>Textbausteine</div>
-                <div style={{ fontSize: 11, color: "#6b7280" }}>Vorlagen für Einsatz-Dokumentation</div>
-              </div>
-            </button>
+        {/* Seiteninhalt */}
+        <main style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
+          {renderPage()}
+        </main>
+      </div>
 
-            <button
-              onClick={() => { setMenuOpen(false); navTo("export"); }}
-              style={{ padding: 13, background: "#fff", color: "#374151", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
-            >
-              <span>📮</span>
-              <div style={{ textAlign: "left" }}>
-                <div>E-Brief / Korrespondenz</div>
-                <div style={{ fontSize: 11, color: "#6b7280" }}>Briefe & E-Mails an Kassen senden</div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => { setMenuOpen(false); navTo("export"); }}
-              style={{ padding: 13, background: "#1f2937", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
-            >
-              <span>📦</span>
-              <div style={{ textAlign: "left" }}>
-                <div>Massen-Export</div>
-                <div style={{ fontSize: 11, opacity: 0.85 }}>Alle Daten als CSV herunterladen</div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => { setMenuOpen(false); navTo("kostentraeger"); }}
-              style={{ padding: 13, background: "#eff6ff", color: "#1d4ed8", border: "2px solid #93c5fd", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
-            >
-              <span>🏥</span>
-              <div style={{ textAlign: "left" }}>
-                <div>Kostenträger</div>
-                <div style={{ fontSize: 11, opacity: 0.8 }}>Pflegekassen mit IK-Nummern</div>
-              </div>
-            </button>
-            <button
-              onClick={() => { setMenuOpen(false); navTo("textbausteine"); }}
-              style={{ padding: 13, background: "#f0fdf4", color: "#15803d", border: "2px solid #86efac", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
-            >
-              <span>📝</span>
-              <div style={{ textAlign: "left" }}>
-                <div>Textbausteine</div>
-                <div style={{ fontSize: 11, opacity: 0.8 }}>Dokumentations-Vorlagen</div>
-              </div>
-            </button>
-            <button
-              onClick={() => { setMenuOpen(false); navTo("export"); }}
-              style={{ padding: 13, background: "#fef3c7", color: "#92400e", border: "2px solid #fcd34d", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
-            >
-              <span>📦</span>
-              <div style={{ textAlign: "left" }}>
-                <div>Export-Center</div>
-                <div style={{ fontSize: 11, opacity: 0.8 }}>CSV-Export, Pflegegrad-Rechner, E-Brief</div>
-              </div>
-            </button>
-            {/* Neue Module Phase 12 */}
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 1, paddingLeft: 4, marginTop: 4 }}>Compliance & Aufnahme</div>
-
-            <button
-              onClick={() => { setMenuOpen(false); navTo("kalender"); }}
-              style={{ padding: 13, background: "#f0f9ff", color: "#0369a1", border: "2px solid #7dd3fc", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
-            >
-              <span>📅</span>
-              <div style={{ textAlign: "left" }}>
-                <div>Einsatz-Kalender</div>
-                <div style={{ fontSize: 11, opacity: 0.8 }}>Monatsübersicht mit Farbcodierung</div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => { setMenuOpen(false); navTo("fuehrerschein"); }}
-              style={{ padding: 13, background: "#fff7ed", color: "#c2410c", border: "2px solid #fdba74", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
-            >
-              <span>🪪</span>
-              <div style={{ textAlign: "left" }}>
-                <div>Führerschein-Kontrolle</div>
-                <div style={{ fontSize: 11, opacity: 0.8 }}>Halbjährliche Prüfung & Archiv</div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => { setMenuOpen(false); navTo("neukundenaufnahme"); }}
-              style={{ padding: 13, background: "#fdf4ff", color: "#7e22ce", border: "2px solid #d8b4fe", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
-            >
-              <span>👤</span>
-              <div style={{ textAlign: "left" }}>
-                <div>Neukundenaufnahme</div>
-                <div style={{ fontSize: 11, opacity: 0.8 }}>Stammdaten, Vollmacht & PDF</div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => { setMenuOpen(false); navTo("kassenanfrage"); }}
-              style={{ padding: 13, background: "#f0fdfa", color: "#0f766e", border: "2px solid #5eead4", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
-            >
-              <span>📋</span>
-              <div style={{ textAlign: "left" }}>
-                <div>Kassenanfragen</div>
-                <div style={{ fontSize: 11, opacity: 0.8 }}>Vollmacht zur Budget-Abfrage</div>
-              </div>
-            </button>
-
-            {/* Phase 15 – Neue Module */}
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 1, paddingLeft: 4, marginTop: 4 }}>Personal & Planung</div>
-
-            <button
-              onClick={() => { setMenuOpen(false); navTo("urlaub"); }}
-              style={{ padding: 13, background: "#f0fdf4", color: "#15803d", border: "2px solid #86efac", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
-            >
-              <span>🏖️</span>
-              <div style={{ textAlign: "left" }}>
-                <div>Urlaubsverwaltung</div>
-                <div style={{ fontSize: 11, opacity: 0.8 }}>Anträge stellen & genehmigen</div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => { setMenuOpen(false); navTo("krank"); }}
-              style={{ padding: 13, background: "#fef2f2", color: "#b91c1c", border: "2px solid #fca5a5", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
-            >
-              <span>🤒</span>
-              <div style={{ textAlign: "left" }}>
-                <div>Krankmeldungen</div>
-                <div style={{ fontSize: 11, opacity: 0.8 }}>Krank melden & Übersicht</div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => { setMenuOpen(false); navTo("touren"); }}
-              style={{ padding: 13, background: "#eff6ff", color: "#1d4ed8", border: "2px solid #93c5fd", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
-            >
-              <span>🗺️</span>
-              <div style={{ textAlign: "left" }}>
-                <div>Tourenplanung</div>
-                <div style={{ fontSize: 11, opacity: 0.8 }}>Wochenansicht & Tour-Verwaltung</div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => { setMenuOpen(false); navTo("leistungsfreigabe"); }}
-              style={{ padding: 13, background: "#f0fdf4", color: "#065f46", border: "2px solid #6ee7b7", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
-            >
-              <span>✅</span>
-              <div style={{ textAlign: "left" }}>
-                <div>Leistungsnachweis-Freigabe</div>
-                <div style={{ fontSize: 11, opacity: 0.8 }}>Prüfen & freigeben</div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => { setMenuOpen(false); navTo("buchhaltung"); }}
-              style={{ padding: 13, background: "#faf5ff", color: "#6b21a8", border: "2px solid #c4b5fd", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
-            >
-              <span>📊</span>
-              <div style={{ textAlign: "left" }}>
-                <div>Buchhaltungs-Export</div>
-                <div style={{ fontSize: 11, opacity: 0.8 }}>DATEV, Lexware, CSV-Export</div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => setMenuOpen(false)}
-              style={{ padding: 13, background: "#f4f6f3", color: "#6b7280", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}
-            >
-              Schließen
-            </button>
-          </div>
-        </BottomSheet>
-      )}
-
-      {/* Onboarding-Tour */}
       <OnboardingTour forceShow={showTour} onClose={closeTour} />
+      <Toaster
+        position="top-right"
+        richColors
+        toastOptions={{
+          style: { fontSize: "14px", fontWeight: 600 },
+          duration: 3000,
+        }}
+      />
     </div>
   );
 }

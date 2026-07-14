@@ -1,6 +1,6 @@
 import { and, eq, gte, lte, desc, sql, like, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, mitarbeiter, kunden, einsaetze, leistungen, fahrten, auditLogs, kundenZuordnung, monatsabschluesse, passwordResets, kostentraeger, textbausteine, ebriefLog, pushSubscriptions, urlaubsantraege, krankmeldungen, touren, tourEinsaetze, notifications, refreshTokens } from "../drizzle/schema";
+import { InsertUser, users, mitarbeiter, kunden, einsaetze, leistungen, fahrten, auditLogs, kundenZuordnung, monatsabschluesse, passwordResets, kostentraeger, textbausteine, ebriefLog, pushSubscriptions, urlaubsantraege, krankmeldungen, touren, tourEinsaetze, notifications, refreshTokens, budgetTransaktionen } from "../drizzle/schema";
 import type { InsertMitarbeiter, InsertKunde, InsertEinsatz, InsertLeistung, InsertFahrt, InsertAuditLog, InsertKostentraeger, InsertTextbaustein, InsertEbriefLog, InsertPushSubscription, InsertUrlaubsantrag, InsertKrankmeldung, InsertTour, InsertNotification, InsertRefreshToken } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -162,6 +162,49 @@ export async function getZuordnungenForMitarbeiter(mitarbeiterId: number) {
   return db.select({ kundenId: kundenZuordnung.kundenId }).from(kundenZuordnung).where(eq(kundenZuordnung.mitarbeiterId, mitarbeiterId));
 }
 
+// ── MEHRFACH-ZUORDNUNG (max. 3 Mitarbeiter pro Kunde) ─────────────
+
+/** Gibt alle Mitarbeiter-Zuordnungen für einen Kunden zurück (max. 3). */
+export async function getZuordnungenForKunde(kundenId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(kundenZuordnung)
+    .where(eq(kundenZuordnung.kundenId, kundenId))
+    .orderBy(kundenZuordnung.prioritaet);
+}
+
+/**
+ * Setzt die Mitarbeiter-Zuordnung für einen Kunden (Admin-only).
+ * Maximal 3 Mitarbeiter erlaubt. Wirft einen Fehler bei Überschreitung.
+ */
+export async function setZuordnungenForKunde(
+  kundenId: number,
+  zuordnungen: Array<{ mitarbeiterId: number; prioritaet: number; rolle: 'hauptbetreuer' | 'vertretung' }>,
+  zugeordnetVon: number
+) {
+  if (zuordnungen.length > 3) throw new Error('Maximal 3 Mitarbeiter pro Kunde erlaubt.');
+  const db = await getDb();
+  if (!db) throw new Error('DB not available');
+  // Bestehende Zuordnungen für diesen Kunden löschen
+  await db.delete(kundenZuordnung).where(eq(kundenZuordnung.kundenId, kundenId));
+  if (zuordnungen.length > 0) {
+    await db.insert(kundenZuordnung).values(
+      zuordnungen.map(z => ({ kundenId, mitarbeiterId: z.mitarbeiterId, prioritaet: z.prioritaet, rolle: z.rolle, zugeordnetVon }))
+    );
+  }
+}
+
+/** Prüft ob ein Mitarbeiter einem Kunden zugeordnet ist. */
+export async function isMitarbeiterZugeordnet(mitarbeiterId: number, kundenId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const rows = await db.select({ id: kundenZuordnung.id })
+    .from(kundenZuordnung)
+    .where(and(eq(kundenZuordnung.mitarbeiterId, mitarbeiterId), eq(kundenZuordnung.kundenId, kundenId)))
+    .limit(1);
+  return rows.length > 0;
+}
+
 // ── EINSÄTZE ─────────────────────────────────────────
 export async function getEinsaetzeByMitarbeiter(mitarbeiterId: number) {
   const db = await getDb();
@@ -289,17 +332,83 @@ export async function getLeistungenByKunde(kundenId: number) {
   return db.select().from(leistungen).where(eq(leistungen.kundenId, kundenId)).orderBy(desc(leistungen.createdAt));
 }
 
+/**
+ * Hilfsfunktion: Kunden-Budget anpassen + Transaktion loggen.
+ * betragDelta > 0 = Abbuchung, < 0 = Rückerstattung
+ */
+export async function adjustKundeVerbraucht(
+  kundenId: number,
+  paragraph: "45b" | "45a" | "39",
+  betragDelta: number,
+  opts?: { leistungId?: number; mitarbeiterId?: number; stunden?: number; monat?: string; beschreibung?: string }
+) {
+  const db = await getDb();
+  if (!db) return;
+  const kundeResult = await db.select().from(kunden).where(eq(kunden.id, kundenId)).limit(1);
+  const kunde = kundeResult[0];
+  if (!kunde) return;
+  if (paragraph === "45b") {
+    const neu = Math.max(0, parseFloat(String(kunde.verbraucht45b ?? 0)) + betragDelta);
+    await db.update(kunden).set({ verbraucht45b: String(Math.round(neu * 100) / 100) }).where(eq(kunden.id, kundenId));
+  } else if (paragraph === "45a") {
+    const neu = Math.max(0, parseFloat(String(kunde.verbraucht45a ?? 0)) + betragDelta);
+    await db.update(kunden).set({ verbraucht45a: String(Math.round(neu * 100) / 100) }).where(eq(kunden.id, kundenId));
+  } else if (paragraph === "39") {
+    const neu = Math.max(0, parseFloat(String(kunde.verbraucht39 ?? 0)) + betragDelta);
+    await db.update(kunden).set({ verbraucht39: String(Math.round(neu * 100) / 100) }).where(eq(kunden.id, kundenId));
+  }
+  // ── Transaktion in Budget-Historie loggen ──
+  const typ = betragDelta >= 0 ? 'abbuchung' : 'rueckerstattung';
+  await db.insert(budgetTransaktionen).values({
+    kundenId,
+    leistungId: opts?.leistungId ?? null,
+    mitarbeiterId: opts?.mitarbeiterId ?? null,
+    typ,
+    paragraph,
+    betrag: String(Math.abs(Math.round(betragDelta * 100) / 100)),
+    stunden: opts?.stunden != null ? String(opts.stunden) : null,
+    monat: opts?.monat ?? null,
+    beschreibung: opts?.beschreibung ?? null,
+  });
+}
+
+/** Alle Budget-Transaktionen für einen Kunden (neueste zuerst). */
+export async function getBudgetHistorie(kundenId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({
+    id: budgetTransaktionen.id,
+    typ: budgetTransaktionen.typ,
+    paragraph: budgetTransaktionen.paragraph,
+    betrag: budgetTransaktionen.betrag,
+    stunden: budgetTransaktionen.stunden,
+    monat: budgetTransaktionen.monat,
+    beschreibung: budgetTransaktionen.beschreibung,
+    createdAt: budgetTransaktionen.createdAt,
+    leistungId: budgetTransaktionen.leistungId,
+    mitarbeiterId: budgetTransaktionen.mitarbeiterId,
+    mitarbeiterVorname: mitarbeiter.vorname,
+    mitarbeiterNachname: mitarbeiter.nachname,
+  })
+  .from(budgetTransaktionen)
+  .leftJoin(mitarbeiter, eq(budgetTransaktionen.mitarbeiterId, mitarbeiter.id))
+  .where(eq(budgetTransaktionen.kundenId, kundenId))
+  .orderBy(desc(budgetTransaktionen.createdAt));
+}
+
 export async function createLeistung(data: InsertLeistung & { mitarbeiterId: number }) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
+  // Stundensatz je Paragraph: §45b = 125 €/h, §39 = 1612 €/Monat (pauschal), §45a = 0
   const rate = data.paragraph === "39" ? 1612 : data.paragraph === "45a" ? 0 : 125;
-  const betrag = (parseFloat(String(data.stunden ?? 0)) * rate).toFixed(2);
+  const stunden = parseFloat(String(data.stunden ?? 0));
+  const betrag = (stunden * rate).toFixed(2);
   await db.insert(leistungen).values({
     mitarbeiterId: data.mitarbeiterId,
     kundenId: data.kundenId,
     monat: data.monat as string,
     paragraph: data.paragraph as "45b" | "45a" | "39",
-    stunden: String(data.stunden ?? 0),
+    stunden: String(stunden),
     anzahlEinsaetze: data.anzahlEinsaetze ?? 1,
     betrag,
     status: "offen",
@@ -307,6 +416,52 @@ export async function createLeistung(data: InsertLeistung & { mitarbeiterId: num
     unterschriftLeister: data.unterschriftLeister,
     unterschriftKunde: (data as any).unterschriftKunde,
   });
+  // ── AUTOMATISCHE BUDGET-ABRECHNUNG: Betrag sofort vom Kunden-Budget abziehen + in Historie loggen ──
+  if (data.kundenId && parseFloat(betrag) > 0) {
+    // leistungId aus dem Insert-Ergebnis lesen
+    const inserted = await db.select({ id: leistungen.id }).from(leistungen)
+      .where(and(eq(leistungen.kundenId, data.kundenId), eq(leistungen.mitarbeiterId, data.mitarbeiterId)))
+      .orderBy(desc(leistungen.createdAt)).limit(1);
+    const leistungId = inserted[0]?.id;
+    await adjustKundeVerbraucht(
+      data.kundenId,
+      data.paragraph as "45b" | "45a" | "39",
+      parseFloat(betrag),
+      {
+        leistungId,
+        mitarbeiterId: data.mitarbeiterId,
+        stunden,
+        monat: data.monat as string,
+        beschreibung: `Leistungsnachweis ${data.monat} – ${stunden}h §${data.paragraph}`,
+      }
+    );
+  }
+}
+
+export async function deleteLeistung(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  // ── BUDGET-RÜCKBUCHUNG: Betrag vor dem Löschen zurückbuchen + in Historie loggen ──
+  const rows = await db.select().from(leistungen).where(eq(leistungen.id, id)).limit(1);
+  const leistung = rows[0];
+  if (leistung && leistung.kundenId && leistung.betrag) {
+    const betrag = parseFloat(String(leistung.betrag));
+    if (betrag > 0) {
+      await adjustKundeVerbraucht(
+        leistung.kundenId,
+        leistung.paragraph as "45b" | "45a" | "39",
+        -betrag,
+        {
+          leistungId: id,
+          mitarbeiterId: leistung.mitarbeiterId ?? undefined,
+          stunden: leistung.stunden ? parseFloat(String(leistung.stunden)) : undefined,
+          monat: leistung.monat ?? undefined,
+          beschreibung: `Rückerstattung: Leistungsnachweis ${leistung.monat} gelöscht`,
+        }
+      );
+    }
+  }
+  await db.delete(leistungen).where(eq(leistungen.id, id));
 }
 
 export async function updateLeistungStatus(id: number, status: "offen" | "pruefung" | "freigegeben" | "versendet") {
@@ -826,6 +981,12 @@ export async function updateUrlaubsantragStatus(
     .where(eq(urlaubsantraege.id, id));
 }
 
+export async function deleteUrlaubsantrag(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(urlaubsantraege).where(eq(urlaubsantraege.id, id));
+}
+
 // ── KRANKMELDUNGEN ───────────────────────────────────────────────────────
 export async function getAllKrankmeldungen() {
   const db = await getDb();
@@ -845,6 +1006,12 @@ export async function createKrankmeldung(data: InsertKrankmeldung) {
   const db = await getDb();
   if (!db) throw new Error('DB not available');
   await db.insert(krankmeldungen).values(data);
+}
+
+export async function deleteKrankmeldung(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(krankmeldungen).where(eq(krankmeldungen.id, id));
 }
 
 // ── TOURENPLANUNG ──────────────────────────────────────────────────────────

@@ -33,10 +33,16 @@ export default function Leistungsnachweise() {
   const sigKundeRef = useRef<import("@/components/SignatureCanvas").SignatureCanvasRef>(null);
   const [previewMitarbeiter, setPreviewMitarbeiter] = useState<string | null>(null);
   const [previewKunde, setPreviewKunde] = useState<string | null>(null);
+  const [signaturMitarbeiter, setSignaturMitarbeiter] = useState<string | null>(null);
+  const [signaturKunde, setSignaturKunde] = useState<string | null>(null);
 
   const { data: kunden = [] } = trpc.kunden.list.useQuery();
   const getKundeName = (id: number) => { const k = kunden.find((c) => c.id === id); return k ? `${k.vorname} ${k.nachname}` : `Kunde #${id}`; };
   const { data: leistungen = [], refetch } = trpc.leistungen.list.useQuery();
+  const deleteLeistung = trpc.leistungen.delete.useMutation({
+    onSuccess: () => { refetch(); toast.success("🗑️ Leistungsnachweis gelöscht"); },
+    onError: (e) => toast.error("❌ " + e.message),
+  });
   const createLeistung = trpc.leistungen.create.useMutation({
     onSuccess: () => {
       refetch();
@@ -47,12 +53,26 @@ export default function Leistungsnachweise() {
       sigKundeRef.current?.clear();
       setPreviewMitarbeiter(null);
       setPreviewKunde(null);
+      setSignaturMitarbeiter(null);
+      setSignaturKunde(null);
     },
     onError: (e) => toast.error("❌ " + e.message),
   });
 
   const rate = para === "39" ? 50 : 39;
   const betragPreview = ((parseFloat(stunden) || 0) * rate + (parseInt(anzahl) || 0) * 6).toFixed(2);
+
+  // Budget-Anzeige für ausgewählten Kunden
+  const selectedKunde = kunden.find((k) => String(k.id) === kundenId);
+  const budgetFeld = para === "45b" ? "budget45b" : para === "45a" ? "budget45a" : "budget39";
+  const verbrauchtFeld = para === "45b" ? "verbraucht45b" : para === "45a" ? "verbraucht45a" : "verbraucht39";
+  const budgetGesamt = parseFloat(String((selectedKunde as any)?.[budgetFeld] ?? 0));
+  const budgetVerbraucht = parseFloat(String((selectedKunde as any)?.[verbrauchtFeld] ?? 0));
+  const budgetRest = Math.max(0, budgetGesamt - budgetVerbraucht);
+  const budgetProzent = budgetGesamt > 0 ? Math.min(100, (budgetVerbraucht / budgetGesamt) * 100) : 0;
+  const budgetKritisch = budgetProzent >= 90;
+  const neuerBetrag = para === "39" ? 1612 : (parseFloat(stunden) || 0) * 125;
+  const budgetNachEintrag = Math.max(0, budgetRest - neuerBetrag);
 
   const saveLnw = () => {
     if (!monat || !kundenId) { toast.error("Bitte alle Felder ausfüllen!"); return; }
@@ -63,8 +83,8 @@ export default function Leistungsnachweise() {
       stunden: parseFloat(stunden) || 0,
       anzahlEinsaetze: parseInt(anzahl) || 1,
       bemerkung,
-      unterschriftLeister: (sigRef.current?.isEmpty() ? undefined : sigRef.current?.toDataURL()) ?? undefined,
-      unterschriftKunde: (sigKundeRef.current?.isEmpty() ? undefined : sigKundeRef.current?.toDataURL()) ?? undefined,
+      unterschriftLeister: signaturMitarbeiter ?? undefined,
+      unterschriftKunde: signaturKunde ?? undefined,
     });
   };
 
@@ -144,6 +164,14 @@ export default function Leistungsnachweise() {
                   >
                     📄 PDF
                   </button>
+                  <button
+                    onClick={() => { if (confirm("Leistungsnachweis wirklich löschen?")) deleteLeistung.mutate({ id: l.id }); }}
+                    title="Löschen"
+                    disabled={deleteLeistung.isPending}
+                    style={{ display: "block", marginTop: 4, padding: "4px 10px", background: "#fee2e2", color: "#dc2626", border: "1.5px solid #dc2626", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer" }}
+                  >
+                    🗑️ Löschen
+                  </button>
                 </div>
               </div>
             </div>
@@ -172,6 +200,35 @@ export default function Leistungsnachweise() {
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+        {/* Budget-Anzeige */}
+        {selectedKunde && budgetGesamt > 0 && (
+          <div style={{ marginBottom: 14, padding: "12px 14px", borderRadius: 10, background: budgetKritisch ? "#fef2f2" : "#f0fdf4", border: `2px solid ${budgetKritisch ? "#fca5a5" : "#86efac"}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: budgetKritisch ? "#dc2626" : "#166534" }}>
+                {budgetKritisch ? "⚠️" : "💰"} Budget §{para} – {selectedKunde.vorname} {selectedKunde.nachname}
+              </span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: budgetKritisch ? "#dc2626" : "#166534" }}>
+                {budgetRest.toFixed(2)} € verbleibend
+              </span>
+            </div>
+            <div style={{ background: "#e5e7eb", borderRadius: 6, height: 8, overflow: "hidden", marginBottom: 6 }}>
+              <div style={{ height: "100%", borderRadius: 6, background: budgetKritisch ? "#ef4444" : budgetProzent >= 70 ? "#f59e0b" : "#4a8c3f", width: `${budgetProzent}%`, transition: "width 0.3s" }} />
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#6b7280" }}>
+              <span>Verbraucht: {budgetVerbraucht.toFixed(2)} €</span>
+              <span>Gesamt: {budgetGesamt.toFixed(2)} €</span>
+            </div>
+            {neuerBetrag > 0 && (
+              <div style={{ marginTop: 8, padding: "6px 10px", background: budgetNachEintrag < 0 ? "#fee2e2" : "#e0f2f0", borderRadius: 8, fontSize: 12, fontWeight: 700, color: budgetNachEintrag < 0 ? "#dc2626" : "#2a9d8f" }}>
+                {budgetNachEintrag < 0
+                  ? `⚠️ Budget wird überschritten! Fehlbetrag: ${Math.abs(budgetNachEintrag).toFixed(2)} €`
+                  : `→ Nach Eintrag verbleiben: ${budgetNachEintrag.toFixed(2)} €`
+                }
+              </div>
+            )}
+          </div>
+        )}
+
           <div>
             <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>Paragraph</label>
             <select value={para} onChange={(e) => setPara(e.target.value as typeof para)}
@@ -205,15 +262,22 @@ export default function Leistungsnachweise() {
           <SignatureCanvas
             ref={sigRef}
             height={120}
-            onDrawEnd={(url) => setPreviewMitarbeiter(url)}
-            onClear={() => setPreviewMitarbeiter(null)}
+            value={signaturMitarbeiter}
+            onDrawEnd={(url) => {
+              setSignaturMitarbeiter(url);
+              setPreviewMitarbeiter(url);
+            }}
+            onClear={() => {
+              setSignaturMitarbeiter(null);
+              setPreviewMitarbeiter(null);
+            }}
           />
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
             <button
               onClick={() => { sigRef.current?.clear(); }}
               style={{ padding: "7px 14px", background: "#fff", color: "#dc2626", border: "2px solid #fca5a5", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}
             >
-              <span style={{ fontSize: 14 }}>↺</span> Zurücksetzen
+              <span style={{ fontSize: 14 }}>↺</span> Neu unterschreiben
             </button>
             {previewMitarbeiter && (
               <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#f0fdf4", border: "1.5px solid #86efac", borderRadius: 8, padding: "4px 10px 4px 6px", flex: 1, minWidth: 0 }}>
@@ -233,8 +297,15 @@ export default function Leistungsnachweise() {
             <SignatureCanvas
               ref={sigKundeRef}
               height={120}
-              onDrawEnd={(url) => setPreviewKunde(url)}
-              onClear={() => setPreviewKunde(null)}
+              value={signaturKunde}
+              onDrawEnd={(url) => {
+                setSignaturKunde(url);
+                setPreviewKunde(url);
+              }}
+              onClear={() => {
+                setSignaturKunde(null);
+                setPreviewKunde(null);
+              }}
             />
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
@@ -242,7 +313,7 @@ export default function Leistungsnachweise() {
               onClick={() => { sigKundeRef.current?.clear(); }}
               style={{ padding: "7px 14px", background: "#fff", color: "#dc2626", border: "2px solid #fca5a5", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}
             >
-              <span style={{ fontSize: 14 }}>↺</span> Zurücksetzen
+              <span style={{ fontSize: 14 }}>↺</span> Neu unterschreiben
             </button>
             {previewKunde && (
               <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#f0fdf4", border: "1.5px solid #86efac", borderRadius: 8, padding: "4px 10px 4px 6px", flex: 1, minWidth: 0 }}>

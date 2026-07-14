@@ -129,27 +129,46 @@ export default function AdminPanel() {
     else createKd.mutate(data);
   };
 
-  // ── Zuordnung ─────────────────────────────────────────
-  const [zuordMaId, setZuordMaId] = useState<number | null>(null);
-  const [selectedKunden, setSelectedKunden] = useState<number[]>([]);
-  const { data: zuordDaten = [] } = trpc.admin.getZuordnung.useQuery({ mitarbeiterId: zuordMaId ?? 0 }, { enabled: !!zuordMaId });
-  const setZuordnung = trpc.admin.setZuordnung.useMutation({
-    onSuccess: () => toast.success("✅ Zuordnung gespeichert"),
+  // ── Zuordnung (Kunden-basiert, max. 3 Mitarbeiter pro Kunde) ──────
+  // Kunden-basierte Zuordnung: Wähle einen Kunden, dann bis zu 3 Mitarbeiter
+  const [zuordKundeId, setZuordKundeId] = useState<number | null>(null);
+  const { data: zuordDaten = [], refetch: refetchZuordnung } = trpc.kunden.getZuordnungen.useQuery(
+    { kundenId: zuordKundeId ?? 0 },
+    { enabled: !!zuordKundeId }
+  );
+  // Lokaler State: Array von { mitarbeiterId, prioritaet, rolle }
+  const [zuordRows, setZuordRows] = useState<Array<{ mitarbeiterId: number; prioritaet: number; rolle: 'hauptbetreuer' | 'vertretung' }>>([]);
+  const setZuordnungenMut = trpc.kunden.setZuordnungen.useMutation({
+    onSuccess: () => { toast.success("✅ Zuordnung gespeichert"); refetchZuordnung(); },
     onError: (e) => toast.error("❌ " + e.message),
   });
 
-  const openZuordnung = (maId: number) => {
-    setZuordMaId(maId);
-    setSelectedKunden(zuordDaten.map((z) => z.kundenId));
+  const openKundeZuordnung = (kundeId: number) => {
+    setZuordKundeId(kundeId);
+    // Bestehende Zuordnungen laden (nach kurzer Verzögerung für Query)
+    setZuordRows([]);
   };
 
-  const toggleKunde = (id: number) => {
-    setSelectedKunden((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  // Wenn Zuordnungsdaten geladen werden, in lokalen State übernehmen
+  const prevZuordKundeId = useState<number | null>(null);
+  if (zuordKundeId && zuordDaten.length > 0 && zuordRows.length === 0) {
+    setZuordRows(zuordDaten.map(z => ({ mitarbeiterId: z.mitarbeiterId, prioritaet: z.prioritaet, rolle: z.rolle as 'hauptbetreuer' | 'vertretung' })));
+  }
+
+  const addZuordRow = () => {
+    if (zuordRows.length >= 3) { toast.error("Maximal 3 Mitarbeiter pro Kunde erlaubt."); return; }
+    setZuordRows(prev => [...prev, { mitarbeiterId: 0, prioritaet: prev.length + 1, rolle: prev.length === 0 ? 'hauptbetreuer' : 'vertretung' }]);
+  };
+
+  const removeZuordRow = (idx: number) => {
+    setZuordRows(prev => prev.filter((_, i) => i !== idx).map((r, i) => ({ ...r, prioritaet: i + 1 })));
   };
 
   const saveZuordnung = () => {
-    if (!zuordMaId) return;
-    setZuordnung.mutate({ mitarbeiterId: zuordMaId, kundenIds: selectedKunden });
+    if (!zuordKundeId) return;
+    const valid = zuordRows.filter(r => r.mitarbeiterId > 0);
+    if (valid.length === 0) { toast.error("Mindestens einen Mitarbeiter auswählen."); return; }
+    setZuordnungenMut.mutate({ kundenId: zuordKundeId, zuordnungen: valid });
   };
 
   // ── Monatsabschluss ───────────────────────────────────
@@ -286,46 +305,69 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* ── ZUORDNUNG ── */}
+      {/* ── ZUORDNUNG (Kunden-basiert, max. 3 Mitarbeiter) ── */}
       {tab === "zuordnung" && (
         <div>
-          <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 12 }}>Wähle einen Mitarbeiter und weise Kunden zu.</div>
-          {maList.map((ma) => (
-            <div key={ma.id} style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 10px rgba(0,0,0,.08)", padding: 14, marginBottom: 10 }}>
+          <div style={{ background: "#e8f5e4", borderRadius: 10, padding: "10px 14px", marginBottom: 14, fontSize: 13, color: "#14532d", fontWeight: 600 }}>
+            🔗 Weise jedem Kunden bis zu <strong>3 Mitarbeiter</strong> zu (1 Hauptbetreuer + bis zu 2 Vertretungen).
+          </div>
+          {kundenList.map((k) => (
+            <div key={k.id} style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 10px rgba(0,0,0,.08)", padding: 14, marginBottom: 10 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 700 }}>{ma.vorname} {ma.nachname}</div>
-                  <div style={{ fontSize: 12, color: "#6b7280" }}>{ma.email}</div>
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>{k.vorname} {k.nachname}</div>
+                  {k.paragraph && <span style={{ fontSize: 11, padding: "1px 6px", borderRadius: 10, background: "#e8f5e4", color: "#4a8c3f", fontWeight: 700 }}>§{k.paragraph}</span>}
                 </div>
                 <button
-                  onClick={() => openZuordnung(ma.id)}
-                  style={{ padding: "7px 14px", background: zuordMaId === ma.id ? "#4a8c3f" : "#f3f4f6", color: zuordMaId === ma.id ? "#fff" : "#4b5563", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                  onClick={() => openKundeZuordnung(k.id)}
+                  style={{ padding: "7px 14px", background: zuordKundeId === k.id ? "#4a8c3f" : "#f3f4f6", color: zuordKundeId === k.id ? "#fff" : "#4b5563", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}
                 >
-                  {zuordMaId === ma.id ? "Ausgewählt ✓" : "Zuordnen"}
+                  {zuordKundeId === k.id ? "Ausgewählt ✓" : "Zuordnen"}
                 </button>
               </div>
             </div>
           ))}
 
-          {zuordMaId && (
-            <div style={{ background: "#f0faf0", borderRadius: 12, padding: 16, marginTop: 8 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10, color: "#4a8c3f" }}>
-                Kunden für {maList.find((m) => m.id === zuordMaId)?.vorname} {maList.find((m) => m.id === zuordMaId)?.nachname}
+          {zuordKundeId && (
+            <div style={{ background: "#f0faf0", borderRadius: 12, padding: 16, marginTop: 8, border: "2px solid #4a8c3f" }}>
+              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4, color: "#4a8c3f" }}>
+                Mitarbeiter für: {kundenList.find(k => k.id === zuordKundeId)?.vorname} {kundenList.find(k => k.id === zuordKundeId)?.nachname}
               </div>
-              {kundenList.map((k) => (
-                <label key={k.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid #e5e7eb", cursor: "pointer" }}>
-                  <input
-                    type="checkbox"
-                    checked={selectedKunden.includes(k.id)}
-                    onChange={() => toggleKunde(k.id)}
-                    style={{ width: 18, height: 18, accentColor: "#4a8c3f" }}
-                  />
-                  <span style={{ fontSize: 14 }}>{k.vorname} {k.nachname}</span>
-                  {k.paragraph && <span style={{ fontSize: 11, padding: "1px 6px", borderRadius: 10, background: "#e8f5e4", color: "#4a8c3f", fontWeight: 700 }}>§{k.paragraph}</span>}
-                </label>
+              <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>Max. 3 Mitarbeiter • Priorität 1 = Hauptbetreuer</div>
+
+              {zuordRows.map((row, idx) => (
+                <div key={idx} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10, background: "#fff", borderRadius: 10, padding: 10, border: "1px solid #d1fae5" }}>
+                  <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#4a8c3f", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800, flexShrink: 0 }}>{idx + 1}</div>
+                  <select
+                    value={String(row.mitarbeiterId)}
+                    onChange={e => setZuordRows(prev => prev.map((r, i) => i === idx ? { ...r, mitarbeiterId: Number(e.target.value) } : r))}
+                    style={{ flex: 1, border: "1px solid #d1d5db", borderRadius: 8, padding: "6px 8px", fontSize: 13 }}
+                  >
+                    <option value="0">Mitarbeiter wählen...</option>
+                    {(maList as any[]).map(ma => (
+                      <option key={ma.id} value={String(ma.id)}>{ma.vorname} {ma.nachname}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={row.rolle}
+                    onChange={e => setZuordRows(prev => prev.map((r, i) => i === idx ? { ...r, rolle: e.target.value as 'hauptbetreuer' | 'vertretung' } : r))}
+                    style={{ border: "1px solid #d1d5db", borderRadius: 8, padding: "6px 8px", fontSize: 12 }}
+                  >
+                    <option value="hauptbetreuer">🏠 Hauptbetreuer</option>
+                    <option value="vertretung">🔄 Vertretung</option>
+                  </select>
+                  <button onClick={() => removeZuordRow(idx)} style={{ background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 8, padding: "6px 10px", fontSize: 13, cursor: "pointer", fontWeight: 700 }}>✕</button>
+                </div>
               ))}
-              <button onClick={saveZuordnung} style={{ ...btnGreen, marginTop: 12 }}>
-                {setZuordnung.isPending ? "Speichern…" : "Zuordnung speichern"}
+
+              {zuordRows.length < 3 && (
+                <button onClick={addZuordRow} style={{ width: "100%", padding: "10px", background: "#f0fdf4", color: "#4a8c3f", border: "2px dashed #4a8c3f", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer", marginBottom: 12 }}>
+                  + Mitarbeiter hinzufügen ({zuordRows.length}/3)
+                </button>
+              )}
+
+              <button onClick={saveZuordnung} style={{ ...btnGreen, width: "100%" }} disabled={setZuordnungenMut.isPending}>
+                {setZuordnungenMut.isPending ? "Speichern…" : "✅ Zuordnung speichern"}
               </button>
             </div>
           )}

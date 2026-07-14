@@ -37,6 +37,8 @@ export default function Einsaetze() {
   const sigKundeRef = useRef<import("@/components/SignatureCanvas").SignatureCanvasRef>(null);
   const [previewMitarbeiter, setPreviewMitarbeiter] = useState<string | null>(null);
   const [previewKunde, setPreviewKunde] = useState<string | null>(null);
+  const [signaturMitarbeiter, setSignaturMitarbeiter] = useState<string | null>(null);
+  const [signaturKunde, setSignaturKunde] = useState<string | null>(null);
 
   const { data: einsaetze = [], refetch } = trpc.einsaetze.list.useQuery();
   const { data: kunden = [] } = trpc.kunden.list.useQuery();
@@ -75,20 +77,17 @@ export default function Einsaetze() {
   const handleAbschluss = (id: number, name: string, datum: string) => {
     setActiveEinsatz({ id, name, datum });
     setBericht(""); setBemerkung(""); setGesundheit("gut");
-    setAbschlussOpen(true);
+    setSignaturMitarbeiter(null);
+    setSignaturKunde(null);
     setPreviewMitarbeiter(null);
     setPreviewKunde(null);
-    // Unterschriften beim Öffnen zurücksetzen
-    setTimeout(() => {
-      sigRef.current?.clear();
-      sigKundeRef.current?.clear();
-    }, 50);
+    setAbschlussOpen(true);
   };
 
   const saveAbschluss = () => {
     if (!activeEinsatz) return;
-    const unterschriftMitarbeiter = (sigRef.current?.isEmpty() ? undefined : sigRef.current?.toDataURL()) ?? undefined;
-    const unterschriftKunde = (sigKundeRef.current?.isEmpty() ? undefined : sigKundeRef.current?.toDataURL()) ?? undefined;
+    const unterschriftMitarbeiter = signaturMitarbeiter ?? undefined;
+    const unterschriftKunde = signaturKunde ?? undefined;
     updateStatus.mutate({
       id: activeEinsatz.id,
       status: "abgeschlossen",
@@ -216,15 +215,22 @@ export default function Einsaetze() {
           <SignatureCanvas
             ref={sigRef}
             height={130}
-            onDrawEnd={(url) => setPreviewMitarbeiter(url)}
-            onClear={() => setPreviewMitarbeiter(null)}
+            value={signaturMitarbeiter}
+            onDrawEnd={(url) => {
+              setSignaturMitarbeiter(url);
+              setPreviewMitarbeiter(url);
+            }}
+            onClear={() => {
+              setSignaturMitarbeiter(null);
+              setPreviewMitarbeiter(null);
+            }}
           />
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
             <button
               onClick={() => { sigRef.current?.clear(); }}
               style={{ padding: "7px 14px", background: "#fff", color: "#dc2626", border: "2px solid #fca5a5", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}
             >
-              <span style={{ fontSize: 14 }}>↺</span> Zurücksetzen
+              <span style={{ fontSize: 14 }}>↺</span> Neu unterschreiben
             </button>
             {previewMitarbeiter && (
               <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#f0fdf4", border: "1.5px solid #86efac", borderRadius: 8, padding: "4px 10px 4px 6px", flex: 1, minWidth: 0 }}>
@@ -244,8 +250,15 @@ export default function Einsaetze() {
             <SignatureCanvas
               ref={sigKundeRef}
               height={130}
-              onDrawEnd={(url) => setPreviewKunde(url)}
-              onClear={() => setPreviewKunde(null)}
+              value={signaturKunde}
+              onDrawEnd={(url) => {
+                setSignaturKunde(url);
+                setPreviewKunde(url);
+              }}
+              onClear={() => {
+                setSignaturKunde(null);
+                setPreviewKunde(null);
+              }}
             />
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
@@ -253,7 +266,7 @@ export default function Einsaetze() {
               onClick={() => { sigKundeRef.current?.clear(); }}
               style={{ padding: "7px 14px", background: "#fff", color: "#dc2626", border: "2px solid #fca5a5", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}
             >
-              <span style={{ fontSize: 14 }}>↺</span> Zurücksetzen
+              <span style={{ fontSize: 14 }}>↺</span> Neu unterschreiben
             </button>
             {previewKunde && (
               <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#f0fdf4", border: "1.5px solid #86efac", borderRadius: 8, padding: "4px 10px 4px 6px", flex: 1, minWidth: 0 }}>

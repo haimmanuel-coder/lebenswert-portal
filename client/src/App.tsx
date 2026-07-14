@@ -7,6 +7,7 @@ import Login from "./pages/Login";
 import PortalApp from "./pages/PortalApp";
 import ResetPasswort from "./pages/ResetPasswort";
 import ErrorBoundary from "./components/ErrorBoundary";
+import CookieBanner from "./components/CookieBanner";
 import { Route, Switch } from "wouter";
 
 function PortalRouter() {
@@ -59,6 +60,7 @@ function App() {
               <Route path="/reset-passwort" component={ResetPasswort} />
               <Route component={PortalRouter} />
             </Switch>
+            <CookieBanner />
           </PortalAuthProvider>
         </TooltipProvider>
       </ThemeProvider>

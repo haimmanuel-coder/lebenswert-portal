@@ -5,6 +5,10 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import { TRPCError } from "@trpc/server";
+import { sql, eq, desc } from "drizzle-orm";
+import { getDb } from "./db";
+import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen } from "../drizzle/schema";
 import {
   getMitarbeiterByEmail,
   getMitarbeiterById,
@@ -18,6 +22,9 @@ import {
   getKundenByMitarbeiter,
   setKundenZuordnung,
   getZuordnungenForMitarbeiter,
+  getZuordnungenForKunde,
+  setZuordnungenForKunde,
+  isMitarbeiterZugeordnet,
   getEinsaetzeByMitarbeiter,
   getAllEinsaetze,
   getEinsaetzeByKunde,
@@ -28,6 +35,7 @@ import {
   getLeistungenByKunde,
   createLeistung,
   updateLeistungStatus,
+  deleteLeistung,
   getFahrtenByMitarbeiter,
   getAllFahrten,
   getFahrtenByKunde,
@@ -85,9 +93,11 @@ import {
   getUrlaubsantraegeByMitarbeiter,
   createUrlaubsantrag,
   updateUrlaubsantragStatus,
+  deleteUrlaubsantrag,
   getAllKrankmeldungen,
   getKrankmeldungenByMitarbeiter,
   createKrankmeldung,
+  deleteKrankmeldung,
   getAllTouren,
   getTourenByMitarbeiter,
   getTourenByDatum,
@@ -106,6 +116,7 @@ import {
   invalidateRefreshToken,
   invalidateAllRefreshTokensForMitarbeiter,
   checkDoppelbelegung,
+  getBudgetHistorie,
 } from "./db";
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "lebenswert-secret-key");
@@ -194,6 +205,18 @@ export const urlaubRouter = router({
       await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'UPDATE', ressource: 'urlaub', details: `id=${input.id} status=${input.status}`, status: 'success' });
       return { success: true };
     }),
+  delete: portalProtected
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input, ctx }) => {
+      const ma = await getMitarbeiterById(ctx.mitarbeiterId);
+      // Nur eigene Anträge löschen (oder Admin darf alle löschen)
+      const antraege = await getUrlaubsantraegeByMitarbeiter(ctx.mitarbeiterId);
+      const eigenerAntrag = antraege.find((a: { id: number }) => a.id === input.id);
+      if (!eigenerAntrag && ma?.rolle !== 'admin') throw new Error('Keine Berechtigung');
+      await deleteUrlaubsantrag(input.id);
+      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'DELETE', ressource: 'urlaub', details: `id=${input.id}`, status: 'success' });
+      return { success: true };
+    }),
 });
 
 export const krankRouter = router({
@@ -226,6 +249,17 @@ export const krankRouter = router({
       await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'CREATE', ressource: 'krankmeldung', status: 'success' });
       return { success: true };
     }),
+  delete: portalProtected
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input, ctx }) => {
+      const ma = await getMitarbeiterById(ctx.mitarbeiterId);
+      const meldungen = await getKrankmeldungenByMitarbeiter(ctx.mitarbeiterId);
+      const eigeneMeldung = meldungen.find((m: { id: number }) => m.id === input.id);
+      if (!eigeneMeldung && ma?.rolle !== 'admin') throw new Error('Keine Berechtigung');
+      await deleteKrankmeldung(input.id);
+      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'DELETE', ressource: 'krankmeldung', details: `id=${input.id}`, status: 'success' });
+      return { success: true };
+    }),
 });
 
 export const tourenRouter = router({
@@ -242,10 +276,22 @@ export const tourenRouter = router({
       mitarbeiterId: z.number().int().positive(),
       datum: z.string(),
       notizen: z.string().optional(),
+      titel: z.string().max(200).optional(),
+      startzeit: z.string().optional(),
+      endzeit: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      await createTour({ mitarbeiterId: input.mitarbeiterId, datum: new Date(input.datum), notizen: input.notizen, status: 'geplant' });
-      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'CREATE', ressource: 'tour', status: 'success' });
+      // ── 2-Wochen-Vorausplanung: Datum darf maximal 14 Tage in der Zukunft liegen ──
+      const tourDatum = new Date(input.datum);
+      tourDatum.setHours(0, 0, 0, 0);
+      const heute = new Date();
+      heute.setHours(0, 0, 0, 0);
+      const maxDatum = new Date(heute);
+      maxDatum.setDate(maxDatum.getDate() + 14);
+      if (tourDatum < heute) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Touren können nicht in der Vergangenheit angelegt werden.' });
+      if (tourDatum > maxDatum) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Touren können maximal 2 Wochen (14 Tage) im Voraus geplant werden.' });
+      await createTour({ mitarbeiterId: input.mitarbeiterId, datum: new Date(input.datum), notizen: input.notizen, titel: input.titel, startzeit: input.startzeit as any, endzeit: input.endzeit as any, angelegtVon: ctx.mitarbeiterId, status: 'geplant' });
+      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'CREATE', ressource: 'tour', details: `datum=${input.datum}`, status: 'success' });
       return { success: true };
     }),
   updateStatus: portalProtected
@@ -303,13 +349,103 @@ export const notificationsRouter = router({
   }),
 });
 
+// ── MODUL 16: MITARBEITERAKTE ─────────────────────────────────────
+const mitarbeiterakteRouter = router({
+  listDokumente: portalProtected
+    .input(z.object({ mitarbeiterId: z.number().int().positive().optional() }))
+    .query(async ({ input, ctx }) => {
+      const db = await getDb();
+      const targetId = input.mitarbeiterId ?? ctx.mitarbeiterId;
+      return db!.select().from(mitarbeiterDokumente)
+        .where(eq(mitarbeiterDokumente.mitarbeiterId, targetId))
+        .orderBy(desc(mitarbeiterDokumente.createdAt));
+    }),
+  addDokument: portalProtected
+    .input(z.object({
+      mitarbeiterId: z.number().int().positive().optional(),
+      typ: z.enum(["zertifikat", "arbeitsvertrag", "krankmeldung", "fuehrerschein", "erstehilfe", "sonstiges"]),
+      bezeichnung: z.string().min(1).max(255),
+      dateiUrl: z.string().optional(),
+      dateiname: z.string().optional(),
+      ausstellungsdatum: z.string().optional(),
+      ablaufdatum: z.string().optional(),
+      notizen: z.string().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      const targetId = input.mitarbeiterId ?? ctx.mitarbeiterId;
+      await db!.insert(mitarbeiterDokumente).values({
+        mitarbeiterId: targetId,
+        typ: input.typ,
+        bezeichnung: input.bezeichnung,
+        dateiUrl: input.dateiUrl,
+        dateiname: input.dateiname,
+        ausstellungsdatum: input.ausstellungsdatum ? new Date(input.ausstellungsdatum) : undefined,
+        ablaufdatum: input.ablaufdatum ? new Date(input.ablaufdatum) : undefined,
+        notizen: input.notizen,
+        hochgeladenVon: ctx.mitarbeiterId,
+      });
+      return { success: true };
+    }),
+  deleteDokument: adminProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      await db!.delete(mitarbeiterDokumente).where(eq(mitarbeiterDokumente.id, input.id));
+      return { success: true };
+    }),
+});
+
+// ── MODUL 16: VERTRETUNGSZUGANG ───────────────────────────────────
+const vertretungenRouter = router({
+  list: adminProcedure.query(async () => {
+    const db = await getDb();
+    return db!.select().from(vertretungen).orderBy(desc(vertretungen.createdAt));
+  }),
+  create: adminProcedure
+    .input(z.object({
+      vertreterId: z.number().int().positive(),
+      vertretenId: z.number().int().positive(),
+      von: z.string(),
+      bis: z.string(),
+      grund: z.string().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      await db!.insert(vertretungen).values({
+        vertreterId: input.vertreterId,
+        vertretenId: input.vertretenId,
+        von: new Date(input.von),
+        bis: new Date(input.bis),
+        grund: input.grund,
+        freigegebenVon: ctx.mitarbeiterId,
+        aktiv: true,
+      });
+      return { success: true };
+    }),
+  deactivate: adminProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      await db!.update(vertretungen).set({ aktiv: false }).where(eq(vertretungen.id, input.id));
+      return { success: true };
+    }),
+  meineVertretungen: portalProtected.query(async ({ ctx }) => {
+    const db = await getDb();
+    return db!.select().from(vertretungen)
+      .where(eq(vertretungen.vertreterId, ctx.mitarbeiterId))
+      .orderBy(desc(vertretungen.von));
+  }),
+});
+
 export const appRouter = router({
   system: systemRouter,
   urlaub: urlaubRouter,
   krank: krankRouter,
   touren: tourenRouter,
-  notifications: notificationsRouter,
-
+    notifications: notificationsRouter,
+  mitarbeiterakte: mitarbeiterakteRouter,
+  vertretungen: vertretungenRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -487,9 +623,45 @@ export const appRouter = router({
         verbraucht39: k.verbraucht39,
       }));
     }),
+
+    // ── MEHRFACH-ZUORDNUNG: Bis zu 3 Mitarbeiter pro Kunde (Admin-only) ──
+
+    /** Gibt alle Mitarbeiter-Zuordnungen für einen Kunden zurück. */
+    getZuordnungen: adminProcedure
+      .input(z.object({ kundenId: z.number().int().positive() }))
+      .query(async ({ input }) => getZuordnungenForKunde(input.kundenId)),
+
+    /**
+     * Setzt die Mitarbeiter-Zuordnung für einen Kunden (max. 3).
+     * Nur Admins dürfen Zuordnungen ändern.
+     */
+    setZuordnungen: adminProcedure
+      .input(z.object({
+        kundenId: z.number().int().positive(),
+        zuordnungen: z.array(z.object({
+          mitarbeiterId: z.number().int().positive(),
+          prioritaet: z.number().int().min(1).max(3),
+          rolle: z.enum(['hauptbetreuer', 'vertretung']),
+        })).max(3, 'Maximal 3 Mitarbeiter pro Kunde erlaubt.'),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await setZuordnungenForKunde(input.kundenId, input.zuordnungen, ctx.adminId);
+        await createAuditLog({
+          mitarbeiterId: ctx.adminId,
+          action: 'ADMIN',
+          ressource: 'kundenZuordnung',
+          details: `kundenId=${input.kundenId} mitarbeiter=${input.zuordnungen.map(z => z.mitarbeiterId).join(',')}`,
+          status: 'success',
+        });
+        return { success: true };
+      }),
+
+    budgetHistorie: adminProcedure
+      .input(z.object({ kundenId: z.number().int().positive() }))
+      .query(async ({ input }) => getBudgetHistorie(input.kundenId)),
   }),
 
-  // ── EINSÄTZE ─────────────────────────────────────────
+  // ── EINSÄTZE ─────────────────────────────────────────────────────────────
   einsaetze: router({
     list: portalProtected.query(async ({ ctx }) => {
       const ma = await getMitarbeiterById(ctx.mitarbeiterId);
@@ -628,6 +800,18 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         await updateLeistungStatus(input.id, input.status);
         await createAuditLog({ mitarbeiterId: ctx.adminId, action: "UPDATE", ressource: "leistung", details: `id=${input.id} status=${input.status}`, status: "success" });
+        return { success: true };
+      }),
+
+    delete: portalProtected
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(async ({ input, ctx }) => {
+        const ma = await getMitarbeiterById(ctx.mitarbeiterId);
+        const eigene = await getLeistungenByMitarbeiter(ctx.mitarbeiterId);
+        const eigeneLeistung = eigene.find((l: { id: number }) => l.id === input.id);
+        if (!eigeneLeistung && ma?.rolle !== 'admin') throw new Error('Keine Berechtigung');
+        await deleteLeistung(input.id);
+        await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'DELETE', ressource: 'leistung', details: `id=${input.id}`, status: 'success' });
         return { success: true };
       }),
   }),
@@ -891,7 +1075,71 @@ export const appRouter = router({
 
   // ── ADMIN ─────────────────────────────────────────────
   admin: router({
+    dashboardStats: adminProcedure.query(async () => {
+      const [alleKunden, alleMitarbeiter, offeneUrlaube, aktiveKrank] = await Promise.all([
+        getAllKunden(),
+        getAllMitarbeiter(),
+        getAllUrlaubsantraege().then(l => l.filter((u: { status: string }) => u.status === 'beantragt')),
+        getAllKrankmeldungen().then(l => l.filter((k: { bis: Date | string | null }) => {
+          if (!k.bis) return true;
+          return new Date(k.bis) >= new Date();
+        })),
+      ]);
+      const heute = new Date().toISOString().split('T')[0];
+      const monatsStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+      // Budget-Ampel
+      const budgetAmpel = alleKunden.map((k: Record<string, unknown>) => {
+        const b45b = parseFloat(String(k.budget45b ?? 0));
+        const v45b = parseFloat(String(k.verbraucht45b ?? 0));
+        const b45a = parseFloat(String(k.budget45a ?? 0));
+        const v45a = parseFloat(String(k.verbraucht45a ?? 0));
+        const b39  = parseFloat(String(k.budget39  ?? 0));
+        const v39  = parseFloat(String(k.verbraucht39  ?? 0));
+        const ampel = (b: number, v: number) => b <= 0 ? 'grau' : v / b >= 0.9 ? 'rot' : v / b >= 0.7 ? 'gelb' : 'gruen';
+        return { id: k.id as number, name: `${k.vorname} ${k.nachname}`,
+          p45b: { budget: b45b, verbraucht: v45b, ampel: ampel(b45b, v45b) },
+          p45a: { budget: b45a, verbraucht: v45a, ampel: ampel(b45a, v45a) },
+          p39:  { budget: b39,  verbraucht: v39,  ampel: ampel(b39, v39) },
+        };
+      });
+      // Auslastung
+      const db2 = await getDb();
+      const monEinsaetze = db2 ? await db2.select().from(einsaetzeTable).where(sql`DATE(${einsaetzeTable.datum}) >= ${monatsStart}`) : [];
+      const auslastung = alleMitarbeiter.map((m: Record<string, unknown>) => {
+        const meineEinsaetze = monEinsaetze.filter((e: { mitarbeiterId: number }) => e.mitarbeiterId === m.id);
+        const istStunden = meineEinsaetze.reduce((s: number, e: { dauerStunden: string | null }) => s + parseFloat(String(e.dauerStunden ?? 0)), 0);
+        const sollStunden = m.beschaeftigungsart === 'minijob' ? 40 : m.beschaeftigungsart === 'teilzeit' ? 80 : 160;
+        return { id: m.id as number, name: `${m.vorname} ${m.nachname}`, art: m.beschaeftigungsart as string,
+          istStunden: Math.round(istStunden * 10) / 10, sollStunden,
+          auslastungProzent: Math.min(100, Math.round((istStunden / (sollStunden as number)) * 100)) };
+      });
+      const heuteEinsaetze = db2 ? await db2.select().from(einsaetzeTable).where(sql`DATE(${einsaetzeTable.datum}) = ${heute}`) : [];
+      const rotKunden = budgetAmpel.filter((k: { p45b: { ampel: string }; p45a: { ampel: string }; p39: { ampel: string } }) => k.p45b.ampel === 'rot' || k.p45a.ampel === 'rot' || k.p39.ampel === 'rot').length;
+      return {
+        budgetAmpel,
+        auslastung,
+        kpis: {
+          aktiveKunden: alleKunden.filter((k: { aktiv: unknown }) => k.aktiv).length,
+          aktiveMitarbeiter: alleMitarbeiter.filter((m: { aktiv: unknown }) => m.aktiv !== false).length,
+          heuteEinsaetze: heuteEinsaetze.length,
+          offeneUrlaube: offeneUrlaube.length,
+          aktivKrank: aktiveKrank.length,
+          rotKunden,
+        },
+      };
+    }),
     mitarbeiterList: adminProcedure.query(async () => getAllMitarbeiter()),
+
+    updateRolle: adminProcedure
+      .input(z.object({
+        mitarbeiterId: z.number().int().positive(),
+        rolle: z.enum(["mitarbeiter", "admin"]),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await updateMitarbeiter(input.mitarbeiterId, { rolle: input.rolle } as any);
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "ADMIN", ressource: "mitarbeiter", details: `rolle=${input.rolle} id=${input.mitarbeiterId}`, status: "success" });
+        return { success: true };
+      }),
 
     mitarbeiterCreate: adminProcedure
       .input(z.object({

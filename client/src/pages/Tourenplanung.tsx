@@ -40,6 +40,18 @@ export default function Tourenplanung() {
   const [selectedMaId, setSelectedMaId] = useState<number | null>(null);
   const [showCreate, setShowCreate] = useState(false);
 
+  // 2-Wochen-Vorausplanung: min = heute, max = heute + 14 Tage
+  const heute = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.toISOString().split("T")[0];
+  }, []);
+  const maxPlanDatum = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 14);
+    return d.toISOString().split("T")[0];
+  }, []);
+
   const weekDates = useMemo(() => getWeekDates(currentDate), [currentDate]);
 
   const { data: touren = [], refetch } = trpc.touren.list.useQuery();
@@ -139,13 +151,16 @@ export default function Tourenplanung() {
               </Select>
             </div>
             <div>
-              <label className="text-xs text-gray-600 block mb-1">Datum</label>
+              <label className="text-xs text-gray-600 block mb-1">Datum <span className="text-blue-600 font-semibold">(max. 2 Wochen im Voraus)</span></label>
               <input
                 type="date"
                 className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
                 value={selectedDatum || ""}
+                min={heute}
+                max={maxPlanDatum}
                 onChange={e => setSelectedDatum(e.target.value)}
               />
+              <p className="text-xs text-gray-400 mt-1">Planung möglich von heute bis {new Date(maxPlanDatum).toLocaleDateString("de-DE")}</p>
             </div>
             <Button
               className="w-full bg-blue-600 hover:bg-blue-700 text-white"

@@ -199,8 +199,8 @@ export default function Kassenanfrage() {
   const [unterschriftMitarbeiter, setUnterschriftMitarbeiter] = useState<string | undefined>();
   const [vorschauKunde, setVorschauKunde] = useState<string | undefined>();
   const [vorschauMitarbeiter, setVorschauMitarbeiter] = useState<string | undefined>();
-  const sigKundeRef = useRef<any>(null);
-  const sigMitarbeiterRef = useRef<any>(null);
+  const sigKundeRef = useRef<import("@/components/SignatureCanvas").SignatureCanvasRef>(null);
+  const sigMitarbeiterRef = useRef<import("@/components/SignatureCanvas").SignatureCanvasRef>(null);
 
   const { data: anfragen, isLoading, error, refetch } = trpc.kassenanfrage.list.useQuery();
   const { data: kunden } = trpc.kunden.list.useQuery();
@@ -230,8 +230,6 @@ export default function Kassenanfrage() {
     setUnterschriftMitarbeiter(undefined);
     setVorschauKunde(undefined);
     setVorschauMitarbeiter(undefined);
-    sigKundeRef.current?.clear();
-    sigMitarbeiterRef.current?.clear();
   }
 
   function handleSubmit() {
@@ -450,6 +448,7 @@ export default function Kassenanfrage() {
               <div className="border-2 border-green-400 rounded-lg overflow-hidden">
                 <SignatureCanvas
                   ref={sigKundeRef}
+                  value={unterschriftKunde ?? null}
                   onDrawEnd={(data) => { setUnterschriftKunde(data ?? undefined); setVorschauKunde(data ?? undefined); }}
                   onClear={() => { setUnterschriftKunde(undefined); setVorschauKunde(undefined); }}
                 />
@@ -466,7 +465,7 @@ export default function Kassenanfrage() {
                   variant="outline"
                   size="sm"
                   className="text-red-600 border-red-300 ml-auto"
-                  onClick={() => { sigKundeRef.current?.clear(); setUnterschriftKunde(undefined); setVorschauKunde(undefined); }}
+                  onClick={() => { setUnterschriftKunde(undefined); setVorschauKunde(undefined); }}
                 >
                   Zuruecksetzen
                 </Button>
@@ -484,6 +483,7 @@ export default function Kassenanfrage() {
               <div className="border-2 border-blue-400 rounded-lg overflow-hidden">
                 <SignatureCanvas
                   ref={sigMitarbeiterRef}
+                  value={unterschriftMitarbeiter ?? null}
                   onDrawEnd={(data) => { setUnterschriftMitarbeiter(data ?? undefined); setVorschauMitarbeiter(data ?? undefined); }}
                   onClear={() => { setUnterschriftMitarbeiter(undefined); setVorschauMitarbeiter(undefined); }}
                 />
@@ -500,7 +500,7 @@ export default function Kassenanfrage() {
                   variant="outline"
                   size="sm"
                   className="text-red-600 border-red-300 ml-auto"
-                  onClick={() => { sigMitarbeiterRef.current?.clear(); setUnterschriftMitarbeiter(undefined); setVorschauMitarbeiter(undefined); }}
+                  onClick={() => { setUnterschriftMitarbeiter(undefined); setVorschauMitarbeiter(undefined); }}
                 >
                   Zuruecksetzen
                 </Button>

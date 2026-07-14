@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useTimer } from "@/contexts/TimerContext";
@@ -52,121 +52,115 @@ export default function Zeiterfassung() {
     });
   };
 
+  const heute = new Date().toLocaleDateString("de-DE", { weekday: "long", day: "2-digit", month: "long" });
+
   return (
-    <div className="page-enter">
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 18, fontWeight: 800 }}>Zeiterfassung</div>
-        <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>Stunden erfassen</div>
+    <div className="lw-page">
+      <div className="lw-page-header">
+        <div>
+          <div className="lw-page-title">Zeiterfassung</div>
+          <div className="lw-page-subtitle">{heute}</div>
+        </div>
       </div>
 
       {/* Timer */}
-      <div className="timer-card">
-        <div style={{ fontSize: 13, opacity: 0.85 }}>{timerLabel}</div>
-        <div className="timer-display">{timerDisplay}</div>
-        <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-          <button
-            onClick={isRunning ? pause : start}
-            style={{
-              flex: 1, padding: 12, border: "none", borderRadius: 10,
-              fontSize: 14, fontWeight: 700, cursor: "pointer",
-              background: "#fff", color: "#4a8c3f",
-            }}
-          >
-            {isRunning ? "⏸ Pausieren" : isPaused ? "▶ Weiter" : "▶ Starten"}
-          </button>
-          {(isRunning || isPaused) && (
+      <div className="lw-card" style={{ marginBottom: "1.25rem" }}>
+        <div className="lw-card-body" style={{ padding: "2rem 1.5rem", textAlign: "center" }}>
+          <div style={{ fontSize: "0.875rem", color: "var(--lw-gray-500)", marginBottom: "0.5rem" }}>{timerLabel}</div>
+          <div style={{ fontFamily: "monospace", fontSize: "3.5rem", fontWeight: 800, color: isRunning ? "var(--lw-green-600)" : "var(--lw-gray-300)", letterSpacing: "0.05em", marginBottom: "1.5rem" }}>
+            {timerDisplay}
+          </div>
+          <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center" }}>
             <button
-              onClick={() => { stop(); toast.success("Timer beendet"); }}
-              style={{
-                flex: 1, padding: 12, border: "2px solid rgba(255,255,255,0.4)",
-                borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer",
-                background: "rgba(255,255,255,0.2)", color: "#fff",
-              }}
+              onClick={isRunning ? pause : start}
+              style={{ padding: "0.875rem 2rem", border: "none", borderRadius: "var(--lw-r-md)", fontSize: "1rem", fontWeight: 700, cursor: "pointer", background: isRunning ? "var(--lw-yellow)" : "var(--lw-green-600)", color: "#fff", transition: "all 0.15s" }}
             >
-              ■ Beenden
+              {isRunning ? "⏸ Pause" : isPaused ? "▶ Weiter" : "▶ Starten"}
             </button>
-          )}
+            {(isRunning || isPaused) && (
+              <button
+                onClick={() => { stop(); toast.success("Timer beendet"); }}
+                style={{ padding: "0.875rem 2rem", border: "none", borderRadius: "var(--lw-r-md)", fontSize: "1rem", fontWeight: 700, cursor: "pointer", background: "var(--lw-red)", color: "#fff" }}
+              >
+                ⏹ Beenden
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Manuelle Erfassung */}
-      <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 10px rgba(0,0,0,.08)", padding: 16, marginBottom: 12 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Manuelle Erfassung</div>
+      <div className="lw-card" style={{ marginBottom: "1.25rem" }}>
+        <div className="lw-card-header"><div style={{ fontWeight: 700, fontSize: "1rem" }}>✏️ Manuelle Erfassung</div></div>
+        <div className="lw-card-body">
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
-          <div>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>Datum</label>
-            <input type="date" value={datum} onChange={(e) => setDatum(e.target.value)}
-              style={{ width: "100%", padding: "12px 13px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 15, outline: "none", boxSizing: "border-box" }} />
+          <div className="lw-grid-2" style={{ marginBottom: "0.75rem" }}>
+            <div>
+              <label className="lw-label">Datum</label>
+              <input type="date" className="lw-input" value={datum} onChange={(e) => setDatum(e.target.value)} />
+            </div>
+            <div>
+              <label className="lw-label">Kunde</label>
+              <select className="lw-input" value={kundenId} onChange={(e) => setKundenId(e.target.value)}>
+                <option value="">Wählen...</option>
+                {kunden.map((k) => (
+                  <option key={k.id} value={k.id}>{k.vorname} {k.nachname}</option>
+                ))}
+              </select>
+            </div>
           </div>
-          <div>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>Kunde</label>
-            <select value={kundenId} onChange={(e) => setKundenId(e.target.value)}
-              style={{ width: "100%", padding: "12px 13px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 15, outline: "none", background: "#fff", boxSizing: "border-box" }}>
-              <option value="">Wählen...</option>
-              {kunden.map((k) => (
-                <option key={k.id} value={k.id}>{k.vorname} {k.nachname}</option>
-              ))}
-            </select>
+          <div className="lw-grid-2" style={{ marginBottom: "0.75rem" }}>
+            <div>
+              <label className="lw-label">Von</label>
+              <input type="time" className="lw-input" value={von} onChange={(e) => setVon(e.target.value)} />
+            </div>
+            <div>
+              <label className="lw-label">Bis</label>
+              <input type="time" className="lw-input" value={bis} onChange={(e) => setBis(e.target.value)} />
+            </div>
           </div>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
-          <div>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>Von</label>
-            <input type="time" value={von} onChange={(e) => setVon(e.target.value)}
-              style={{ width: "100%", padding: "12px 13px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 15, outline: "none", boxSizing: "border-box" }} />
-          </div>
-          <div>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>Bis</label>
-            <input type="time" value={bis} onChange={(e) => setBis(e.target.value)}
-              style={{ width: "100%", padding: "12px 13px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 15, outline: "none", boxSizing: "border-box" }} />
-          </div>
-        </div>
-
-        <div style={{ marginBottom: 10 }}>
-          <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>Paragraph</label>
-          <select value={para} onChange={(e) => setPara(e.target.value as typeof para)}
-            style={{ width: "100%", padding: "12px 13px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 15, outline: "none", background: "#fff", boxSizing: "border-box" }}>
+          <div style={{ marginBottom: "0.75rem" }}>
+            <label className="lw-label">Paragraph</label>
+            <select className="lw-input" value={para} onChange={(e) => setPara(e.target.value as typeof para)}>
               <option value="45b">§45b SGB XI – Entlastungsleistung</option>
               <option value="45a">§45a SGB XI – Entlastungsleistung</option>
               <option value="39">§39 SGB XI – Verhinderungspflege</option>
-          </select>
+            </select>
+          </div>
+          <button onClick={saveZeit} disabled={createEinsatz.isPending} className="lw-btn lw-btn-primary" style={{ width: "100%" }}>
+            {createEinsatz.isPending ? "Speichern…" : "💾 Zeit speichern"}
+          </button>
         </div>
-
-        <button onClick={saveZeit} disabled={createEinsatz.isPending}
-          style={{ width: "100%", padding: 13, background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
-          {createEinsatz.isPending ? "Speichern…" : "Zeit speichern"}
-        </button>
       </div>
 
       {/* Heute erfasst */}
-      <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 10px rgba(0,0,0,.08)", padding: 16, marginBottom: 12 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Heute erfasst</div>
+      <div className="lw-card">
+        <div className="lw-card-header">
+          <div style={{ fontWeight: 700, fontSize: "1rem" }}>📋 Heute erfasst</div>
+          <span className="lw-badge lw-badge-gray">{todayE.length}</span>
+        </div>
         {todayE.length === 0 ? (
-          <p style={{ color: "#6b7280", fontSize: 13, padding: "4px 0" }}>Noch keine Zeiten heute.</p>
+          <div className="lw-empty">
+            <div className="lw-empty-icon">📅</div>
+            <div className="lw-empty-text">Noch keine Zeiten heute</div>
+          </div>
         ) : (
-          todayE.map((e) => (
-            <div key={e.id} className="list-item">
-              <div className="li-icon teal">⏱</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>{getKundeName(e.kundenId)}</div>
-                <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
-                  {(e.startzeit || "").slice(0, 5)} Uhr · {e.dauerStunden}h · §{e.paragraph}
-                </div>
-              </div>
-              <span
-                style={{
-                  display: "inline-block", padding: "3px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700,
-                  ...(e.status === "abgeschlossen"
-                    ? { background: "#e0f2f0", color: "#2a9d8f" }
-                    : { background: "#fef3c7", color: "#92400e" }),
-                }}
-              >
-                {e.status}
-              </span>
-            </div>
-          ))
+          <div style={{ overflowX: "auto" }}>
+            <table className="lw-table">
+              <thead><tr><th>Kunde</th><th>Zeit</th><th>Dauer</th><th>§</th><th>Status</th></tr></thead>
+              <tbody>
+                {todayE.map((e) => (
+                  <tr key={e.id}>
+                    <td style={{ fontWeight: 600 }}>{getKundeName(e.kundenId)}</td>
+                    <td>{(e.startzeit || "").slice(0, 5)} Uhr</td>
+                    <td>{e.dauerStunden}h</td>
+                    <td><span className="lw-badge lw-badge-green">§{e.paragraph}</span></td>
+                    <td><span className={`lw-badge ${e.status === "abgeschlossen" ? "lw-badge-green" : "lw-badge-yellow"}`}>{e.status}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
