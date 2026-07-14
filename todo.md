@@ -272,3 +272,43 @@
 ### Navigation
 - [x] Navigation: Urlaub, Krankmeldung, Tourenplanung, Profil, Benachrichtigungen in PortalApp.tsx einbinden
 - [x] Navigation: Benachrichtigungs-Badge (Anzahl ungelesener) in TopBar
+
+## Phase 16 – Vollständiges UI/UX-Redesign & neue Module ✅
+
+### Design-System
+- [x] Neues CSS-Design-System: LW-Tokens, Farben, Typografie, Animationen in index.css
+- [x] Professionelle Klassen: lw-page, lw-card, lw-btn, lw-badge, lw-table, lw-grid
+
+### Admin-Dashboard (Ampel-Visualisierungen)
+- [x] AdminDashboard.tsx: Ampel-Kacheln für §45b, §45a, §39 (grün/gelb/rot nach Verbrauch)
+- [x] KPI-Kacheln: Mitarbeiter, Kunden, Einsätze heute, offene Leistungsnachweise
+- [x] Auslastungsanzeigen: Minijob/Teilzeit/Vollzeit-Verteilung
+- [x] Backend: admin.dashboardStats-Route mit allen KPI-Daten
+
+### Mitarbeiterakte
+- [x] DB: mitarbeiterDokumente-Tabelle (mitarbeiterId, typ, titel, dateiUrl, dateiKey, ablaufdatum)
+- [x] Backend: mitarbeiterakte.listDokumente, mitarbeiterakte.addDokument, mitarbeiterakte.deleteDokument
+- [x] Frontend: Mitarbeiterakte.tsx mit Tabs (Zertifikate, Verträge, Krankmeldungen, Sonstiges)
+- [x] Upload-Funktion für Dokumente (S3-Storage)
+
+### Vertretungsverwaltung
+- [x] DB: vertretungen-Tabelle (vertreterId, vertretenId, von, bis, grund, aktiv)
+- [x] Backend: vertretungen.create, vertretungen.list, vertretungen.meineVertretungen, vertretungen.deactivate
+- [x] Frontend: Vertretungen.tsx – Admin richtet ein, Mitarbeiter sieht eigene Vertretungen
+
+### Logbuch
+- [x] Frontend: Logbuch.tsx – Alle Systemaktivitäten mit Filter (Aktion, Bereich, Suche)
+- [x] Farbcodierte Badges für Aktionstypen (Login, Erstellt, Geändert, Gelöscht, Export)
+
+### DSGVO & Cookie-Banner
+- [x] CookieBanner.tsx – DSGVO-konformer Cookie-Hinweis mit Details-Ansicht
+- [x] Rechtsgrundlage Art. 6 Abs. 1 lit. f DSGVO, Betroffenenrechte Art. 13 DSGVO
+- [x] Einbindung in App.tsx
+
+### Navigation
+- [x] Alle 4 neuen Module in PortalApp.tsx eingebunden (Ampel-Dashboard, Mitarbeiterakte, Vertretungen, Logbuch)
+- [x] Neue Sektion "Personalakte & System" im Admin-Menü
+
+### Qualität
+- [x] 0 TypeScript-Fehler
+- [x] 33/33 Tests bestanden

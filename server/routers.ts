@@ -5,6 +5,9 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import { sql, eq, desc } from "drizzle-orm";
+import { getDb } from "./db";
+import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen } from "../drizzle/schema";
 import {
   getMitarbeiterByEmail,
   getMitarbeiterById,
@@ -303,13 +306,103 @@ export const notificationsRouter = router({
   }),
 });
 
+// ── MODUL 16: MITARBEITERAKTE ─────────────────────────────────────
+const mitarbeiterakteRouter = router({
+  listDokumente: portalProtected
+    .input(z.object({ mitarbeiterId: z.number().int().positive().optional() }))
+    .query(async ({ input, ctx }) => {
+      const db = await getDb();
+      const targetId = input.mitarbeiterId ?? ctx.mitarbeiterId;
+      return db!.select().from(mitarbeiterDokumente)
+        .where(eq(mitarbeiterDokumente.mitarbeiterId, targetId))
+        .orderBy(desc(mitarbeiterDokumente.createdAt));
+    }),
+  addDokument: portalProtected
+    .input(z.object({
+      mitarbeiterId: z.number().int().positive().optional(),
+      typ: z.enum(["zertifikat", "arbeitsvertrag", "krankmeldung", "fuehrerschein", "erstehilfe", "sonstiges"]),
+      bezeichnung: z.string().min(1).max(255),
+      dateiUrl: z.string().optional(),
+      dateiname: z.string().optional(),
+      ausstellungsdatum: z.string().optional(),
+      ablaufdatum: z.string().optional(),
+      notizen: z.string().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      const targetId = input.mitarbeiterId ?? ctx.mitarbeiterId;
+      await db!.insert(mitarbeiterDokumente).values({
+        mitarbeiterId: targetId,
+        typ: input.typ,
+        bezeichnung: input.bezeichnung,
+        dateiUrl: input.dateiUrl,
+        dateiname: input.dateiname,
+        ausstellungsdatum: input.ausstellungsdatum ? new Date(input.ausstellungsdatum) : undefined,
+        ablaufdatum: input.ablaufdatum ? new Date(input.ablaufdatum) : undefined,
+        notizen: input.notizen,
+        hochgeladenVon: ctx.mitarbeiterId,
+      });
+      return { success: true };
+    }),
+  deleteDokument: adminProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      await db!.delete(mitarbeiterDokumente).where(eq(mitarbeiterDokumente.id, input.id));
+      return { success: true };
+    }),
+});
+
+// ── MODUL 16: VERTRETUNGSZUGANG ───────────────────────────────────
+const vertretungenRouter = router({
+  list: adminProcedure.query(async () => {
+    const db = await getDb();
+    return db!.select().from(vertretungen).orderBy(desc(vertretungen.createdAt));
+  }),
+  create: adminProcedure
+    .input(z.object({
+      vertreterId: z.number().int().positive(),
+      vertretenId: z.number().int().positive(),
+      von: z.string(),
+      bis: z.string(),
+      grund: z.string().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      await db!.insert(vertretungen).values({
+        vertreterId: input.vertreterId,
+        vertretenId: input.vertretenId,
+        von: new Date(input.von),
+        bis: new Date(input.bis),
+        grund: input.grund,
+        freigegebenVon: ctx.mitarbeiterId,
+        aktiv: true,
+      });
+      return { success: true };
+    }),
+  deactivate: adminProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      await db!.update(vertretungen).set({ aktiv: false }).where(eq(vertretungen.id, input.id));
+      return { success: true };
+    }),
+  meineVertretungen: portalProtected.query(async ({ ctx }) => {
+    const db = await getDb();
+    return db!.select().from(vertretungen)
+      .where(eq(vertretungen.vertreterId, ctx.mitarbeiterId))
+      .orderBy(desc(vertretungen.von));
+  }),
+});
+
 export const appRouter = router({
   system: systemRouter,
   urlaub: urlaubRouter,
   krank: krankRouter,
   touren: tourenRouter,
-  notifications: notificationsRouter,
-
+    notifications: notificationsRouter,
+  mitarbeiterakte: mitarbeiterakteRouter,
+  vertretungen: vertretungenRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -891,6 +984,59 @@ export const appRouter = router({
 
   // ── ADMIN ─────────────────────────────────────────────
   admin: router({
+    dashboardStats: adminProcedure.query(async () => {
+      const [alleKunden, alleMitarbeiter, offeneUrlaube, aktiveKrank] = await Promise.all([
+        getAllKunden(),
+        getAllMitarbeiter(),
+        getAllUrlaubsantraege().then(l => l.filter((u: { status: string }) => u.status === 'beantragt')),
+        getAllKrankmeldungen().then(l => l.filter((k: { bis: Date | string | null }) => {
+          if (!k.bis) return true;
+          return new Date(k.bis) >= new Date();
+        })),
+      ]);
+      const heute = new Date().toISOString().split('T')[0];
+      const monatsStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+      // Budget-Ampel
+      const budgetAmpel = alleKunden.map((k: Record<string, unknown>) => {
+        const b45b = parseFloat(String(k.budget45b ?? 0));
+        const v45b = parseFloat(String(k.verbraucht45b ?? 0));
+        const b45a = parseFloat(String(k.budget45a ?? 0));
+        const v45a = parseFloat(String(k.verbraucht45a ?? 0));
+        const b39  = parseFloat(String(k.budget39  ?? 0));
+        const v39  = parseFloat(String(k.verbraucht39  ?? 0));
+        const ampel = (b: number, v: number) => b <= 0 ? 'grau' : v / b >= 0.9 ? 'rot' : v / b >= 0.7 ? 'gelb' : 'gruen';
+        return { id: k.id as number, name: `${k.vorname} ${k.nachname}`,
+          p45b: { budget: b45b, verbraucht: v45b, ampel: ampel(b45b, v45b) },
+          p45a: { budget: b45a, verbraucht: v45a, ampel: ampel(b45a, v45a) },
+          p39:  { budget: b39,  verbraucht: v39,  ampel: ampel(b39, v39) },
+        };
+      });
+      // Auslastung
+      const db2 = await getDb();
+      const monEinsaetze = db2 ? await db2.select().from(einsaetzeTable).where(sql`DATE(${einsaetzeTable.datum}) >= ${monatsStart}`) : [];
+      const auslastung = alleMitarbeiter.map((m: Record<string, unknown>) => {
+        const meineEinsaetze = monEinsaetze.filter((e: { mitarbeiterId: number }) => e.mitarbeiterId === m.id);
+        const istStunden = meineEinsaetze.reduce((s: number, e: { dauerStunden: string | null }) => s + parseFloat(String(e.dauerStunden ?? 0)), 0);
+        const sollStunden = m.beschaeftigungsart === 'minijob' ? 40 : m.beschaeftigungsart === 'teilzeit' ? 80 : 160;
+        return { id: m.id as number, name: `${m.vorname} ${m.nachname}`, art: m.beschaeftigungsart as string,
+          istStunden: Math.round(istStunden * 10) / 10, sollStunden,
+          auslastungProzent: Math.min(100, Math.round((istStunden / (sollStunden as number)) * 100)) };
+      });
+      const heuteEinsaetze = db2 ? await db2.select().from(einsaetzeTable).where(sql`DATE(${einsaetzeTable.datum}) = ${heute}`) : [];
+      const rotKunden = budgetAmpel.filter((k: { p45b: { ampel: string }; p45a: { ampel: string }; p39: { ampel: string } }) => k.p45b.ampel === 'rot' || k.p45a.ampel === 'rot' || k.p39.ampel === 'rot').length;
+      return {
+        budgetAmpel,
+        auslastung,
+        kpis: {
+          aktiveKunden: alleKunden.filter((k: { aktiv: unknown }) => k.aktiv).length,
+          aktiveMitarbeiter: alleMitarbeiter.filter((m: { aktiv: unknown }) => m.aktiv !== false).length,
+          heuteEinsaetze: heuteEinsaetze.length,
+          offeneUrlaube: offeneUrlaube.length,
+          aktivKrank: aktiveKrank.length,
+          rotKunden,
+        },
+      };
+    }),
     mitarbeiterList: adminProcedure.query(async () => getAllMitarbeiter()),
 
     mitarbeiterCreate: adminProcedure

@@ -376,3 +376,35 @@ export const refreshTokens = mysqlTable("refreshTokens", {
 });
 export type RefreshToken = typeof refreshTokens.$inferSelect;
 export type InsertRefreshToken = typeof refreshTokens.$inferInsert;
+
+// ── MODUL 16: MITARBEITER-DOKUMENTE ──────────────────────────────
+export const mitarbeiterDokumente = mysqlTable("mitarbeiterDokumente", {
+  id: int("id").autoincrement().primaryKey(),
+  mitarbeiterId: int("mitarbeiterId").notNull(),
+  typ: mysqlEnum("typ", ["zertifikat", "arbeitsvertrag", "krankmeldung", "fuehrerschein", "erstehilfe", "sonstiges"]).notNull(),
+  bezeichnung: varchar("bezeichnung", { length: 255 }).notNull(),
+  dateiUrl: text("dateiUrl"),
+  dateiname: varchar("dateiname", { length: 255 }),
+  ausstellungsdatum: date("ausstellungsdatum"),
+  ablaufdatum: date("ablaufdatum"),
+  notizen: text("notizen"),
+  hochgeladenVon: int("hochgeladenVon"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type MitarbeiterDokument = typeof mitarbeiterDokumente.$inferSelect;
+export type InsertMitarbeiterDokument = typeof mitarbeiterDokumente.$inferInsert;
+
+// ── MODUL 16: VERTRETUNGSZUGANG ───────────────────────────────────
+export const vertretungen = mysqlTable("vertretungen", {
+  id: int("id").autoincrement().primaryKey(),
+  vertreterId: int("vertreterId").notNull(),
+  vertretenId: int("vertretenId").notNull(),
+  von: date("von").notNull(),
+  bis: date("bis").notNull(),
+  grund: varchar("grund", { length: 255 }),
+  freigegebenVon: int("freigegebenVon"),
+  aktiv: boolean("aktiv").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type Vertretung = typeof vertretungen.$inferSelect;
+export type InsertVertretung = typeof vertretungen.$inferInsert;

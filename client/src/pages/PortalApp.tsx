@@ -24,11 +24,15 @@ import Benachrichtigungen from "./Benachrichtigungen";
 import MeinProfil from "./MeinProfil";
 import LeistungsFreigabe from "./LeistungsFreigabe";
 import BuchhaltungsExport from "./BuchhaltungsExport";
+import Mitarbeiterakte from "./Mitarbeiterakte";
+import Logbuch from "./Logbuch";
+import Vertretungen from "./Vertretungen";
+import AdminDashboard from "./AdminDashboard";
 import BottomSheet from "@/components/BottomSheet";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 import OnboardingTour, { useOnboardingTour } from "@/components/OnboardingTour";
 
-type PageId = "home" | "einsaetze" | "zeit" | "lnw" | "fahrt" | "admin" | "management" | "kunden" | "kostentraeger" | "textbausteine" | "export" | "fuehrerschein" | "neukundenaufnahme" | "kalender" | "kassenanfrage" | "urlaub" | "krank" | "touren" | "benachrichtigungen" | "profil" | "leistungsfreigabe" | "buchhaltung";
+type PageId = "home" | "einsaetze" | "zeit" | "lnw" | "fahrt" | "admin" | "management" | "kunden" | "kostentraeger" | "textbausteine" | "export" | "fuehrerschein" | "neukundenaufnahme" | "kalender" | "kassenanfrage" | "urlaub" | "krank" | "touren" | "benachrichtigungen" | "profil" | "leistungsfreigabe" | "buchhaltung" | "mitarbeiterakte" | "logbuch" | "vertretungen" | "admindashboard";
 
 const pages: { id: PageId; icon: string; label: string }[] = [
   { id: "home", icon: "🏠", label: "Home" },
@@ -85,6 +89,10 @@ export default function PortalApp() {
       case "profil": return <MeinProfil />;
       case "leistungsfreigabe": return <LeistungsFreigabe />;
       case "buchhaltung": return <BuchhaltungsExport />;
+      case "mitarbeiterakte": return <Mitarbeiterakte />;
+      case "logbuch": return <Logbuch />;
+      case "vertretungen": return <Vertretungen />;
+      case "admindashboard": return <AdminDashboard />;
       default: return <Dashboard />;
     }
   };
@@ -550,6 +558,53 @@ export default function PortalApp() {
               <div style={{ textAlign: "left" }}>
                 <div>Buchhaltungs-Export</div>
                 <div style={{ fontSize: 11, opacity: 0.8 }}>DATEV, Lexware, CSV-Export</div>
+              </div>
+            </button>
+
+            {/* Phase 16 – Neue Module */}
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 1, paddingLeft: 4, marginTop: 4 }}>Personalakte & System</div>
+
+            <button
+              onClick={() => { setMenuOpen(false); navTo("admindashboard"); }}
+              style={{ padding: 13, background: "#f0fdf4", color: "#14532d", border: "2px solid #4ade80", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
+            >
+              <span>📊</span>
+              <div style={{ textAlign: "left" }}>
+                <div>Ampel-Dashboard</div>
+                <div style={{ fontSize: 11, opacity: 0.8 }}>Budgets, Auslastung, KPIs</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => { setMenuOpen(false); navTo("mitarbeiterakte"); }}
+              style={{ padding: 13, background: "#fff7ed", color: "#9a3412", border: "2px solid #fdba74", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
+            >
+              <span>📂</span>
+              <div style={{ textAlign: "left" }}>
+                <div>Mitarbeiterakte</div>
+                <div style={{ fontSize: 11, opacity: 0.8 }}>Zertifikate, Verträge, Dokumente</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => { setMenuOpen(false); navTo("vertretungen"); }}
+              style={{ padding: 13, background: "#f0f9ff", color: "#075985", border: "2px solid #7dd3fc", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
+            >
+              <span>🔄</span>
+              <div style={{ textAlign: "left" }}>
+                <div>Vertretungen</div>
+                <div style={{ fontSize: 11, opacity: 0.8 }}>Temporärer Zugriff für Vertretungen</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => { setMenuOpen(false); navTo("logbuch"); }}
+              style={{ padding: 13, background: "#fafafa", color: "#374151", border: "2px solid #d1d5db", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
+            >
+              <span>📝</span>
+              <div style={{ textAlign: "left" }}>
+                <div>Logbuch</div>
+                <div style={{ fontSize: 11, opacity: 0.8 }}>Alle Systemaktivitäten</div>
               </div>
             </button>
 
