@@ -332,17 +332,45 @@ export async function getLeistungenByKunde(kundenId: number) {
   return db.select().from(leistungen).where(eq(leistungen.kundenId, kundenId)).orderBy(desc(leistungen.createdAt));
 }
 
+/**
+ * Hilfsfunktion: Kunden-Budget anpassen (positiver delta = mehr verbraucht, negativ = Rückbuchung).
+ * Paragraph bestimmt welches Budget-Feld aktualisiert wird.
+ */
+export async function adjustKundeVerbraucht(
+  kundenId: number,
+  paragraph: "45b" | "45a" | "39",
+  betragDelta: number
+) {
+  const db = await getDb();
+  if (!db) return;
+  const kundeResult = await db.select().from(kunden).where(eq(kunden.id, kundenId)).limit(1);
+  const kunde = kundeResult[0];
+  if (!kunde) return;
+  if (paragraph === "45b") {
+    const neu = Math.max(0, parseFloat(String(kunde.verbraucht45b ?? 0)) + betragDelta);
+    await db.update(kunden).set({ verbraucht45b: String(Math.round(neu * 100) / 100) }).where(eq(kunden.id, kundenId));
+  } else if (paragraph === "45a") {
+    const neu = Math.max(0, parseFloat(String(kunde.verbraucht45a ?? 0)) + betragDelta);
+    await db.update(kunden).set({ verbraucht45a: String(Math.round(neu * 100) / 100) }).where(eq(kunden.id, kundenId));
+  } else if (paragraph === "39") {
+    const neu = Math.max(0, parseFloat(String(kunde.verbraucht39 ?? 0)) + betragDelta);
+    await db.update(kunden).set({ verbraucht39: String(Math.round(neu * 100) / 100) }).where(eq(kunden.id, kundenId));
+  }
+}
+
 export async function createLeistung(data: InsertLeistung & { mitarbeiterId: number }) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
+  // Stundensatz je Paragraph: §45b = 125 €/h, §39 = 1612 €/Monat (pauschal), §45a = 0
   const rate = data.paragraph === "39" ? 1612 : data.paragraph === "45a" ? 0 : 125;
-  const betrag = (parseFloat(String(data.stunden ?? 0)) * rate).toFixed(2);
+  const stunden = parseFloat(String(data.stunden ?? 0));
+  const betrag = (stunden * rate).toFixed(2);
   await db.insert(leistungen).values({
     mitarbeiterId: data.mitarbeiterId,
     kundenId: data.kundenId,
     monat: data.monat as string,
     paragraph: data.paragraph as "45b" | "45a" | "39",
-    stunden: String(data.stunden ?? 0),
+    stunden: String(stunden),
     anzahlEinsaetze: data.anzahlEinsaetze ?? 1,
     betrag,
     status: "offen",
@@ -350,11 +378,24 @@ export async function createLeistung(data: InsertLeistung & { mitarbeiterId: num
     unterschriftLeister: data.unterschriftLeister,
     unterschriftKunde: (data as any).unterschriftKunde,
   });
+  // ── AUTOMATISCHE BUDGET-ABRECHNUNG: Betrag sofort vom Kunden-Budget abziehen ──
+  if (data.kundenId && parseFloat(betrag) > 0) {
+    await adjustKundeVerbraucht(data.kundenId, data.paragraph as "45b" | "45a" | "39", parseFloat(betrag));
+  }
 }
 
 export async function deleteLeistung(id: number) {
   const db = await getDb();
   if (!db) return;
+  // ── BUDGET-RÜCKBUCHUNG: Betrag vor dem Löschen zurückbuchen ──
+  const rows = await db.select().from(leistungen).where(eq(leistungen.id, id)).limit(1);
+  const leistung = rows[0];
+  if (leistung && leistung.kundenId && leistung.betrag) {
+    const betrag = parseFloat(String(leistung.betrag));
+    if (betrag > 0) {
+      await adjustKundeVerbraucht(leistung.kundenId, leistung.paragraph as "45b" | "45a" | "39", -betrag);
+    }
+  }
   await db.delete(leistungen).where(eq(leistungen.id, id));
 }
 

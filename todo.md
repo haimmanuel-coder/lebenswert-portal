@@ -377,3 +377,14 @@
 - [x] Frontend: Kundenliste.tsx – Bearbeiten/Anlegen/Deaktivieren bereits Admin-only
 - [x] Frontend: AdminPanel.tsx – Zuordnungs-Tab auf Kunden-basierte Mehrfach-Zuordnung umgestellt
 - [x] 0 TypeScript-Fehler
+
+## Phase 18 – Automatische Budget-Abrechnung aus Leistungsnachweisen
+
+- [x] db.ts: createLeistung – nach Eintrag sofort verbraucht-Feld des Kunden erhöhen
+- [x] db.ts: deleteLeistung – beim Löschen verbraucht-Feld wieder reduzieren
+- [x] db.ts: updateLeistungStatus – bei Status-Änderung keine Doppel-Abrechnung
+- [x] db.ts: neue Hilfsfunktion adjustKundeVerbraucht (zentrale Logik)
+- [x] routers.ts: leistungen.create – Budget-Abrechnung automatisch in db.ts
+- [x] routers.ts: leistungen.delete – Budget-Rückbuchung automatisch in db.ts
+- [x] Frontend: Leistungsnachweise.tsx – Budget-Restanzeige mit Fortschrittsbalken
+- [x] Frontend: Kundenliste.tsx – Budget-Fortschrittsbalken aktualisiert sich live (bereits vorhanden)
