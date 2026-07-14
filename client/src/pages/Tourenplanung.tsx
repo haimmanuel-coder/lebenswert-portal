@@ -59,6 +59,24 @@ export default function Tourenplanung() {
 
   const { data: touren = [], refetch } = trpc.touren.list.useQuery();
   const { data: mitarbeiterListe = [] } = trpc.admin.mitarbeiterList.useQuery(undefined, { enabled: isAdmin });
+  const { data: abwesenheiten = [] } = (trpc.touren as any).listAbwesenheiten.useQuery();
+
+  // Abwesenheiten nach Datum-Bereich aufschlüsseln
+  const abwesenheitenByDatum = useMemo(() => {
+    const map: Record<string, Array<{ typ: 'urlaub' | 'krank'; name: string; bis: string | null }>> = {};
+    (abwesenheiten as any[]).forEach(a => {
+      const von = new Date(a.von);
+      const bis = a.bis ? new Date(a.bis) : von;
+      const cursor = new Date(von);
+      while (cursor <= bis) {
+        const key = cursor.toISOString().split('T')[0];
+        if (!map[key]) map[key] = [];
+        map[key].push({ typ: a.typ, name: `${a.mitarbeiterVorname} ${a.mitarbeiterNachname}`.trim(), bis: a.bis });
+        cursor.setDate(cursor.getDate() + 1);
+      }
+    });
+    return map;
+  }, [abwesenheiten]);
 
   const createMut = trpc.touren.create.useMutation({
     onSuccess: () => {
@@ -171,6 +189,7 @@ export default function Tourenplanung() {
           const dayTouren = tourenByDatum[dateStr] || [];
           const isPast = dateStr < heute;
           const isFuture = dateStr > maxPlanDatum;
+          const dayAbwesenheiten = abwesenheitenByDatum[dateStr] || [];
 
           return (
             <div
@@ -196,6 +215,28 @@ export default function Tourenplanung() {
                   {date.getDate()}
                 </div>
               </div>
+              {dayAbwesenheiten.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 2 }}>
+                  {dayAbwesenheiten.slice(0, 2).map((a: any, idx: number) => (
+                    <div
+                      key={idx}
+                      title={`${a.typ === 'urlaub' ? 'Urlaub' : 'Krank'}: ${a.name}`}
+                      style={{
+                        background: a.typ === 'urlaub' ? '#fef3c7' : '#fee2e2',
+                        color: a.typ === 'urlaub' ? '#92400e' : '#dc2626',
+                        border: `1px solid ${a.typ === 'urlaub' ? '#fcd34d' : '#fca5a5'}`,
+                        borderRadius: 4, padding: '1px 4px', fontSize: 9, fontWeight: 700,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {a.typ === 'urlaub' ? '🏖' : '🤒'} {a.name.split(' ')[0]}
+                    </div>
+                  ))}
+                  {dayAbwesenheiten.length > 2 && (
+                    <div style={{ fontSize: 9, color: '#9ca3af', textAlign: 'center' }}>+{dayAbwesenheiten.length - 2}</div>
+                  )}
+                </div>
+              )}
               {dayTouren.length > 0 && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                   {dayTouren.slice(0, 3).map((t: any) => {
@@ -232,11 +273,17 @@ export default function Tourenplanung() {
         })}
       </div>
 
-      {isAdmin && (
-        <div style={{ fontSize: 11, color: "#9ca3af", textAlign: "center", marginBottom: 12 }}>
-          💡 Auf einen Tag klicken = Tour erstellen · Touren per Drag &amp; Drop verschieben · Auf Tour klicken = Details
-        </div>
-      )}
+      {/* Legende */}
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12, padding: '8px 12px', background: '#f9fafb', borderRadius: 10, border: '1px solid #f3f4f6' }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: '#6b7280' }}>Legende:</span>
+        {[{bg:'#dbeafe',border:'#93c5fd',label:'Tour geplant'},{bg:'#fef9c3',border:'#fcd34d',label:'Tour aktiv'},{bg:'#dcfce7',border:'#86efac',label:'Tour fertig'},{bg:'#fef3c7',border:'#fcd34d',label:'🏖️ Urlaub'},{bg:'#fee2e2',border:'#fca5a5',label:'🤒 Krank'}].map(item => (
+          <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ width: 12, height: 12, borderRadius: 3, background: item.bg, border: `1px solid ${item.border}` }} />
+            <span style={{ fontSize: 11, color: '#374151' }}>{item.label}</span>
+          </div>
+        ))}
+        {isAdmin && <span style={{ marginLeft: 'auto', fontSize: 10, color: '#9ca3af' }}>Klick = Tour erstellen · Drag &amp; Drop = verschieben</span>}
+      </div>
 
       {/* Tour-Detail-Ansicht (Klick auf Tour-Chip) */}
       {editTour && (

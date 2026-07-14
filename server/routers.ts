@@ -362,6 +362,41 @@ export const tourenRouter = router({
       await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'DELETE', ressource: 'tour', details: `id=${input.id}`, status: 'success' });
       return { success: true };
     }),
+
+  // Liefert alle genehmigten Urlaubsanträge und Krankmeldungen für den Kalender
+  listAbwesenheiten: portalProtected.query(async ({ ctx }) => {
+    const ma = await getMitarbeiterById(ctx.mitarbeiterId);
+    let urlaubsantraege: any[];
+    let krankmeldungen: any[];
+    if (ma?.rolle === 'admin') {
+      urlaubsantraege = await getAllUrlaubsantraege();
+      krankmeldungen = await getAllKrankmeldungen();
+    } else {
+      urlaubsantraege = await getUrlaubsantraegeByMitarbeiter(ctx.mitarbeiterId);
+      krankmeldungen = await getKrankmeldungenByMitarbeiter(ctx.mitarbeiterId);
+    }
+    const urlaube = urlaubsantraege
+      .filter((u: any) => u.status === 'genehmigt')
+      .map((u: any) => ({
+        typ: 'urlaub' as const,
+        mitarbeiterId: u.mitarbeiterId,
+        mitarbeiterVorname: u.mitarbeiterVorname ?? '',
+        mitarbeiterNachname: u.mitarbeiterNachname ?? '',
+        von: u.von instanceof Date ? u.von.toISOString().split('T')[0] : String(u.von).split('T')[0],
+        bis: u.bis instanceof Date ? u.bis.toISOString().split('T')[0] : String(u.bis).split('T')[0],
+        tage: u.tage,
+      }));
+    const krankheiten = krankmeldungen.map((k: any) => ({
+      typ: 'krank' as const,
+      mitarbeiterId: k.mitarbeiterId,
+      mitarbeiterVorname: k.mitarbeiterVorname ?? '',
+      mitarbeiterNachname: k.mitarbeiterNachname ?? '',
+      von: k.von instanceof Date ? k.von.toISOString().split('T')[0] : String(k.von).split('T')[0],
+      bis: k.bis ? (k.bis instanceof Date ? k.bis.toISOString().split('T')[0] : String(k.bis).split('T')[0]) : null,
+      tage: k.tage ?? null,
+    }));
+    return [...urlaube, ...krankheiten];
+  }),
 });
 
 export const notificationsRouter = router({
@@ -421,12 +456,31 @@ const mitarbeiterakteRouter = router({
       });
       return { success: true };
     }),
-  deleteDokument: adminProcedure
+  deleteDokument: portalProtected
     .input(z.object({ id: z.number().int().positive() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = await getDb();
+      const ma = await getMitarbeiterById(ctx.mitarbeiterId);
+      // Admin darf alle löschen, Mitarbeiter nur eigene
+      const [dok] = await db!.select().from(mitarbeiterDokumente).where(eq(mitarbeiterDokumente.id, input.id));
+      if (!dok) throw new TRPCError({ code: 'NOT_FOUND', message: 'Dokument nicht gefunden' });
+      if (ma?.rolle !== 'admin' && dok.mitarbeiterId !== ctx.mitarbeiterId) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Keine Berechtigung' });
+      }
       await db!.delete(mitarbeiterDokumente).where(eq(mitarbeiterDokumente.id, input.id));
       return { success: true };
+    }),
+  // Self-Service: Upload-URL für eigene Dokumente generieren
+  getUploadUrl: portalProtected
+    .input(z.object({
+      dateiname: z.string().min(1),
+      contentType: z.string().default('application/pdf'),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const { storagePut } = await import('./storage');
+      const key = `mitarbeiter-dokumente/ma-${ctx.mitarbeiterId}/${Date.now()}-${input.dateiname}`;
+      const { url } = await storagePut(key, Buffer.from(''), input.contentType);
+      return { uploadUrl: url, key };
     }),
 });
 

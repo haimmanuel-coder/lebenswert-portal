@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import BottomSheet from "@/components/BottomSheet";
@@ -8,6 +8,11 @@ function fmtDate(d: string | Date | null) {
   const s = typeof d === "string" ? d : d.toISOString().split("T")[0];
   const [y, m, day] = s.split("-");
   return `${day}.${m}.${y}`;
+}
+
+function toDateStr(d: string | Date | null): string {
+  if (!d) return "";
+  return typeof d === "string" ? d.split("T")[0] : d.toISOString().split("T")[0];
 }
 
 export default function Fahrtenbuch() {
@@ -21,8 +26,15 @@ export default function Fahrtenbuch() {
   const [kundenId, setKundenId] = useState("");
   const [zweck, setZweck] = useState("");
 
+  // ── Filter-State ──────────────────────────────────────────────────────────
+  const currentMonat = today.slice(0, 7);
+  const [filterMonat, setFilterMonat] = useState(currentMonat);
+  const [filterTyp, setFilterTyp] = useState<"" | "normal" | "sonder">("");
+  const [filterKunde, setFilterKunde] = useState("");
+
   const { data: kunden = [] } = trpc.kunden.list.useQuery();
   const { data: fahrten = [], refetch } = trpc.fahrten.list.useQuery();
+
   const createFahrt = trpc.fahrten.create.useMutation({
     onSuccess: () => {
       refetch();
@@ -42,15 +54,6 @@ export default function Fahrtenbuch() {
     if (!window.confirm(`Fahrt "${label}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`)) return;
     deleteFahrt.mutate({ id });
   };
-
-  const monat = today.slice(0, 7);
-  const monatStr = new Date().toLocaleDateString("de-DE", { month: "long", year: "numeric" });
-  const monFahrten = fahrten.filter((f) => {
-    const fd = typeof f.datum === "string" ? f.datum : (f.datum as Date).toISOString().split("T")[0];
-    return fd?.slice(0, 7) === monat;
-  });
-  const totalKm = monFahrten.reduce((s, f) => s + parseFloat(String(f.kilometer ?? 0)), 0);
-  const totalEur = monFahrten.reduce((s, f) => s + parseFloat(String(f.verguetung ?? 0)), 0);
 
   const rate = typ === "sonder" ? 0.35 : 0.30;
   const eurPreview = ((parseFloat(km) || 0) * rate).toFixed(2);
@@ -91,29 +94,147 @@ export default function Fahrtenbuch() {
     });
   };
 
-  const sorted = [...fahrten].sort((a, b) => {
-    const da = typeof a.datum === "string" ? a.datum : (a.datum as Date).toISOString().split("T")[0];
-    const db2 = typeof b.datum === "string" ? b.datum : (b.datum as Date).toISOString().split("T")[0];
-    return db2.localeCompare(da);
-  });
+  // ── Gefilterte und sortierte Liste ────────────────────────────────────────
+  const filtered = useMemo(() => {
+    return [...fahrten]
+      .filter((f) => {
+        const ds = toDateStr(f.datum);
+        if (filterMonat && !ds.startsWith(filterMonat)) return false;
+        if (filterTyp && f.typ !== filterTyp) return false;
+        if (filterKunde && String(f.kundenId) !== filterKunde) return false;
+        return true;
+      })
+      .sort((a, b) => toDateStr(b.datum).localeCompare(toDateStr(a.datum)));
+  }, [fahrten, filterMonat, filterTyp, filterKunde]);
+
+  const totalKm = filtered.reduce((s, f) => s + parseFloat(String(f.kilometer ?? 0)), 0);
+  const totalEur = filtered.reduce((s, f) => s + parseFloat(String(f.verguetung ?? 0)), 0);
+
+  // ── Verfügbare Monate für Dropdown ────────────────────────────────────────
+  const availableMonths = useMemo(() => {
+    const months = new Set<string>();
+    fahrten.forEach(f => {
+      const ds = toDateStr(f.datum);
+      if (ds) months.add(ds.slice(0, 7));
+    });
+    if (!months.has(currentMonat)) months.add(currentMonat);
+    return Array.from(months).sort().reverse();
+  }, [fahrten, currentMonat]);
+
+  // ── CSV-Export ────────────────────────────────────────────────────────────
+  function exportCSV() {
+    if (filtered.length === 0) { toast.error("Keine Fahrten zum Exportieren"); return; }
+    const headers = ["Datum", "Von", "Nach", "Kilometer", "Typ", "Vergütung (€)", "Zweck", "Kunde"];
+    const rows = filtered.map(f => {
+      const kunde = kunden.find(k => k.id === f.kundenId);
+      const kundeName = kunde ? `${kunde.vorname} ${kunde.nachname}` : "";
+      return [
+        fmtDate(f.datum),
+        f.vonOrt ?? "",
+        f.nachOrt ?? "",
+        parseFloat(String(f.kilometer ?? 0)).toFixed(1),
+        f.typ === "sonder" ? "Sonderfahrt" : "Normal",
+        parseFloat(String(f.verguetung ?? 0)).toFixed(2),
+        f.zweck ?? "",
+        kundeName,
+      ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(";");
+    });
+    // Summenzeile
+    rows.push(["", "", "GESAMT", totalKm.toFixed(1), "", totalEur.toFixed(2), "", ""].map(v => `"${v}"`).join(";"));
+    const csv = [headers.join(";"), ...rows].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const monatLabel = filterMonat ? filterMonat.replace("-", "_") : "alle";
+    a.download = `Fahrtenbuch_${monatLabel}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("📥 CSV exportiert");
+  }
+
+  const monatStr = filterMonat
+    ? new Date(filterMonat + "-01").toLocaleDateString("de-DE", { month: "long", year: "numeric" })
+    : "Alle Monate";
 
   return (
     <div className="page-enter">
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
         <div>
           <div style={{ fontSize: 18, fontWeight: 800 }}>Fahrtenbuch</div>
           <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>{monatStr}</div>
         </div>
-        <button
-          onClick={() => setSheetOpen(true)}
-          style={{ padding: "9px 16px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={exportCSV}
+            style={{ padding: "9px 14px", background: "#1d4ed8", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+          >
+            📥 CSV
+          </button>
+          <button
+            onClick={() => setSheetOpen(true)}
+            style={{ padding: "9px 16px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+          >
+            + Fahrt
+          </button>
+        </div>
+      </div>
+
+      {/* Filter-Leiste */}
+      <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 12, padding: "10px 12px", marginBottom: 12, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: "#6b7280" }}>Filter:</span>
+        {/* Monat */}
+        <select
+          value={filterMonat}
+          onChange={e => setFilterMonat(e.target.value)}
+          style={{ padding: "6px 10px", border: "1.5px solid #d1d5db", borderRadius: 8, fontSize: 12, background: "#fff", cursor: "pointer" }}
         >
-          + Fahrt
-        </button>
+          <option value="">Alle Monate</option>
+          {availableMonths.map(m => (
+            <option key={m} value={m}>
+              {new Date(m + "-01").toLocaleDateString("de-DE", { month: "long", year: "numeric" })}
+            </option>
+          ))}
+        </select>
+        {/* Typ */}
+        <select
+          value={filterTyp}
+          onChange={e => setFilterTyp(e.target.value as typeof filterTyp)}
+          style={{ padding: "6px 10px", border: "1.5px solid #d1d5db", borderRadius: 8, fontSize: 12, background: "#fff", cursor: "pointer" }}
+        >
+          <option value="">Alle Typen</option>
+          <option value="normal">Normal</option>
+          <option value="sonder">Sonderfahrt</option>
+        </select>
+        {/* Kunde */}
+        <select
+          value={filterKunde}
+          onChange={e => setFilterKunde(e.target.value)}
+          style={{ padding: "6px 10px", border: "1.5px solid #d1d5db", borderRadius: 8, fontSize: 12, background: "#fff", cursor: "pointer" }}
+        >
+          <option value="">Alle Kunden</option>
+          {kunden.map(k => (
+            <option key={k.id} value={String(k.id)}>{k.vorname} {k.nachname}</option>
+          ))}
+        </select>
+        {/* Reset */}
+        {(filterMonat !== currentMonat || filterTyp || filterKunde) && (
+          <button
+            onClick={() => { setFilterMonat(currentMonat); setFilterTyp(""); setFilterKunde(""); }}
+            style={{ padding: "5px 10px", background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer" }}
+          >
+            ✕ Zurücksetzen
+          </button>
+        )}
       </div>
 
       {/* KPI */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
+        <div className="kpi-card">
+          <div className="kpi-value">{filtered.length}</div>
+          <div className="kpi-label">Fahrten</div>
+        </div>
         <div className="kpi-card">
           <div className="kpi-value">{totalKm.toFixed(1)}</div>
           <div className="kpi-label">km gesamt</div>
@@ -125,11 +246,14 @@ export default function Fahrtenbuch() {
       </div>
 
       {/* Liste */}
-      {sorted.length === 0 ? (
-        <p style={{ color: "#6b7280", fontSize: 13 }}>Noch keine Fahrten erfasst.</p>
+      {filtered.length === 0 ? (
+        <p style={{ color: "#6b7280", fontSize: 13, textAlign: "center", padding: "24px 0" }}>
+          {fahrten.length === 0 ? "Noch keine Fahrten erfasst." : "Keine Fahrten für diesen Filter."}
+        </p>
       ) : (
-        sorted.map((f) => {
-          const datum2 = typeof f.datum === "string" ? f.datum : (f.datum as Date).toISOString().split("T")[0];
+        filtered.map((f) => {
+          const datum2 = toDateStr(f.datum);
+          const kunde = kunden.find(k => k.id === f.kundenId);
           return (
             <div key={f.id} style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 10px rgba(0,0,0,.08)", padding: 14, marginBottom: 10 }}>
               <div className="list-item" style={{ padding: 0, border: "none" }}>
@@ -140,6 +264,7 @@ export default function Fahrtenbuch() {
                   </div>
                   <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2, display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
                     {fmtDate(datum2)} · {f.zweck || "–"}
+                    {kunde && <span style={{ color: "#0d9488" }}>· {kunde.vorname} {kunde.nachname}</span>}
                     <span
                       style={{
                         display: "inline-block", padding: "2px 6px", borderRadius: 20, fontSize: 10, fontWeight: 700,

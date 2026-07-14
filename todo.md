@@ -293,3 +293,17 @@
 - [x] Mitarbeiterverwaltung: Personalbogen-PDF mit allen Mitarbeiterdaten (jsPDF)
 - [x] Profil: Eigene Stammdaten bearbeiten (Telefon, Adresse, E-Mail)
 - [x] Profil: Passwort ändern (altes Passwort bestätigen, neues setzen)
+
+## Phase 22 – Kalender-Abwesenheiten, Fahrtenbuch-Filter/Export, Dokument-Upload
+
+- [ ] Tourenkalender: Urlaubsanträge (genehmigt) als gelbe Balken im Kalender anzeigen
+- [ ] Tourenkalender: Krankmeldungen als rote Balken im Kalender anzeigen
+- [ ] Tourenkalender: Legende (Urlaub/Krank/Tour) unter dem Kalender
+- [ ] Tourenkalender: Tooltip bei Hover auf Abwesenheits-Balken (Name, Zeitraum)
+- [ ] Fahrtenbuch: Filter nach Monat, Fahrtyp und Kunde
+- [ ] Fahrtenbuch: CSV-Export der gefilterten Einträge (Datum, Von, Nach, km, Vergütung)
+- [ ] Fahrtenbuch: Monats-Zusammenfassung (Gesamt-km, Gesamt-Vergütung) im Filter-Bereich
+- [ ] MeinProfil: Dokument-Upload-Tab (Qualifikationsnachweise, Zertifikate, sonstige Dokumente)
+- [ ] MeinProfil: Dokumente in S3 speichern, Metadaten in DB (mitarbeiterDokumente-Tabelle)
+- [ ] MeinProfil: Hochgeladene Dokumente auflisten mit Download-Link und Lösch-Option
+- [ ] Personalbogen-PDF: Abschnitt "Hochgeladene Dokumente" mit Dateinamen und Datum

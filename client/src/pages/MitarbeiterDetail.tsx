@@ -52,6 +52,8 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
 
   const utils = trpc.useUtils();
   const { data: ma, isLoading } = trpc.admin.mitarbeiterDetail.useQuery({ id: mitarbeiterId });
+  // Dokumente des Mitarbeiters für Personalbogen
+  const { data: mitarbeiterDoks = [] } = (trpc.mitarbeiterakte as any).listDokumente.useQuery({ mitarbeiterId });
 
   async function exportPersonalbogen(ma: any) {
     try {
@@ -113,6 +115,43 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
         doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor('#111827');
         doc.text(lines, lm, y);
         y += lines.length * 5 + 4;
+      }
+      // Dokumente aus Self-Service
+      if (mitarbeiterDoks && mitarbeiterDoks.length > 0) {
+        // Neue Seite wenn zu wenig Platz
+        if (y > 230) { doc.addPage(); y = 20; }
+        section('HOCHGELADENE DOKUMENTE & QUALIFIKATIONSNACHWEISE');
+        const dokTypLabels: Record<string, string> = {
+          zertifikat: 'Zertifikat', arbeitsvertrag: 'Arbeitsvertrag', krankmeldung: 'Krankmeldung',
+          fuehrerschein: 'Führerschein', erstehilfe: 'Erste-Hilfe-Kurs', sonstiges: 'Sonstiges',
+        };
+        mitarbeiterDoks.forEach((d: any, idx: number) => {
+          if (y > 270) { doc.addPage(); y = 20; }
+          doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor('#111827');
+          doc.text(`${idx + 1}. ${d.bezeichnung}`, lm, y);
+          y += 5;
+          doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor('#6b7280');
+          const typ = dokTypLabels[d.typ] ?? d.typ;
+          let info = `Typ: ${typ}`;
+          if (d.ausstellungsdatum) info += `  |  Ausgestellt: ${new Date(d.ausstellungsdatum).toLocaleDateString('de-DE')}`;
+          if (d.ablaufdatum) {
+            const abgelaufen = new Date(d.ablaufdatum) < new Date();
+            info += `  |  Ablauf: ${new Date(d.ablaufdatum).toLocaleDateString('de-DE')}${abgelaufen ? ' (ABGELAUFEN)' : ''}`;
+          }
+          doc.text(info, lm + 4, y);
+          y += 5;
+          if (d.notizen) {
+            doc.setTextColor('#9ca3af');
+            doc.text(`Notiz: ${d.notizen}`, lm + 4, y);
+            y += 5;
+          }
+          if (d.dateiUrl) {
+            doc.setTextColor('#0d9488');
+            doc.text(`Datei: ${d.dateiname ?? d.dateiUrl}`, lm + 4, y);
+            y += 5;
+          }
+          y += 2;
+        });
       }
       // Footer
       doc.setFontSize(8); doc.setTextColor('#9ca3af');
