@@ -431,3 +431,20 @@ export const vertretungen = mysqlTable("vertretungen", {
 });
 export type Vertretung = typeof vertretungen.$inferSelect;
 export type InsertVertretung = typeof vertretungen.$inferInsert;
+
+// ── MODUL: BUDGET-TRANSAKTIONEN (Historien-Ansicht) ──────────────────────────
+export const budgetTransaktionen = mysqlTable("budgetTransaktionen", {
+  id: int("id").autoincrement().primaryKey(),
+  kundenId: int("kundenId").notNull(),
+  leistungId: int("leistungId"),               // Verknüpfung zum Leistungsnachweis (null bei manuellen Korrekturen)
+  mitarbeiterId: int("mitarbeiterId"),          // Wer hat die Leistung erbracht
+  typ: mysqlEnum("typ", ["abbuchung", "rueckerstattung", "korrektur"]).notNull(),
+  paragraph: mysqlEnum("paragraph", ["45b", "45a", "39"]).notNull(),
+  betrag: decimal("betrag", { precision: 10, scale: 2 }).notNull(),   // immer positiv, typ bestimmt Richtung
+  stunden: decimal("stunden", { precision: 5, scale: 2 }),
+  monat: varchar("monat", { length: 7 }),       // YYYY-MM des Leistungsmonats
+  beschreibung: varchar("beschreibung", { length: 500 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type BudgetTransaktion = typeof budgetTransaktionen.$inferSelect;
+export type InsertBudgetTransaktion = typeof budgetTransaktionen.$inferInsert;

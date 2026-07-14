@@ -113,9 +113,91 @@ function KundenKarte({ k, onClick, istKritisch }: { k: KundeDetail; onClick: () 
 }
 
 // ── DETAIL-SHEET ─────────────────────────────────────────────────────────────
+function BudgetHistorieTab({ kundenId }: { kundenId: number }) {
+  const { data: historie = [], isLoading } = trpc.kunden.budgetHistorie.useQuery({ kundenId });
+  const fmtDatum = (d: Date | string) => {
+    const dt = new Date(d);
+    return dt.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
+  const fmtMonat = (m: string | null | undefined) => {
+    if (!m) return '';
+    const [y, mo] = m.split('-');
+    const n = ['', 'Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+    return `${n[parseInt(mo)]} ${y}`;
+  };
+  if (isLoading) return <div style={{ textAlign: 'center', padding: 24, color: '#9ca3af' }}>Lade Historie...</div>;
+  if (historie.length === 0) return (
+    <div style={{ textAlign: 'center', padding: 24, color: '#9ca3af' }}>
+      <div style={{ fontSize: 32, marginBottom: 8 }}>📊</div>
+      <div style={{ fontSize: 14 }}>Noch keine Budget-Transaktionen vorhanden.</div>
+      <div style={{ fontSize: 12, marginTop: 4 }}>Transaktionen entstehen beim Einreichen oder Löschen von Leistungsnachweisen.</div>
+    </div>
+  );
+  return (
+    <div>
+      {/* Zusammenfassung */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
+        <div style={{ background: '#fee2e2', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
+          <div style={{ fontSize: 10, color: '#dc2626', fontWeight: 700, textTransform: 'uppercase', marginBottom: 3 }}>Abbuchungen gesamt</div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: '#dc2626' }}>
+            {formatEuro(historie.filter(t => t.typ === 'abbuchung').reduce((s, t) => s + parseFloat(String(t.betrag)), 0))}
+          </div>
+        </div>
+        <div style={{ background: '#f0fdf4', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
+          <div style={{ fontSize: 10, color: '#166534', fontWeight: 700, textTransform: 'uppercase', marginBottom: 3 }}>Rückerstattungen gesamt</div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: '#166534' }}>
+            {formatEuro(historie.filter(t => t.typ === 'rueckerstattung').reduce((s, t) => s + parseFloat(String(t.betrag)), 0))}
+          </div>
+        </div>
+      </div>
+      {/* Transaktionsliste */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {historie.map((t) => {
+          const isAbbuchung = t.typ === 'abbuchung';
+          return (
+            <div key={t.id} style={{ background: isAbbuchung ? '#fef2f2' : '#f0fdf4', border: `1.5px solid ${isAbbuchung ? '#fca5a5' : '#86efac'}`, borderRadius: 12, padding: '12px 14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 16 }}>{isAbbuchung ? '📉' : '📈'}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: isAbbuchung ? '#dc2626' : '#166534' }}>
+                    {isAbbuchung ? 'Abbuchung' : 'Rückerstattung'}
+                  </span>
+                  <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 20, background: isAbbuchung ? '#fca5a5' : '#86efac', color: isAbbuchung ? '#7f1d1d' : '#14532d', fontWeight: 700 }}>
+                    §{t.paragraph}
+                  </span>
+                </div>
+                <span style={{ fontSize: 15, fontWeight: 800, color: isAbbuchung ? '#dc2626' : '#166534' }}>
+                  {isAbbuchung ? '-' : '+'}{formatEuro(parseFloat(String(t.betrag)))}
+                </span>
+              </div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 3 }}>
+                {t.beschreibung || (isAbbuchung ? 'Budget abgebucht' : 'Budget zurückgebucht')}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: 11, color: '#9ca3af' }}>
+                  {t.mitarbeiterVorname ? `👤 ${t.mitarbeiterVorname} ${t.mitarbeiterNachname ?? ''}` : ''}
+                  {t.monat ? ` · ${fmtMonat(t.monat)}` : ''}
+                  {t.stunden ? ` · ${parseFloat(String(t.stunden))}h` : ''}
+                </div>
+                <div style={{ fontSize: 11, color: '#9ca3af' }}>{fmtDatum(t.createdAt)}</div>
+              </div>
+              {t.leistungId && (
+                <div style={{ marginTop: 5, fontSize: 11, color: '#6b7280', background: 'rgba(0,0,0,0.04)', borderRadius: 6, padding: '3px 8px', display: 'inline-block' }}>
+                  📄 Leistungsnachweis #LN-{String(t.leistungId).padStart(4, '0')}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function KundenDetailSheet({
   k, onClose, onEdit, onDeactivate, isAdmin,
 }: { k: KundeDetail; onClose: () => void; onEdit: () => void; onDeactivate: () => void; isAdmin: boolean }) {
+  const [activeTab, setActiveTab] = useState<'info' | 'budget' | 'historie'>('info');
   const b45b = toNum(k.budget45b); const v45b = toNum(k.verbraucht45b);
   const b45a = toNum(k.budget45a); const v45a = toNum(k.verbraucht45a);
   const b39 = toNum(k.budget39); const v39 = toNum(k.verbraucht39);
@@ -124,6 +206,20 @@ function KundenDetailSheet({
       <div onClick={onClose} style={{ flex: 1, background: "rgba(0,0,0,0.5)" }} />
       <div style={{ background: "#fff", borderRadius: "20px 20px 0 0", maxHeight: "90vh", overflowY: "auto", padding: 20 }}>
         <div style={{ width: 40, height: 4, background: "#e5e7eb", borderRadius: 2, margin: "0 auto 16px" }} />
+
+        {/* Tab-Navigation */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 16, background: '#f3f4f6', borderRadius: 12, padding: 4 }}>
+          {(['info', 'budget', 'historie'] as const).map((tab) => (
+            <button key={tab} onClick={() => setActiveTab(tab)}
+              style={{ flex: 1, padding: '8px 4px', border: 'none', borderRadius: 9, fontSize: 12, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s',
+                background: activeTab === tab ? '#fff' : 'transparent',
+                color: activeTab === tab ? '#4a8c3f' : '#6b7280',
+                boxShadow: activeTab === tab ? '0 1px 4px rgba(0,0,0,0.1)' : 'none'
+              }}>
+              {tab === 'info' ? '📄 Info' : tab === 'budget' ? '💰 Budget' : '📊 Historie'}
+            </button>
+          ))}
+        </div>
 
         {/* Header */}
         <div style={{ background: "linear-gradient(135deg, #4a8c3f, #2a9d8f)", borderRadius: 14, padding: 18, marginBottom: 16, color: "#fff" }}>
@@ -137,63 +233,74 @@ function KundenDetailSheet({
           </div>
         </div>
 
-        {/* Kontakt */}
-        <div style={{ background: "#f9fafb", borderRadius: 12, padding: 14, marginBottom: 12 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 8 }}>Kontakt</div>
-          {k.telefon && <div style={{ fontSize: 14, marginBottom: 4 }}>📞 {k.telefon}</div>}
-          {k.mobil && <div style={{ fontSize: 14, marginBottom: 4 }}>📱 {k.mobil}</div>}
-          {k.email && <div style={{ fontSize: 14, marginBottom: 4 }}>✉️ {k.email}</div>}
-          {!k.telefon && !k.mobil && !k.email && <div style={{ fontSize: 13, color: "#9ca3af" }}>Keine Kontaktdaten hinterlegt</div>}
-        </div>
+        {/* Tab-Inhalte */}
+        {activeTab === 'info' && (
+          <>
+            {/* Kontakt */}
+            <div style={{ background: "#f9fafb", borderRadius: 12, padding: 14, marginBottom: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 8 }}>Kontakt</div>
+              {k.telefon && <div style={{ fontSize: 14, marginBottom: 4 }}>📞 {k.telefon}</div>}
+              {k.mobil && <div style={{ fontSize: 14, marginBottom: 4 }}>📱 {k.mobil}</div>}
+              {k.email && <div style={{ fontSize: 14, marginBottom: 4 }}>✉️ {k.email}</div>}
+              {!k.telefon && !k.mobil && !k.email && <div style={{ fontSize: 13, color: "#9ca3af" }}>Keine Kontaktdaten hinterlegt</div>}
+            </div>
+            {/* Kostenträger */}
+            <div style={{ background: "#f9fafb", borderRadius: 12, padding: 14, marginBottom: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 8 }}>Kostenträger & Versicherung</div>
+              {k.kostentraeger && <div style={{ fontSize: 14, marginBottom: 4 }}>🏥 {k.kostentraeger}</div>}
+              {k.versicherungsnummer && <div style={{ fontSize: 14, color: "#4b5563" }}>Nr.: {k.versicherungsnummer}</div>}
+              {!k.kostentraeger && <div style={{ fontSize: 13, color: "#9ca3af" }}>Keine Angaben</div>}
+            </div>
+          </>
+        )}
 
-        {/* Kostenträger */}
-        <div style={{ background: "#f9fafb", borderRadius: 12, padding: 14, marginBottom: 12 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 8 }}>Kostenträger & Versicherung</div>
-          {k.kostentraeger && <div style={{ fontSize: 14, marginBottom: 4 }}>🏥 {k.kostentraeger}</div>}
-          {k.versicherungsnummer && <div style={{ fontSize: 14, color: "#4b5563" }}>Nr.: {k.versicherungsnummer}</div>}
-          {!k.kostentraeger && <div style={{ fontSize: 13, color: "#9ca3af" }}>Keine Angaben</div>}
-        </div>
+        {activeTab === 'budget' && (
+          <div style={{ background: "#f0faf0", borderRadius: 12, padding: 14, marginBottom: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#4a8c3f", marginBottom: 12 }}>💰 Budget-Übersicht</div>
+            {(b45b > 0 || v45b > 0) && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#1f2937", marginBottom: 6 }}>§45b SGB XI – Entlastungsleistungen</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 6 }}>
+                  <div style={{ background: "#fff", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}><div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Budget</div><div style={{ fontSize: 14, fontWeight: 800, color: "#4a8c3f" }}>{formatEuro(b45b)}</div></div>
+                  <div style={{ background: "#fff", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}><div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Verbraucht</div><div style={{ fontSize: 14, fontWeight: 800, color: "#f59e0b" }}>{formatEuro(v45b)}</div></div>
+                  <div style={{ background: "#fff", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}><div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Verfügbar</div><div style={{ fontSize: 14, fontWeight: 800, color: b45b - v45b >= 0 ? "#4a8c3f" : "#ef4444" }}>{formatEuro(b45b - v45b)}</div></div>
+                </div>
+                <BudgetBar budget={b45b} verbraucht={v45b} label="45b" />
+              </div>
+            )}
+            {(b45a > 0 || v45a > 0) && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#1f2937", marginBottom: 6 }}>§45a SGB XI – Angebote zur Unterstützung</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 6 }}>
+                  <div style={{ background: "#fff", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}><div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Budget</div><div style={{ fontSize: 14, fontWeight: 800, color: "#4a8c3f" }}>{formatEuro(b45a)}</div></div>
+                  <div style={{ background: "#fff", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}><div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Verbraucht</div><div style={{ fontSize: 14, fontWeight: 800, color: "#f59e0b" }}>{formatEuro(v45a)}</div></div>
+                  <div style={{ background: "#fff", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}><div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Verfügbar</div><div style={{ fontSize: 14, fontWeight: 800, color: b45a - v45a >= 0 ? "#4a8c3f" : "#ef4444" }}>{formatEuro(b45a - v45a)}</div></div>
+                </div>
+                <BudgetBar budget={b45a} verbraucht={v45a} label="45a" />
+              </div>
+            )}
+            {(b39 > 0 || v39 > 0) && (
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#1f2937", marginBottom: 6 }}>§39 SGB XI – Häusliche Krankenpflege</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 6 }}>
+                  <div style={{ background: "#fff", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}><div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Budget</div><div style={{ fontSize: 14, fontWeight: 800, color: "#4a8c3f" }}>{formatEuro(b39)}</div></div>
+                  <div style={{ background: "#fff", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}><div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Verbraucht</div><div style={{ fontSize: 14, fontWeight: 800, color: "#f59e0b" }}>{formatEuro(v39)}</div></div>
+                  <div style={{ background: "#fff", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}><div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Verfügbar</div><div style={{ fontSize: 14, fontWeight: 800, color: b39 - v39 >= 0 ? "#4a8c3f" : "#ef4444" }}>{formatEuro(b39 - v39)}</div></div>
+                </div>
+                <BudgetBar budget={b39} verbraucht={v39} label="39" />
+              </div>
+            )}
+            {b45b === 0 && v45b === 0 && b45a === 0 && v45a === 0 && b39 === 0 && v39 === 0 && (
+              <div style={{ fontSize: 13, color: "#9ca3af", textAlign: "center", padding: "8px 0" }}>Noch kein Budget hinterlegt</div>
+            )}
+          </div>
+        )}
 
-        {/* Budget */}
-        <div style={{ background: "#f0faf0", borderRadius: 12, padding: 14, marginBottom: 12 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#4a8c3f", marginBottom: 12 }}>💰 Budget-Übersicht</div>
-          {(b45b > 0 || v45b > 0) && (
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#1f2937", marginBottom: 6 }}>§45b SGB XI – Entlastungsleistungen</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 6 }}>
-                <div style={{ background: "#fff", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}><div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Budget</div><div style={{ fontSize: 14, fontWeight: 800, color: "#4a8c3f" }}>{formatEuro(b45b)}</div></div>
-                <div style={{ background: "#fff", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}><div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Verbraucht</div><div style={{ fontSize: 14, fontWeight: 800, color: "#f59e0b" }}>{formatEuro(v45b)}</div></div>
-                <div style={{ background: "#fff", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}><div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Verfügbar</div><div style={{ fontSize: 14, fontWeight: 800, color: b45b - v45b >= 0 ? "#4a8c3f" : "#ef4444" }}>{formatEuro(b45b - v45b)}</div></div>
-              </div>
-              <BudgetBar budget={b45b} verbraucht={v45b} label="45b" />
-            </div>
-          )}
-          {(b45a > 0 || v45a > 0) && (
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#1f2937", marginBottom: 6 }}>§45a SGB XI – Angebote zur Unterstützung</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 6 }}>
-                <div style={{ background: "#fff", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}><div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Budget</div><div style={{ fontSize: 14, fontWeight: 800, color: "#4a8c3f" }}>{formatEuro(b45a)}</div></div>
-                <div style={{ background: "#fff", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}><div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Verbraucht</div><div style={{ fontSize: 14, fontWeight: 800, color: "#f59e0b" }}>{formatEuro(v45a)}</div></div>
-                <div style={{ background: "#fff", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}><div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Verfügbar</div><div style={{ fontSize: 14, fontWeight: 800, color: b45a - v45a >= 0 ? "#4a8c3f" : "#ef4444" }}>{formatEuro(b45a - v45a)}</div></div>
-              </div>
-              <BudgetBar budget={b45a} verbraucht={v45a} label="45a" />
-            </div>
-          )}
-          {(b39 > 0 || v39 > 0) && (
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#1f2937", marginBottom: 6 }}>§39 SGB XI – Häusliche Krankenpflege</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 6 }}>
-                <div style={{ background: "#fff", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}><div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Budget</div><div style={{ fontSize: 14, fontWeight: 800, color: "#4a8c3f" }}>{formatEuro(b39)}</div></div>
-                <div style={{ background: "#fff", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}><div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Verbraucht</div><div style={{ fontSize: 14, fontWeight: 800, color: "#f59e0b" }}>{formatEuro(v39)}</div></div>
-                <div style={{ background: "#fff", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}><div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Verfügbar</div><div style={{ fontSize: 14, fontWeight: 800, color: b39 - v39 >= 0 ? "#4a8c3f" : "#ef4444" }}>{formatEuro(b39 - v39)}</div></div>
-              </div>
-              <BudgetBar budget={b39} verbraucht={v39} label="39" />
-            </div>
-          )}
-          {b45b === 0 && v45b === 0 && b45a === 0 && v45a === 0 && b39 === 0 && v39 === 0 && (
-            <div style={{ fontSize: 13, color: "#9ca3af", textAlign: "center", padding: "8px 0" }}>Noch kein Budget hinterlegt</div>
-          )}
-        </div>
+        {activeTab === 'historie' && (
+          <div style={{ marginBottom: 12 }}>
+            <BudgetHistorieTab kundenId={k.id} />
+          </div>
+        )}
 
         {/* Admin-Aktionen */}
         {isAdmin && (

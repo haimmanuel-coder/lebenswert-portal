@@ -1,6 +1,6 @@
 import { and, eq, gte, lte, desc, sql, like, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, mitarbeiter, kunden, einsaetze, leistungen, fahrten, auditLogs, kundenZuordnung, monatsabschluesse, passwordResets, kostentraeger, textbausteine, ebriefLog, pushSubscriptions, urlaubsantraege, krankmeldungen, touren, tourEinsaetze, notifications, refreshTokens } from "../drizzle/schema";
+import { InsertUser, users, mitarbeiter, kunden, einsaetze, leistungen, fahrten, auditLogs, kundenZuordnung, monatsabschluesse, passwordResets, kostentraeger, textbausteine, ebriefLog, pushSubscriptions, urlaubsantraege, krankmeldungen, touren, tourEinsaetze, notifications, refreshTokens, budgetTransaktionen } from "../drizzle/schema";
 import type { InsertMitarbeiter, InsertKunde, InsertEinsatz, InsertLeistung, InsertFahrt, InsertAuditLog, InsertKostentraeger, InsertTextbaustein, InsertEbriefLog, InsertPushSubscription, InsertUrlaubsantrag, InsertKrankmeldung, InsertTour, InsertNotification, InsertRefreshToken } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -333,13 +333,14 @@ export async function getLeistungenByKunde(kundenId: number) {
 }
 
 /**
- * Hilfsfunktion: Kunden-Budget anpassen (positiver delta = mehr verbraucht, negativ = Rückbuchung).
- * Paragraph bestimmt welches Budget-Feld aktualisiert wird.
+ * Hilfsfunktion: Kunden-Budget anpassen + Transaktion loggen.
+ * betragDelta > 0 = Abbuchung, < 0 = Rückerstattung
  */
 export async function adjustKundeVerbraucht(
   kundenId: number,
   paragraph: "45b" | "45a" | "39",
-  betragDelta: number
+  betragDelta: number,
+  opts?: { leistungId?: number; mitarbeiterId?: number; stunden?: number; monat?: string; beschreibung?: string }
 ) {
   const db = await getDb();
   if (!db) return;
@@ -356,6 +357,43 @@ export async function adjustKundeVerbraucht(
     const neu = Math.max(0, parseFloat(String(kunde.verbraucht39 ?? 0)) + betragDelta);
     await db.update(kunden).set({ verbraucht39: String(Math.round(neu * 100) / 100) }).where(eq(kunden.id, kundenId));
   }
+  // ── Transaktion in Budget-Historie loggen ──
+  const typ = betragDelta >= 0 ? 'abbuchung' : 'rueckerstattung';
+  await db.insert(budgetTransaktionen).values({
+    kundenId,
+    leistungId: opts?.leistungId ?? null,
+    mitarbeiterId: opts?.mitarbeiterId ?? null,
+    typ,
+    paragraph,
+    betrag: String(Math.abs(Math.round(betragDelta * 100) / 100)),
+    stunden: opts?.stunden != null ? String(opts.stunden) : null,
+    monat: opts?.monat ?? null,
+    beschreibung: opts?.beschreibung ?? null,
+  });
+}
+
+/** Alle Budget-Transaktionen für einen Kunden (neueste zuerst). */
+export async function getBudgetHistorie(kundenId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({
+    id: budgetTransaktionen.id,
+    typ: budgetTransaktionen.typ,
+    paragraph: budgetTransaktionen.paragraph,
+    betrag: budgetTransaktionen.betrag,
+    stunden: budgetTransaktionen.stunden,
+    monat: budgetTransaktionen.monat,
+    beschreibung: budgetTransaktionen.beschreibung,
+    createdAt: budgetTransaktionen.createdAt,
+    leistungId: budgetTransaktionen.leistungId,
+    mitarbeiterId: budgetTransaktionen.mitarbeiterId,
+    mitarbeiterVorname: mitarbeiter.vorname,
+    mitarbeiterNachname: mitarbeiter.nachname,
+  })
+  .from(budgetTransaktionen)
+  .leftJoin(mitarbeiter, eq(budgetTransaktionen.mitarbeiterId, mitarbeiter.id))
+  .where(eq(budgetTransaktionen.kundenId, kundenId))
+  .orderBy(desc(budgetTransaktionen.createdAt));
 }
 
 export async function createLeistung(data: InsertLeistung & { mitarbeiterId: number }) {
@@ -378,22 +416,49 @@ export async function createLeistung(data: InsertLeistung & { mitarbeiterId: num
     unterschriftLeister: data.unterschriftLeister,
     unterschriftKunde: (data as any).unterschriftKunde,
   });
-  // ── AUTOMATISCHE BUDGET-ABRECHNUNG: Betrag sofort vom Kunden-Budget abziehen ──
+  // ── AUTOMATISCHE BUDGET-ABRECHNUNG: Betrag sofort vom Kunden-Budget abziehen + in Historie loggen ──
   if (data.kundenId && parseFloat(betrag) > 0) {
-    await adjustKundeVerbraucht(data.kundenId, data.paragraph as "45b" | "45a" | "39", parseFloat(betrag));
+    // leistungId aus dem Insert-Ergebnis lesen
+    const inserted = await db.select({ id: leistungen.id }).from(leistungen)
+      .where(and(eq(leistungen.kundenId, data.kundenId), eq(leistungen.mitarbeiterId, data.mitarbeiterId)))
+      .orderBy(desc(leistungen.createdAt)).limit(1);
+    const leistungId = inserted[0]?.id;
+    await adjustKundeVerbraucht(
+      data.kundenId,
+      data.paragraph as "45b" | "45a" | "39",
+      parseFloat(betrag),
+      {
+        leistungId,
+        mitarbeiterId: data.mitarbeiterId,
+        stunden,
+        monat: data.monat as string,
+        beschreibung: `Leistungsnachweis ${data.monat} – ${stunden}h §${data.paragraph}`,
+      }
+    );
   }
 }
 
 export async function deleteLeistung(id: number) {
   const db = await getDb();
   if (!db) return;
-  // ── BUDGET-RÜCKBUCHUNG: Betrag vor dem Löschen zurückbuchen ──
+  // ── BUDGET-RÜCKBUCHUNG: Betrag vor dem Löschen zurückbuchen + in Historie loggen ──
   const rows = await db.select().from(leistungen).where(eq(leistungen.id, id)).limit(1);
   const leistung = rows[0];
   if (leistung && leistung.kundenId && leistung.betrag) {
     const betrag = parseFloat(String(leistung.betrag));
     if (betrag > 0) {
-      await adjustKundeVerbraucht(leistung.kundenId, leistung.paragraph as "45b" | "45a" | "39", -betrag);
+      await adjustKundeVerbraucht(
+        leistung.kundenId,
+        leistung.paragraph as "45b" | "45a" | "39",
+        -betrag,
+        {
+          leistungId: id,
+          mitarbeiterId: leistung.mitarbeiterId ?? undefined,
+          stunden: leistung.stunden ? parseFloat(String(leistung.stunden)) : undefined,
+          monat: leistung.monat ?? undefined,
+          beschreibung: `Rückerstattung: Leistungsnachweis ${leistung.monat} gelöscht`,
+        }
+      );
     }
   }
   await db.delete(leistungen).where(eq(leistungen.id, id));

@@ -116,6 +116,7 @@ import {
   invalidateRefreshToken,
   invalidateAllRefreshTokensForMitarbeiter,
   checkDoppelbelegung,
+  getBudgetHistorie,
 } from "./db";
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "lebenswert-secret-key");
@@ -654,9 +655,13 @@ export const appRouter = router({
         });
         return { success: true };
       }),
+
+    budgetHistorie: adminProcedure
+      .input(z.object({ kundenId: z.number().int().positive() }))
+      .query(async ({ input }) => getBudgetHistorie(input.kundenId)),
   }),
 
-  // ── EINSÄTZE ─────────────────────────────────────────
+  // ── EINSÄTZE ─────────────────────────────────────────────────────────────
   einsaetze: router({
     list: portalProtected.query(async ({ ctx }) => {
       const ma = await getMitarbeiterById(ctx.mitarbeiterId);
