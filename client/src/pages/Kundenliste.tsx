@@ -2,6 +2,7 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { usePortalAuth } from "@/contexts/PortalAuthContext";
 import { toast } from "sonner";
+import { getBudgetForPflegegrad } from "../../../shared/pflegegradBudgets";
 
 type KundeDetail = {
   id: number;
@@ -113,9 +114,193 @@ function KundenKarte({ k, onClick, istKritisch }: { k: KundeDetail; onClick: () 
 }
 
 // ── DETAIL-SHEET ─────────────────────────────────────────────────────────────
+// ── BUDGET-HISTORIE TAB ─────────────────────────────────────────────────────
+function BudgetHistorieTab({ kundenId, kundenName }: { kundenId: number; kundenName: string }) {
+  const { data: historieRaw = [], isLoading } = (trpc.kunden as any).budgetHistorie.useQuery({ kundenId });
+  const [filterMonat, setFilterMonat] = useState("");
+  const [filterParagraph, setFilterParagraph] = useState("alle");
+  const [filterMitarbeiter, setFilterMitarbeiter] = useState("");
+  const [filterTyp, setFilterTyp] = useState("alle");
+
+  const fmtDatum = (d: Date | string) => new Date(d).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const fmtMonat = (m: string | null | undefined) => {
+    if (!m) return '';
+    const [y, mo] = m.split('-');
+    const n = ['', 'Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+    return `${n[parseInt(mo)]} ${y}`;
+  };
+
+  const alleMonats = Array.from(new Set((historieRaw as any[]).map((t: any) => t.monat).filter(Boolean))).sort().reverse() as string[];
+  const alleMitarbeiter = Array.from(new Set((historieRaw as any[]).map((t: any) => t.mitarbeiterVorname ? `${t.mitarbeiterVorname} ${t.mitarbeiterNachname ?? ''}`.trim() : '').filter(Boolean))) as string[];
+
+  const historie = (historieRaw as any[]).filter(t => {
+    if (filterMonat && t.monat !== filterMonat) return false;
+    if (filterParagraph !== 'alle' && t.paragraph !== filterParagraph) return false;
+    if (filterTyp !== 'alle' && t.typ !== filterTyp) return false;
+    if (filterMitarbeiter) {
+      const name = t.mitarbeiterVorname ? `${t.mitarbeiterVorname} ${t.mitarbeiterNachname ?? ''}`.trim() : '';
+      if (name !== filterMitarbeiter) return false;
+    }
+    return true;
+  });
+
+  const gesamtAbbuchung = historie.filter((t: any) => t.typ === 'abbuchung').reduce((s: number, t: any) => s + parseFloat(String(t.betrag)), 0);
+  const gesamtRueck = historie.filter((t: any) => t.typ === 'rueckerstattung').reduce((s: number, t: any) => s + parseFloat(String(t.betrag)), 0);
+
+  const exportCSV = () => {
+    const rows = [
+      ['Datum', 'Typ', 'Paragraph', 'Betrag (EUR)', 'Stunden', 'Monat', 'Mitarbeiter', 'Leistungsnachweis-Nr', 'Beschreibung'],
+      ...historie.map((t: any) => [
+        fmtDatum(t.createdAt), t.typ === 'abbuchung' ? 'Abbuchung' : 'Rückerstattung',
+        `§${t.paragraph}`, parseFloat(String(t.betrag)).toFixed(2),
+        t.stunden ? parseFloat(String(t.stunden)).toString() : '', fmtMonat(t.monat),
+        t.mitarbeiterVorname ? `${t.mitarbeiterVorname} ${t.mitarbeiterNachname ?? ''}`.trim() : '',
+        t.leistungId ? `LN-${String(t.leistungId).padStart(4, '0')}` : '', t.beschreibung ?? '',
+      ])
+    ];
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `Budget-Historie_${kundenName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+    toast.success('✅ CSV-Export heruntergeladen');
+  };
+
+  const exportPDF = async () => {
+    const { jsPDF } = await import('jspdf');
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pw = doc.internal.pageSize.getWidth();
+    let y = 20;
+    doc.setFontSize(16); doc.setFont('helvetica', 'bold');
+    doc.text('Budget-Historie', pw / 2, y, { align: 'center' }); y += 8;
+    doc.setFontSize(11); doc.setFont('helvetica', 'normal');
+    doc.text(`Kunde: ${kundenName}`, pw / 2, y, { align: 'center' }); y += 6;
+    doc.text(`Erstellt: ${new Date().toLocaleDateString('de-DE')}`, pw / 2, y, { align: 'center' }); y += 10;
+    doc.setFillColor(240, 250, 240); doc.rect(14, y, pw - 28, 14, 'F');
+    doc.setFontSize(10); doc.setFont('helvetica', 'bold');
+    doc.text(`Abbuchungen: ${gesamtAbbuchung.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}`, 18, y + 6);
+    doc.text(`Rückerstattungen: ${gesamtRueck.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}`, 18, y + 11);
+    y += 20;
+    const cols = [28, 30, 16, 26, 22, 40];
+    const headers = ['Datum', 'Mitarbeiter', 'Para.', 'Betrag', 'Monat', 'Beschreibung'];
+    doc.setFillColor(74, 140, 63); doc.setTextColor(255, 255, 255);
+    doc.rect(14, y, pw - 28, 7, 'F');
+    let x = 14;
+    headers.forEach((h, i) => { doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.text(h, x + 1, y + 5); x += cols[i]; });
+    doc.setTextColor(0, 0, 0); y += 8;
+    historie.forEach((t: any, idx: number) => {
+      if (y > 270) { doc.addPage(); y = 20; }
+      if (idx % 2 === 0) { doc.setFillColor(248, 250, 248); doc.rect(14, y - 1, pw - 28, 7, 'F'); }
+      const isAbb = t.typ === 'abbuchung';
+      const betragStr = `${isAbb ? '-' : '+'}${parseFloat(String(t.betrag)).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}`;
+      const vals = [
+        fmtDatum(t.createdAt).slice(0, 16),
+        t.mitarbeiterVorname ? `${t.mitarbeiterVorname} ${(t.mitarbeiterNachname ?? '').charAt(0)}.` : '-',
+        `§${t.paragraph}`, betragStr, fmtMonat(t.monat) || '-', (t.beschreibung ?? '').slice(0, 30),
+      ];
+      x = 14;
+      vals.forEach((v, i) => { doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.text(String(v), x + 1, y + 4); x += cols[i]; });
+      y += 7;
+    });
+    doc.save(`Budget-Historie_${kundenName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`);
+    toast.success('✅ PDF-Export heruntergeladen');
+  };
+
+  const selStyle: React.CSSProperties = { padding: '6px 10px', border: '1.5px solid #e5e7eb', borderRadius: 8, fontSize: 12, background: '#fff', cursor: 'pointer', width: '100%' };
+
+  if (isLoading) return <div style={{ textAlign: 'center', padding: 24, color: '#9ca3af' }}>Lade Historie...</div>;
+
+  return (
+    <div>
+      <div style={{ background: '#f9fafb', borderRadius: 12, padding: 12, marginBottom: 12 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', marginBottom: 8 }}>Filter & Suche</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+          <div><div style={{ fontSize: 11, color: '#6b7280', marginBottom: 3 }}>Monat</div>
+            <select style={selStyle} value={filterMonat} onChange={e => setFilterMonat(e.target.value)}>
+              <option value="">Alle Monate</option>
+              {alleMonats.map(m => <option key={m} value={m}>{fmtMonat(m)}</option>)}
+            </select></div>
+          <div><div style={{ fontSize: 11, color: '#6b7280', marginBottom: 3 }}>Paragraph</div>
+            <select style={selStyle} value={filterParagraph} onChange={e => setFilterParagraph(e.target.value)}>
+              <option value="alle">Alle</option>
+              <option value="45b">§45b</option>
+              <option value="45a">§45a</option>
+              <option value="39">§39</option>
+            </select></div>
+          <div><div style={{ fontSize: 11, color: '#6b7280', marginBottom: 3 }}>Typ</div>
+            <select style={selStyle} value={filterTyp} onChange={e => setFilterTyp(e.target.value)}>
+              <option value="alle">Alle</option>
+              <option value="abbuchung">Abbuchungen</option>
+              <option value="rueckerstattung">Rückerstattungen</option>
+            </select></div>
+          <div><div style={{ fontSize: 11, color: '#6b7280', marginBottom: 3 }}>Mitarbeiter</div>
+            <select style={selStyle} value={filterMitarbeiter} onChange={e => setFilterMitarbeiter(e.target.value)}>
+              <option value="">Alle</option>
+              {alleMitarbeiter.map(m => <option key={m} value={m}>{m}</option>)}
+            </select></div>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={exportCSV} style={{ flex: 1, padding: '8px 12px', background: '#4a8c3f', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>↓ CSV</button>
+          <button onClick={exportPDF} style={{ flex: 1, padding: '8px 12px', background: '#2a9d8f', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>↓ PDF</button>
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+        <div style={{ background: '#fee2e2', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
+          <div style={{ fontSize: 10, color: '#dc2626', fontWeight: 700, textTransform: 'uppercase', marginBottom: 3 }}>Abbuchungen</div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: '#dc2626' }}>{formatEuro(gesamtAbbuchung)}</div>
+        </div>
+        <div style={{ background: '#f0fdf4', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
+          <div style={{ fontSize: 10, color: '#166534', fontWeight: 700, textTransform: 'uppercase', marginBottom: 3 }}>Rückerstattungen</div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: '#166534' }}>{formatEuro(gesamtRueck)}</div>
+        </div>
+      </div>
+      {historie.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 24, color: '#9ca3af' }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>📊</div>
+          <div style={{ fontSize: 14 }}>Keine Transaktionen für die gewählten Filter.</div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {historie.map((t: any) => {
+            const isAbbuchung = t.typ === 'abbuchung';
+            return (
+              <div key={t.id} style={{ background: isAbbuchung ? '#fef2f2' : '#f0fdf4', border: `1.5px solid ${isAbbuchung ? '#fca5a5' : '#86efac'}`, borderRadius: 12, padding: '12px 14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 16 }}>{isAbbuchung ? '📉' : '📈'}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: isAbbuchung ? '#dc2626' : '#166534' }}>{isAbbuchung ? 'Abbuchung' : 'Rückerstattung'}</span>
+                    <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 20, background: isAbbuchung ? '#fca5a5' : '#86efac', color: isAbbuchung ? '#7f1d1d' : '#14532d', fontWeight: 700 }}>§{t.paragraph}</span>
+                  </div>
+                  <span style={{ fontSize: 15, fontWeight: 800, color: isAbbuchung ? '#dc2626' : '#166534' }}>{isAbbuchung ? '-' : '+'}{formatEuro(parseFloat(String(t.betrag)))}</span>
+                </div>
+                <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 3 }}>{t.beschreibung || (isAbbuchung ? 'Budget abgebucht' : 'Budget zurückgebucht')}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: 11, color: '#9ca3af' }}>
+                    {t.mitarbeiterVorname ? `👤 ${t.mitarbeiterVorname} ${t.mitarbeiterNachname ?? ''}` : ''}
+                    {t.monat ? ` · ${fmtMonat(t.monat)}` : ''}
+                    {t.stunden ? ` · ${parseFloat(String(t.stunden))}h` : ''}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#9ca3af' }}>{fmtDatum(t.createdAt)}</div>
+                </div>
+                {t.leistungId && (
+                  <div style={{ marginTop: 5, fontSize: 11, color: '#6b7280', background: 'rgba(0,0,0,0.04)', borderRadius: 6, padding: '3px 8px', display: 'inline-block' }}>
+                    📄 Leistungsnachweis #LN-{String(t.leistungId).padStart(4, '0')}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function KundenDetailSheet({
   k, onClose, onEdit, onDeactivate, isAdmin,
 }: { k: KundeDetail; onClose: () => void; onEdit: () => void; onDeactivate: () => void; isAdmin: boolean }) {
+  const [activeTab, setActiveTab] = useState<'info' | 'budget' | 'historie'>('info');
   const b45b = toNum(k.budget45b); const v45b = toNum(k.verbraucht45b);
   const b45a = toNum(k.budget45a); const v45a = toNum(k.verbraucht45a);
   const b39 = toNum(k.budget39); const v39 = toNum(k.verbraucht39);
@@ -137,6 +322,17 @@ function KundenDetailSheet({
           </div>
         </div>
 
+        {/* Tab-Navigation */}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: '#f3f4f6', borderRadius: 12, padding: 4 }}>
+          {(['info', 'budget', 'historie'] as const).map(tab => (
+            <button key={tab} onClick={() => setActiveTab(tab)} style={{ flex: 1, padding: '8px 4px', border: 'none', borderRadius: 9, fontSize: 12, fontWeight: 700, cursor: 'pointer', background: activeTab === tab ? '#4a8c3f' : 'transparent', color: activeTab === tab ? '#fff' : '#6b7280', transition: 'all 0.15s ease' }}>
+              {tab === 'info' ? '📄 Info' : tab === 'budget' ? '💰 Budget' : '📊 Historie'}
+            </button>
+          ))}
+        </div>
+
+        {/* TAB: Info */}
+        {activeTab === 'info' && <>
         {/* Kontakt */}
         <div style={{ background: "#f9fafb", borderRadius: 12, padding: 14, marginBottom: 12 }}>
           <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 8 }}>Kontakt</div>
@@ -206,8 +402,57 @@ function KundenDetailSheet({
             </button>
           </div>
         )}
+        </>}
 
-        <button onClick={onClose} style={{ width: "100%", padding: 14, background: "#f3f4f6", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: "pointer", color: "#4b5563" }}>
+        {/* TAB: Budget */}
+        {activeTab === 'budget' && (
+          <div style={{ background: "#f0faf0", borderRadius: 12, padding: 14, marginBottom: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#4a8c3f", marginBottom: 12 }}>💰 Budget-Übersicht</div>
+            {(b45b > 0 || v45b > 0) && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#1f2937", marginBottom: 6 }}>§45b SGB XI – Entlastungsleistungen</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 6 }}>
+                  <div style={{ background: "#fff", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}><div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Budget</div><div style={{ fontSize: 14, fontWeight: 800, color: "#4a8c3f" }}>{formatEuro(b45b)}</div></div>
+                  <div style={{ background: "#fff", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}><div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Verbraucht</div><div style={{ fontSize: 14, fontWeight: 800, color: "#f59e0b" }}>{formatEuro(v45b)}</div></div>
+                  <div style={{ background: "#fff", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}><div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Verfügbar</div><div style={{ fontSize: 14, fontWeight: 800, color: b45b - v45b >= 0 ? "#4a8c3f" : "#ef4444" }}>{formatEuro(b45b - v45b)}</div></div>
+                </div>
+                <BudgetBar budget={b45b} verbraucht={v45b} label="45b" />
+              </div>
+            )}
+            {(b45a > 0 || v45a > 0) && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#1f2937", marginBottom: 6 }}>§45a SGB XI – Angebote zur Unterstützung</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 6 }}>
+                  <div style={{ background: "#fff", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}><div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Budget</div><div style={{ fontSize: 14, fontWeight: 800, color: "#4a8c3f" }}>{formatEuro(b45a)}</div></div>
+                  <div style={{ background: "#fff", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}><div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Verbraucht</div><div style={{ fontSize: 14, fontWeight: 800, color: "#f59e0b" }}>{formatEuro(v45a)}</div></div>
+                  <div style={{ background: "#fff", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}><div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Verfügbar</div><div style={{ fontSize: 14, fontWeight: 800, color: b45a - v45a >= 0 ? "#4a8c3f" : "#ef4444" }}>{formatEuro(b45a - v45a)}</div></div>
+                </div>
+                <BudgetBar budget={b45a} verbraucht={v45a} label="45a" />
+              </div>
+            )}
+            {(b39 > 0 || v39 > 0) && (
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#1f2937", marginBottom: 6 }}>§39 SGB XI – Häusliche Krankenpflege</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 6 }}>
+                  <div style={{ background: "#fff", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}><div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Budget</div><div style={{ fontSize: 14, fontWeight: 800, color: "#4a8c3f" }}>{formatEuro(b39)}</div></div>
+                  <div style={{ background: "#fff", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}><div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Verbraucht</div><div style={{ fontSize: 14, fontWeight: 800, color: "#f59e0b" }}>{formatEuro(v39)}</div></div>
+                  <div style={{ background: "#fff", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}><div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Verfügbar</div><div style={{ fontSize: 14, fontWeight: 800, color: b39 - v39 >= 0 ? "#4a8c3f" : "#ef4444" }}>{formatEuro(b39 - v39)}</div></div>
+                </div>
+                <BudgetBar budget={b39} verbraucht={v39} label="39" />
+              </div>
+            )}
+            {b45b === 0 && v45b === 0 && b45a === 0 && v45a === 0 && b39 === 0 && v39 === 0 && (
+              <div style={{ fontSize: 13, color: "#9ca3af", textAlign: "center", padding: "8px 0" }}>Noch kein Budget hinterlegt</div>
+            )}
+          </div>
+        )}
+
+        {/* TAB: Historie */}
+        {activeTab === 'historie' && (
+          <BudgetHistorieTab kundenId={k.id} kundenName={`${k.vorname} ${k.nachname}`} />
+        )}
+
+        <button onClick={onClose} style={{ width: "100%", padding: 14, background: "#f3f4f6", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: "pointer", color: "#4b5563", marginTop: 12 }}>
           Schließen
         </button>
       </div>
@@ -327,7 +572,21 @@ function KundeFormSheet({
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
           <div>
             <label style={lbl}>Pflegegrad</label>
-            <select style={{ ...inp, cursor: "pointer" }} value={form.pflegegrad} onChange={e => set("pflegegrad", e.target.value)}>
+            <select style={{ ...inp, cursor: "pointer" }} value={form.pflegegrad} onChange={e => {
+              const pg = e.target.value;
+              set("pflegegrad", pg);
+              // Automatische Budget-Vorschläge nach Pflegegrad
+              const budgets = getBudgetForPflegegrad(parseInt(pg));
+              if (budgets) {
+                setForm(f => ({
+                  ...f,
+                  pflegegrad: pg,
+                  budget45b: String(budgets.budget45b),
+                  budget45a: String(budgets.budget45a),
+                  budget39: String(budgets.budget39),
+                }));
+              }
+            }}>
               {[1, 2, 3, 4, 5].map(pg => <option key={pg} value={String(pg)}>Pflegegrad {pg}</option>)}
             </select>
           </div>
@@ -359,11 +618,14 @@ function KundeFormSheet({
         {/* Budget (nur bei Bearbeitung) */}
         {isEdit && (
           <>
-            <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#4a8c3f", marginBottom: 10, marginTop: 16 }}>💰 Budget festlegen</div>
+            <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#4a8c3f", marginBottom: 6, marginTop: 16 }}>💰 Budget festlegen</div>
+            <div style={{ background: "#f0fdf4", border: "1.5px solid #86efac", borderRadius: 10, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "#166534" }}>
+              ℹ️ Die Beträge wurden automatisch aus dem Pflegegrad übernommen. Du kannst sie hier manuell anpassen.
+            </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 10 }}>
-              <div><label style={lbl}>§45b Budget (€)</label><input type="number" step="0.01" style={inp} value={form.budget45b} onChange={e => set("budget45b", e.target.value)} placeholder="0.00" /></div>
-              <div><label style={lbl}>§45a Budget (€)</label><input type="number" step="0.01" style={inp} value={form.budget45a} onChange={e => set("budget45a", e.target.value)} placeholder="0.00" /></div>
-              <div><label style={lbl}>§39 Budget (€)</label><input type="number" step="0.01" style={inp} value={form.budget39} onChange={e => set("budget39", e.target.value)} placeholder="0.00" /></div>
+              <div><label style={lbl}>§45b Budget (€/Monat)</label><input type="number" step="0.01" style={inp} value={form.budget45b} onChange={e => set("budget45b", e.target.value)} placeholder="131.00" /></div>
+              <div><label style={lbl}>§45a Budget (€/Monat)</label><input type="number" step="0.01" style={inp} value={form.budget45a} onChange={e => set("budget45a", e.target.value)} placeholder="0.00" /></div>
+              <div><label style={lbl}>§39 Budget (€/Monat)</label><input type="number" step="0.01" style={inp} value={form.budget39} onChange={e => set("budget39", e.target.value)} placeholder="0.00" /></div>
             </div>
           </>
         )}

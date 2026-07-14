@@ -272,3 +272,11 @@
 ### Navigation
 - [x] Navigation: Urlaub, Krankmeldung, Tourenplanung, Profil, Benachrichtigungen in PortalApp.tsx einbinden
 - [x] Navigation: Benachrichtigungs-Badge (Anzahl ungelesener) in TopBar
+
+## Phase 20 – Export, Filter und Pflegegrad-Budget-Automatik
+
+- [ ] shared/pflegegradBudgets.ts: Pflegegrad-Tabelle (§45b=131€, §45a je Pflegegrad) als Konstante
+- [ ] Kundenliste.tsx: Pflegegrad-Auswahl löst automatische Budget-Vorschläge aus (manuell überschreibbar)
+- [ ] BudgetHistorieTab: Filter nach Monat, Paragraph, Mitarbeiter
+- [ ] BudgetHistorieTab: CSV-Export der gefilterten Transaktionen
+- [ ] BudgetHistorieTab: PDF-Export der gefilterten Transaktionen (client-seitig mit jsPDF)
