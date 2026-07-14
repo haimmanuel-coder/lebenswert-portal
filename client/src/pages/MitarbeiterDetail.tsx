@@ -20,6 +20,7 @@ import {
   Edit2,
   Save,
   X,
+  FileDown,
 } from "lucide-react";
 
 type ZertifikatStatus = "erhalten" | "angemeldet" | "nicht_angemeldet";
@@ -51,6 +52,78 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
 
   const utils = trpc.useUtils();
   const { data: ma, isLoading } = trpc.admin.mitarbeiterDetail.useQuery({ id: mitarbeiterId });
+
+  async function exportPersonalbogen(ma: any) {
+    try {
+      const { jsPDF } = await import('jspdf');
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const lm = 20; let y = 20;
+      const line = (text: string, size = 11, bold = false, color = '#111827') => {
+        doc.setFontSize(size);
+        doc.setFont('helvetica', bold ? 'bold' : 'normal');
+        doc.setTextColor(color);
+        doc.text(text, lm, y);
+        y += size * 0.5 + 2;
+      };
+      const section = (title: string) => {
+        y += 4;
+        doc.setFillColor(13, 148, 136);
+        doc.rect(lm - 2, y - 5, 170, 8, 'F');
+        doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor('#ffffff');
+        doc.text(title, lm, y);
+        y += 8;
+      };
+      const field = (label: string, value: string | null | undefined) => {
+        doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor('#6b7280');
+        doc.text(label.toUpperCase(), lm, y);
+        doc.setFont('helvetica', 'normal'); doc.setTextColor('#111827');
+        doc.text(value || '–', lm + 55, y);
+        y += 6;
+      };
+      // Header
+      doc.setFillColor(13, 148, 136);
+      doc.rect(0, 0, 210, 28, 'F');
+      doc.setFontSize(18); doc.setFont('helvetica', 'bold'); doc.setTextColor('#ffffff');
+      doc.text('PERSONALBOGEN', lm, 14);
+      doc.setFontSize(10); doc.setFont('helvetica', 'normal');
+      doc.text('Lebensnah Betreuung – Vertraulich', lm, 21);
+      doc.setFontSize(9); doc.setTextColor('#ccfbf1');
+      doc.text(`Erstellt: ${new Date().toLocaleDateString('de-DE')}`, 150, 21);
+      y = 38;
+      section('PERSÖNLICHE DATEN');
+      field('Name', `${ma.vorname} ${ma.nachname}`);
+      field('E-Mail', ma.email);
+      field('Telefon', ma.telefon);
+      field('Mobil', ma.mobil);
+      field('Geburtsdatum', ma.geburtsdatum ? new Date(ma.geburtsdatum).toLocaleDateString('de-DE') : undefined);
+      field('Adresse', [ma.strasse, ma.plz, ma.ort].filter(Boolean).join(', '));
+      section('BESCHÄFTIGUNG');
+      field('Beschäftigungsart', ma.beschaeftigungsart);
+      field('Position', ma.position);
+      field('Eintrittsdatum', ma.eintrittsdatum ? new Date(ma.eintrittsdatum).toLocaleDateString('de-DE') : undefined);
+      field('Stunden/Woche', ma.stundenProWoche ? String(ma.stundenProWoche) : undefined);
+      section('QUALIFIKATION');
+      field('Zertifikat-Status', ma.zertifikatStatus);
+      field('Schulungsdatum', ma.schulungsDatum ? new Date(ma.schulungsDatum).toLocaleDateString('de-DE') : undefined);
+      field('Zertifikat-Datum', ma.zertifikatDatum ? new Date(ma.zertifikatDatum).toLocaleDateString('de-DE') : undefined);
+      field('Zertifikat-Nr.', ma.zertifikatNummer);
+      if (ma.aktenvermerke) {
+        section('AKTENVERMERKE');
+        const lines = doc.splitTextToSize(ma.aktenvermerke, 160);
+        doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor('#111827');
+        doc.text(lines, lm, y);
+        y += lines.length * 5 + 4;
+      }
+      // Footer
+      doc.setFontSize(8); doc.setTextColor('#9ca3af');
+      doc.text('Vertraulich – nur für den internen Gebrauch', lm, 285);
+      doc.text(`Seite 1`, 185, 285);
+      doc.save(`Personalbogen_${ma.vorname}_${ma.nachname}_${new Date().toISOString().split('T')[0]}.pdf`);
+      toast.success('📄 Personalbogen als PDF heruntergeladen');
+    } catch (err) {
+      toast.error('PDF-Export fehlgeschlagen');
+    }
+  }
 
   // Stammdaten-Formular
   const [stammForm, setStammForm] = useState<Record<string, string>>({});
@@ -155,6 +228,14 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
             <ZertIcon className="w-3 h-3 mr-1" />
             {ZERT_CONFIG[zertStatus].label}
           </Badge>
+          <button
+            onClick={() => exportPersonalbogen(ma)}
+            className="flex items-center gap-1 bg-white/20 hover:bg-white/30 text-white text-xs font-semibold px-2 py-1 rounded-lg transition-colors mt-1"
+            title="Personalbogen als PDF exportieren (nur Admin)"
+          >
+            <FileDown className="w-3 h-3" />
+            Personalbogen
+          </button>
         </div>
       </div>
 

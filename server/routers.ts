@@ -8,7 +8,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { sql, eq, desc } from "drizzle-orm";
 import { getDb } from "./db";
-import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen } from "../drizzle/schema";
+import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter } from "../drizzle/schema";
 import {
   getMitarbeiterByEmail,
   getMitarbeiterById,
@@ -94,6 +94,7 @@ import {
   createUrlaubsantrag,
   updateUrlaubsantragStatus,
   deleteUrlaubsantrag,
+  deleteFahrt,
   getAllKrankmeldungen,
   getKrankmeldungenByMitarbeiter,
   createKrankmeldung,
@@ -319,13 +320,46 @@ export const tourenRouter = router({
       return { success: true };
     }),
   removeEinsatz: portalProtected
+      .input(z.object({
+        tourId: z.number().int().positive(),
+        einsatzId: z.number().int().positive(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await removeEinsatzFromTour(input.tourId, input.einsatzId);
+        await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'UPDATE', ressource: 'tour', details: `removeEinsatz einsatzId=${input.einsatzId}`, status: 'success' });
+        return { success: true };
+      }),
+
+  moveTour: portalProtected
     .input(z.object({
-      tourId: z.number().int().positive(),
-      einsatzId: z.number().int().positive(),
+      id: z.number().int().positive(),
+      newDatum: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     }))
     .mutation(async ({ input, ctx }) => {
-      await removeEinsatzFromTour(input.tourId, input.einsatzId);
-      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'UPDATE', ressource: 'tour', details: `removeEinsatz einsatzId=${input.einsatzId}`, status: 'success' });
+      const tourDatum = new Date(input.newDatum);
+      tourDatum.setHours(0, 0, 0, 0);
+      const heute = new Date(); heute.setHours(0, 0, 0, 0);
+      const maxDatum = new Date(heute); maxDatum.setDate(maxDatum.getDate() + 14);
+      if (tourDatum < heute) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Touren können nicht in die Vergangenheit verschoben werden.' });
+      if (tourDatum > maxDatum) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Touren können maximal 2 Wochen im Voraus geplant werden.' });
+      const db = await (await import('./db')).getDb();
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB nicht verfügbar' });
+      const { touren: tourenTable } = await import('../drizzle/schema');
+      const { eq } = await import('drizzle-orm');
+      await db.update(tourenTable).set({ datum: tourDatum }).where(eq(tourenTable.id, input.id));
+      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'UPDATE', ressource: 'tour', details: `moveTour id=${input.id} newDatum=${input.newDatum}`, status: 'success' });
+      return { success: true };
+    }),
+
+  deleteTour: portalProtected
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await (await import('./db')).getDb();
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB nicht verfügbar' });
+      const { touren: tourenTable } = await import('../drizzle/schema');
+      const { eq } = await import('drizzle-orm');
+      await db.delete(tourenTable).where(eq(tourenTable.id, input.id));
+      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'DELETE', ressource: 'tour', details: `id=${input.id}`, status: 'success' });
       return { success: true };
     }),
 });
@@ -530,6 +564,51 @@ export const appRouter = router({
         await updateMitarbeiterPasswort(reset.mitarbeiterId, hash);
         await markPasswordResetTokenUsed(input.token);
         await createAuditLog({ mitarbeiterId: reset.mitarbeiterId, action: "PASSWORD_RESET_DONE", ressource: "portal", status: "success" });
+        return { success: true };
+      }),
+
+    updateProfile: portalProtected
+      .input(z.object({
+        vorname: z.string().min(1).optional(),
+        nachname: z.string().min(1).optional(),
+        telefon: z.string().optional(),
+        mobil: z.string().optional(),
+        strasse: z.string().optional(),
+        plz: z.string().optional(),
+        ort: z.string().optional(),
+        email: z.string().email().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        const { mitarbeiterId } = ctx;
+        const updates: Record<string, string> = {};
+        if (input.vorname !== undefined) updates.vorname = input.vorname;
+        if (input.nachname !== undefined) updates.nachname = input.nachname;
+        if (input.telefon !== undefined) updates.telefon = input.telefon;
+        if (input.mobil !== undefined) updates.mobil = input.mobil;
+        if (input.strasse !== undefined) updates.strasse = input.strasse;
+        if (input.plz !== undefined) updates.plz = input.plz;
+        if (input.ort !== undefined) updates.ort = input.ort;
+        if (input.email !== undefined) updates.email = input.email;
+        if (Object.keys(updates).length === 0) return { success: true };
+        await db!.update(mitarbeiter).set(updates).where(eq(mitarbeiter.id, mitarbeiterId));
+        await createAuditLog({ mitarbeiterId, action: "PROFILE_UPDATE", ressource: "portal", status: "success" });
+        return { success: true };
+      }),
+
+    changePassword: portalProtected
+      .input(z.object({
+        altesPasswort: z.string().min(1),
+        neuesPasswort: z.string().min(6, "Neues Passwort muss mindestens 6 Zeichen haben"),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const ma = await getMitarbeiterById(ctx.mitarbeiterId);
+        if (!ma) throw new Error("Mitarbeiter nicht gefunden.");
+        const valid = await bcrypt.compare(input.altesPasswort, ma.passwortHash);
+        if (!valid) throw new Error("Das aktuelle Passwort ist falsch.");
+        const hash = await bcrypt.hash(input.neuesPasswort, 10);
+        await updateMitarbeiterPasswort(ctx.mitarbeiterId, hash);
+        await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "PASSWORD_CHANGE", ressource: "portal", status: "success" });
         return { success: true };
       }),
   }),
@@ -854,6 +933,14 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         await updateFahrtStatus(input.id, input.status);
         await createAuditLog({ mitarbeiterId: ctx.adminId, action: "UPDATE", ressource: "fahrt", details: `id=${input.id} status=${input.status}`, status: "success" });
+        return { success: true };
+      }),
+
+    delete: portalProtected
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(async ({ input, ctx }) => {
+        await deleteFahrt(input.id);
+        await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "DELETE", ressource: "fahrt", details: `id=${input.id}`, status: "success" });
         return { success: true };
       }),
   }),

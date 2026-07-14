@@ -113,7 +113,7 @@ function KundenKarte({ k, onClick, istKritisch }: { k: KundeDetail; onClick: () 
   );
 }
 
-// ── BUDGET-HISTORIE TAB ─────────────────────────────────────────────────────
+// BUDGET-HISTORIE TAB
 function BudgetHistorieTab({ kundenId, kundenName }: { kundenId: number; kundenName: string }) {
   const { data: historieRaw = [], isLoading } = (trpc.kunden as any).budgetHistorie.useQuery({ kundenId });
   const [filterMonat, setFilterMonat] = useState("");
@@ -853,3 +853,4 @@ export default function Kundenliste({ onKundeSelect }: { onKundeSelect?: (id: nu
     </div>
   );
 }
+

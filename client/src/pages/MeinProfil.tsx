@@ -1,200 +1,246 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/_core/hooks/useAuth";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
+import { usePortalAuth } from "@/contexts/PortalAuthContext";
 import { toast } from "sonner";
 
 export default function MeinProfil() {
-  const { user } = useAuth();
-  const isAdmin = (user as any)?.rolle === "admin";
+  const { mitarbeiter, refreshAuth } = usePortalAuth() as any;
+  const [tab, setTab] = useState<"profil" | "passwort">("profil");
 
-  const { data: profil, refetch } = trpc.portal.me.useQuery();
-
+  // Profil-Formular
+  const [form, setForm] = useState({
+    vorname: mitarbeiter?.vorname ?? "",
+    nachname: mitarbeiter?.nachname ?? "",
+    email: mitarbeiter?.email ?? "",
+    telefon: mitarbeiter?.telefon ?? "",
+    mobil: mitarbeiter?.mobil ?? "",
+    strasse: mitarbeiter?.strasse ?? "",
+    plz: mitarbeiter?.plz ?? "",
+    ort: mitarbeiter?.ort ?? "",
+  });
   const [editMode, setEditMode] = useState(false);
-  const [telefon, setTelefon] = useState("");
-  const [adresse, setAdresse] = useState("");
-  const [notfallKontakt, setNotfallKontakt] = useState("");
-  const [datevZustimmung, setDatevZustimmung] = useState(false);
 
-  // updateProfil wird über den Admin-Mitarbeiter-Update-Endpunkt realisiert
-  // Für Mitarbeiter: Profil-Felder werden lokal angezeigt, Änderungen über Admin
-  const [saving, setSaving] = useState(false);
-  async function handleSaveLocal() {
-    setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
+  // Passwort-Formular
+  const [pwForm, setPwForm] = useState({ alt: "", neu: "", bestaetigung: "" });
+  const [pwVisible, setPwVisible] = useState({ alt: false, neu: false, best: false });
+
+  const updateProfile = (trpc.portal as any).updateProfile.useMutation({
+    onSuccess: () => {
+      toast.success("✅ Profil gespeichert!");
       setEditMode(false);
-      toast.info("Profiländerungen wurden zur Überprüfung gespeichert. Bitte Admin kontaktieren.");
-    }, 500);
+      if (refreshAuth) refreshAuth();
+    },
+    onError: (e: any) => toast.error("❌ " + e.message),
+  });
+
+  const changePassword = (trpc.portal as any).changePassword.useMutation({
+    onSuccess: () => {
+      toast.success("🔒 Passwort erfolgreich geändert!");
+      setPwForm({ alt: "", neu: "", bestaetigung: "" });
+    },
+    onError: (e: any) => toast.error("❌ " + e.message),
+  });
+
+  function handleSaveProfil() {
+    updateProfile.mutate({
+      vorname: form.vorname,
+      nachname: form.nachname,
+      email: form.email,
+      telefon: form.telefon,
+      mobil: form.mobil,
+      strasse: form.strasse,
+      plz: form.plz,
+      ort: form.ort,
+    });
   }
 
-  function startEdit() {
-    setTelefon((profil as any)?.telefon || "");
-    setAdresse((profil as any)?.adresse || "");
-    setNotfallKontakt((profil as any)?.notfallKontakt || "");
-    setDatevZustimmung(!!(profil as any)?.datevZustimmung);
-    setEditMode(true);
+  function handleChangePassword() {
+    if (!pwForm.alt || !pwForm.neu || !pwForm.bestaetigung) {
+      toast.error("Bitte alle Felder ausfüllen.");
+      return;
+    }
+    if (pwForm.neu !== pwForm.bestaetigung) {
+      toast.error("Die neuen Passwörter stimmen nicht überein.");
+      return;
+    }
+    if (pwForm.neu.length < 6) {
+      toast.error("Das neue Passwort muss mindestens 6 Zeichen haben.");
+      return;
+    }
+    changePassword.mutate({ altesPasswort: pwForm.alt, neuesPasswort: pwForm.neu });
   }
 
-
-
-  if (!profil) {
-    return (
-      <div className="p-4 text-center text-gray-400">
-        <div className="text-4xl mb-2">👤</div>
-        <p>Profil wird geladen...</p>
-      </div>
-    );
-  }
-
-  const p = profil as any;
+  const initials = `${mitarbeiter?.vorname?.[0] ?? ""}${mitarbeiter?.nachname?.[0] ?? ""}`.toUpperCase();
 
   return (
-    <div className="p-4 pb-28 max-w-2xl mx-auto">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold text-gray-900">👤 Mein Profil</h1>
-        {!editMode && (
-          <Button size="sm" onClick={startEdit} variant="outline" className="text-xs">
-            ✏️ Bearbeiten
-          </Button>
-        )}
+    <div style={{ padding: "16px 12px 100px", maxWidth: 540, margin: "0 auto" }}>
+      {/* Avatar + Name */}
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24, background: "#fff", borderRadius: 16, padding: "20px 18px", border: "1px solid #e5e7eb" }}>
+        <div style={{
+          width: 64, height: 64, borderRadius: "50%", background: "linear-gradient(135deg, #0d9488, #14b8a6)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 24, fontWeight: 800, color: "#fff", flexShrink: 0,
+        }}>
+          {initials || "?"}
+        </div>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: "#111827" }}>
+            {mitarbeiter?.vorname} {mitarbeiter?.nachname}
+          </div>
+          <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>{mitarbeiter?.email}</div>
+          <div style={{ marginTop: 6 }}>
+            <span style={{
+              background: mitarbeiter?.rolle === "admin" ? "#fef9c3" : "#dbeafe",
+              color: mitarbeiter?.rolle === "admin" ? "#92400e" : "#1e40af",
+              border: `1px solid ${mitarbeiter?.rolle === "admin" ? "#fcd34d" : "#93c5fd"}`,
+              borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700,
+            }}>
+              {mitarbeiter?.rolle === "admin" ? "👑 Administrator" : "👤 Mitarbeiter"}
+            </span>
+          </div>
+        </div>
       </div>
 
-      {/* Avatar & Grunddaten */}
-      <Card className="mb-4 bg-gradient-to-br from-teal-50 to-blue-50 border-teal-200">
-        <CardContent className="p-4">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-teal-600 flex items-center justify-center text-white text-2xl font-bold flex-shrink-0">
-              {p.vorname?.[0]}{p.nachname?.[0]}
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-gray-900">{p.vorname} {p.nachname}</h2>
-              <p className="text-sm text-gray-600">{p.email}</p>
-              <Badge className={`mt-1 text-xs ${isAdmin ? "bg-purple-100 text-purple-800 border-purple-200" : "bg-teal-100 text-teal-800 border-teal-200"} border`}>
-                {isAdmin ? "👑 Administrator" : "👷 Mitarbeiter"}
-              </Badge>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Kontaktdaten */}
-      <Card className="mb-4">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">📞 Kontaktdaten</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {editMode ? (
-            <>
-              <div>
-                <Label className="text-xs">Telefon</Label>
-                <Input
-                  placeholder="z.B. 0151 12345678"
-                  value={telefon}
-                  onChange={e => setTelefon(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Adresse</Label>
-                <Input
-                  placeholder="z.B. Musterstraße 1, 12345 Musterstadt"
-                  value={adresse}
-                  onChange={e => setAdresse(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Notfallkontakt</Label>
-                <Input
-                  placeholder="z.B. Max Mustermann, 0151 98765432"
-                  value={notfallKontakt}
-                  onChange={e => setNotfallKontakt(e.target.value)}
-                />
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-gray-400 w-20">Telefon:</span>
-                <span className="text-gray-800">{p.telefon || <span className="text-gray-400 italic">nicht angegeben</span>}</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-gray-400 w-20">Adresse:</span>
-                <span className="text-gray-800">{p.adresse || <span className="text-gray-400 italic">nicht angegeben</span>}</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-gray-400 w-20">Notfall:</span>
-                <span className="text-gray-800">{p.notfallKontakt || <span className="text-gray-400 italic">nicht angegeben</span>}</span>
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* DATEV Arbeitnehmer Online */}
-      <Card className="mb-4">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">📄 DATEV Arbeitnehmer Online</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
-            <Switch
-              checked={editMode ? datevZustimmung : !!(p.datevZustimmung)}
-              onCheckedChange={editMode ? setDatevZustimmung : undefined}
-              disabled={!editMode}
-            />
-            <div>
-              <p className="text-sm font-medium text-gray-800">Digitale Lohnabrechnung</p>
-              <p className="text-xs text-gray-500">
-                Ich stimme der digitalen Bereitstellung meiner Lohnabrechnung über DATEV Arbeitnehmer Online zu.
-              </p>
-            </div>
-          </div>
-          {p.datevZustimmung && !editMode && (
-            <p className="text-xs text-green-600 mt-2">
-              ✅ Zustimmung erteilt am {new Date(p.datevZustimmungDatum || p.updatedAt).toLocaleDateString("de-DE")}
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Passwort ändern */}
-      <Card className="mb-4">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">🔒 Sicherheit</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-gray-600 mb-3">
-            Für eine Passwortänderung wende dich bitte an deinen Administrator.
-          </p>
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <span>🔑</span>
-            <span>Letzte Anmeldung: {p.letzteAnmeldung ? new Date(p.letzteAnmeldung).toLocaleString("de-DE") : "Unbekannt"}</span>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Speichern/Abbrechen */}
-      {editMode && (
-        <div className="flex gap-3">
-          <Button
-            className="flex-1 bg-teal-600 hover:bg-teal-700 text-white"
-            onClick={handleSaveLocal}
-            disabled={saving}
+      {/* Tab-Navigation */}
+      <div style={{ display: "flex", background: "#f3f4f6", borderRadius: 12, padding: 4, marginBottom: 20, gap: 4 }}>
+        {[
+          { id: "profil", label: "👤 Meine Daten" },
+          { id: "passwort", label: "🔒 Passwort ändern" },
+        ].map(t => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id as any)}
+            style={{
+              flex: 1, padding: "10px 8px", borderRadius: 10, border: "none", cursor: "pointer",
+              fontWeight: 700, fontSize: 13, transition: "all 0.15s ease",
+              background: tab === t.id ? "#fff" : "transparent",
+              color: tab === t.id ? "#0d9488" : "#6b7280",
+              boxShadow: tab === t.id ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+            }}
           >
-            {saving ? "Wird gespeichert..." : "💾 Speichern"}
-          </Button>
-          <Button
-            variant="outline"
-            className="flex-1"
-            onClick={() => setEditMode(false)}
-          >
-            Abbrechen
-          </Button>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Profil-Tab */}
+      {tab === "profil" && (
+        <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #e5e7eb", overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: "1px solid #f3f4f6" }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: "#111827" }}>Persönliche Daten</div>
+            {!editMode ? (
+              <button
+                onClick={() => setEditMode(true)}
+                style={{ background: "#f0fdfa", color: "#0d9488", border: "1px solid #99f6e4", borderRadius: 10, padding: "6px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer" }}
+              >
+                ✏️ Bearbeiten
+              </button>
+            ) : (
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => {
+                    setEditMode(false);
+                    setForm({
+                      vorname: mitarbeiter?.vorname ?? "",
+                      nachname: mitarbeiter?.nachname ?? "",
+                      email: mitarbeiter?.email ?? "",
+                      telefon: mitarbeiter?.telefon ?? "",
+                      mobil: mitarbeiter?.mobil ?? "",
+                      strasse: mitarbeiter?.strasse ?? "",
+                      plz: mitarbeiter?.plz ?? "",
+                      ort: mitarbeiter?.ort ?? "",
+                    });
+                  }}
+                  style={{ background: "#f3f4f6", color: "#6b7280", border: "1px solid #e5e7eb", borderRadius: 10, padding: "6px 12px", fontWeight: 700, fontSize: 12, cursor: "pointer" }}
+                >
+                  Abbrechen
+                </button>
+                <button
+                  onClick={handleSaveProfil}
+                  disabled={updateProfile.isPending}
+                  style={{ background: "#0d9488", color: "#fff", border: "none", borderRadius: 10, padding: "6px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer", opacity: updateProfile.isPending ? 0.7 : 1 }}
+                >
+                  {updateProfile.isPending ? "Speichert..." : "💾 Speichern"}
+                </button>
+              </div>
+            )}
+          </div>
+          <div style={{ padding: "16px 18px", display: "grid", gap: 14 }}>
+            {[
+              { label: "Vorname", key: "vorname" },
+              { label: "Nachname", key: "nachname" },
+              { label: "E-Mail", key: "email", type: "email" },
+              { label: "Telefon", key: "telefon", type: "tel" },
+              { label: "Mobil", key: "mobil", type: "tel" },
+              { label: "Straße & Hausnummer", key: "strasse" },
+              { label: "PLZ", key: "plz" },
+              { label: "Ort", key: "ort" },
+            ].map(({ label, key, type = "text" }) => (
+              <div key={key}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", display: "block", marginBottom: 4 }}>{label}</label>
+                {editMode ? (
+                  <input
+                    type={type}
+                    value={(form as any)[key]}
+                    onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+                    style={{ width: "100%", padding: "10px 12px", border: "2px solid #0d9488", borderRadius: 10, fontSize: 14, boxSizing: "border-box", outline: "none" }}
+                  />
+                ) : (
+                  <div style={{ fontSize: 14, color: (form as any)[key] ? "#111827" : "#d1d5db", padding: "10px 0", borderBottom: "1px solid #f3f4f6" }}>
+                    {(form as any)[key] || "—"}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Passwort-Tab */}
+      {tab === "passwort" && (
+        <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #e5e7eb", overflow: "hidden" }}>
+          <div style={{ padding: "14px 18px", borderBottom: "1px solid #f3f4f6", fontWeight: 700, fontSize: 14, color: "#111827" }}>
+            🔒 Passwort ändern
+          </div>
+          <div style={{ padding: "16px 18px", display: "grid", gap: 16 }}>
+            <div style={{ background: "#fef9c3", border: "1px solid #fcd34d", borderRadius: 10, padding: "10px 14px", fontSize: 12, color: "#92400e" }}>
+              ⚠️ Wähle ein sicheres Passwort mit mindestens 6 Zeichen. Du wirst nach der Änderung nicht automatisch ausgeloggt.
+            </div>
+            {[
+              { label: "Aktuelles Passwort", key: "alt", visKey: "alt" as const },
+              { label: "Neues Passwort", key: "neu", visKey: "neu" as const },
+              { label: "Neues Passwort bestätigen", key: "bestaetigung", visKey: "best" as const },
+            ].map(({ label, key, visKey }) => (
+              <div key={key}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", display: "block", marginBottom: 4 }}>{label}</label>
+                <div style={{ position: "relative" }}>
+                  <input
+                    type={pwVisible[visKey] ? "text" : "password"}
+                    value={(pwForm as any)[key]}
+                    onChange={e => setPwForm(f => ({ ...f, [key]: e.target.value }))}
+                    placeholder="••••••••"
+                    style={{ width: "100%", padding: "10px 40px 10px 12px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, boxSizing: "border-box", outline: "none" }}
+                    onFocus={e => (e.target.style.borderColor = "#0d9488")}
+                    onBlur={e => (e.target.style.borderColor = "#e5e7eb")}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setPwVisible(v => ({ ...v, [visKey]: !v[visKey] }))}
+                    style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "#9ca3af" }}
+                  >
+                    {pwVisible[visKey] ? "🙈" : "👁️"}
+                  </button>
+                </div>
+              </div>
+            ))}
+            <button
+              onClick={handleChangePassword}
+              disabled={changePassword.isPending}
+              style={{ background: "#0d9488", color: "#fff", border: "none", borderRadius: 12, padding: "13px", fontWeight: 700, fontSize: 15, cursor: "pointer", opacity: changePassword.isPending ? 0.7 : 1, marginTop: 4 }}
+            >
+              {changePassword.isPending ? "Wird geändert..." : "🔒 Passwort jetzt ändern"}
+            </button>
+          </div>
         </div>
       )}
     </div>

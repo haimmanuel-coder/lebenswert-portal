@@ -33,6 +33,16 @@ export default function Fahrtenbuch() {
     onError: (e) => toast.error("❌ " + e.message),
   });
 
+  const deleteFahrt = trpc.fahrten.delete.useMutation({
+    onSuccess: () => { refetch(); toast.success("🗑️ Fahrt gelöscht"); },
+    onError: (e) => toast.error("❌ " + e.message),
+  });
+
+  const handleDeleteFahrt = (id: number, label: string) => {
+    if (!window.confirm(`Fahrt "${label}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`)) return;
+    deleteFahrt.mutate({ id });
+  };
+
   const monat = today.slice(0, 7);
   const monatStr = new Date().toLocaleDateString("de-DE", { month: "long", year: "numeric" });
   const monFahrten = fahrten.filter((f) => {
@@ -145,6 +155,12 @@ export default function Fahrtenbuch() {
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 700 }}>{parseFloat(String(f.kilometer ?? 0)).toFixed(1)} km</div>
                   <div style={{ fontSize: 11, color: "#6b7280" }}>{parseFloat(String(f.verguetung ?? 0)).toFixed(2)} €</div>
+                  <button
+                    onClick={() => handleDeleteFahrt(f.id, `${f.vonOrt} → ${f.nachOrt}`)}
+                    style={{ marginTop: 6, padding: "4px 10px", background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer" }}
+                  >
+                    🗑️ Löschen
+                  </button>
                 </div>
               </div>
             </div>

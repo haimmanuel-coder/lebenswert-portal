@@ -524,6 +524,12 @@ export async function updateFahrtStatus(id: number, status: "offen" | "eingereic
   await db.update(fahrten).set({ abrechnungsStatus: status }).where(eq(fahrten.id, id));
 }
 
+export async function deleteFahrt(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.delete(fahrten).where(eq(fahrten.id, id));
+}
+
 // ── MODUL 1: KOSTENTRÄGER ────────────────────────────
 export async function getAllKostentraeger() {
   const db = await getDb();

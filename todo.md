@@ -280,3 +280,16 @@
 - [x] BudgetHistorieTab: Filter nach Monat, Paragraph, Mitarbeiter
 - [x] BudgetHistorieTab: CSV-Export der gefilterten Transaktionen
 - [x] BudgetHistorieTab: PDF-Export der gefilterten Transaktionen (client-seitig mit jsPDF)
+
+## Phase 21 – Fahrtenbuch-Löschfunktion, Kalender-Tourenplanung, Personalbogen, Self-Service-Profil
+
+- [ ] Fahrtenbuch: Backend deleteFahrt-Route (db.ts + routers.ts)
+- [ ] Fahrtenbuch: Lösch-Button mit Sicherheitsabfrage im Frontend
+- [ ] Fahrtenbuch: Toast-Bestätigung nach Löschen
+- [ ] Tourenplanung: Kalenderansicht (Wochenkalender, Drag-and-Drop)
+- [ ] Tourenplanung: Tour direkt im Kalender erstellen (Klick auf Tag)
+- [ ] Tourenplanung: Tour bearbeiten/verschieben im Kalender
+- [ ] Mitarbeiterverwaltung: Personalbogen-Button (Admin-only) in Mitarbeiter-Detailansicht
+- [ ] Mitarbeiterverwaltung: Personalbogen-PDF mit allen Mitarbeiterdaten (jsPDF)
+- [ ] Profil: Eigene Stammdaten bearbeiten (Telefon, Adresse, E-Mail)
+- [ ] Profil: Passwort ändern (altes Passwort bestätigen, neues setzen)
