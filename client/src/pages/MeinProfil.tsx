@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { usePortalAuth } from "@/contexts/PortalAuthContext";
 import { toast } from "sonner";
@@ -18,6 +18,22 @@ export default function MeinProfil() {
     plz: mitarbeiter?.plz ?? "",
     ort: mitarbeiter?.ort ?? "",
   });
+  // Formular synchronisieren wenn mitarbeiter-Daten nach dem ersten Render laden
+  useEffect(() => {
+    if (mitarbeiter) {
+      setForm({
+        vorname: mitarbeiter.vorname ?? "",
+        nachname: mitarbeiter.nachname ?? "",
+        email: mitarbeiter.email ?? "",
+        telefon: mitarbeiter.telefon ?? "",
+        mobil: mitarbeiter.mobil ?? "",
+        strasse: mitarbeiter.strasse ?? "",
+        plz: mitarbeiter.plz ?? "",
+        ort: mitarbeiter.ort ?? "",
+      });
+    }
+  }, [mitarbeiter?.id]);
+
   const [editMode, setEditMode] = useState(false);
 
   // Passwort-Formular

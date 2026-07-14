@@ -283,13 +283,13 @@
 
 ## Phase 21 – Fahrtenbuch-Löschfunktion, Kalender-Tourenplanung, Personalbogen, Self-Service-Profil
 
-- [ ] Fahrtenbuch: Backend deleteFahrt-Route (db.ts + routers.ts)
-- [ ] Fahrtenbuch: Lösch-Button mit Sicherheitsabfrage im Frontend
-- [ ] Fahrtenbuch: Toast-Bestätigung nach Löschen
-- [ ] Tourenplanung: Kalenderansicht (Wochenkalender, Drag-and-Drop)
-- [ ] Tourenplanung: Tour direkt im Kalender erstellen (Klick auf Tag)
-- [ ] Tourenplanung: Tour bearbeiten/verschieben im Kalender
-- [ ] Mitarbeiterverwaltung: Personalbogen-Button (Admin-only) in Mitarbeiter-Detailansicht
-- [ ] Mitarbeiterverwaltung: Personalbogen-PDF mit allen Mitarbeiterdaten (jsPDF)
-- [ ] Profil: Eigene Stammdaten bearbeiten (Telefon, Adresse, E-Mail)
-- [ ] Profil: Passwort ändern (altes Passwort bestätigen, neues setzen)
+- [x] Fahrtenbuch: Backend deleteFahrt-Route (db.ts + routers.ts)
+- [x] Fahrtenbuch: Lösch-Button mit Sicherheitsabfrage im Frontend
+- [x] Fahrtenbuch: Toast-Bestätigung nach Löschen
+- [x] Tourenplanung: Kalenderansicht (Wochenkalender, Drag-and-Drop)
+- [x] Tourenplanung: Tour direkt im Kalender erstellen (Klick auf Tag)
+- [x] Tourenplanung: Tour bearbeiten/verschieben im Kalender
+- [x] Mitarbeiterverwaltung: Personalbogen-Button (Admin-only) in Mitarbeiter-Detailansicht
+- [x] Mitarbeiterverwaltung: Personalbogen-PDF mit allen Mitarbeiterdaten (jsPDF)
+- [x] Profil: Eigene Stammdaten bearbeiten (Telefon, Adresse, E-Mail)
+- [x] Profil: Passwort ändern (altes Passwort bestätigen, neues setzen)
