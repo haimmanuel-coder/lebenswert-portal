@@ -34,7 +34,7 @@ export default function Krankmeldung() {
   });
 
   const deleteMut = trpc.krank.delete.useMutation({
-    onSuccess: () => { toast.success("Krankmeldung gelöscht"); refetch(); },
+    onSuccess: () => { toast.success("🗑️ Krankmeldung wurde gelöscht"); refetch(); },
     onError: (e) => toast.error(e.message),
   });
 

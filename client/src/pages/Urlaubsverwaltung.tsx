@@ -48,7 +48,7 @@ export default function Urlaubsverwaltung() {
   });
 
   const deleteMut = trpc.urlaub.delete.useMutation({
-    onSuccess: () => { toast.success("Urlaubsantrag gelöscht"); refetch(); },
+    onSuccess: () => { toast.success("🗑️ Urlaubsantrag wurde gelöscht"); refetch(); },
     onError: (e) => toast.error(e.message),
   });
 

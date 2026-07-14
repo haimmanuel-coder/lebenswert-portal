@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Toaster } from "@/components/ui/sonner";
 import { usePortalAuth } from "@/contexts/PortalAuthContext";
 import { trpc } from "@/lib/trpc";
 import Dashboard from "./Dashboard";
@@ -389,6 +390,14 @@ export default function PortalApp() {
       </div>
 
       <OnboardingTour forceShow={showTour} onClose={closeTour} />
+      <Toaster
+        position="top-right"
+        richColors
+        toastOptions={{
+          style: { fontSize: "14px", fontWeight: 600 },
+          duration: 3000,
+        }}
+      />
     </div>
   );
 }
