@@ -113,7 +113,6 @@ function KundenKarte({ k, onClick, istKritisch }: { k: KundeDetail; onClick: () 
   );
 }
 
-// ── DETAIL-SHEET ─────────────────────────────────────────────────────────────
 // ── BUDGET-HISTORIE TAB ─────────────────────────────────────────────────────
 function BudgetHistorieTab({ kundenId, kundenName }: { kundenId: number; kundenName: string }) {
   const { data: historieRaw = [], isLoading } = (trpc.kunden as any).budgetHistorie.useQuery({ kundenId });
@@ -645,7 +644,7 @@ function KundeFormSheet({
 }
 
 // ── HAUPTKOMPONENTE ───────────────────────────────────────────────────────────
-export default function Kundenliste() {
+export default function Kundenliste({ onKundeSelect }: { onKundeSelect?: (id: number) => void } = {}) {
   const { mitarbeiter } = usePortalAuth();
   const isAdmin = mitarbeiter?.rolle === "admin";
 

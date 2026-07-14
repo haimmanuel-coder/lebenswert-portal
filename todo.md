@@ -275,8 +275,8 @@
 
 ## Phase 20 – Export, Filter und Pflegegrad-Budget-Automatik
 
-- [ ] shared/pflegegradBudgets.ts: Pflegegrad-Tabelle (§45b=131€, §45a je Pflegegrad) als Konstante
-- [ ] Kundenliste.tsx: Pflegegrad-Auswahl löst automatische Budget-Vorschläge aus (manuell überschreibbar)
-- [ ] BudgetHistorieTab: Filter nach Monat, Paragraph, Mitarbeiter
-- [ ] BudgetHistorieTab: CSV-Export der gefilterten Transaktionen
-- [ ] BudgetHistorieTab: PDF-Export der gefilterten Transaktionen (client-seitig mit jsPDF)
+- [x] shared/pflegegradBudgets.ts: Pflegegrad-Tabelle (§45b=131€, §45a je Pflegegrad) als Konstante
+- [x] Kundenliste.tsx: Pflegegrad-Auswahl löst automatische Budget-Vorschläge aus (manuell überschreibbar)
+- [x] BudgetHistorieTab: Filter nach Monat, Paragraph, Mitarbeiter
+- [x] BudgetHistorieTab: CSV-Export der gefilterten Transaktionen
+- [x] BudgetHistorieTab: PDF-Export der gefilterten Transaktionen (client-seitig mit jsPDF)
