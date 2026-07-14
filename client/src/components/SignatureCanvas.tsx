@@ -8,30 +8,89 @@ export interface SignatureCanvasRef {
 
 interface Props {
   height?: number;
-  onDrawEnd?: (dataUrl: string | null) => void; // Callback nach jedem Strich-Ende
-  onClear?: () => void;                          // Callback nach clear()
+  value?: string | null;
+  onDrawEnd?: (dataUrl: string | null) => void;
+  onClear?: () => void;
 }
 
 const SignatureCanvas = forwardRef<SignatureCanvasRef, Props>(
-  ({ height = 140, onDrawEnd, onClear }, ref) => {
+  ({ height = 140, value, onDrawEnd, onClear }, ref) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const drawing = useRef(false);
     const hasDrawn = useRef(false);
+    const latestValueRef = useRef<string | null>(value ?? null);
+    const onDrawEndRef = useRef<Props["onDrawEnd"]>(onDrawEnd);
+    const onClearRef = useRef<Props["onClear"]>(onClear);
+
+    useEffect(() => {
+      onDrawEndRef.current = onDrawEnd;
+    }, [onDrawEnd]);
+
+    useEffect(() => {
+      onClearRef.current = onClear;
+    }, [onClear]);
+
+    const configureContext = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return null;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+      ctx.strokeStyle = "#1a1a1a";
+      ctx.lineWidth = 2;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      return ctx;
+    };
+
+    const clearCanvasInternal = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      configureContext();
+    };
+
+    const restoreSignature = (dataUrl: string | null | undefined) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      clearCanvasInternal();
+
+      if (!dataUrl) {
+        hasDrawn.current = false;
+        latestValueRef.current = null;
+        return;
+      }
+
+      const img = new Image();
+      img.onload = () => {
+        const ctx = configureContext();
+        if (!ctx) return;
+        const displayWidth = canvas.width / window.devicePixelRatio;
+        const displayHeight = canvas.height / window.devicePixelRatio;
+        ctx.drawImage(img, 0, 0, displayWidth, displayHeight);
+        hasDrawn.current = true;
+      };
+      img.src = dataUrl;
+      latestValueRef.current = dataUrl;
+    };
 
     useImperativeHandle(ref, () => ({
       clear: () => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext("2d");
-        if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+        latestValueRef.current = null;
         hasDrawn.current = false;
-        onClear?.();
+        clearCanvasInternal();
+        onClearRef.current?.();
       },
       toDataURL: () => {
-        if (!hasDrawn.current) return null;
-        return canvasRef.current?.toDataURL("image/png") ?? null;
+        if (!hasDrawn.current) return latestValueRef.current;
+        return canvasRef.current?.toDataURL("image/png") ?? latestValueRef.current;
       },
-      isEmpty: () => !hasDrawn.current,
+      isEmpty: () => !hasDrawn.current && !latestValueRef.current,
     }));
 
     useEffect(() => {
@@ -40,15 +99,11 @@ const SignatureCanvas = forwardRef<SignatureCanvasRef, Props>(
 
       const resizeCanvas = () => {
         const rect = canvas.getBoundingClientRect();
-        canvas.width = rect.width * window.devicePixelRatio;
-        canvas.height = height * window.devicePixelRatio;
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-          ctx.strokeStyle = "#1a1a1a";
-          ctx.lineWidth = 2;
-          ctx.lineCap = "round";
-          ctx.lineJoin = "round";
+        canvas.width = Math.max(1, rect.width * window.devicePixelRatio);
+        canvas.height = Math.max(1, height * window.devicePixelRatio);
+        configureContext();
+        if (latestValueRef.current) {
+          restoreSignature(latestValueRef.current);
         }
       };
       resizeCanvas();
@@ -60,9 +115,10 @@ const SignatureCanvas = forwardRef<SignatureCanvasRef, Props>(
 
       const fireDrawEnd = () => {
         drawing.current = false;
-        if (hasDrawn.current && onDrawEnd) {
-          onDrawEnd(canvas.toDataURL("image/png"));
-        }
+        if (!hasDrawn.current) return;
+        const url = canvas.toDataURL("image/png");
+        latestValueRef.current = url;
+        onDrawEndRef.current?.(url);
       };
 
       const onMouseDown = (e: MouseEvent) => {
@@ -128,7 +184,12 @@ const SignatureCanvas = forwardRef<SignatureCanvasRef, Props>(
         canvas.removeEventListener("touchmove", onTouchMove);
         canvas.removeEventListener("touchend", onTouchEnd);
       };
-    }, [height, onDrawEnd, onClear]);
+    }, [height]);
+
+    useEffect(() => {
+      latestValueRef.current = value ?? null;
+      restoreSignature(value ?? null);
+    }, [value]);
 
     return (
       <canvas

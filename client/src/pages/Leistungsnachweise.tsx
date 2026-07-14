@@ -33,10 +33,16 @@ export default function Leistungsnachweise() {
   const sigKundeRef = useRef<import("@/components/SignatureCanvas").SignatureCanvasRef>(null);
   const [previewMitarbeiter, setPreviewMitarbeiter] = useState<string | null>(null);
   const [previewKunde, setPreviewKunde] = useState<string | null>(null);
+  const [signaturMitarbeiter, setSignaturMitarbeiter] = useState<string | null>(null);
+  const [signaturKunde, setSignaturKunde] = useState<string | null>(null);
 
   const { data: kunden = [] } = trpc.kunden.list.useQuery();
   const getKundeName = (id: number) => { const k = kunden.find((c) => c.id === id); return k ? `${k.vorname} ${k.nachname}` : `Kunde #${id}`; };
   const { data: leistungen = [], refetch } = trpc.leistungen.list.useQuery();
+  const deleteLeistung = trpc.leistungen.delete.useMutation({
+    onSuccess: () => { refetch(); toast.success("🗑️ Leistungsnachweis gelöscht"); },
+    onError: (e) => toast.error("❌ " + e.message),
+  });
   const createLeistung = trpc.leistungen.create.useMutation({
     onSuccess: () => {
       refetch();
@@ -47,6 +53,8 @@ export default function Leistungsnachweise() {
       sigKundeRef.current?.clear();
       setPreviewMitarbeiter(null);
       setPreviewKunde(null);
+      setSignaturMitarbeiter(null);
+      setSignaturKunde(null);
     },
     onError: (e) => toast.error("❌ " + e.message),
   });
@@ -63,8 +71,8 @@ export default function Leistungsnachweise() {
       stunden: parseFloat(stunden) || 0,
       anzahlEinsaetze: parseInt(anzahl) || 1,
       bemerkung,
-      unterschriftLeister: (sigRef.current?.isEmpty() ? undefined : sigRef.current?.toDataURL()) ?? undefined,
-      unterschriftKunde: (sigKundeRef.current?.isEmpty() ? undefined : sigKundeRef.current?.toDataURL()) ?? undefined,
+      unterschriftLeister: signaturMitarbeiter ?? undefined,
+      unterschriftKunde: signaturKunde ?? undefined,
     });
   };
 
@@ -144,6 +152,14 @@ export default function Leistungsnachweise() {
                   >
                     📄 PDF
                   </button>
+                  <button
+                    onClick={() => { if (confirm("Leistungsnachweis wirklich löschen?")) deleteLeistung.mutate({ id: l.id }); }}
+                    title="Löschen"
+                    disabled={deleteLeistung.isPending}
+                    style={{ display: "block", marginTop: 4, padding: "4px 10px", background: "#fee2e2", color: "#dc2626", border: "1.5px solid #dc2626", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer" }}
+                  >
+                    🗑️ Löschen
+                  </button>
                 </div>
               </div>
             </div>
@@ -205,15 +221,22 @@ export default function Leistungsnachweise() {
           <SignatureCanvas
             ref={sigRef}
             height={120}
-            onDrawEnd={(url) => setPreviewMitarbeiter(url)}
-            onClear={() => setPreviewMitarbeiter(null)}
+            value={signaturMitarbeiter}
+            onDrawEnd={(url) => {
+              setSignaturMitarbeiter(url);
+              setPreviewMitarbeiter(url);
+            }}
+            onClear={() => {
+              setSignaturMitarbeiter(null);
+              setPreviewMitarbeiter(null);
+            }}
           />
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
             <button
               onClick={() => { sigRef.current?.clear(); }}
               style={{ padding: "7px 14px", background: "#fff", color: "#dc2626", border: "2px solid #fca5a5", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}
             >
-              <span style={{ fontSize: 14 }}>↺</span> Zurücksetzen
+              <span style={{ fontSize: 14 }}>↺</span> Neu unterschreiben
             </button>
             {previewMitarbeiter && (
               <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#f0fdf4", border: "1.5px solid #86efac", borderRadius: 8, padding: "4px 10px 4px 6px", flex: 1, minWidth: 0 }}>
@@ -233,8 +256,15 @@ export default function Leistungsnachweise() {
             <SignatureCanvas
               ref={sigKundeRef}
               height={120}
-              onDrawEnd={(url) => setPreviewKunde(url)}
-              onClear={() => setPreviewKunde(null)}
+              value={signaturKunde}
+              onDrawEnd={(url) => {
+                setSignaturKunde(url);
+                setPreviewKunde(url);
+              }}
+              onClear={() => {
+                setSignaturKunde(null);
+                setPreviewKunde(null);
+              }}
             />
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
@@ -242,7 +272,7 @@ export default function Leistungsnachweise() {
               onClick={() => { sigKundeRef.current?.clear(); }}
               style={{ padding: "7px 14px", background: "#fff", color: "#dc2626", border: "2px solid #fca5a5", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}
             >
-              <span style={{ fontSize: 14 }}>↺</span> Zurücksetzen
+              <span style={{ fontSize: 14 }}>↺</span> Neu unterschreiben
             </button>
             {previewKunde && (
               <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#f0fdf4", border: "1.5px solid #86efac", borderRadius: 8, padding: "4px 10px 4px 6px", flex: 1, minWidth: 0 }}>

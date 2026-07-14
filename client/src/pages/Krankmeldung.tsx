@@ -33,6 +33,11 @@ export default function Krankmeldung() {
     onError: (e) => toast.error(e.message),
   });
 
+  const deleteMut = trpc.krank.delete.useMutation({
+    onSuccess: () => { toast.success("Krankmeldung gelöscht"); refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
+
   function handleSubmit() {
     if (!von) { toast.error("Bitte Startdatum angeben."); return; }
     createMut.mutate({
@@ -156,9 +161,22 @@ export default function Krankmeldung() {
                 {m.notizen && (
                   <p className="text-xs text-gray-500 italic">{m.notizen}</p>
                 )}
-                <p className="text-xs text-gray-400 mt-1">
-                  Gemeldet: {new Date(m.createdAt).toLocaleDateString("de-DE")}
-                </p>
+                <div className="flex items-center justify-between mt-1">
+                  <p className="text-xs text-gray-400">
+                    Gemeldet: {new Date(m.createdAt).toLocaleDateString("de-DE")}
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs text-red-600 border-red-300 hover:bg-red-50 h-7 px-2"
+                    onClick={() => {
+                      if (confirm("Krankmeldung wirklich löschen?")) deleteMut.mutate({ id: m.id });
+                    }}
+                    disabled={deleteMut.isPending}
+                  >
+                    🗑️ Löschen
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ))}

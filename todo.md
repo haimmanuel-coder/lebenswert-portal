@@ -332,3 +332,31 @@
 - [x] Rollenverwaltung-Seite (Admin kann Rollen manuell zuteilen/entziehen)
 - [x] Backend: admin.updateRolle-Route mit Audit-Log
 - [x] 0 TypeScript-Fehler, 33/33 Tests bestanden
+
+## Phase 18 – Unterschriften-Persistenz & Lösch-Buttons
+
+- [ ] Unterschriften-Canvas: Unterschrift bleibt nach Zeichnen erhalten (kein Auto-Reset)
+- [ ] Unterschriften-Canvas: "Neu unterschreiben"-Button zum manuellen Löschen
+- [ ] Leistungsnachweise: Löschen-Button (mit Bestätigungsdialog)
+- [ ] Leistungsnachweise: Bearbeiten-Button (Status zurücksetzen auf offen)
+- [ ] Urlaubsanträge: Löschen-Button für eigene Anträge (Mitarbeiter) + Admin
+- [ ] Krankmeldungen: Löschen-Button für eigene Einträge (Mitarbeiter) + Admin
+- [ ] Kassenanfragen: Löschen-Button + Unterschrift neu zeichnen
+- [ ] Backend: delete-Routen für Leistungsnachweise, Urlaubsanträge, Krankmeldungen
+
+## Phase 16 – Unterschriften-Persistenz & Lösch-Buttons
+
+- [x] SignatureCanvas: value-Prop für persistente Anzeige gespeicherter Unterschriften
+- [x] SignatureCanvas: Neu-unterschreiben-Button (Löschen + neu zeichnen)
+- [x] Einsaetze.tsx: Unterschriften werden nach Speichern stabil angezeigt
+- [x] Leistungsnachweise.tsx: Unterschriften werden nach Speichern stabil angezeigt
+- [x] Kassenanfrage.tsx: Unterschriften werden nach Speichern stabil angezeigt
+- [x] Backend: deleteUrlaubsantrag in db.ts
+- [x] Backend: deleteKrankmeldung in db.ts
+- [x] Backend: deleteLeistung in db.ts
+- [x] Backend: urlaub.delete tRPC-Route (eigene Anträge oder Admin)
+- [x] Backend: krank.delete tRPC-Route (eigene Meldungen oder Admin)
+- [x] Backend: leistungen.delete tRPC-Route (eigene Nachweise oder Admin)
+- [x] Frontend: Lösch-Button in Urlaubsverwaltung.tsx
+- [x] Frontend: Lösch-Button in Krankmeldung.tsx
+- [x] Frontend: Lösch-Button in Leistungsnachweise.tsx

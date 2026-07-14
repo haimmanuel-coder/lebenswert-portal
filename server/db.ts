@@ -309,6 +309,12 @@ export async function createLeistung(data: InsertLeistung & { mitarbeiterId: num
   });
 }
 
+export async function deleteLeistung(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(leistungen).where(eq(leistungen.id, id));
+}
+
 export async function updateLeistungStatus(id: number, status: "offen" | "pruefung" | "freigegeben" | "versendet") {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
@@ -826,6 +832,12 @@ export async function updateUrlaubsantragStatus(
     .where(eq(urlaubsantraege.id, id));
 }
 
+export async function deleteUrlaubsantrag(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(urlaubsantraege).where(eq(urlaubsantraege.id, id));
+}
+
 // ── KRANKMELDUNGEN ───────────────────────────────────────────────────────
 export async function getAllKrankmeldungen() {
   const db = await getDb();
@@ -845,6 +857,12 @@ export async function createKrankmeldung(data: InsertKrankmeldung) {
   const db = await getDb();
   if (!db) throw new Error('DB not available');
   await db.insert(krankmeldungen).values(data);
+}
+
+export async function deleteKrankmeldung(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(krankmeldungen).where(eq(krankmeldungen.id, id));
 }
 
 // ── TOURENPLANUNG ──────────────────────────────────────────────────────────

@@ -31,6 +31,7 @@ import {
   getLeistungenByKunde,
   createLeistung,
   updateLeistungStatus,
+  deleteLeistung,
   getFahrtenByMitarbeiter,
   getAllFahrten,
   getFahrtenByKunde,
@@ -88,9 +89,11 @@ import {
   getUrlaubsantraegeByMitarbeiter,
   createUrlaubsantrag,
   updateUrlaubsantragStatus,
+  deleteUrlaubsantrag,
   getAllKrankmeldungen,
   getKrankmeldungenByMitarbeiter,
   createKrankmeldung,
+  deleteKrankmeldung,
   getAllTouren,
   getTourenByMitarbeiter,
   getTourenByDatum,
@@ -197,6 +200,18 @@ export const urlaubRouter = router({
       await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'UPDATE', ressource: 'urlaub', details: `id=${input.id} status=${input.status}`, status: 'success' });
       return { success: true };
     }),
+  delete: portalProtected
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input, ctx }) => {
+      const ma = await getMitarbeiterById(ctx.mitarbeiterId);
+      // Nur eigene Anträge löschen (oder Admin darf alle löschen)
+      const antraege = await getUrlaubsantraegeByMitarbeiter(ctx.mitarbeiterId);
+      const eigenerAntrag = antraege.find((a: { id: number }) => a.id === input.id);
+      if (!eigenerAntrag && ma?.rolle !== 'admin') throw new Error('Keine Berechtigung');
+      await deleteUrlaubsantrag(input.id);
+      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'DELETE', ressource: 'urlaub', details: `id=${input.id}`, status: 'success' });
+      return { success: true };
+    }),
 });
 
 export const krankRouter = router({
@@ -227,6 +242,17 @@ export const krankRouter = router({
         });
       }
       await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'CREATE', ressource: 'krankmeldung', status: 'success' });
+      return { success: true };
+    }),
+  delete: portalProtected
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input, ctx }) => {
+      const ma = await getMitarbeiterById(ctx.mitarbeiterId);
+      const meldungen = await getKrankmeldungenByMitarbeiter(ctx.mitarbeiterId);
+      const eigeneMeldung = meldungen.find((m: { id: number }) => m.id === input.id);
+      if (!eigeneMeldung && ma?.rolle !== 'admin') throw new Error('Keine Berechtigung');
+      await deleteKrankmeldung(input.id);
+      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'DELETE', ressource: 'krankmeldung', details: `id=${input.id}`, status: 'success' });
       return { success: true };
     }),
 });
@@ -721,6 +747,18 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         await updateLeistungStatus(input.id, input.status);
         await createAuditLog({ mitarbeiterId: ctx.adminId, action: "UPDATE", ressource: "leistung", details: `id=${input.id} status=${input.status}`, status: "success" });
+        return { success: true };
+      }),
+
+    delete: portalProtected
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(async ({ input, ctx }) => {
+        const ma = await getMitarbeiterById(ctx.mitarbeiterId);
+        const eigene = await getLeistungenByMitarbeiter(ctx.mitarbeiterId);
+        const eigeneLeistung = eigene.find((l: { id: number }) => l.id === input.id);
+        if (!eigeneLeistung && ma?.rolle !== 'admin') throw new Error('Keine Berechtigung');
+        await deleteLeistung(input.id);
+        await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'DELETE', ressource: 'leistung', details: `id=${input.id}`, status: 'success' });
         return { success: true };
       }),
   }),

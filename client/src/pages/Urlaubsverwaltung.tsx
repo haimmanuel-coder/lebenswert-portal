@@ -47,6 +47,11 @@ export default function Urlaubsverwaltung() {
     onError: (e) => toast.error(e.message),
   });
 
+  const deleteMut = trpc.urlaub.delete.useMutation({
+    onSuccess: () => { toast.success("Urlaubsantrag gelöscht"); refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
+
   function calcTage(von: string, bis: string) {
     if (!von || !bis) return 0;
     const d1 = new Date(von), d2 = new Date(bis);
@@ -184,9 +189,24 @@ export default function Urlaubsverwaltung() {
                     </Button>
                   </div>
                 )}
-                <p className="text-xs text-gray-400 mt-1">
-                  Eingereicht: {new Date(a.createdAt).toLocaleDateString("de-DE")}
-                </p>
+                <div className="flex items-center justify-between mt-1">
+                  <p className="text-xs text-gray-400">
+                    Eingereicht: {new Date(a.createdAt).toLocaleDateString("de-DE")}
+                  </p>
+                  {(a.status === "beantragt" || isAdmin) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs text-red-600 border-red-300 hover:bg-red-50 h-7 px-2"
+                      onClick={() => {
+                        if (confirm("Urlaubsantrag wirklich löschen?")) deleteMut.mutate({ id: a.id });
+                      }}
+                      disabled={deleteMut.isPending}
+                    >
+                      🗑️ Löschen
+                    </Button>
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))}
