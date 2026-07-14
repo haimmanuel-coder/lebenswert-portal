@@ -488,6 +488,8 @@ function KundeFormSheet({
     paragraph: initialData?.paragraph ?? "45b",
     kostentraegerId: String(initialData?.kostentraegerId ?? ""),
     versicherungsnummer: initialData?.versicherungsnummer ?? "",
+    wunschtag1: (initialData as any)?.wunschtag1 ?? "",
+    wunschtag2: (initialData as any)?.wunschtag2 ?? "",
     // Budget (nur bei Bearbeitung)
     budget45b: String(initialData?.budget45b ?? ""),
     budget45a: String(initialData?.budget45a ?? ""),
@@ -513,6 +515,8 @@ function KundeFormSheet({
       paragraph: form.paragraph as "45b" | "45a" | "39" | "privat",
       kostentraegerId: form.kostentraegerId ? parseInt(form.kostentraegerId) : null,
       versicherungsnummer: form.versicherungsnummer || undefined,
+      wunschtag1: (form as any).wunschtag1 || undefined,
+      wunschtag2: (form as any).wunschtag2 || undefined,
     };
     if (form.geburtsdatum) payload.geburtsdatum = form.geburtsdatum;
     if (isEdit) {
@@ -612,6 +616,32 @@ function KundeFormSheet({
         <div style={{ marginBottom: 10 }}>
           <label style={lbl}>Versicherungsnummer</label>
           <input style={inp} value={form.versicherungsnummer} onChange={e => set("versicherungsnummer", e.target.value)} placeholder="A123456789" />
+        </div>
+
+        {/* P1: Wunschtage */}
+        <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 10, marginTop: 16 }}>Wunschtage (P1)</div>
+        <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 10, padding: "10px 12px", marginBottom: 10, fontSize: 12, color: "#0369a1" }}>
+          ℹ️ Wunschtage werden beim Neukunden-Push an alle Mitarbeiter übermittelt.
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+          <div>
+            <label style={lbl}>Wunschtag 1</label>
+            <select style={{ ...inp, cursor: "pointer" }} value={(form as any).wunschtag1 ?? ""} onChange={e => set("wunschtag1", e.target.value)}>
+              <option value="">– kein Wunschtag –</option>
+              {["montag","dienstag","mittwoch","donnerstag","freitag","samstag","sonntag"].map(d => (
+                <option key={d} value={d}>{d.charAt(0).toUpperCase() + d.slice(1)}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label style={lbl}>Wunschtag 2</label>
+            <select style={{ ...inp, cursor: "pointer" }} value={(form as any).wunschtag2 ?? ""} onChange={e => set("wunschtag2", e.target.value)}>
+              <option value="">– kein Wunschtag –</option>
+              {["montag","dienstag","mittwoch","donnerstag","freitag","samstag","sonntag"].map(d => (
+                <option key={d} value={d}>{d.charAt(0).toUpperCase() + d.slice(1)}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* Budget (nur bei Bearbeitung) */}

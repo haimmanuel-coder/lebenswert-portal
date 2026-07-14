@@ -9,6 +9,81 @@ function fmtDate(d: string | Date | null | undefined) {
   return `${day}.${m}.${y}`;
 }
 
+// ── P2: DSGVO-Vertretungs-Übernahme-Panel ──────────────────────────────────────
+function VertretungsUebernahmePanel() {
+  const { data: meineAktiven = [] } = (trpc as any).vertretungUebernahme.meineAktiven.useQuery();
+  const [showUebernahme, setShowUebernahme] = useState(false);
+  const [urlaubsantragId, setUrlaubsantragId] = useState("");
+  const [kundenId, setKundenId] = useState("");
+  const [vollzugriffBis, setVollzugriffBis] = useState("");
+  const utils = trpc.useUtils();
+
+  const uebernehmen = (trpc as any).vertretungUebernahme.uebernahme.useMutation({
+    onSuccess: () => {
+      toast.success("✅ Vertretungs-Übernahme bestätigt! Vollzugriff aktiv.");
+      setShowUebernahme(false);
+      (utils as any).vertretungUebernahme.meineAktiven.invalidate();
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  return (
+    <div className="lw-card" style={{ marginBottom: "1.25rem", border: "2px solid #bae6fd" }}>
+      <div className="lw-card-header">
+        <div style={{ fontWeight: 700 }}>🛡️ DSGVO-Vertretungs-Übernahme (P2)</div>
+        <button className="lw-btn lw-btn-primary lw-btn-sm" onClick={() => setShowUebernahme(!showUebernahme)}>
+          {showUebernahme ? "Schließen" : "+ Übernahme bestätigen"}
+        </button>
+      </div>
+      <div className="lw-card-body">
+        <div style={{ fontSize: 13, color: "#0369a1", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, padding: "8px 12px", marginBottom: 12 }}>
+          ℹ️ Wenn du einen Kunden während des Urlaubs eines Kollegen übernimmst, bestätige hier die DSGVO-konforme Übernahme. Du erhältst temporären Vollzugriff auf die Kundendaten.
+        </div>
+
+        {/* Aktive Übernahmen */}
+        {(meineAktiven as any[]).length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#6b7280", marginBottom: 6 }}>AKTIVE ÜBERNAHMEN</div>
+            {(meineAktiven as any[]).map((v: any) => (
+              <div key={v.id} style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 8, padding: "8px 12px", marginBottom: 6, fontSize: 13 }}>
+                ✅ Kunde #{v.kundenId} – Vollzugriff bis {v.vollzugriffBis ? new Date(v.vollzugriffBis).toLocaleDateString("de-DE") : "–"}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Übernahme-Formular */}
+        {showUebernahme && (
+          <div style={{ display: "grid", gap: 10 }}>
+            <div>
+              <label className="lw-label">Urlaubsantrags-ID (vom Admin mitgeteilt)</label>
+              <input className="lw-input" type="number" value={urlaubsantragId} onChange={e => setUrlaubsantragId(e.target.value)} placeholder="z.B. 42" />
+            </div>
+            <div>
+              <label className="lw-label">Kunden-ID</label>
+              <input className="lw-input" type="number" value={kundenId} onChange={e => setKundenId(e.target.value)} placeholder="z.B. 7" />
+            </div>
+            <div>
+              <label className="lw-label">Vollzugriff bis (Datum)</label>
+              <input className="lw-input" type="date" value={vollzugriffBis} onChange={e => setVollzugriffBis(e.target.value)} />
+            </div>
+            <div style={{ background: "#fef9c3", border: "1px solid #fcd34d", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#92400e" }}>
+              ⚠️ <strong>DSGVO-Hinweis:</strong> Du bestätigst, dass du die Kundendaten nur für die Vertretungszeit und ausschließlich für die Pflege des Kunden nutzt. Nach Ablauf wird der Zugriff automatisch entzogen.
+            </div>
+            <button
+              className="lw-btn lw-btn-primary"
+              disabled={!urlaubsantragId || !kundenId || !vollzugriffBis || uebernehmen.isPending}
+              onClick={() => uebernehmen.mutate({ urlaubsantragId: Number(urlaubsantragId), kundenId: Number(kundenId), vollzugriffBisDatum: vollzugriffBis })}
+            >
+              {uebernehmen.isPending ? "Wird gespeichert..." : "✅ DSGVO-Übernahme bestätigen"}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Vertretungen() {
   const { data: me } = trpc.portal.me.useQuery();
   const isAdmin = me?.rolle === "admin";
@@ -177,6 +252,9 @@ export default function Vertretungen() {
           )}
         </div>
       )}
+
+      {/* P2: DSGVO-Vertretungs-Übernahme-UI */}
+      {!isAdmin && <VertretungsUebernahmePanel />}
 
       {/* Mitarbeiter-Ansicht: Eigene Vertretungen */}
       {!isAdmin && (

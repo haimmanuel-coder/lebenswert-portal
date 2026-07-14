@@ -310,20 +310,20 @@
 
 ## Phase 23 – Prozessdiagramm-Abgleich (P1–P5)
 
-- [ ] Schema: kunden.wunschtag1 und wunschtag2 (Wochentag-Enum) hinzufügen
-- [ ] Schema: mitarbeiter.hatDienstwagen (boolean) hinzufügen
-- [ ] Schema: neukundenPushBestaetigung Tabelle anlegen
-- [ ] Schema: einsaetze.anfahrtPauschale (decimal) und unterschreitungEskaliert (boolean) hinzufügen
-- [ ] DB-Migration ausführen
-- [ ] Backend: Neukunden-Push-Workflow (Bestätigungspflicht, 24h/48h-Eskalation)
-- [ ] Backend: DSGVO-Vertretungs-Push (Mindestdaten, Übernahme-Bestätigung, Vollzugriff)
-- [ ] Backend: Anfahrtspauschale 6€ automatisch bei Einsatz-Abschluss
-- [ ] Backend: Dienstwagen-Flag → 0€ Erstattung für Mitarbeiter, 0,35€/km für Kunden
-- [ ] Backend: Mindestzeit-Eskalation (3× Unterschreitung → Admin-Alert)
-- [ ] Frontend: Wunschtage im Kunden-Formular (Kundenliste.tsx)
-- [ ] Frontend: Dienstwagen-Flag im Mitarbeiterprofil (MitarbeiterDetail.tsx)
-- [ ] Frontend: Neukunden-Push-Bestätigungs-UI für Mitarbeiter (Dashboard)
-- [ ] Frontend: DSGVO-Vertretungs-Übernahme-UI (neue Seite Vertretung.tsx)
+- [x] Schema: kunden.wunschtag1 und wunschtag2 (Wochentag-Enum) hinzufügen
+- [x] Schema: mitarbeiter.hatDienstwagen (boolean) + fahrzeugTyp hinzufügen
+- [x] Schema: neukundenPushBestaetigung Tabelle anlegen
+- [x] Schema: einsaetze.anfahrtPauschale (decimal) und unterschreitungEskaliert (boolean) hinzufügen
+- [x] DB-Migration ausführen
+- [x] Backend: Neukunden-Push-Workflow (Bestätigungspflicht, 24h/48h-Eskalation)
+- [x] Backend: DSGVO-Vertretungs-Push (Mindestdaten, Übernahme-Bestätigung, Vollzugriff)
+- [x] Backend: Anfahrtspauschale 6€ automatisch bei Einsatz-Abschluss
+- [x] Backend: Dienstwagen-Flag → 0€ Erstattung für Mitarbeiter, 0,35€/km für Kunden
+- [x] Backend: Mindestzeit-Eskalation (3× Unterschreitung → Admin-Alert)
+- [x] Frontend: Wunschtage im Kunden-Formular (Kundenliste.tsx) – Wunschtag 1 & 2 Selects
+- [x] Frontend: Dienstwagen-Flag im Mitarbeiterprofil (MitarbeiterDetail.tsx) – DienstwagenCard
+- [x] Frontend: Neukunden-Push-Badge in Sidebar (PortalApp.tsx)
+- [x] Frontend: DSGVO-Vertretungs-Übernahme-UI in Vertretungen.tsx (VertretungsUebernahmePanel)
 
 ## Phase 23 – Fortschritt (Checkpoint)
 - [x] DB-Schema: neukundenPushBestaetigung, vertretungsUebernahmen Tabellen, dienstwagen/fahrzeugTyp, anfahrtPauschale, unterschreitungEskaliert, wunschtage
