@@ -312,3 +312,23 @@
 ### Qualität
 - [x] 0 TypeScript-Fehler
 - [x] 33/33 Tests bestanden
+
+## Phase 17 – Desktop-Sidebar & Rollenverwaltung
+
+- [ ] PortalApp.tsx: Bottom-Tabs durch permanente linke Sidebar ersetzen (Desktop)
+- [ ] Sidebar: 4 Sektionen (Übersicht, Kunden & Einsätze, Personal, Verwaltung)
+- [ ] Sidebar: Responsive – auf Mobile als Drawer/Hamburger-Menü
+- [ ] Sidebar: Aktiver Menüpunkt farblich hervorgehoben
+- [ ] Sidebar: Mitarbeiter-Name und Avatar unten in der Sidebar
+- [ ] Backend: admin.setRolle-Route (Admin setzt Rolle: admin|mitarbeiter)
+- [ ] Backend: Alle Mitarbeiter mit aktueller Rolle abrufen
+- [ ] Frontend: Rollenverwaltung.tsx – Mitarbeiter-Liste mit Rollen-Badge und Toggle-Button
+- [ ] Frontend: Bestätigungs-Dialog vor Rollen-Änderung
+- [ ] Navigation: Rollenverwaltung in Sidebar einbinden (Admin-only)
+
+## Phase 17 – Desktop-Sidebar & Rollenverwaltung ✅
+- [x] Desktop-Sidebar mit 4 Sektionen (Übersicht, Mitarbeiter, Kunden, Administration)
+- [x] Responsives Mobile-Hamburger-Menü
+- [x] Rollenverwaltung-Seite (Admin kann Rollen manuell zuteilen/entziehen)
+- [x] Backend: admin.updateRolle-Route mit Audit-Log
+- [x] 0 TypeScript-Fehler, 33/33 Tests bestanden

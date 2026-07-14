@@ -1039,6 +1039,17 @@ export const appRouter = router({
     }),
     mitarbeiterList: adminProcedure.query(async () => getAllMitarbeiter()),
 
+    updateRolle: adminProcedure
+      .input(z.object({
+        mitarbeiterId: z.number().int().positive(),
+        rolle: z.enum(["mitarbeiter", "admin"]),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await updateMitarbeiter(input.mitarbeiterId, { rolle: input.rolle } as any);
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "ADMIN", ressource: "mitarbeiter", details: `rolle=${input.rolle} id=${input.mitarbeiterId}`, status: "success" });
+        return { success: true };
+      }),
+
     mitarbeiterCreate: adminProcedure
       .input(z.object({
         vorname: z.string().min(1),

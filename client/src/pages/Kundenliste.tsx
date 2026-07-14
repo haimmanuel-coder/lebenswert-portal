@@ -383,7 +383,8 @@ function KundeFormSheet({
 }
 
 // ── HAUPTKOMPONENTE ───────────────────────────────────────────────────────────
-export default function Kundenliste() {
+interface KundenlisteProps { onKundeSelect?: (id: number) => void; }
+export default function Kundenliste({ onKundeSelect }: KundenlisteProps = {}) {
   const { mitarbeiter } = usePortalAuth();
   const isAdmin = mitarbeiter?.rolle === "admin";
 
