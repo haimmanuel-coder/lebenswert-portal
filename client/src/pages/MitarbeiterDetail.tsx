@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/_core/hooks/useAuth";
+import { usePortalAuth } from "@/contexts/PortalAuthContext";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -95,8 +95,8 @@ const BESCHAEFT_CONFIG: Record<Beschaeftigungsart, { label: string; color: strin
 };
 
 export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
-  const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const { mitarbeiter: portalUser } = usePortalAuth();
+  const isAdmin = portalUser?.rolle === 'admin';
   const [activeTab, setActiveTab] = useState<"stamm" | "zertifikat" | "vertrag">("stamm");
   const [editStamm, setEditStamm] = useState(false);
   const [editZert, setEditZert] = useState(false);

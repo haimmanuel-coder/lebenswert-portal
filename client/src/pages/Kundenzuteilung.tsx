@@ -5,14 +5,14 @@
  */
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/_core/hooks/useAuth";
+import { usePortalAuth } from "@/contexts/PortalAuthContext";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 
 export default function Kundenzuteilung() {
-  const { user } = useAuth();
-  const isAdmin = (user as any)?.rolle === "admin";
+  const { mitarbeiter } = usePortalAuth();
+  const isAdmin = mitarbeiter?.rolle === "admin";
 
   const [selectedMaId, setSelectedMaId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
@@ -148,7 +148,7 @@ export default function Kundenzuteilung() {
                       {ma.vorname} {ma.nachname}
                     </div>
                     <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 1 }}>
-                      {ma.rolle === "admin" ? "🔑 Admin" : "👤 Mitarbeiter"}
+                      {(ma as any).rolle === "admin" ? "🔑 Admin" : "👤 Mitarbeiter"}
                     </div>
                   </div>
                 );

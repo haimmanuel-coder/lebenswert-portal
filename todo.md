@@ -361,27 +361,27 @@
 ## Phase 25 – Heartbeat, Kundenzuteilung & Tourenplanung-Dashboard
 
 ### 1. Heartbeat-Jobs (Backend)
-- [ ] SDK-Patch: server/_core/sdk.ts – CRON_OPEN_ID_PREFIX + AuthenticatedUser + buildCronUser + cron short-circuit
-- [ ] SDK-Patch: server/_core/types/manusTypes.ts – taskUid Feld hinzufügen
-- [ ] Handler: /api/scheduled/neukunden-eskalation (POST) in server/_core/index.ts registrieren
-- [ ] Handler: /api/scheduled/vertretung-bereinigung (POST) in server/_core/index.ts registrieren
-- [ ] Heartbeat-Job per CLI: nightly-neukunden-eskalation (täglich 02:00 UTC)
-- [ ] Heartbeat-Job per CLI: nightly-vertretung-bereinigung (täglich 02:05 UTC)
+- [x] SDK-Patch: server/_core/sdk.ts – CRON_OPEN_ID_PREFIX + AuthenticatedUser + buildCronUser + cron short-circuit
+- [x] SDK-Patch: server/_core/types/manusTypes.ts – taskUid Feld hinzufügen
+- [x] Handler: /api/scheduled/neukunden-eskalation (POST) in server/_core/index.ts registriert
+- [x] Handler: /api/scheduled/vertretung-bereinigung (POST) in server/_core/index.ts registriert
+- [x] Heartbeat-Job per CLI: nightly-neukunden-eskalation (täglich 02:00 UTC)
+- [x] Heartbeat-Job per CLI: nightly-vertretung-bereinigung (täglich 02:05 UTC)
 
 ### 2. Admin-Kundenzuteilung (DB + Backend + Frontend)
-- [ ] DB-Schema: kunden.zugewiesenerMitarbeiterId (FK auf mitarbeiter) hinzufügen
-- [ ] DB-Migration ausführen
-- [ ] Backend: kunden.zuweisen Mutation (Admin only)
-- [ ] Backend: kunden.listMitZuweisung Query (Admin: alle, Mitarbeiter: nur eigene)
-- [ ] Frontend: Admin-Seite Kundenzuteilung – Tabelle mit Dropdown pro Kunde
-- [ ] Frontend: Kundenliste zeigt zugewiesenen Mitarbeiter
+- [x] DB-Schema: kundenZuordnung-Tabelle (mitarbeiterId, kundenId) bereits vorhanden
+- [x] DB-Migration bereits ausgeführt
+- [x] Backend: admin.setZuordnung Mutation (Admin only)
+- [x] Backend: admin.getZuordnung Query + touren.listZugewieseneKunden
+- [x] Frontend: Admin-Seite Kundenzuteilung.tsx mit Checkbox-Tabelle und sofortigem Speichern
+- [x] Frontend: Kundenzuteilung in Navigation eingebunden
 
 ### 3. Tourenplanung-Dashboard (Frontend)
-- [ ] 2-Wochen-Kalenderansicht (Montag–Sonntag, 14 Tage)
-- [ ] Kunden-Sidebar: nur dem ausgewählten Mitarbeiter zugewiesene Kunden
-- [ ] Drag-and-Drop: Kunde aus Sidebar auf Kalender-Tag ziehen → Tour/Besuch erstellen
-- [ ] Performance: Kundendaten im Hintergrund laden (keine UI-Blockierung)
-- [ ] Responsive: Desktop-optimiert, kein horizontales Scrollen
+- [x] 2-Wochen-Kalenderansicht (Montag–Sonntag, 14 Tage in 2×7-Grid)
+- [x] Kunden-Sidebar: nur dem ausgewählten Mitarbeiter zugewiesene Kunden
+- [x] Drag-and-Drop: Kunde aus Sidebar auf Kalender-Tag ziehen → Tour/Besuch erstellen
+- [x] Performance: Kundendaten per tRPC-Query im Hintergrund geladen
+- [x] Responsive: Desktop-optimiert, Sidebar + Kalender nebeneinander ohne horizontales Scrollen
 
 ## Phase 25 – Heartbeat, Kundenzuteilung, 2-Wochen-Kalender (ERLEDIGT ✅)
 - [x] Heartbeat-Handler in server/scheduledHandlers.ts erstellen (Neukunden-Eskalation + Vertretungs-Bereinigung)
