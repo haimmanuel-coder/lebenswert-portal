@@ -1,27 +1,15 @@
 import { z } from "zod";
-import { router, publicProcedure } from "../_core/trpc";
+import { router } from "../_core/trpc";
+import { portalProtected } from "../portalAuth";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
 import { datenschutzDokumente, datenschutzZustimmungen } from "../../drizzle/schema";
 import { eq, desc, and } from "drizzle-orm";
-import { jwtVerify } from "jose";
 
-const JWT_SECRET_KEY = new TextEncoder().encode(process.env.JWT_SECRET || "lebenswert-secret-key");
-
-async function getMaIdFromCtx(ctx: any): Promise<number | null> {
-  const authHeader = ctx.req?.headers?.authorization;
-  if (!authHeader?.startsWith("Bearer ")) return null;
-  try {
-    const { payload } = await jwtVerify(authHeader.slice(7), JWT_SECRET_KEY);
-    return typeof payload.mitarbeiterId === "number" ? payload.mitarbeiterId : null;
-  } catch {
-    return null;
-  }
-}
 
 export const datenschutzRouter = router({
   /** Aktuelle Datenschutzvereinbarung abrufen */
-  getAktuelle: publicProcedure.query(async () => {
+  getAktuelle: portalProtected.query(async () => {
     const db = await getDb();
     if (!db) return null;
     const rows = await db
@@ -34,9 +22,7 @@ export const datenschutzRouter = router({
   }),
 
   /** Prüfen ob der eingeloggte Mitarbeiter der aktuellen Version zugestimmt hat */
-  checkZustimmung: publicProcedure.query(async ({ ctx }) => {
-    const maId = await getMaIdFromCtx(ctx);
-    if (!maId) return { required: false, zugestimmt: true };
+  checkZustimmung: portalProtected.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) return { required: false, zugestimmt: true };
     // Aktuelle Version holen
@@ -54,7 +40,7 @@ export const datenschutzRouter = router({
       .from(datenschutzZustimmungen)
       .where(
         and(
-          eq(datenschutzZustimmungen.mitarbeiterId, maId),
+          eq(datenschutzZustimmungen.mitarbeiterId, ctx.mitarbeiterId),
           eq(datenschutzZustimmungen.dokumentId, dok.id)
         )
       )
@@ -67,11 +53,9 @@ export const datenschutzRouter = router({
   }),
 
   /** Zustimmung zur aktuellen Version aufzeichnen */
-  zustimmen: publicProcedure
+  zustimmen: portalProtected
     .input(z.object({ dokumentId: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      const maId = await getMaIdFromCtx(ctx);
-      if (!maId) throw new TRPCError({ code: "UNAUTHORIZED" });
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const dokRows = await db
@@ -82,7 +66,7 @@ export const datenschutzRouter = router({
       if (dokRows.length === 0) throw new TRPCError({ code: "NOT_FOUND" });
       const dok = dokRows[0];
       await db.insert(datenschutzZustimmungen).values({
-        mitarbeiterId: maId,
+        mitarbeiterId: ctx.mitarbeiterId,
         dokumentId: dok.id,
         dokumentVersion: dok.version,
       });
@@ -90,11 +74,9 @@ export const datenschutzRouter = router({
     }),
 
   /** Neues Datenschutzdokument erstellen (Admin) */
-  createDokument: publicProcedure
+  createDokument: portalProtected
     .input(z.object({ version: z.string(), titel: z.string(), inhalt: z.string(), typ: z.enum(["datenschutzerklaerung", "avv", "einwilligung", "loeschkonzept", "verarbeitungsverzeichnis"]).default("datenschutzerklaerung") }))
-    .mutation(async ({ ctx, input }) => {
-      const maId = await getMaIdFromCtx(ctx);
-      if (!maId) throw new TRPCError({ code: "UNAUTHORIZED" });
+    .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       // Alle alten als inaktiv setzen

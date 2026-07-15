@@ -1,36 +1,22 @@
 import { z } from "zod";
-import { router, publicProcedure } from "../_core/trpc";
+import { router } from "../_core/trpc";
+import { portalProtected, adminProcedure } from "../portalAuth";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
 import { integrationen, integrationsLaeufe, analyseSnapshots, backupProtokolle } from "../../drizzle/schema";
 import { eq, desc } from "drizzle-orm";
-import { jwtVerify } from "jose";
 
-const JWT_SECRET_KEY = new TextEncoder().encode(process.env.JWT_SECRET || "lebenswert-secret-key");
-
-async function getMaIdFromCtx(ctx: any): Promise<number | null> {
-  const authHeader = ctx.req?.headers?.authorization;
-  if (!authHeader?.startsWith("Bearer ")) return null;
-  try {
-    const { payload } = await jwtVerify(authHeader.slice(7), JWT_SECRET_KEY);
-    return typeof payload.mitarbeiterId === "number" ? payload.mitarbeiterId : null;
-  } catch {
-    return null;
-  }
-}
 
 export const integrationenRouter = router({
   /** Alle Integrationen abrufen */
-  list: publicProcedure.query(async ({ ctx }) => {
-    const maId = await getMaIdFromCtx(ctx);
-    if (!maId) throw new TRPCError({ code: "UNAUTHORIZED" });
+  list: portalProtected.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) return [];
     return db.select().from(integrationen).orderBy(desc(integrationen.createdAt));
   }),
 
   /** Integration erstellen oder aktualisieren */
-  upsert: publicProcedure
+  upsert: portalProtected
     .input(
       z.object({
         id: z.number().optional(),
@@ -41,8 +27,6 @@ export const integrationenRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const maId = await getMaIdFromCtx(ctx);
-      if (!maId) throw new TRPCError({ code: "UNAUTHORIZED" });
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       if (input.id) {
@@ -62,11 +46,9 @@ export const integrationenRouter = router({
     }),
 
   /** Verbindungstest simulieren */
-  testVerbindung: publicProcedure
+  testVerbindung: portalProtected
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      const maId = await getMaIdFromCtx(ctx);
-      if (!maId) throw new TRPCError({ code: "UNAUTHORIZED" });
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       // Simulierter Test: immer "Zugang fehlt" für OptaData/DATEV/Lexware
@@ -89,11 +71,9 @@ export const integrationenRouter = router({
     }),
 
   /** Letzte Läufe einer Integration */
-  listLaeufe: publicProcedure
+  listLaeufe: portalProtected
     .input(z.object({ integrationId: z.number() }))
     .query(async ({ ctx, input }) => {
-      const maId = await getMaIdFromCtx(ctx);
-      if (!maId) throw new TRPCError({ code: "UNAUTHORIZED" });
       const db = await getDb();
       if (!db) return [];
       return db
@@ -107,11 +87,9 @@ export const integrationenRouter = router({
 
 export const analysenRouter = router({
   /** Analyse-Snapshots abrufen */
-  list: publicProcedure
+  list: portalProtected
     .input(z.object({ typ: z.string().optional(), monat: z.string().optional() }))
     .query(async ({ ctx, input }) => {
-      const maId = await getMaIdFromCtx(ctx);
-      if (!maId) throw new TRPCError({ code: "UNAUTHORIZED" });
       const db = await getDb();
       if (!db) return [];
       return db
@@ -122,9 +100,7 @@ export const analysenRouter = router({
     }),
 
   /** Backup-Protokolle abrufen */
-  listBackups: publicProcedure.query(async ({ ctx }) => {
-    const maId = await getMaIdFromCtx(ctx);
-    if (!maId) throw new TRPCError({ code: "UNAUTHORIZED" });
+  listBackups: portalProtected.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) return [];
     return db
