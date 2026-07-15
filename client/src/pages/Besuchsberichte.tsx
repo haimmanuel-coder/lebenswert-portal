@@ -23,16 +23,18 @@ export default function Besuchsberichte() {
   const [tab, setTab] = useState<"meine" | "alle">(isAdmin ? "alle" : "meine");
   const [showCreate, setShowCreate] = useState(false);
   const [filterKunde, setFilterKunde] = useState("");
+  const [filterStatus, setFilterStatus] = useState<"alle" | "entwurf" | "eingereicht" | "genehmigt" | "abgelehnt">("alle");
+  const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  const { data: meineberichte = [], refetch: refetchMeine } = (trpc.besuchsberichte as any).getMeineBerichte.useQuery(
+  const { data: meineberichte = [], isLoading: loadingMeine, refetch: refetchMeine } = (trpc.besuchsberichte as any).getMeineBerichte.useQuery(
     undefined,
     { enabled: tab === "meine" }
   );
-  const { data: alleberichte = [], refetch: refetchAlle } = (trpc.besuchsberichte as any).getAlleBerichte.useQuery(
+  const { data: alleberichte = [], isLoading: loadingAlle, refetch: refetchAlle } = (trpc.besuchsberichte as any).getAlleBerichte.useQuery(
     undefined,
     { enabled: tab === "alle" && isAdmin }
   );
@@ -116,10 +118,18 @@ export default function Besuchsberichte() {
     onError: (e: any) => toast.error("❌ " + e.message),
   });
 
+  const isLoading = tab === "meine" ? loadingMeine : loadingAlle;
   const berichte = tab === "meine" ? (meineberichte as any[]) : (alleberichte as any[]);
-  const gefilterteBerichte = filterKunde
-    ? berichte.filter((b: any) => `${b.kunde?.vorname} ${b.kunde?.nachname}`.toLowerCase().includes(filterKunde.toLowerCase()))
-    : berichte;
+  let gefilterteBerichte = berichte.filter((b: any) => {
+    const matchKunde = !filterKunde || `${b.kunde?.vorname} ${b.kunde?.nachname}`.toLowerCase().includes(filterKunde.toLowerCase());
+    const matchStatus = filterStatus === "alle" || b.status === filterStatus;
+    return matchKunde && matchStatus;
+  });
+  gefilterteBerichte = [...gefilterteBerichte].sort((a: any, b: any) => {
+    const da = new Date(a.datum).getTime();
+    const db2 = new Date(b.datum).getTime();
+    return sortDir === "desc" ? db2 - da : da - db2;
+  });
 
   return (
     <div style={{ padding: "20px 16px 100px", maxWidth: 900, margin: "0 auto" }}>
@@ -160,18 +170,55 @@ export default function Besuchsberichte() {
         </div>
       )}
 
-      {/* Filter */}
-      <div style={{ marginBottom: 16 }}>
+      {/* Filter & Sortierung */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
         <input
           placeholder="🔍 Nach Kunde filtern..."
           value={filterKunde}
-          onChange={e => setFilterKunde(e.target.value)}
-          style={{ width: "100%", padding: "10px 14px", border: "2px solid #e5e7eb", borderRadius: 12, fontSize: 14, boxSizing: "border-box" }}
+          onChange={e => { setFilterKunde(e.target.value); }}
+          style={{ flex: 2, minWidth: 150, padding: "9px 14px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 13, boxSizing: "border-box" }}
         />
+        <select
+          value={filterStatus}
+          onChange={e => setFilterStatus(e.target.value as any)}
+          style={{ flex: 1, minWidth: 130, padding: "9px 10px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 13, background: "#fff", cursor: "pointer" }}
+        >
+          <option value="alle">Alle Status</option>
+          <option value="entwurf">Entwurf</option>
+          <option value="eingereicht">Eingereicht</option>
+          <option value="genehmigt">Genehmigt</option>
+          <option value="abgelehnt">Abgelehnt</option>
+        </select>
+        <button
+          onClick={() => setSortDir(d => d === "desc" ? "asc" : "desc")}
+          style={{ padding: "9px 14px", border: "2px solid #e5e7eb", borderRadius: 10, background: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 700, color: "#374151", whiteSpace: "nowrap" }}
+        >
+          {sortDir === "desc" ? "📅 Neueste ↓" : "📅 Älteste ↑"}
+        </button>
       </div>
 
+      {/* Skeleton-Ladeanimation */}
+      {isLoading && (
+        <>
+          <style>{`@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}`}</style>
+          <div style={{ display: "grid", gap: 12, marginBottom: 4 }}>
+            {[1, 2, 3].map(i => (
+              <div key={i} style={{ background: "#fff", borderRadius: 16, border: "1px solid #e5e7eb", padding: "18px 20px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+                  <div>
+                    <div style={{ width: 140, height: 14, borderRadius: 6, background: "linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s infinite", marginBottom: 8 }} />
+                    <div style={{ width: 200, height: 11, borderRadius: 6, background: "linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s infinite" }} />
+                  </div>
+                  <div style={{ width: 80, height: 26, borderRadius: 8, background: "linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s infinite" }} />
+                </div>
+                <div style={{ width: "90%", height: 11, borderRadius: 6, background: "linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s infinite" }} />
+              </div>
+            ))}
+          </div>
+        </>
+      )}
       {/* Berichte-Liste */}
-      <div style={{ display: "grid", gap: 12 }}>
+      {!isLoading && <div style={{ display: "grid", gap: 12 }}>
         {gefilterteBerichte.length === 0 ? (
           <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #e5e7eb", padding: "40px 20px", textAlign: "center", color: "#9ca3af" }}>
             <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
@@ -243,8 +290,7 @@ export default function Besuchsberichte() {
             );
           })
         )}
-      </div>
-
+      </div>}
       {/* Neuer Bericht Modal */}
       {showCreate && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>

@@ -520,3 +520,8 @@
 - [x] server/db.ts: getMitarbeiterByEmail try/catch (DB-Fehler → null statt throw)
 - [x] TypeScript: 0 Fehler (pnpm tsc --noEmit)
 - [x] Tests: 33/33 bestanden (pnpm test)
+
+## Phase 29 – UX-Verbesserungen
+- [x] Besuchsberichte: Filter nach Status (alle/eingereicht/genehmigt/korrektur), Sortierung nach Datum (neueste/älteste zuerst), Suchfeld nach Kundenname
+- [x] Ladeanimation (Skeleton) für Besuchsberichte beim Datenabruf
+- [x] Ladeanimation (Skeleton) für Verfügbarkeiten beim Datenabruf

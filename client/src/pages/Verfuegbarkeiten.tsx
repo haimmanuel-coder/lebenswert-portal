@@ -39,7 +39,7 @@ export default function Verfuegbarkeiten() {
     gueltigBis: "",
   });
 
-  const { data: liste = [], refetch } = (trpc as any).verfuegbarkeiten.list.useQuery({});
+  const { data: liste = [], isLoading, refetch } = (trpc as any).verfuegbarkeiten.list.useQuery({});
   const createMut = (trpc as any).verfuegbarkeiten.create.useMutation({
     onSuccess: () => { refetch(); setShowForm(false); toast.success("Verfügbarkeit gespeichert"); },
     onError: (e: any) => toast.error(e.message),
@@ -137,8 +137,27 @@ export default function Verfuegbarkeiten() {
         </div>
       )}
 
+      {/* Skeleton-Ladeanimation */}
+      {isLoading && (
+        <>
+          <style>{`@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}`}</style>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} style={{ background: "#fff", borderRadius: 12, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+                <div style={{ background: "#f9fafb", padding: "10px 16px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 80, height: 13, borderRadius: 6, background: "linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s infinite" }} />
+                </div>
+                <div style={{ padding: "12px 16px", display: "flex", gap: 8 }}>
+                  <div style={{ width: 110, height: 30, borderRadius: 8, background: "linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s infinite" }} />
+                  <div style={{ width: 90, height: 30, borderRadius: 8, background: "linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s infinite" }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
       {/* Wochenübersicht */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {!isLoading && <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {grouped.map(tag => (
           <div key={tag.value} style={{ background: "#fff", borderRadius: 12, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
             <div style={{ background: "#f9fafb", padding: "10px 16px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 10 }}>
@@ -173,7 +192,7 @@ export default function Verfuegbarkeiten() {
             )}
           </div>
         ))}
-      </div>
+      </div>}
     </div>
   );
 }
