@@ -56,8 +56,12 @@ export async function getUserByOpenId(openId: string) {
 export async function getMitarbeiterByEmail(email: string) {
   const db = await getDb();
   if (!db) return null;
-  const result = await db.select().from(mitarbeiter).where(eq(mitarbeiter.email, email)).limit(1);
-  return result[0] ?? null;
+  try {
+    const result = await db.select().from(mitarbeiter).where(eq(mitarbeiter.email, email)).limit(1);
+    return result[0] ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export async function getMitarbeiterById(id: number) {

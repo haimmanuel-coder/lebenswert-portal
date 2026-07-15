@@ -35,9 +35,9 @@ export const integrationenRouter = router({
       z.object({
         id: z.number().optional(),
         anbieter: z.string(),
-        name: z.string(),
-        modus: z.enum(["vorbereitet", "aktiv", "deaktiviert", "fehler"]).default("vorbereitet"),
-        endpoint: z.string().optional(),
+        bezeichnung: z.string(),
+        status: z.enum(["nicht_eingerichtet", "testmodus", "aktiv", "fehler", "pausiert"]).default("nicht_eingerichtet"),
+        basisUrl: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -48,14 +48,14 @@ export const integrationenRouter = router({
       if (input.id) {
         await db
           .update(integrationen)
-          .set({ modus: input.modus, endpoint: input.endpoint ?? null })
+          .set({ status: input.status, basisUrl: input.basisUrl ?? null })
           .where(eq(integrationen.id, input.id));
       } else {
         await db.insert(integrationen).values({
-          anbieter: input.anbieter,
-          name: input.name,
-          modus: input.modus,
-          endpoint: input.endpoint ?? null,
+          anbieter: input.anbieter as any,
+          bezeichnung: input.bezeichnung,
+          status: input.status,
+          basisUrl: input.basisUrl ?? null,
         });
       }
       return { success: true };
@@ -73,17 +73,17 @@ export const integrationenRouter = router({
       const rows = await db.select().from(integrationen).where(eq(integrationen.id, input.id)).limit(1);
       if (rows.length === 0) throw new TRPCError({ code: "NOT_FOUND" });
       const integration = rows[0];
-      const testOk = integration.modus === "aktiv" && !!integration.endpoint;
+      const testOk = integration.status === "aktiv" && !!integration.basisUrl;
       await db
         .update(integrationen)
-        .set({ letzterTest: new Date(), letzterTestStatus: testOk ? "ok" : "fehler" })
+        .set({ letzterTestAt: new Date(), letzterTestStatus: testOk ? "erfolg" : "fehler" })
         .where(eq(integrationen.id, input.id));
       // Lauf protokollieren
       await db.insert(integrationsLaeufe).values({
         integrationId: input.id,
-        status: testOk ? "erfolgreich" : "fehlgeschlagen",
-        fehlerCode: testOk ? null : "ZUGANG_FEHLT",
-        fehlerMeldung: testOk ? null : "Zugangsdaten fehlen oder Endpunkt nicht erreichbar",
+        typ: "test",
+        status: testOk ? "erfolg" : "fehler",
+        meldung: testOk ? null : "Zugangsdaten fehlen oder Endpunkt nicht erreichbar",
       });
       return { success: testOk, status: testOk ? "ok" : "fehler" };
     }),

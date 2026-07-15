@@ -91,7 +91,7 @@ export const datenschutzRouter = router({
 
   /** Neues Datenschutzdokument erstellen (Admin) */
   createDokument: publicProcedure
-    .input(z.object({ version: z.string(), titel: z.string(), inhalt: z.string() }))
+    .input(z.object({ version: z.string(), titel: z.string(), inhalt: z.string(), typ: z.enum(["datenschutzerklaerung", "avv", "einwilligung", "loeschkonzept", "verarbeitungsverzeichnis"]).default("datenschutzerklaerung") }))
     .mutation(async ({ ctx, input }) => {
       const maId = await getMaIdFromCtx(ctx);
       if (!maId) throw new TRPCError({ code: "UNAUTHORIZED" });
@@ -100,6 +100,7 @@ export const datenschutzRouter = router({
       // Alle alten als inaktiv setzen
       await db.update(datenschutzDokumente).set({ aktiv: false });
       await db.insert(datenschutzDokumente).values({
+        typ: input.typ,
         version: input.version,
         titel: input.titel,
         inhalt: input.inhalt,

@@ -60,9 +60,10 @@ export const besuchsberichteRouter = router({
       z.object({
         einsatzId: z.number(),
         kundenId: z.number(),
-        inhalt: z.string().optional(),
-        unterschriftMitarbeiter: z.string().optional(),
-        unterschriftKunde: z.string().optional(),
+        taetigkeiten: z.string().default(""),
+        beobachtungen: z.string().optional(),
+        besonderheiten: z.string().optional(),
+        naechsteSchritte: z.string().optional(),
         einreichen: z.boolean().default(false),
       })
     )
@@ -78,16 +79,17 @@ export const besuchsberichteRouter = router({
         .where(eq(besuchsberichte.einsatzId, input.einsatzId))
         .limit(1);
 
-      const zustand = input.einreichen ? "eingereicht" : "entwurf";
+      const status = input.einreichen ? "eingereicht" : "entwurf";
 
       if (existing.length > 0) {
         await db
           .update(besuchsberichte)
           .set({
-            inhalt: input.inhalt ?? existing[0].inhalt,
-            unterschriftMitarbeiter: input.unterschriftMitarbeiter ?? existing[0].unterschriftMitarbeiter,
-            unterschriftKunde: input.unterschriftKunde ?? existing[0].unterschriftKunde,
-            zustand,
+            taetigkeiten: input.taetigkeiten || existing[0].taetigkeiten,
+            beobachtungen: input.beobachtungen ?? existing[0].beobachtungen,
+            besonderheiten: input.besonderheiten ?? existing[0].besonderheiten,
+            naechsteSchritte: input.naechsteSchritte ?? existing[0].naechsteSchritte,
+            status,
           })
           .where(eq(besuchsberichte.id, existing[0].id));
         return { id: existing[0].id, success: true };
@@ -96,10 +98,12 @@ export const besuchsberichteRouter = router({
           einsatzId: input.einsatzId,
           kundenId: input.kundenId,
           mitarbeiterId: maId,
-          inhalt: input.inhalt ?? null,
-          unterschriftMitarbeiter: input.unterschriftMitarbeiter ?? null,
-          unterschriftKunde: input.unterschriftKunde ?? null,
-          zustand,
+          datum: new Date(),
+          taetigkeiten: input.taetigkeiten || "",
+          beobachtungen: input.beobachtungen ?? null,
+          besonderheiten: input.besonderheiten ?? null,
+          naechsteSchritte: input.naechsteSchritte ?? null,
+          status,
         });
         return { id: (result as any).insertId, success: true };
       }
@@ -116,8 +120,8 @@ export const besuchsberichteRouter = router({
       await db
         .update(besuchsberichte)
         .set({
-          zustand: input.ablehnen ? "abgelehnt" : "freigegeben",
-          freigegebenVonId: maId,
+          status: input.ablehnen ? "korrektur" : "freigegeben",
+          freigegebenVon: maId,
           freigegebenAt: new Date(),
         })
         .where(eq(besuchsberichte.id, input.id));
@@ -125,7 +129,7 @@ export const besuchsberichteRouter = router({
         mitarbeiterId: maId,
         action: "UPDATE",
         ressource: "besuchsbericht",
-        details: `id=${input.id} zustand=${input.ablehnen ? "abgelehnt" : "freigegeben"}`,
+        details: `id=${input.id} status=${input.ablehnen ? "korrektur" : "freigegeben"}`,
         status: "success",
       });
       return { success: true };

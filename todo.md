@@ -501,3 +501,22 @@
 - [ ] Backend: KI-Analysen (regelbasierte Basisprognose, optionales LLM für Erklärtexte)
 - [ ] Frontend: Spracheingabe-Button in Besuchsbericht (Mikrofon → Transkription → Vorschau)
 - [ ] Frontend: KI-Erklärtexte in Analyse-Dashboard
+
+## Phase 28 – TypeScript-Fehler-Bereinigung (0 Fehler, 33/33 Tests)
+
+- [x] pflichtenheftRouter.ts: einsaetze.zustand → einsaetze.status
+- [x] pflichtenheftRouter.ts: verfuegbarkeiten.wochentag Typ-Mismatch (number → enum string)
+- [x] pflichtenheftRouter.ts: besuchsberichte-Felder (status→zustand, datum→inhalt JSON, freigegebenVon→freigegebenVonId)
+- [x] pflichtenheftRouter.ts: integrationen-Felder (status→modus, verschluesselteZugangsdaten→konfiguration)
+- [x] pflichtenheftRouter.ts: integrationsLaeufe-Insert (gestartetVon/typ/meldung/beendetAt entfernt)
+- [x] pflichtenheftRouter.ts: datenschutzDokumente-Insert (gueltigAb/typ/dateiUrl entfernt, in inhalt gemappt)
+- [x] pflichtenheftRouter.ts: getOrSetCachedJson Argument-Reihenfolge korrigiert
+- [x] integrationenRouter.ts: letzterTestStatus "ok" → "erfolg"
+- [x] PflichtenheftCenter.tsx: wochentag useState number → enum string
+- [x] PflichtenheftCenter.tsx: save.mutate zeitVon/zeitBis → vonZeit/bisZeit
+- [x] PflichtenheftCenter.tsx: data.kennzahlen statt data direkt
+- [x] PflichtenheftCenter.tsx: JSON.parse([] || "[]") → JSON.parse("[]")
+- [x] drizzle/schema.ts: besuchsberichte.einsatzId nullable (optional)
+- [x] server/db.ts: getMitarbeiterByEmail try/catch (DB-Fehler → null statt throw)
+- [x] TypeScript: 0 Fehler (pnpm tsc --noEmit)
+- [x] Tests: 33/33 bestanden (pnpm test)

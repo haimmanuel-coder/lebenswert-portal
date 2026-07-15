@@ -34,17 +34,17 @@ export const verfuegbarkeitenRouter = router({
       return db
         .select()
         .from(verfuegbarkeiten)
-        .where(and(eq(verfuegbarkeiten.mitarbeiterId, targetId), eq(verfuegbarkeiten.aktiv, true)));
+        .where(eq(verfuegbarkeiten.mitarbeiterId, targetId));
     }),
 
   /** Verfügbarkeit erstellen */
   create: publicProcedure
     .input(
       z.object({
-        wochentag: WochentagEnum,
-        zeitVon: z.string(), // "HH:MM"
-        zeitBis: z.string(),
-        sollstunden: z.number().optional(),
+        wochentag: z.number().int().min(1).max(7), // 1=Mo...7=So
+        vonZeit: z.string(), // "HH:MM"
+        bisZeit: z.string(),
+        status: z.enum(["verfuegbar", "nicht_verfuegbar", "bevorzugt"]).default("verfuegbar"),
         gueltigVon: z.string().optional(),
         gueltigBis: z.string().optional(),
       })
@@ -57,13 +57,12 @@ export const verfuegbarkeitenRouter = router({
       await db.insert(verfuegbarkeiten).values({
         mitarbeiterId: maId,
         wochentag: input.wochentag,
-        zeitVon: input.zeitVon,
-        zeitBis: input.zeitBis,
-        sollstunden: input.sollstunden?.toString() ?? "0.00",
-        gueltigVon: input.gueltigVon ?? null,
-        gueltigBis: input.gueltigBis ?? null,
-        aktiv: true,
-      } as any);
+        vonZeit: input.vonZeit,
+        bisZeit: input.bisZeit,
+        status: input.status,
+        gueltigVon: input.gueltigVon ? new Date(`${input.gueltigVon}T00:00:00`) : null,
+        gueltigBis: input.gueltigBis ? new Date(`${input.gueltigBis}T00:00:00`) : null,
+      });
       return { success: true };
     }),
 
@@ -77,7 +76,7 @@ export const verfuegbarkeitenRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       await db
         .update(verfuegbarkeiten)
-        .set({ aktiv: false })
+        .set({ status: "nicht_verfuegbar" })
         .where(and(eq(verfuegbarkeiten.id, input.id), eq(verfuegbarkeiten.mitarbeiterId, maId)));
       return { success: true };
     }),
