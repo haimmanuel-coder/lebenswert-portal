@@ -427,22 +427,22 @@
 ## Phase 27 – Umsetzungskonzept vollständig implementieren
 
 ### Stufe 1 – Rollen, Berechtigungen, 2FA, Löschschutz
-- [ ] DB: mitarbeiter.rolle Enum um 'teamleitung' und 'buchhaltung' erweitern
-- [ ] DB: mitarbeiter 2FA-Felder (twoFactorEnabled, twoFactorSecret, twoFactorActivatedAt)
-- [ ] DB: zweiFaktorCodes Tabelle (Wiederherstellungscodes, gehasht, einmalig nutzbar)
-- [ ] DB: mitarbeiterBerechtigungen Tabelle (optionale Ausnahmen je Mitarbeiter)
-- [ ] DB: datenschutzDokumente Tabelle (versionierte Vereinbarungen)
-- [ ] DB: datenschutzZustimmungen Tabelle (Zustimmung je Nutzer und Version)
-- [ ] DB: backupProtokolle Tabelle (Sicherungsstatus ohne Sicherungsinhalt)
-- [ ] DB-Migration ausführen
-- [ ] Backend: Rollenverwaltung um teamleitung und buchhaltung erweitern
-- [ ] Backend: Berechtigungsmatrix serverseitig für alle Router-Procedures
-- [ ] Backend: TOTP-2FA einrichten (QR-Code, Verify, Disable, Wiederherstellungscodes)
+- [x] DB: mitarbeiter.rolle Enum um 'teamleitung' und 'buchhaltung' erweitern
+- [x] DB: mitarbeiter 2FA-Felder (twoFactorEnabled, twoFactorSecret, twoFactorActivatedAt)
+- [x] DB: zweiFaktorCodes Tabelle (Wiederherstellungscodes, gehasht, einmalig nutzbar)
+- [x] DB: mitarbeiterBerechtigungen Tabelle (optionale Ausnahmen je Mitarbeiter)
+- [x] DB: datenschutzDokumente Tabelle (versionierte Vereinbarungen)
+- [x] DB: datenschutzZustimmungen Tabelle (Zustimmung je Nutzer und Version)
+- [x] DB: backupProtokolle Tabelle (Sicherungsstatus ohne Sicherungsinhalt)
+- [x] DB-Migration ausführen
+- [x] Backend: Rollenverwaltung um teamleitung und buchhaltung erweitern
+- [x] Backend: Berechtigungsmatrix serverseitig für alle Router-Procedures
+- [x] Backend: TOTP-2FA einrichten (QR-Code, Verify, Disable, Wiederherstellungscodes)
 - [ ] Backend: Kunden-DSGVO-Archivierung (Soft-Delete Standard, Hard-Delete nur Admin+2FA+Texteingabe)
-- [ ] Backend: Datenschutzvereinbarung (create, getLatest, recordConsent, checkConsent)
-- [ ] Backend: Backup-Protokoll-Statusseite (letzter Lauf, Fehlerstatus)
+- [x] Backend: Datenschutzvereinbarung (create, getLatest, recordConsent, checkConsent)
+- [x] Backend: Backup-Protokoll-Statusseite (letzter Lauf, Fehlerstatus)
 - [ ] Backend: Pagination für alle großen Listen (kunden, mitarbeiter, einsaetze, fahrten)
-- [ ] Frontend: Rollenverwaltung.tsx um teamleitung und buchhaltung erweitern
+- [x] Frontend: Rollenverwaltung.tsx um teamleitung und buchhaltung erweitern
 - [ ] Frontend: 2FA-Einrichtungsseite (QR-Code, Code eingeben, Wiederherstellungscodes anzeigen)
 - [ ] Frontend: 2FA-Code-Eingabe beim Login
 - [ ] Frontend: DSGVO-Zustimmungsdialog beim ersten Login und bei neuer Version
@@ -450,9 +450,9 @@
 - [ ] Frontend: Pagination/Infinite Scroll in Kundenliste, Mitarbeiterliste, Einsätze
 
 ### Stufe 2 – Verfügbarkeit, Terminstatus, Navigation, Benachrichtigungen
-- [ ] DB: verfuegbarkeiten Tabelle (Wochentag, Zeitfenster, Gültigkeit, Sollstunden)
+- [x] DB: verfuegbarkeiten Tabelle (Wochentag, Zeitfenster, Gültigkeit, Sollstunden)
 - [ ] DB: einsatzAenderungen Tabelle (Änderungs-/Absagehistorie, Bestätigungsstatus)
-- [ ] Backend: Verfügbarkeits-CRUD (create, list, update, delete)
+- [x] Backend: Verfügbarkeits-CRUD (create, list, update, delete)
 - [ ] Backend: Einsatz-Änderungshistorie (recordChange, listChanges)
 - [ ] Backend: Automatische Terminbestätigung (In-App + Push bei Einsatz-Erstellung)
 - [ ] Backend: SMTP E-Mail-Benachrichtigungen (Konfiguration, Vorlagen, Versandprotokoll)
@@ -463,19 +463,19 @@
 - [ ] Frontend: Echtzeit-Polling für Benachrichtigungen (alle 30s)
 
 ### Stufe 3 – Besuchsberichte, Fotos, Formulare, PDFs
-- [ ] DB: besuchsberichte Tabelle (Inhalt, Zustand, Freigabe, Formularversion, Unterschriften)
-- [ ] DB: besuchsberichtDateien Tabelle (Fotos und Anhänge mit Metadaten)
-- [ ] DB: formularVorlagen Tabelle (versionierte, konfigurierbare Formularfelder)
-- [ ] Backend: besuchsberichte CRUD (create, list, update, approve)
+- [x] DB: besuchsberichte Tabelle (Inhalt, Zustand, Freigabe, Formularversion, Unterschriften)
+- [x] DB: besuchsberichtDateien Tabelle (Fotos und Anhänge mit Metadaten)
+- [x] DB: formularVorlagen Tabelle (versionierte, konfigurierbare Formularfelder)
+- [x] Backend: besuchsberichte CRUD (create, list, update, approve)
 - [ ] Backend: Foto-Upload für Besuchsberichte (S3)
-- [ ] Backend: Formularvorlagen CRUD
+- [x] Backend: Formularvorlagen CRUD
 - [ ] Backend: Serverseitige PDF-Generierung (Leistungsnachweise, Besuchsberichte, DSGVO)
 - [ ] Frontend: Besuchsbericht-Seite (Bericht pro Einsatz, Fotos, Kategorien, Unterschrift)
 - [ ] Frontend: Formularvorlagen-Verwaltung (Admin)
 - [ ] Frontend: Besuchsbericht-Freigabe (Teamleitung/Admin)
 
 ### Stufe 4 – Analysen, Prognosen, Exporte
-- [ ] DB: analyseSnapshots Tabelle (vorberechnete Monatskennzahlen und Prognosewerte)
+- [x] DB: analyseSnapshots Tabelle (vorberechnete Monatskennzahlen und Prognosewerte)
 - [ ] Backend: Umsatzprognose (geplante Einsätze × Stundensätze + historische Daten)
 - [ ] Backend: Mitarbeiter-Auslastungsanalyse (Soll/Ist-Stunden, Kapazität, Ampel)
 - [ ] Backend: Kundenzuwachs-Analyse (neu, aktiv, beendet, Nettoentwicklung)
@@ -486,9 +486,9 @@
 - [ ] Frontend: PDF/CSV-Export für alle Analysen
 
 ### Stufe 5 – Integrationen (vorbereitet, Zugang fehlt)
-- [ ] DB: integrationen Tabelle (Anbieter, Modus, Endpoint, Aktivstatus, verschlüsselte Konfiguration)
-- [ ] DB: integrationsLaeufe Tabelle (Übertragungsstatus, Wiederholungen, Fehlercode)
-- [ ] Backend: Integrationszentrum CRUD (create, list, update, testConnection)
+- [x] DB: integrationen Tabelle (Anbieter, Modus, Endpoint, Aktivstatus, verschlüsselte Konfiguration)
+- [x] DB: integrationsLaeufe Tabelle (Übertragungsstatus, Wiederholungen, Fehlercode)
+- [x] Backend: Integrationszentrum CRUD (create, list, update, testConnection)
 - [ ] Backend: OptaData Connector (vorbereitet, Status "Zugang fehlt")
 - [ ] Backend: DATEV Connector (CSV + optionaler API-Connector, Exporthistorie)
 - [ ] Backend: Lexware Connector (Mapping, Exporthistorie)

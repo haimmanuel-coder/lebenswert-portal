@@ -19,7 +19,7 @@ const typColor: Record<string, string> = {
 };
 
 export default function Benachrichtigungen() {
-  const { data: notifications = [], refetch } = trpc.notifications.list.useQuery();
+  const { data: notifications = [], refetch } = trpc.notifications.list.useQuery(undefined, { refetchInterval: 30000 });
 
   const markReadMut = trpc.notifications.markRead.useMutation({
     onSuccess: () => refetch(),

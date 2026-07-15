@@ -8,7 +8,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { sql, eq, desc } from "drizzle-orm";
 import { getDb } from "./db";
-import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter } from "../drizzle/schema";
+import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, einsatzAenderungen } from "../drizzle/schema";
 import {
   getMitarbeiterByEmail,
   getMitarbeiterById,
@@ -1070,10 +1070,37 @@ export const appRouter = router({
           }
         }
 
+                return { success: true };
+      }),
+    listChanges: portalProtected
+      .input(z.object({ einsatzId: z.number().int().positive() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        return db.select().from(einsatzAenderungen).where(eq(einsatzAenderungen.einsatzId, input.einsatzId)).orderBy(desc(einsatzAenderungen.createdAt)).limit(50);
+      }),
+    recordChange: portalProtected
+      .input(z.object({
+        einsatzId: z.number().int().positive(),
+        aenderungstyp: z.enum(["erstellt", "geaendert", "abgesagt", "verschoben", "bestaetigt", "abgelehnt"]),
+        aenderungsgrund: z.string().optional(),
+        alteDaten: z.string().optional(),
+        neueDaten: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.insert(einsatzAenderungen).values({
+          einsatzId: input.einsatzId,
+          aenderungstyp: input.aenderungstyp,
+          aenderungsgrund: input.aenderungsgrund ?? null,
+          alteDaten: input.alteDaten ?? null,
+          neueDaten: input.neueDaten ?? null,
+          geaendertVonId: ctx.mitarbeiterId,
+        });
         return { success: true };
       }),
   }),
-
   // ── LEISTUNGEN ───────────────────────────────────────
   leistungen: router({
     list: portalProtected.query(async ({ ctx }) => {
@@ -1454,7 +1481,7 @@ export const appRouter = router({
     updateRolle: adminProcedure
       .input(z.object({
         mitarbeiterId: z.number().int().positive(),
-        rolle: z.enum(["mitarbeiter", "admin"]),
+        rolle: z.enum(["mitarbeiter", "teamleitung", "buchhaltung", "admin"]),
       }))
       .mutation(async ({ input, ctx }) => {
         await updateMitarbeiter(input.mitarbeiterId, { rolle: input.rolle } as any);

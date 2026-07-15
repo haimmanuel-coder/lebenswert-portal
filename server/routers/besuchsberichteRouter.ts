@@ -6,6 +6,7 @@ import { besuchsberichte, besuchsberichtDateien, formularVorlagen } from "../../
 import { eq, desc, and } from "drizzle-orm";
 import { jwtVerify } from "jose";
 import { createAuditLog } from "../db";
+import { transcribeAudio } from "../_core/voiceTranscription";
 
 const JWT_SECRET_KEY = new TextEncoder().encode(process.env.JWT_SECRET || "lebenswert-secret-key");
 
@@ -208,5 +209,39 @@ export const besuchsberichteRouter = router({
         aktiv: true,
       });
       return { success: true };
+    }),
+
+  /** Meine Besuchsberichte abrufen */
+  getMeineBerichte: publicProcedure.query(async ({ ctx }) => {
+    const maId = await getMaIdFromCtx(ctx);
+    if (!maId) throw new TRPCError({ code: "UNAUTHORIZED" });
+    const db = await getDb();
+    if (!db) return [];
+    return db.select().from(besuchsberichte).where(eq(besuchsberichte.mitarbeiterId, maId)).orderBy(desc(besuchsberichte.datum)).limit(50);
+  }),
+
+  /** Alle Besuchsberichte abrufen (Admin) */
+  getAlleBerichte: publicProcedure.query(async ({ ctx }) => {
+    const maId = await getMaIdFromCtx(ctx);
+    if (!maId) throw new TRPCError({ code: "UNAUTHORIZED" });
+    const db = await getDb();
+    if (!db) return [];
+    return db.select().from(besuchsberichte).orderBy(desc(besuchsberichte.datum)).limit(100);
+  }),
+
+  /** Spracheingabe transkribieren (Whisper) */
+  transkribieren: publicProcedure
+    .input(z.object({ audioUrl: z.string(), sprache: z.string().default("de") }))
+    .mutation(async ({ ctx, input }) => {
+      const maId = await getMaIdFromCtx(ctx);
+      if (!maId) throw new TRPCError({ code: "UNAUTHORIZED" });
+      try {
+        const result = await transcribeAudio({ audioUrl: input.audioUrl, language: input.sprache });
+        if ("error" in result) throw new Error(result.error);
+        const r = result as any;
+        return { text: r.text ?? "", sprache: r.language ?? "de" };
+      } catch (e: any) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Transkription fehlgeschlagen: " + e.message });
+      }
     }),
 });

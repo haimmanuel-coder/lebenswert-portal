@@ -13,6 +13,8 @@ type Mitarbeiter = {
 
 const ROLLEN = [
   { value: "admin", label: "Administrator", icon: "🔑", color: "#dc2626", bg: "#fee2e2", desc: "Vollzugriff auf alle Bereiche, Benutzerverwaltung, Exporte, Logbuch" },
+  { value: "teamleitung", label: "Teamleitung", icon: "👥", color: "#7c3aed", bg: "#f5f3ff", desc: "Tourenplanung, Einsatzplanung, Mitarbeiterübersicht, Besuchsberichte freigeben" },
+  { value: "buchhaltung", label: "Buchhaltung", icon: "💼", color: "#b45309", bg: "#fffbeb", desc: "Kundenliste (lesend), Finanzen, DATEV-Export, Leistungsnachweise" },
   { value: "mitarbeiter", label: "Mitarbeiter", icon: "👤", color: "#4a8c3f", bg: "#f0fdf4", desc: "Zeiterfassung, eigene Einsätze, Kundenliste (lesend), Leistungsnachweise" },
 ];
 
@@ -38,18 +40,20 @@ export default function Rollenverwaltung() {
   const handleRolleChange = async (mitarbeiterId: number, neueRolle: string, name: string) => {
     setSaving(mitarbeiterId);
     try {
-      await updateRolleMut.mutateAsync({ mitarbeiterId, rolle: neueRolle as "admin" | "mitarbeiter" });
+      await updateRolleMut.mutateAsync({ mitarbeiterId, rolle: neueRolle as "admin" | "teamleitung" | "buchhaltung" | "mitarbeiter" });
       toast.success(`Rolle von ${name} auf "${neueRolle}" geändert`);
     } finally {
       setSaving(null);
     }
   };
 
-  const adminCount = (mitarbeiterListe as Mitarbeiter[]).filter((m) => m.rolle === "admin").length;
-  const mitarbeiterCount = (mitarbeiterListe as Mitarbeiter[]).filter((m) => m.rolle === "mitarbeiter").length;
+  const rollenCounts = ROLLEN.map(r => ({
+    ...r,
+    count: (mitarbeiterListe as Mitarbeiter[]).filter(m => m.rolle === r.value).length,
+  }));
 
   return (
-    <div style={{ padding: "24px 20px", maxWidth: 800, margin: "0 auto" }}>
+    <div style={{ padding: "24px 20px", maxWidth: 900, margin: "0 auto" }}>
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 22, fontWeight: 800, color: "#1f2937", margin: 0 }}>🔑 Rollenverwaltung</h1>
@@ -59,23 +63,21 @@ export default function Rollenverwaltung() {
       </div>
 
       {/* Statistik-Kacheln */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
-        <div style={{ background: "#fff", borderRadius: 12, padding: "14px 16px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", borderLeft: "4px solid #6b7280" }}>
-          <div style={{ fontSize: 22, fontWeight: 800, color: "#1f2937" }}>{(mitarbeiterListe as Mitarbeiter[]).length}</div>
-          <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 600 }}>Gesamt</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10, marginBottom: 24 }}>
+        <div style={{ background: "#fff", borderRadius: 12, padding: "12px 14px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", borderLeft: "4px solid #6b7280" }}>
+          <div style={{ fontSize: 20, fontWeight: 800, color: "#1f2937" }}>{(mitarbeiterListe as Mitarbeiter[]).length}</div>
+          <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600 }}>Gesamt</div>
         </div>
-        <div style={{ background: "#fff", borderRadius: 12, padding: "14px 16px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", borderLeft: "4px solid #dc2626" }}>
-          <div style={{ fontSize: 22, fontWeight: 800, color: "#dc2626" }}>{adminCount}</div>
-          <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 600 }}>Administratoren</div>
-        </div>
-        <div style={{ background: "#fff", borderRadius: 12, padding: "14px 16px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", borderLeft: "4px solid #4a8c3f" }}>
-          <div style={{ fontSize: 22, fontWeight: 800, color: "#4a8c3f" }}>{mitarbeiterCount}</div>
-          <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 600 }}>Mitarbeiter</div>
-        </div>
+        {rollenCounts.map(r => (
+          <div key={r.value} style={{ background: "#fff", borderRadius: 12, padding: "12px 14px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", borderLeft: `4px solid ${r.color}` }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: r.color }}>{r.count}</div>
+            <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600 }}>{r.label}</div>
+          </div>
+        ))}
       </div>
 
       {/* Rollen-Erklärung */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 }}>
         {ROLLEN.map((r) => (
           <div key={r.value} style={{ background: r.bg, border: `1.5px solid ${r.color}33`, borderRadius: 12, padding: "12px 14px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
@@ -110,7 +112,7 @@ export default function Rollenverwaltung() {
           </div>
         )}
         {filtered.map((m) => {
-          const currentRolle = ROLLEN.find((r) => r.value === m.rolle) ?? ROLLEN[1];
+          const currentRolle = ROLLEN.find((r) => r.value === m.rolle) ?? ROLLEN[3];
           const isSaving = saving === m.id;
           return (
             <div key={m.id} style={{
@@ -149,7 +151,7 @@ export default function Rollenverwaltung() {
                 </div>
 
                 {/* Rollen-Buttons */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, flexShrink: 0, maxWidth: 280, justifyContent: "flex-end" }}>
                   {ROLLEN.map((r) => {
                     const isActive = m.rolle === r.value;
                     return (
@@ -158,19 +160,19 @@ export default function Rollenverwaltung() {
                         disabled={isActive || isSaving}
                         onClick={() => handleRolleChange(m.id, r.value, `${m.vorname} ${m.nachname}`)}
                         style={{
-                          padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+                          padding: "5px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700,
                           cursor: isActive || isSaving ? "default" : "pointer",
                           border: isActive ? `2px solid ${r.color}` : "2px solid #e5e7eb",
                           background: isActive ? r.bg : "#f9fafb",
                           color: isActive ? r.color : "#6b7280",
                           opacity: isSaving ? 0.6 : 1,
                           transition: "all 0.15s",
-                          minWidth: 130,
-                          display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                          minWidth: 120,
+                          display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
                         }}
                       >
                         {isSaving && !isActive ? (
-                          <span style={{ fontSize: 12 }}>⏳</span>
+                          <span style={{ fontSize: 11 }}>⏳</span>
                         ) : (
                           <span>{r.icon}</span>
                         )}
@@ -192,7 +194,7 @@ export default function Rollenverwaltung() {
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#92400e", marginBottom: 3 }}>Wichtiger Hinweis</div>
             <p style={{ fontSize: 12, color: "#78350f", margin: 0, lineHeight: 1.6 }}>
-              Rollenänderungen wirken sofort. Wenn du einem Mitarbeiter die Admin-Rolle gibst, hat er vollen Zugriff auf alle Daten, Exporte und die Benutzerverwaltung. Entziehe Admin-Rechte nur, wenn du sicher bist. Es muss immer mindestens ein Administrator im System verbleiben.
+              Rollenänderungen wirken sofort. Teamleitung darf Touren planen und Besuchsberichte freigeben. Buchhaltung hat Zugriff auf Finanzdaten und DATEV-Export. Wenn du einem Mitarbeiter die Admin-Rolle gibst, hat er vollen Zugriff auf alle Daten. Es muss immer mindestens ein Administrator im System verbleiben.
             </p>
           </div>
         </div>

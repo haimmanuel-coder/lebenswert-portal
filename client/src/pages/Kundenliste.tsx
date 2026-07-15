@@ -696,6 +696,8 @@ export default function Kundenliste({ onKundeSelect }: { onKundeSelect?: (id: nu
   const [editKunde, setEditKunde] = useState<KundeDetail | null>(null);
   const [showNeuSheet, setShowNeuSheet] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [seite, setSeite] = useState(1);
+  const ITEMS_PER_PAGE = 20;
 
   const createKunde = trpc.kunden.create.useMutation({
     onSuccess: () => { utils.kunden.list.invalidate(); setShowNeuSheet(false); toast.success("✅ Kunde angelegt"); },
@@ -751,6 +753,8 @@ export default function Kundenliste({ onKundeSelect }: { onKundeSelect?: (id: nu
   if (sortBy === "name") gefiltert.sort((a, b) => a.nachname.localeCompare(b.nachname));
   else if (sortBy === "pflegegrad") gefiltert.sort((a, b) => (b.pflegegrad ?? 0) - (a.pflegegrad ?? 0));
   else if (sortBy === "budget") gefiltert.sort((a, b) => toNum(b.budget45b) - toNum(a.budget45b));
+  const gesamtSeiten = Math.max(1, Math.ceil(gefiltert.length / ITEMS_PER_PAGE));
+  const angezeigt = gefiltert.slice((seite - 1) * ITEMS_PER_PAGE, seite * ITEMS_PER_PAGE);
 
   const inputStyle: React.CSSProperties = { width: "100%", padding: "10px 12px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, outline: "none", boxSizing: "border-box", background: "#fff" };
   const selectStyle: React.CSSProperties = { padding: "8px 10px", border: "2px solid #e5e7eb", borderRadius: 8, fontSize: 13, outline: "none", background: "#fff", cursor: "pointer" };
@@ -844,9 +848,18 @@ export default function Kundenliste({ onKundeSelect }: { onKundeSelect?: (id: nu
           )}
         </div>
       ) : (
-        gefiltert.map(k => (
-          <KundenKarte key={k.id} k={k} onClick={() => setSelectedKunde(k)} istKritisch={kritischeKundenIds.has(k.id)} />
-        ))
+        <>
+          {angezeigt.map(k => (
+            <KundenKarte key={k.id} k={k} onClick={() => setSelectedKunde(k)} istKritisch={kritischeKundenIds.has(k.id)} />
+          ))}
+          {gesamtSeiten > 1 && (
+            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 8, marginTop: 16, paddingBottom: 8 }}>
+              <button onClick={() => setSeite(s => Math.max(1, s - 1))} disabled={seite === 1} style={{ padding: "6px 14px", borderRadius: 8, border: "1.5px solid #e5e7eb", background: seite === 1 ? "#f3f4f6" : "#fff", cursor: seite === 1 ? "default" : "pointer", fontWeight: 700, fontSize: 14 }}>‹</button>
+              <span style={{ fontSize: 13, color: "#6b7280" }}>Seite {seite} / {gesamtSeiten} ({gefiltert.length} Kunden)</span>
+              <button onClick={() => setSeite(s => Math.min(gesamtSeiten, s + 1))} disabled={seite === gesamtSeiten} style={{ padding: "6px 14px", borderRadius: 8, border: "1.5px solid #e5e7eb", background: seite === gesamtSeiten ? "#f3f4f6" : "#fff", cursor: seite === gesamtSeiten ? "default" : "pointer", fontWeight: 700, fontSize: 14 }}>›</button>
+            </div>
+          )}
+        </>
       )}
 
       {/* Detail-Sheet */}

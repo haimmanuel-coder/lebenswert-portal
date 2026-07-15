@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { usePortalAuth } from "@/contexts/PortalAuthContext";
 import { toast } from "sonner";
@@ -10,12 +10,23 @@ const STATUS_FARBEN: Record<string, { bg: string; color: string; border: string 
   abgelehnt: { bg: "#fef2f2", color: "#991b1b", border: "#fca5a5" },
 };
 
+const STIMMUNG_LABELS: Record<string, string> = {
+  sehr_gut: "😊 Sehr gut",
+  gut: "🙂 Gut",
+  neutral: "😐 Neutral",
+  besorgniserregend: "😟 Besorgniserregend",
+};
+
 export default function Besuchsberichte() {
   const { mitarbeiter } = usePortalAuth() as any;
   const isAdmin = mitarbeiter?.rolle === "admin";
   const [tab, setTab] = useState<"meine" | "alle">(isAdmin ? "alle" : "meine");
   const [showCreate, setShowCreate] = useState(false);
   const [filterKunde, setFilterKunde] = useState("");
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   const { data: meineberichte = [], refetch: refetchMeine } = (trpc.besuchsberichte as any).getMeineBerichte.useQuery(
     undefined,
@@ -39,6 +50,57 @@ export default function Besuchsberichte() {
     unterschriftKunde: false,
   });
 
+  const transkribierenMut = (trpc.besuchsberichte as any).transkribieren.useMutation({
+    onSuccess: (data: any) => {
+      setForm(f => ({ ...f, inhalt: f.inhalt ? f.inhalt + " " + data.text : data.text }));
+      setIsTranscribing(false);
+      toast.success("🎤 Sprache transkribiert!");
+    },
+    onError: (e: any) => {
+      setIsTranscribing(false);
+      toast.error("Transkription fehlgeschlagen: " + e.message);
+    },
+  });
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      audioChunksRef.current = [];
+      mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      mr.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        if (blob.size > 16 * 1024 * 1024) {
+          toast.error("Aufnahme zu lang (max. 16 MB)");
+          setIsTranscribing(false);
+          return;
+        }
+        setIsTranscribing(true);
+        const formData = new FormData();
+        formData.append("file", blob, "aufnahme.webm");
+        try {
+          const res = await fetch("/api/upload/audio", { method: "POST", body: formData });
+          const { url } = await res.json();
+          transkribierenMut.mutate({ audioUrl: url, sprache: "de" });
+        } catch {
+          setIsTranscribing(false);
+          toast.error("Upload fehlgeschlagen");
+        }
+      };
+      mr.start();
+      mediaRecorderRef.current = mr;
+      setIsRecording(true);
+    } catch {
+      toast.error("Mikrofon-Zugriff verweigert");
+    }
+  };
+
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop();
+    setIsRecording(false);
+  };
+
   const createBericht = (trpc.besuchsberichte as any).create.useMutation({
     onSuccess: () => {
       toast.success("✅ Besuchsbericht gespeichert!");
@@ -58,13 +120,6 @@ export default function Besuchsberichte() {
   const gefilterteBerichte = filterKunde
     ? berichte.filter((b: any) => `${b.kunde?.vorname} ${b.kunde?.nachname}`.toLowerCase().includes(filterKunde.toLowerCase()))
     : berichte;
-
-  const STIMMUNG_LABELS: Record<string, string> = {
-    sehr_gut: "😊 Sehr gut",
-    gut: "🙂 Gut",
-    neutral: "😐 Neutral",
-    besorgniserregend: "😟 Besorgniserregend",
-  };
 
   return (
     <div style={{ padding: "20px 16px 100px", maxWidth: 900, margin: "0 auto" }}>
@@ -248,12 +303,33 @@ export default function Besuchsberichte() {
                 </div>
               </div>
 
+              {/* Bericht-Feld mit Spracheingabe */}
               <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", display: "block", marginBottom: 4 }}>Bericht *</label>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase" }}>Bericht *</label>
+                  <button
+                    type="button"
+                    onClick={isRecording ? stopRecording : startRecording}
+                    disabled={isTranscribing}
+                    style={{
+                      background: isRecording ? "#dc2626" : "#4a8c3f",
+                      color: "#fff", border: "none", borderRadius: 8,
+                      padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer",
+                      display: "flex", alignItems: "center", gap: 4,
+                    }}
+                  >
+                    {isTranscribing ? "⏳ Transkribiere..." : isRecording ? "⏹ Aufnahme stoppen" : "🎤 Spracheingabe"}
+                  </button>
+                </div>
+                {isRecording && (
+                  <div style={{ background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 8, padding: "6px 10px", marginBottom: 6, fontSize: 11, color: "#dc2626", fontWeight: 700 }}>
+                    🔴 Aufnahme läuft... Klicke auf "Aufnahme stoppen" wenn fertig.
+                  </div>
+                )}
                 <textarea
                   value={form.inhalt}
                   onChange={e => setForm(f => ({ ...f, inhalt: e.target.value }))}
-                  placeholder="Beschreibe den Besuch, Beobachtungen, Besonderheiten..."
+                  placeholder="Beschreibe den Besuch, Beobachtungen, Besonderheiten... oder nutze die Spracheingabe."
                   rows={4}
                   style={{ width: "100%", padding: "10px 12px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 13, boxSizing: "border-box", resize: "vertical" }}
                 />

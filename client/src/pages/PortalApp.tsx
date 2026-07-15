@@ -35,6 +35,10 @@ import Besuchsberichte from "./Besuchsberichte";
 import Datenschutz from "./Datenschutz";
 import Integrationen from "./Integrationen";
 import PflichtenheftCenter from "./PflichtenheftCenter";
+import ZweiFaktor from "./ZweiFaktor";
+import Verfuegbarkeiten from "./Verfuegbarkeiten";
+import AnalyseDashboard from "./AnalyseDashboard";
+import BackupStatus from "./BackupStatus";
 import OnboardingTour, { useOnboardingTour } from "@/components/OnboardingTour";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 
@@ -47,7 +51,8 @@ type PageId =
   | "profil" | "leistungsfreigabe" | "buchhaltung"
   | "mitarbeiterakte" | "logbuch" | "vertretungen"
   | "admindashboard" | "rollenverwaltung" | "kundenzuteilung"
-  | "besuchsberichte" | "datenschutz" | "integrationen" | "arbeitszentrum";
+  | "besuchsberichte" | "datenschutz" | "integrationen" | "arbeitszentrum"
+  | "zweifaktor" | "verfuegbarkeiten" | "analysen" | "backupstatus";
 
 interface NavItem {
   id: PageId;
@@ -146,9 +151,13 @@ export default function PortalApp() {
           { id: "besuchsberichte" as PageId, icon: "📋", label: "Besuchsberichte" },
           { id: "integrationen" as PageId, icon: "🔌", label: "Integrationen", adminOnly: true },
           { id: "datenschutz" as PageId, icon: "🔐", label: "Datenschutz" },
+          { id: "analysen" as PageId, icon: "📊", label: "Analysen", adminOnly: true },
+          { id: "backupstatus" as PageId, icon: "💾", label: "Backup-Status", adminOnly: true },
         ] : [
           { id: "export" as PageId, icon: "📮", label: "Export & Briefe" },
         ]),
+        { id: "zweifaktor" as PageId, icon: "🔒", label: "2FA-Sicherheit" },
+        { id: "verfuegbarkeiten" as PageId, icon: "📅", label: "Verfügbarkeiten" },
       ],
     },
   ];
@@ -190,6 +199,10 @@ export default function PortalApp() {
       case "datenschutz": return <Datenschutz />;
       case "integrationen": return <Integrationen />;
       case "arbeitszentrum": return <PflichtenheftCenter />;
+      case "zweifaktor": return <ZweiFaktor />;
+      case "verfuegbarkeiten": return <Verfuegbarkeiten />;
+      case "analysen": return <AnalyseDashboard />;
+      case "backupstatus": return <BackupStatus />;
       default: return <Dashboard />;
     }
   };
