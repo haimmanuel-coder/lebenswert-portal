@@ -1330,3 +1330,46 @@ export async function getUnterschreitungsZaehler(mitarbeiterId: number): Promise
     ));
   return rows.length;
 }
+
+// ── P1: NEUKUNDEN-PUSH ESKALATION ─────────────────────────────────────────────
+
+/** Gibt alle unbestätigten Einträge zurück, die älter als `minAgeMs` Millisekunden sind */
+export async function getStaleNeukundenPush(minAgeMs: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const grenze = new Date(Date.now() - minAgeMs);
+  return db.select().from(neukundenPushBestaetigung)
+    .where(and(
+      sql`${neukundenPushBestaetigung.bestaetigtAt} IS NULL`,
+      sql`${neukundenPushBestaetigung.createdAt} < ${grenze}`
+    ));
+}
+
+/** Erhöht die Eskalationsstufe eines Neukunden-Push-Eintrags */
+export async function eskaliereNeukundenPush(id: number, stufe: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(neukundenPushBestaetigung)
+    .set({ eskalationsstufe: stufe })
+    .where(eq(neukundenPushBestaetigung.id, id));
+}
+
+// ── P2: VERTRETUNGS-BEREINIGUNG ───────────────────────────────────────────────
+
+/** Gibt alle abgelaufenen Vertretungs-Übernahmen zurück (vollzugriffBis < jetzt) */
+export async function getAbgelaufeneVertretungen() {
+  const db = await getDb();
+  if (!db) return [];
+  const jetzt = new Date();
+  return db.select().from(vertretungsUebernahmen)
+    .where(sql`${vertretungsUebernahmen.vollzugriffBis} < ${jetzt}`);
+}
+
+/** Deaktiviert eine Vertretungs-Übernahme (setzt vollzugriffBis auf jetzt) */
+export async function deaktiviereVertretung(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(vertretungsUebernahmen)
+    .set({ vollzugriffBis: new Date() })
+    .where(eq(vertretungsUebernahmen.id, id));
+}

@@ -29,7 +29,7 @@ type FilterType = "alle" | "geplant" | "abgeschlossen";
 export default function Einsaetze() {
   const [filter, setFilter] = useState<FilterType>("alle");
   const [abschlussOpen, setAbschlussOpen] = useState(false);
-  const [activeEinsatz, setActiveEinsatz] = useState<{ id: number; name: string; datum: string } | null>(null);
+  const [activeEinsatz, setActiveEinsatz] = useState<{ id: number; name: string; datum: string; dauerStunden?: number | null } | null>(null);
   const [bericht, setBericht] = useState("");
   const [gesundheit, setGesundheit] = useState<"gut" | "stabil" | "auffaellig" | "kritisch">("gut");
   const [bemerkung, setBemerkung] = useState("");
@@ -74,8 +74,8 @@ export default function Einsaetze() {
     return db2.localeCompare(da);
   });
 
-  const handleAbschluss = (id: number, name: string, datum: string) => {
-    setActiveEinsatz({ id, name, datum });
+  const handleAbschluss = (id: number, name: string, datum: string, dauerStunden?: number | null) => {
+    setActiveEinsatz({ id, name, datum, dauerStunden });
     setBericht(""); setBemerkung(""); setGesundheit("gut");
     setSignaturMitarbeiter(null);
     setSignaturKunde(null);
@@ -181,7 +181,7 @@ export default function Einsaetze() {
                   {e.status === "geplant" && (
                     <div>
                       <button
-                        onClick={() => handleAbschluss(e.id, getKundeName(e.kundenId), fmtDate(datum))}
+                        onClick={() => handleAbschluss(e.id, getKundeName(e.kundenId), fmtDate(datum), e.dauerStunden != null ? parseFloat(String(e.dauerStunden)) : null)}
                         style={{
                           marginTop: 6, padding: "7px 12px", background: "#4a8c3f", color: "#fff",
                           border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer",
@@ -203,6 +203,16 @@ export default function Einsaetze() {
         {activeEinsatz && (
           <div style={{ background: "#dbeafe", border: "1px solid #93c5fd", color: "#1e40af", padding: "11px 13px", borderRadius: 10, fontSize: 13, marginBottom: 14 }}>
             Einsatz bei {activeEinsatz.name} am {activeEinsatz.datum}
+          </div>
+        )}
+        {/* P3: Mindestzeit-Warnung im Abschluss-Modal */}
+        {activeEinsatz?.dauerStunden != null && activeEinsatz.dauerStunden < 1.5 && (
+          <div style={{ background: "#fef9c3", border: "1.5px solid #fde047", color: "#854d0e", padding: "10px 13px", borderRadius: 10, fontSize: 13, marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 18 }}>⚠️</span>
+            <div>
+              <strong>Mindestzeit unterschritten!</strong><br />
+              Dieser Einsatz dauert nur {activeEinsatz.dauerStunden}h – Mindestdauer sind 1,5h (90 Min). Der Admin wird automatisch informiert.
+            </div>
           </div>
         )}
         <div style={{ marginBottom: 14 }}>

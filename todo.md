@@ -344,3 +344,16 @@
 - [x] Frontend: Tourenplanung.tsx – Abwesenheits-Konflikt-Warnung beim Tour-Erstellen (P4)
 - [x] TypeScript: 0 Fehler
 - [x] Tests: 33/33 bestanden
+
+## Phase 24 – Restarbeiten aus PDF und Anforderungsbeschreibung
+- [x] Personalbogen-Button in MitarbeiterDetail.tsx strikt nur für Admin sichtbar machen (useAuth + isAdmin-Guard)
+- [x] Personalbogen-Export clientseitig gegen Nicht-Admin abgesichert (Button ausgeblendet)
+- [x] Prozessabgleich P1: 24h-Erinnerung und 48h-Admin-Alert – neukundenPush.eskaliereStale Mutation
+- [x] Prozessabgleich P1: Anamnesebogen bereits in NeukundenAufnahme.tsx vorhanden
+- [x] Prozessabgleich P2: Vertretungs-Übernahme mit Audit-Log (createAuditLog) ergänzt
+- [x] Prozessabgleich P2: automatische Bereinigung – vertretungUebernahme.bereinigen Mutation
+- [x] Prozessabgleich P2: Admin-Abschluss-Nachricht nach Ende der Vertretung implementiert
+- [x] Prozessabgleich P3: Mindestzeit-Warnung im Abschluss-Modal anzeigen (gelbe Box)
+- [x] Prozessabgleich P4: Mindestbetreuungszeit-Hinweis beim Planen einer Tour ergänzt
+- [x] Vollständigen PDF-Abgleich P1–P5 dokumentiert und alle Punkte abgehakt
+

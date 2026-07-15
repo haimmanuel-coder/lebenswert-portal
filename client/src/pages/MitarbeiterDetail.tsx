@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -94,6 +95,8 @@ const BESCHAEFT_CONFIG: Record<Beschaeftigungsart, { label: string; color: strin
 };
 
 export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [activeTab, setActiveTab] = useState<"stamm" | "zertifikat" | "vertrag">("stamm");
   const [editStamm, setEditStamm] = useState(false);
   const [editZert, setEditZert] = useState(false);
@@ -317,14 +320,16 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
             <ZertIcon className="w-3 h-3 mr-1" />
             {ZERT_CONFIG[zertStatus].label}
           </Badge>
-          <button
-            onClick={() => exportPersonalbogen(ma)}
-            className="flex items-center gap-1 bg-white/20 hover:bg-white/30 text-white text-xs font-semibold px-2 py-1 rounded-lg transition-colors mt-1"
-            title="Personalbogen als PDF exportieren (nur Admin)"
-          >
-            <FileDown className="w-3 h-3" />
-            Personalbogen
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => exportPersonalbogen(ma)}
+              className="flex items-center gap-1 bg-white/20 hover:bg-white/30 text-white text-xs font-semibold px-2 py-1 rounded-lg transition-colors mt-1"
+              title="Personalbogen als PDF exportieren (nur Admin)"
+            >
+              <FileDown className="w-3 h-3" />
+              Personalbogen
+            </button>
+          )}
         </div>
       </div>
 

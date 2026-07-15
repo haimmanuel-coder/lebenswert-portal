@@ -88,6 +88,12 @@ export default function NeukundenAufnahme() {
     strasse: "", plz: "", ort: "", telefon: "", email: "",
     pflegegrad: "" as string, kostentraeger: "", versicherungsnummer: "",
     paragraph: "45b" as "45b" | "45a" | "39", notizen: "",
+    // Anamnesebogen-Felder
+    gesundheitszustand: "", medikamente: "", allergien: "",
+    notfallkontaktName: "", notfallkontaktTelefon: "",
+    arztName: "", arztTelefon: "",
+    mobilitaet: "selbststaendig" as "selbststaendig" | "eingeschraenkt" | "bettlaegerig",
+    demenz: false as boolean,
   });
   const [previewMitarbeiter, setPreviewMitarbeiter] = useState<string | null>(null);
   const [previewKunde, setPreviewKunde] = useState<string | null>(null);
@@ -100,7 +106,7 @@ export default function NeukundenAufnahme() {
       toast.success("✅ Neukundenaufnahme gespeichert");
       setSheetOpen(false);
       setStep(1);
-      setForm({ vorname: "", nachname: "", geburtsdatum: "", strasse: "", plz: "", ort: "", telefon: "", email: "", pflegegrad: "", kostentraeger: "", versicherungsnummer: "", paragraph: "45b", notizen: "" });
+      setForm({ vorname: "", nachname: "", geburtsdatum: "", strasse: "", plz: "", ort: "", telefon: "", email: "", pflegegrad: "", kostentraeger: "", versicherungsnummer: "", paragraph: "45b", notizen: "", gesundheitszustand: "", medikamente: "", allergien: "", notfallkontaktName: "", notfallkontaktTelefon: "", arztName: "", arztTelefon: "", mobilitaet: "selbststaendig", demenz: false });
       setPreviewMitarbeiter(null); setPreviewKunde(null);
       refetch();
     },
@@ -232,10 +238,10 @@ export default function NeukundenAufnahme() {
               </>
             )}
 
-            {/* Schritt 2: Adresse & Pflegedaten */}
+            {/* Schritt 2: Adresse & Pflegedaten + Anamnesebogen */}
             {step === 2 && (
               <>
-                <h2 style={{ fontSize: 17, fontWeight: 800, color: "#1a2e1a", marginBottom: 16 }}>Schritt 2 – Adresse & Pflegedaten</h2>
+                <h2 style={{ fontSize: 17, fontWeight: 800, color: "#1a2e1a", marginBottom: 16 }}>Schritt 2 – Adresse, Pflegedaten & Anamnese</h2>
                 <div style={{ marginBottom: 12 }}><label style={labelStyle}>Straße & Hausnummer</label><input style={inputStyle} value={form.strasse} onChange={e => f("strasse", e.target.value)} placeholder="Musterstraße 12" /></div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 12, marginBottom: 12 }}>
                   <div><label style={labelStyle}>PLZ</label><input style={inputStyle} value={form.plz} onChange={e => f("plz", e.target.value)} placeholder="12345" /></div>
@@ -257,6 +263,44 @@ export default function NeukundenAufnahme() {
                   </select>
                 </div>
                 <div style={{ marginBottom: 20 }}><label style={labelStyle}>Notizen</label><textarea style={{ ...inputStyle, resize: "none", minHeight: 60 }} value={form.notizen} onChange={e => f("notizen", e.target.value)} placeholder="Besonderheiten, Hinweise..." /></div>
+
+                {/* Anamnesebogen */}
+                <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 12, padding: "14px 14px 10px", marginBottom: 16 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: "#166534", marginBottom: 12 }}>📋 Anamnesebogen (optional)</div>
+                  <div style={{ marginBottom: 10 }}>
+                    <label style={labelStyle}>Allgemeiner Gesundheitszustand</label>
+                    <textarea style={{ ...inputStyle, resize: "none", minHeight: 50 }} value={form.gesundheitszustand} onChange={e => f("gesundheitszustand", e.target.value)} placeholder="z.B. Herzinsuffizienz, Diabetes..." />
+                  </div>
+                  <div style={{ marginBottom: 10 }}>
+                    <label style={labelStyle}>Medikamente</label>
+                    <textarea style={{ ...inputStyle, resize: "none", minHeight: 50 }} value={form.medikamente} onChange={e => f("medikamente", e.target.value)} placeholder="z.B. Metformin 500mg 2x täglich..." />
+                  </div>
+                  <div style={{ marginBottom: 10 }}>
+                    <label style={labelStyle}>Allergien / Unverträglichkeiten</label>
+                    <input style={inputStyle} value={form.allergien} onChange={e => f("allergien", e.target.value)} placeholder="z.B. Penicillin, Latex..." />
+                  </div>
+                  <div style={{ marginBottom: 10 }}>
+                    <label style={labelStyle}>Mobilität</label>
+                    <select style={inputStyle} value={form.mobilitaet} onChange={e => f("mobilitaet", e.target.value as any)}>
+                      <option value="selbststaendig">Selbstständig</option>
+                      <option value="eingeschraenkt">Eingeschränkt (Rollator/Rollstuhl)</option>
+                      <option value="bettlaegerig">Bettlägerig</option>
+                    </select>
+                  </div>
+                  <div style={{ marginBottom: 10, display: "flex", alignItems: "center", gap: 10 }}>
+                    <input type="checkbox" id="demenz" checked={form.demenz} onChange={e => setForm(prev => ({ ...prev, demenz: e.target.checked }))} style={{ width: 18, height: 18, cursor: "pointer" }} />
+                    <label htmlFor="demenz" style={{ fontSize: 13, fontWeight: 600, color: "#374151", cursor: "pointer" }}>Demenz / kognitive Einschränkung</label>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                    <div><label style={labelStyle}>Notfallkontakt Name</label><input style={inputStyle} value={form.notfallkontaktName} onChange={e => f("notfallkontaktName", e.target.value)} placeholder="Max Mustermann" /></div>
+                    <div><label style={labelStyle}>Notfallkontakt Telefon</label><input style={inputStyle} value={form.notfallkontaktTelefon} onChange={e => f("notfallkontaktTelefon", e.target.value)} placeholder="0123 456789" /></div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <div><label style={labelStyle}>Hausarzt Name</label><input style={inputStyle} value={form.arztName} onChange={e => f("arztName", e.target.value)} placeholder="Dr. Musterarzt" /></div>
+                    <div><label style={labelStyle}>Hausarzt Telefon</label><input style={inputStyle} value={form.arztTelefon} onChange={e => f("arztTelefon", e.target.value)} placeholder="0123 456789" /></div>
+                  </div>
+                </div>
+
                 <div style={{ display: "flex", gap: 10 }}>
                   <button onClick={() => setStep(1)} style={{ flex: 1, padding: 13, background: "#f4f6f3", color: "#6b7280", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>← Zurück</button>
                   <button onClick={() => setStep(3)} style={{ flex: 2, padding: 13, background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>Weiter →</button>

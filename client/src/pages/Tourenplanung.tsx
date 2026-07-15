@@ -384,6 +384,10 @@ export default function Tourenplanung() {
                   style={{ width: "100%", padding: "10px 12px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, boxSizing: "border-box", resize: "vertical" }}
                 />
               </div>
+              {/* P4: Mindestbetreuungszeit-Hinweis */}
+              <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 10, padding: "10px 12px", fontSize: 12, color: "#166534" }}>
+                ℹ️ Jeder Einsatz in dieser Tour muss mindestens <strong>1,5 Stunden (90 Min.)</strong> dauern. Kürzere Einsätze werden automatisch eskaliert.
+              </div>
               {/* P4: Abwesenheits-Konflikt-Warnung */}
               {createMaId && createDatum && (() => {
                 const konflikte = (abwesenheitenByDatum[createDatum] || []).filter(a => {

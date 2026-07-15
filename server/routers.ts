@@ -1983,6 +1983,48 @@ export const appRouter = router({
     alleOffen: adminProcedure.query(async () => {
       return getAlleOffenenNeukundenPush();
     }),
+
+    // Admin: 24h/48h-Eskalation manuell auslösen (oder per Heartbeat)
+    eskaliereStale: adminProcedure.mutation(async ({ ctx }) => {
+      const { getStaleNeukundenPush, eskaliereNeukundenPush } = await import('./db');
+      // 24h-Stufe: noch auf Stufe 0 und älter als 24h
+      const stale24h = await getStaleNeukundenPush(24 * 60 * 60 * 1000);
+      let eskaliert = 0;
+      for (const row of stale24h) {
+        const stufe = (row.eskalationsstufe ?? 0) as number;
+        if (stufe === 0) {
+          await eskaliereNeukundenPush(row.id, 1);
+          await createNotification({
+            empfaengerId: row.mitarbeiterId,
+            titel: '⚠️ Erinnerung: Neukunden-Bestätigung ausstehend',
+            nachricht: 'Du hast eine Neukunden-Bestätigung noch nicht abgehakt. Bitte jetzt erledigen.',
+            typ: 'warnung',
+          });
+          eskaliert++;
+        }
+      }
+      // 48h-Stufe: auf Stufe 1 und älter als 48h → Admin-Alert
+      const stale48h = await getStaleNeukundenPush(48 * 60 * 60 * 1000);
+      for (const row of stale48h) {
+        const stufe = (row.eskalationsstufe ?? 0) as number;
+        if (stufe === 1) {
+          await eskaliereNeukundenPush(row.id, 2);
+          const alleMa = await getAllMitarbeiter();
+          const admins = alleMa.filter((m: { rolle: string }) => m.rolle === 'admin');
+          for (const admin of admins) {
+            await createNotification({
+              empfaengerId: admin.id,
+              titel: '🚨 Admin-Alert: Neukunden-Push 48h unbestätigt',
+              nachricht: `Mitarbeiter-ID ${row.mitarbeiterId} hat eine Neukunden-Bestätigung seit 48h nicht abgehakt!`,
+              typ: 'fehler',
+            });
+          }
+          eskaliert++;
+        }
+      }
+      await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'ADMIN', ressource: 'neukunden_push_eskalation', details: `eskaliert=${eskaliert}`, status: 'success' });
+      return { success: true, eskaliert };
+    }),
   }),
 
   // ── P2: VERTRETUNGS-ÜBERNAHMEN ────────────────────────────────────────────────
@@ -2018,6 +2060,30 @@ export const appRouter = router({
         const hatZugriff = await hatVertretungsVollzugriff(ctx.mitarbeiterId, input.kundenId);
         return { hatZugriff };
       }),
+
+    // Admin: abgelaufene Vertretungen bereinigen und Admin-Abschluss-Nachricht senden
+    bereinigen: adminProcedure.mutation(async ({ ctx }) => {
+      const { getAbgelaufeneVertretungen, deaktiviereVertretung } = await import('./db');
+      const abgelaufene = await getAbgelaufeneVertretungen();
+      let bereinigt = 0;
+      for (const v of abgelaufene) {
+        await deaktiviereVertretung(v.id);
+        // Admin-Abschluss-Nachricht
+        const alleMa = await getAllMitarbeiter();
+        const admins = alleMa.filter((m: { rolle: string }) => m.rolle === 'admin');
+        for (const admin of admins) {
+          await createNotification({
+            empfaengerId: admin.id,
+            titel: '✅ Vertretung beendet',
+            nachricht: `Vertretung für Kunden-ID ${v.kundenId} durch Mitarbeiter-ID ${v.vertreterId} ist abgelaufen und wurde bereinigt.`,
+            typ: 'info',
+          });
+        }
+        bereinigt++;
+      }
+      await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'ADMIN', ressource: 'vertretung_bereinigung', details: `bereinigt=${bereinigt}`, status: 'success' });
+      return { success: true, bereinigt };
+    }),
   }),
 
   // ── P3: ADMIN-DIENSTWAGEN-VERWALTUNG ─────────────────────────────────────────
