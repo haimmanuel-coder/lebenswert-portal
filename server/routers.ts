@@ -85,8 +85,11 @@ import {
   getVertretungsKundenFuerUrlaub,
   getUnterschreitungsZaehler,
 } from "./db";
-import { SignJWT, jwtVerify } from "jose";
 import { ENV } from "./_core/env";
+import { adminProcedure, decryptSecret, encryptSecret, portalProcedure, portalProtected, PORTAL_COOKIE, signPortalToken, verifyPortalToken } from "./portalAuth";
+import * as OTPAuth from "otpauth";
+import QRCode from "qrcode";
+import { pflichtenheftRouter } from "./pflichtenheftRouter";
 import { VAPID_PUBLIC, sendBudgetWarnungPush } from "./webpush";
 import {
   savePushSubscription,
@@ -116,6 +119,7 @@ import {
   getTourEinsaetze,
   addEinsatzToTour,
   removeEinsatzFromTour,
+  updateTourReihenfolge,
   getNotificationsByMitarbeiter,
   getUnreadNotificationCount,
   createNotification,
@@ -128,51 +132,6 @@ import {
   checkDoppelbelegung,
   getBudgetHistorie,
 } from "./db";
-
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "lebenswert-secret-key");
-const PORTAL_COOKIE = "lb_portal_token";
-
-async function signPortalToken(mitarbeiterId: number) {
-  return new SignJWT({ mitarbeiterId })
-    .setProtectedHeader({ alg: "HS256" })
-    .setExpirationTime("30d")
-    .sign(JWT_SECRET);
-}
-
-async function verifyPortalToken(token: string): Promise<number | null> {
-  try {
-    const { payload } = await jwtVerify(token, JWT_SECRET);
-    return (payload as { mitarbeiterId: number }).mitarbeiterId;
-  } catch {
-    return null;
-  }
-}
-
-const portalProcedure = publicProcedure.use(async ({ ctx, next }) => {
-  let token = ctx.req.cookies?.[PORTAL_COOKIE];
-  if (!token) {
-    const authHeader = ctx.req.headers?.['authorization'] as string | undefined;
-    if (authHeader?.startsWith('Bearer ')) {
-      token = authHeader.slice(7);
-    }
-  }
-  let mitarbeiterId: number | null = null;
-  if (token) mitarbeiterId = await verifyPortalToken(token);
-  return next({ ctx: { ...ctx, mitarbeiterId } });
-});
-
-const portalProtected = portalProcedure.use(async ({ ctx, next }) => {
-  if (!ctx.mitarbeiterId) throw new Error("Nicht angemeldet");
-  return next({ ctx: { ...ctx, mitarbeiterId: ctx.mitarbeiterId as number } });
-});
-
-const adminProcedure = portalProtected.use(async ({ ctx, next }) => {
-  const ma = await getMitarbeiterById(ctx.mitarbeiterId);
-  if (!ma || ma.rolle !== "admin") throw new Error("Keine Admin-Berechtigung");
-  return next({ ctx: { ...ctx, adminId: ctx.mitarbeiterId } });
-});
-
-
 
 export const urlaubRouter = router({
   list: portalProtected.query(async ({ ctx }) => {
@@ -344,6 +303,25 @@ export const tourenRouter = router({
   getEinsaetze: portalProtected
     .input(z.object({ tourId: z.number().int().positive() }))
     .query(async ({ input }) => getTourEinsaetze(input.tourId)),
+  optimieren: portalProtected
+    .input(z.object({ tourId: z.number().int().positive() }))
+    .mutation(async ({ input, ctx }) => {
+      const ma = await getMitarbeiterById(ctx.mitarbeiterId);
+      if (!ma || !['admin', 'teamleitung'].includes(ma.rolle)) throw new TRPCError({ code: 'FORBIDDEN', message: 'Nur Administration und Teamleitung dürfen Touren neu ordnen.' });
+      const stopps = await getTourEinsaetze(input.tourId);
+      if (stopps.length < 2) return { success: true, anzahl: stopps.length, hinweis: 'Für diese Tour ist keine Neuordnung nötig.' };
+      const normalisieren = (wert: string | null | undefined) => (wert || '').trim().toLocaleLowerCase('de-DE');
+      const sortiert = [...stopps].sort((a, b) => {
+        const aHatAdresse = Boolean(a.plz || a.ort || a.strasse), bHatAdresse = Boolean(b.plz || b.ort || b.strasse);
+        if (aHatAdresse !== bHatAdresse) return aHatAdresse ? -1 : 1;
+        return normalisieren(a.plz).localeCompare(normalisieren(b.plz), 'de-DE', { numeric: true })
+          || normalisieren(a.ort).localeCompare(normalisieren(b.ort), 'de-DE')
+          || normalisieren(a.strasse).localeCompare(normalisieren(b.strasse), 'de-DE', { numeric: true });
+      });
+      await updateTourReihenfolge(input.tourId, sortiert.map(stopp => stopp.id));
+      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'OPTIMIZE', ressource: 'tour', details: `id=${input.tourId} stopps=${sortiert.length} methode=lokale_adressbuendelung`, status: 'success' });
+      return { success: true, anzahl: sortiert.length, hinweis: 'Stopps wurden datenschutzfreundlich nach räumlichen Adressbereichen gebündelt.' };
+    }),
   addEinsatz: portalProtected
     .input(z.object({
       tourId: z.number().int().positive(),
@@ -413,17 +391,28 @@ export const tourenRouter = router({
       const maxDatum = new Date(heute); maxDatum.setDate(maxDatum.getDate() + 14);
       if (tourDatum < heute) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Touren können nicht in der Vergangenheit angelegt werden.' });
       if (tourDatum > maxDatum) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Touren können maximal 2 Wochen im Voraus geplant werden.' });
-      const kunde = (await getAllKunden()).find((k: any) => k.id === input.kundenId);
-      const titel = kunde ? `Besuch ${kunde.vorname} ${kunde.nachname}` : `Besuch Kunden-ID ${input.kundenId}`;
-      await createTour({
+      const kunde = (await getAllKunden()).find((k: any) => k.id === input.kundenId && Number(k.aktiv ?? 1) === 1);
+      if (!kunde) throw new TRPCError({ code: 'NOT_FOUND', message: 'Der ausgewählte Kunde wurde nicht gefunden oder ist deaktiviert.' });
+      const titel = `Besuch ${kunde.vorname} ${kunde.nachname}`;
+      const tourId = await createTour({
         mitarbeiterId: input.mitarbeiterId,
         datum: tourDatum,
         titel,
         angelegtVon: ctx.mitarbeiterId,
         status: 'geplant',
       });
-      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'CREATE', ressource: 'tour', details: `createFromKunde kundenId=${input.kundenId} datum=${input.datum}`, status: 'success' });
-      return { success: true };
+      const paragraph = ['45b', '45a', '39'].includes(String(kunde.paragraph)) ? kunde.paragraph as '45b' | '45a' | '39' : '45b';
+      const einsatzId = await createEinsatz({
+        mitarbeiterId: input.mitarbeiterId,
+        kundenId: input.kundenId,
+        datum: tourDatum,
+        startzeit: '08:00',
+        dauerStunden: '1.50',
+        paragraph,
+      });
+      await addEinsatzToTour(tourId, einsatzId, 0);
+      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'CREATE', ressource: 'tour', details: `createFromKunde tourId=${tourId} einsatzId=${einsatzId} kundenId=${input.kundenId} datum=${input.datum}`, status: 'success' });
+      return { success: true, tourId, einsatzId };
     }),
 
   // Liefert die dem Mitarbeiter zugewiesenen Kunden (für Kunden-Sidebar im Tourenplanung-Dashboard)
@@ -622,6 +611,7 @@ const vertretungenRouter = router({
 
 export const appRouter = router({
   system: systemRouter,
+  pflichtenheft: pflichtenheftRouter,
   urlaub: urlaubRouter,
   krank: krankRouter,
   touren: tourenRouter,
@@ -639,13 +629,26 @@ export const appRouter = router({
 
   portal: router({
     login: publicProcedure
-      .input(z.object({ email: z.string().email(), passwort: z.string().min(1) }))
+      .input(z.object({ email: z.string().email(), passwort: z.string().min(1), otp: z.string().regex(/^\d{6}$/).optional() }))
       .mutation(async ({ input, ctx }) => {
         const ma = await getMitarbeiterByEmail(input.email);
-        if (!ma) throw new Error("E-Mail oder Passwort ungültig.");
+        if (!ma || !ma.aktiv) throw new Error("E-Mail oder Passwort ungültig.");
         const valid = await bcrypt.compare(input.passwort, ma.passwortHash);
-        if (!valid) throw new Error("E-Mail oder Passwort ungültig.");
-        const token = await signPortalToken(ma.id);
+        if (!valid) {
+          await createAuditLog({ mitarbeiterId: ma.id, action: "LOGIN", ressource: "portal", status: "failure", details: "Passwortprüfung fehlgeschlagen" });
+          throw new Error("E-Mail oder Passwort ungültig.");
+        }
+        if (ma.zweiFaktorAktiv) {
+          if (!input.otp) return { requiresTwoFactor: true as const, token: null, id: ma.id, vorname: ma.vorname, nachname: ma.nachname, email: ma.email, rolle: ma.rolle };
+          if (!ma.zweiFaktorSecret) throw new Error("Zwei-Faktor-Anmeldung ist unvollständig eingerichtet. Bitte Admin kontaktieren.");
+          const secret = decryptSecret(ma.zweiFaktorSecret);
+          const totp = new OTPAuth.TOTP({ issuer: "Lebenswert Betreuung", label: ma.email, algorithm: "SHA1", digits: 6, period: 30, secret: OTPAuth.Secret.fromBase32(secret) });
+          if (totp.validate({ token: input.otp, window: 1 }) === null) {
+            await createAuditLog({ mitarbeiterId: ma.id, action: "LOGIN_2FA", ressource: "portal", status: "failure" });
+            throw new Error("Der Sicherheitscode ist ungültig oder abgelaufen.");
+          }
+        }
+        const token = await signPortalToken(ma.id, { mfa: true });
         const isSecure = ctx.req.secure || ctx.req.headers['x-forwarded-proto'] === 'https';
         ctx.res.cookie(PORTAL_COOKIE, token, {
           httpOnly: true,
@@ -654,15 +657,15 @@ export const appRouter = router({
           path: '/',
           maxAge: 30 * 24 * 60 * 60 * 1000,
         });
-        await createAuditLog({ mitarbeiterId: ma.id, action: "LOGIN", ressource: "portal", status: "success" });
-        return { id: ma.id, vorname: ma.vorname, nachname: ma.nachname, email: ma.email, rolle: ma.rolle, token };
+        await createAuditLog({ mitarbeiterId: ma.id, action: ma.zweiFaktorAktiv ? "LOGIN_2FA" : "LOGIN", ressource: "portal", status: "success" });
+        return { requiresTwoFactor: false as const, id: ma.id, vorname: ma.vorname, nachname: ma.nachname, email: ma.email, rolle: ma.rolle, token };
       }),
 
     logout: publicProcedure.mutation(async ({ ctx }) => {
       const token = ctx.req.cookies?.[PORTAL_COOKIE];
       if (token) {
-        const id = await verifyPortalToken(token);
-        if (id) await createAuditLog({ mitarbeiterId: id, action: "LOGOUT", ressource: "portal", status: "success" });
+        const session = await verifyPortalToken(token);
+        if (session) await createAuditLog({ mitarbeiterId: session.mitarbeiterId, action: "LOGOUT", ressource: "portal", status: "success" });
       }
       ctx.res.clearCookie(PORTAL_COOKIE, { path: "/" });
       return { success: true };
@@ -672,7 +675,7 @@ export const appRouter = router({
       if (!ctx.mitarbeiterId) return null;
       const ma = await getMitarbeiterById(ctx.mitarbeiterId);
       if (!ma) return null;
-      return { id: ma.id, vorname: ma.vorname, nachname: ma.nachname, email: ma.email, rolle: ma.rolle };
+      return { id: ma.id, vorname: ma.vorname, nachname: ma.nachname, email: ma.email, rolle: ma.rolle, zweiFaktorAktiv: ma.zweiFaktorAktiv };
     }),
 
     requestPasswordReset: publicProcedure
@@ -757,6 +760,50 @@ export const appRouter = router({
         const hash = await bcrypt.hash(input.neuesPasswort, 10);
         await updateMitarbeiterPasswort(ctx.mitarbeiterId, hash);
         await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "PASSWORD_CHANGE", ressource: "portal", status: "success" });
+        return { success: true };
+      }),
+
+    zweiFaktorStatus: portalProtected.query(async ({ ctx }) => ({
+      aktiv: Boolean(ctx.portalMitarbeiter.zweiFaktorAktiv),
+      bestaetigtAt: ctx.portalMitarbeiter.zweiFaktorBestaetigtAt,
+    })),
+
+    zweiFaktorStarten: portalProtected.mutation(async ({ ctx }) => {
+      const secret = new OTPAuth.Secret({ size: 20 }).base32;
+      const totp = new OTPAuth.TOTP({ issuer: "Lebenswert Betreuung", label: ctx.portalMitarbeiter.email, algorithm: "SHA1", digits: 6, period: 30, secret: OTPAuth.Secret.fromBase32(secret) });
+      const qrCodeDataUrl = await QRCode.toDataURL(totp.toString(), { width: 280, margin: 2, errorCorrectionLevel: "M" });
+      const db = await getDb();
+      await db!.update(mitarbeiter).set({ zweiFaktorSecret: encryptSecret(secret), zweiFaktorAktiv: false, zweiFaktorBestaetigtAt: null }).where(eq(mitarbeiter.id, ctx.mitarbeiterId));
+      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "2FA_SETUP_START", ressource: "portal", status: "success" });
+      return { secret, qrCodeDataUrl };
+    }),
+
+    zweiFaktorBestaetigen: portalProtected
+      .input(z.object({ code: z.string().regex(/^\d{6}$/) }))
+      .mutation(async ({ ctx, input }) => {
+        const ma = await getMitarbeiterById(ctx.mitarbeiterId);
+        if (!ma?.zweiFaktorSecret) throw new Error("Bitte die Einrichtung zuerst starten.");
+        const secret = decryptSecret(ma.zweiFaktorSecret);
+        const totp = new OTPAuth.TOTP({ issuer: "Lebenswert Betreuung", label: ma.email, algorithm: "SHA1", digits: 6, period: 30, secret: OTPAuth.Secret.fromBase32(secret) });
+        if (totp.validate({ token: input.code, window: 1 }) === null) throw new Error("Der Sicherheitscode ist ungültig.");
+        const db = await getDb();
+        await db!.update(mitarbeiter).set({ zweiFaktorAktiv: true, zweiFaktorBestaetigtAt: new Date() }).where(eq(mitarbeiter.id, ctx.mitarbeiterId));
+        await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "2FA_ENABLED", ressource: "portal", status: "success" });
+        return { success: true };
+      }),
+
+    zweiFaktorDeaktivieren: portalProtected
+      .input(z.object({ passwort: z.string().min(1), code: z.string().regex(/^\d{6}$/) }))
+      .mutation(async ({ ctx, input }) => {
+        const ma = await getMitarbeiterById(ctx.mitarbeiterId);
+        if (!ma?.zweiFaktorSecret || !ma.zweiFaktorAktiv) return { success: true };
+        if (!(await bcrypt.compare(input.passwort, ma.passwortHash))) throw new Error("Das Passwort ist falsch.");
+        const secret = decryptSecret(ma.zweiFaktorSecret);
+        const totp = new OTPAuth.TOTP({ issuer: "Lebenswert Betreuung", label: ma.email, algorithm: "SHA1", digits: 6, period: 30, secret: OTPAuth.Secret.fromBase32(secret) });
+        if (totp.validate({ token: input.code, window: 1 }) === null) throw new Error("Der Sicherheitscode ist ungültig.");
+        const db = await getDb();
+        await db!.update(mitarbeiter).set({ zweiFaktorAktiv: false, zweiFaktorSecret: null, zweiFaktorBestaetigtAt: null }).where(eq(mitarbeiter.id, ctx.mitarbeiterId));
+        await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "2FA_DISABLED", ressource: "portal", status: "success" });
         return { success: true };
       }),
   }),
@@ -1416,7 +1463,7 @@ export const appRouter = router({
         nachname: z.string().min(1),
         email: z.string().email(),
         passwort: z.string().min(6),
-        rolle: z.enum(["mitarbeiter", "admin"]).default("mitarbeiter"),
+        rolle: z.enum(["mitarbeiter", "teamleitung", "buchhaltung", "admin"]).default("mitarbeiter"),
         telefon: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
@@ -1432,7 +1479,7 @@ export const appRouter = router({
         vorname: z.string().min(1).optional(),
         nachname: z.string().min(1).optional(),
         email: z.string().email().optional(),
-        rolle: z.enum(["mitarbeiter", "admin"]).optional(),
+        rolle: z.enum(["mitarbeiter", "teamleitung", "buchhaltung", "admin"]).optional(),
         aktiv: z.number().int().optional(),
         telefon: z.string().optional(),
         neuesPasswort: z.string().min(6).optional(),
@@ -1549,7 +1596,7 @@ export const appRouter = router({
         eintrittsdatum: z.string().optional(),
         position: z.string().optional(),
         beschaeftigungsart: z.enum(["minijob", "teilzeit", "vollzeit"]).optional(),
-        rolle: z.enum(["mitarbeiter", "admin"]).optional(),
+        rolle: z.enum(["mitarbeiter", "teamleitung", "buchhaltung", "admin"]).optional(),
         aktiv: z.number().int().optional(),
         notizen: z.string().optional(),
         neuesPasswort: z.string().min(6).optional(),

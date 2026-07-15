@@ -33,7 +33,13 @@ export const mitarbeiter = mysqlTable("mitarbeiter", {
   nachname: varchar("nachname", { length: 100 }).notNull(),
   email: varchar("email", { length: 320 }).notNull().unique(),
   passwortHash: varchar("passwortHash", { length: 255 }).notNull(),
-  rolle: mysqlEnum("rolle", ["mitarbeiter", "admin"]).default("mitarbeiter").notNull(),
+  rolle: mysqlEnum("rolle", ["mitarbeiter", "teamleitung", "buchhaltung", "admin"]).default("mitarbeiter").notNull(),
+  berechtigungen: text("berechtigungen"), // optionales JSON-Array für zusätzliche Einzelrechte
+  zweiFaktorAktiv: boolean("zweiFaktorAktiv").default(false).notNull(),
+  zweiFaktorSecret: varchar("zweiFaktorSecret", { length: 255 }),
+  zweiFaktorBestaetigtAt: timestamp("zweiFaktorBestaetigtAt"),
+  datevEinwilligung: boolean("datevEinwilligung").default(false).notNull(),
+  datevEinwilligungAt: timestamp("datevEinwilligungAt"),
   aktiv: int("aktiv").default(1).notNull(),
   // Stammdaten
   telefon: varchar("telefon", { length: 50 }),
@@ -127,6 +133,9 @@ export const kunden = mysqlTable("kunden", {
   wunschtag1: mysqlEnum("wunschtag1", ["montag","dienstag","mittwoch","donnerstag","freitag","samstag"]),
   wunschtag2: mysqlEnum("wunschtag2", ["montag","dienstag","mittwoch","donnerstag","freitag","samstag"]),
   aktiv: int("aktiv").default(1).notNull(),
+  geloeschtAt: timestamp("geloeschtAt"),
+  geloeschtVon: int("geloeschtVon"),
+  loeschgrund: text("loeschgrund"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -177,7 +186,12 @@ export const einsaetze = mysqlTable("einsaetze", {
   startzeit: time("startzeit"),
   dauerStunden: decimal("dauerStunden", { precision: 4, scale: 2 }),
   paragraph: mysqlEnum("paragraph", ["45b", "45a", "39"]).default("45b").notNull(),
-  status: mysqlEnum("status", ["geplant", "abgeschlossen", "abgesagt"]).default("geplant").notNull(),
+  status: mysqlEnum("status", ["geplant", "bestaetigt", "aenderung_angefragt", "abgeschlossen", "abgesagt"]).default("geplant").notNull(),
+  bestaetigtAt: timestamp("bestaetigtAt"),
+  absagegrund: text("absagegrund"),
+  aenderungswunsch: text("aenderungswunsch"),
+  tatsaechlicherStart: timestamp("tatsaechlicherStart"),
+  tatsaechlichesEnde: timestamp("tatsaechlichesEnde"),
   bericht: text("bericht"),
   gesundheit: mysqlEnum("gesundheit", ["gut", "stabil", "auffaellig", "kritisch"]),
   bemerkung: text("bemerkung"),
@@ -482,3 +496,162 @@ export const vertretungsUebernahmen = mysqlTable("vertretungsUebernahmen", {
 });
 export type VertretungsUebernahme = typeof vertretungsUebernahmen.$inferSelect;
 export type InsertVertretungsUebernahme = typeof vertretungsUebernahmen.$inferInsert;
+
+// ── PFLICHTENHEFT 2026: VERFÜGBARKEIT & ARBEITSZEIT ─────────────────────
+export const verfuegbarkeiten = mysqlTable("verfuegbarkeiten", {
+  id: int("id").autoincrement().primaryKey(),
+  mitarbeiterId: int("mitarbeiterId").notNull(),
+  wochentag: int("wochentag").notNull(), // 1=Montag ... 7=Sonntag
+  vonZeit: time("vonZeit").notNull(),
+  bisZeit: time("bisZeit").notNull(),
+  gueltigVon: date("gueltigVon"),
+  gueltigBis: date("gueltigBis"),
+  status: mysqlEnum("status", ["verfuegbar", "nicht_verfuegbar", "bevorzugt"]).default("verfuegbar").notNull(),
+  notiz: text("notiz"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type Verfuegbarkeit = typeof verfuegbarkeiten.$inferSelect;
+export type InsertVerfuegbarkeit = typeof verfuegbarkeiten.$inferInsert;
+
+export const arbeitszeitKonten = mysqlTable("arbeitszeitKonten", {
+  id: int("id").autoincrement().primaryKey(),
+  mitarbeiterId: int("mitarbeiterId").notNull(),
+  monat: varchar("monat", { length: 7 }).notNull(),
+  sollStunden: decimal("sollStunden", { precision: 7, scale: 2 }).default("0").notNull(),
+  istStunden: decimal("istStunden", { precision: 7, scale: 2 }).default("0").notNull(),
+  ueberstunden: decimal("ueberstunden", { precision: 7, scale: 2 }).default("0").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type ArbeitszeitKonto = typeof arbeitszeitKonten.$inferSelect;
+
+// ── PFLICHTENHEFT 2026: TERMINBESTÄTIGUNG & BESUCHSBERICHTE ───────────
+export const terminRueckmeldungen = mysqlTable("terminRueckmeldungen", {
+  id: int("id").autoincrement().primaryKey(),
+  einsatzId: int("einsatzId").notNull(),
+  mitarbeiterId: int("mitarbeiterId").notNull(),
+  aktion: mysqlEnum("aktion", ["bestaetigt", "abgesagt", "aenderung_angefragt"]).notNull(),
+  grund: text("grund"),
+  wunschDatum: date("wunschDatum"),
+  wunschZeit: time("wunschZeit"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type TerminRueckmeldung = typeof terminRueckmeldungen.$inferSelect;
+
+export const besuchsberichte = mysqlTable("besuchsberichte", {
+  id: int("id").autoincrement().primaryKey(),
+  einsatzId: int("einsatzId"),
+  kundenId: int("kundenId").notNull(),
+  mitarbeiterId: int("mitarbeiterId").notNull(),
+  datum: date("datum").notNull(),
+  dauerMinuten: int("dauerMinuten"),
+  taetigkeiten: text("taetigkeiten").notNull(),
+  beobachtungen: text("beobachtungen"),
+  besonderheiten: text("besonderheiten"),
+  naechsteSchritte: text("naechsteSchritte"),
+  kiVorschlag: text("kiVorschlag"),
+  anhangUrls: text("anhangUrls"), // JSON-Liste
+  status: mysqlEnum("status", ["entwurf", "eingereicht", "freigegeben", "korrektur"]).default("entwurf").notNull(),
+  freigegebenVon: int("freigegebenVon"),
+  freigegebenAt: timestamp("freigegebenAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type Besuchsbericht = typeof besuchsberichte.$inferSelect;
+export type InsertBesuchsbericht = typeof besuchsberichte.$inferInsert;
+
+// ── PFLICHTENHEFT 2026: INTEGRATIONSZENTRUM ────────────────────────────
+export const integrationen = mysqlTable("integrationen", {
+  id: int("id").autoincrement().primaryKey(),
+  anbieter: mysqlEnum("anbieter", ["datev", "optadata", "pflegekassen", "gehaltsprogramm", "email", "ebrief", "redis", "maps", "ki"]).notNull(),
+  bezeichnung: varchar("bezeichnung", { length: 200 }).notNull(),
+  status: mysqlEnum("status", ["nicht_eingerichtet", "testmodus", "aktiv", "fehler", "pausiert"]).default("nicht_eingerichtet").notNull(),
+  basisUrl: text("basisUrl"),
+  verschluesselteZugangsdaten: text("verschluesselteZugangsdaten"),
+  zugangHinweis: varchar("zugangHinweis", { length: 100 }),
+  konfiguration: text("konfiguration"), // JSON ohne Geheimnisse
+  letzterTestAt: timestamp("letzterTestAt"),
+  letzterTestStatus: mysqlEnum("letzterTestStatus", ["erfolg", "fehler"]),
+  letzterFehler: text("letzterFehler"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type Integration = typeof integrationen.$inferSelect;
+
+export const integrationsLaeufe = mysqlTable("integrationsLaeufe", {
+  id: int("id").autoincrement().primaryKey(),
+  integrationId: int("integrationId").notNull(),
+  gestartetVon: int("gestartetVon"),
+  typ: mysqlEnum("typ", ["test", "export", "import", "synchronisation", "backup"]).notNull(),
+  status: mysqlEnum("status", ["gestartet", "erfolg", "fehler", "teilweise"]).default("gestartet").notNull(),
+  anzahlDatensaetze: int("anzahlDatensaetze").default(0),
+  meldung: text("meldung"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  beendetAt: timestamp("beendetAt"),
+});
+export type IntegrationsLauf = typeof integrationsLaeufe.$inferSelect;
+
+// ── PFLICHTENHEFT 2026: DATENSCHUTZ & SICHERHEIT ──────────────────────
+export const datenschutzDokumente = mysqlTable("datenschutzDokumente", {
+  id: int("id").autoincrement().primaryKey(),
+  typ: mysqlEnum("typ", ["datenschutzerklaerung", "avv", "einwilligung", "loeschkonzept", "verarbeitungsverzeichnis"]).notNull(),
+  titel: varchar("titel", { length: 255 }).notNull(),
+  version: varchar("version", { length: 40 }).notNull(),
+  inhalt: text("inhalt"),
+  dateiUrl: text("dateiUrl"),
+  aktiv: boolean("aktiv").default(true).notNull(),
+  gueltigAb: date("gueltigAb"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type DatenschutzDokument = typeof datenschutzDokumente.$inferSelect;
+
+export const einwilligungen = mysqlTable("einwilligungen", {
+  id: int("id").autoincrement().primaryKey(),
+  personTyp: mysqlEnum("personTyp", ["mitarbeiter", "kunde"]).notNull(),
+  personId: int("personId").notNull(),
+  zweck: mysqlEnum("zweck", ["datev", "optadata", "pflegekasse", "email", "ki", "allgemein"]).notNull(),
+  erteilt: boolean("erteilt").notNull(),
+  dokumentVersion: varchar("dokumentVersion", { length: 40 }),
+  ipAddress: varchar("ipAddress", { length: 45 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  widerrufenAt: timestamp("widerrufenAt"),
+});
+export type Einwilligung = typeof einwilligungen.$inferSelect;
+
+export const loeschAnfragen = mysqlTable("loeschAnfragen", {
+  id: int("id").autoincrement().primaryKey(),
+  personTyp: mysqlEnum("personTyp", ["mitarbeiter", "kunde"]).notNull(),
+  personId: int("personId").notNull(),
+  grund: text("grund"),
+  status: mysqlEnum("status", ["angefragt", "geprueft", "gesperrt", "anonymisiert", "abgelehnt"]).default("angefragt").notNull(),
+  bearbeitetVon: int("bearbeitetVon"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type LoeschAnfrage = typeof loeschAnfragen.$inferSelect;
+
+export const backupLaeufe = mysqlTable("backupLaeufe", {
+  id: int("id").autoincrement().primaryKey(),
+  typ: mysqlEnum("typ", ["datenbank", "dokumente", "vollbackup"]).notNull(),
+  status: mysqlEnum("status", ["gestartet", "erfolg", "fehler"]).default("gestartet").notNull(),
+  speicherort: varchar("speicherort", { length: 255 }),
+  pruefsumme: varchar("pruefsumme", { length: 128 }),
+  meldung: text("meldung"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  beendetAt: timestamp("beendetAt"),
+});
+export type BackupLauf = typeof backupLaeufe.$inferSelect;
+
+// ── PFLICHTENHEFT 2026: ANALYSE & PROGNOSE ────────────────────────────
+export const prognoseSnapshots = mysqlTable("prognoseSnapshots", {
+  id: int("id").autoincrement().primaryKey(),
+  monat: varchar("monat", { length: 7 }).notNull(),
+  typ: mysqlEnum("typ", ["budget", "personal", "auslastung", "umsatz"]).notNull(),
+  prognoseWert: decimal("prognoseWert", { precision: 12, scale: 2 }).notNull(),
+  basisWert: decimal("basisWert", { precision: 12, scale: 2 }).notNull(),
+  vertrauenProzent: int("vertrauenProzent").default(70).notNull(),
+  details: text("details"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type PrognoseSnapshot = typeof prognoseSnapshots.$inferSelect;

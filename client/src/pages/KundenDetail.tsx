@@ -92,6 +92,37 @@ export default function KundenDetail({ kundenId, onBack }: Props) {
         </div>
       </div>
 
+      {/* Pflichtenheft: drei gleichzeitig sichtbare Informationsspalten auf großen Bildschirmen */}
+      <div className="kunden-detail-dreispalten" aria-label="Kundenübersicht in drei Bereichen">
+        <section className="kunden-detail-spalte">
+          <div className="kunden-detail-spalte-titel">Stammdaten</div>
+          <div className="kunden-detail-zeile"><span>Geburtsdatum</span><strong>{fmtDate(kunde.geburtsdatum as string | null)}</strong></div>
+          <div className="kunden-detail-zeile"><span>Pflegegrad</span><strong>{kunde.pflegegrad ? `Pflegegrad ${kunde.pflegegrad}` : "–"}</strong></div>
+          <div className="kunden-detail-zeile"><span>Telefon</span><strong>{kunde.telefon || "–"}</strong></div>
+          <div className="kunden-detail-zeile"><span>Kostenträger</span><strong>{kunde.kostentraeger || "–"}</strong></div>
+        </section>
+        <section className="kunden-detail-spalte">
+          <div className="kunden-detail-spalte-titel">Nächste Einsätze</div>
+          {einsaetze.length === 0 ? <p className="kunden-detail-leer">Keine Einsätze geplant.</p> : einsaetze.slice(0, 4).map(e => (
+            <div key={e.id} className="kunden-detail-termin">
+              <div><strong>{fmtDate(e.datum as string | Date)}</strong><span>{(e.startzeit || "").slice(0, 5) || "Zeit offen"} · {e.dauerStunden || "–"} Std.</span></div>
+              {statusBadge(e.status)}
+            </div>
+          ))}
+        </section>
+        <section className="kunden-detail-spalte">
+          <div className="kunden-detail-spalte-titel">Budget & Nachweise</div>
+          {["45b", "45a", "39"].map(par => {
+            const budget = Number(kundeAny[`budget${par}`] || 0);
+            const verbraucht = Number(kundeAny[`verbraucht${par}`] || 0);
+            if (!budget) return null;
+            return <div key={par} className="kunden-detail-budget"><span>§{par}</span><strong>{Math.max(0, budget - verbraucht).toLocaleString("de-DE", { style: "currency", currency: "EUR" })} frei</strong></div>;
+          })}
+          <div className="kunden-detail-zeile"><span>Leistungsnachweise</span><strong>{leistungen.length}</strong></div>
+          <div className="kunden-detail-zeile"><span>Fahrten</span><strong>{fahrten.length}</strong></div>
+        </section>
+      </div>
+
       {/* Tabs */}
       <div style={{ display: "flex", gap: 6, marginBottom: 16, background: "#f4f6f3", borderRadius: 12, padding: 4 }}>
         {(["uebersicht", "budget", "stammdaten"] as const).map((t) => (

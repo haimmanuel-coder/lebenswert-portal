@@ -2,12 +2,13 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { usePortalAuth, setStoredToken } from "@/contexts/PortalAuthContext";
 
-type View = "login" | "reset-request" | "reset-sent";
+type View = "login" | "mfa" | "reset-request" | "reset-sent";
 
 export default function Login() {
   const [view, setView] = useState<View>("login");
   const [email, setEmail] = useState("");
   const [passwort, setPasswort] = useState("");
+  const [otp, setOtp] = useState("");
   const [resetEmail, setResetEmail] = useState("");
   const [error, setError] = useState("");
   const [resetResult, setResetResult] = useState<{ token?: string; name?: string } | null>(null);
@@ -16,6 +17,11 @@ export default function Login() {
   // ── Login ──────────────────────────────────────────
   const loginMutation = trpc.portal.login.useMutation({
     onSuccess: async (data) => {
+      if (data.requiresTwoFactor) {
+        setView("mfa");
+        setError("");
+        return;
+      }
       if (data.token) setStoredToken(data.token);
       await new Promise((r) => setTimeout(r, 100));
       await refetch();
@@ -33,7 +39,7 @@ export default function Login() {
   const doLogin = () => {
     setError("");
     if (!email || !passwort) { setError("Bitte E-Mail und Passwort eingeben."); return; }
-    loginMutation.mutate({ email: email.trim().toLowerCase(), passwort });
+    loginMutation.mutate({ email: email.trim().toLowerCase(), passwort, ...(otp ? { otp } : {}) });
   };
 
   // ── Passwort-Reset anfordern ───────────────────────
@@ -90,6 +96,7 @@ export default function Login() {
 
   return (
     <div
+      className="lw-login-page"
       style={{
         display: "flex",
         alignItems: "center",
@@ -116,7 +123,7 @@ export default function Login() {
             Lebenswert Betreuung
           </h1>
           <p style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>
-            {view === "login" ? "Mitarbeiter-Portal" : "Passwort zurücksetzen"}
+            {view === "login" ? "Mitarbeiter-Portal" : view === "mfa" ? "Sicherheitsprüfung" : "Passwort zurücksetzen"}
           </p>
         </div>
 
@@ -184,6 +191,22 @@ export default function Login() {
               🔒 SSL-verschlüsselt · DSGVO-konform
             </p>
 
+          </>
+        )}
+
+        {/* ── ZWEI-FAKTOR-PRÜFUNG ── */}
+        {view === "mfa" && (
+          <>
+            <p style={{ fontSize: 14, color: "#374151", lineHeight: 1.5, marginBottom: 18 }}>
+              Öffnen Sie Ihre Authenticator-App und geben Sie den aktuellen sechsstelligen Sicherheitscode ein.
+            </p>
+            {error && <div style={{ background: "#fee2e2", color: "#991b1b", border: "1px solid #fca5a5", padding: "10px 12px", borderRadius: 8, fontSize: 13, marginBottom: 14 }}>{error}</div>}
+            <div style={{ marginBottom: 16 }}>
+              <label style={labelStyle}>Sicherheitscode</label>
+              <input type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))} onKeyDown={(e) => e.key === "Enter" && otp.length === 6 && doLogin()} placeholder="123456" style={{ ...inputStyle, textAlign: "center", letterSpacing: 8, fontSize: 22, fontWeight: 800 }} autoFocus />
+            </div>
+            <button onClick={doLogin} disabled={otp.length !== 6 || loginMutation.isPending} style={btnStyle(loginMutation.isPending || otp.length !== 6)}>{loginMutation.isPending ? "Prüfe…" : "Sicher anmelden"}</button>
+            <button onClick={() => { setOtp(""); setPasswort(""); setError(""); setView("login"); }} style={{ width: "100%", marginTop: 12, background: "transparent", border: 0, color: "#6b7280", cursor: "pointer" }}>Zurück</button>
           </>
         )}
 
