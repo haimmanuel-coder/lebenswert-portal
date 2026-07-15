@@ -1,15 +1,17 @@
 import { useState, useMemo, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/_core/hooks/useAuth";
+import { usePortalAuth } from "@/contexts/PortalAuthContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
-// ── Hilfsfunktionen ───────────────────────────────────────────────────────────
-const WOCHENTAGE_KURZ = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+const WOCHENTAGE = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 const MONATE = ["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
 
 function get14Days(baseDate: Date): Date[] {
-  // Beginnt am Montag der aktuellen Woche
   const day = baseDate.getDay();
   const diff = day === 0 ? -6 : 1 - day;
   const monday = new Date(baseDate);
@@ -22,67 +24,59 @@ function get14Days(baseDate: Date): Date[] {
   });
 }
 
-function toDateStr(d: Date) {
-  return d.toISOString().split("T")[0];
-}
+function toDateStr(d: Date) { return d.toISOString().split("T")[0]; }
 
-const STATUS_COLOR: Record<string, { bg: string; text: string; border: string }> = {
-  geplant:       { bg: "#dbeafe", text: "#1e40af", border: "#93c5fd" },
-  aktiv:         { bg: "#fef9c3", text: "#92400e", border: "#fcd34d" },
-  abgeschlossen: { bg: "#dcfce7", text: "#166534", border: "#86efac" },
+const STATUS_STYLE: Record<string, { bg: string; text: string; border: string; dot: string }> = {
+  geplant:       { bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe", dot: "#3b82f6" },
+  aktiv:         { bg: "#fefce8", text: "#854d0e", border: "#fde68a", dot: "#f59e0b" },
+  abgeschlossen: { bg: "#f0fdf4", text: "#166534", border: "#bbf7d0", dot: "#22c55e" },
 };
 
-// ── Drag-Typen ────────────────────────────────────────────────────────────────
 type DragPayload =
   | { type: "tour"; tourId: number }
   | { type: "kunde"; kundenId: number; mitarbeiterId: number };
 
-// ── Hauptkomponente ───────────────────────────────────────────────────────────
 export default function Tourenplanung() {
-  const { user } = useAuth();
-  const isAdmin = (user as any)?.rolle === "admin";
+  const { mitarbeiter } = usePortalAuth();
+  const isAdmin = mitarbeiter?.rolle === "admin";
 
-  // Kalender-Navigation (2 Wochen ab Montag der aktuellen Woche)
   const [currentDate, setCurrentDate] = useState(new Date());
   const days = useMemo(() => get14Days(currentDate), [currentDate]);
   const heute = useMemo(() => toDateStr(new Date()), []);
   const maxPlanDatum = useMemo(() => {
-    const d = new Date(); d.setDate(d.getDate() + 14);
-    return toDateStr(d);
+    const d = new Date(); d.setDate(d.getDate() + 14); return toDateStr(d);
   }, []);
 
-  // Drag-State
   const [dragPayload, setDragPayload] = useState<DragPayload | null>(null);
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
-
-  // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createDatum, setCreateDatum] = useState("");
   const [createMaId, setCreateMaId] = useState<number | null>(null);
   const [createTitel, setCreateTitel] = useState("");
   const [createNotizen, setCreateNotizen] = useState("");
+  const [createStartzeit, setCreateStartzeit] = useState("08:00");
+  const [createEndzeit, setCreateEndzeit] = useState("10:00");
   const [editTour, setEditTour] = useState<any | null>(null);
-
-  // Mitarbeiter-Filter (Admin kann für jeden Mitarbeiter filtern)
+  const [deleteTourTarget, setDeleteTourTarget] = useState<{ id: number; label: string } | null>(null);
   const [filterMaId, setFilterMaId] = useState<number | null>(null);
+  const [sidebarSearch, setSidebarSearch] = useState("");
 
-  // ── Daten ─────────────────────────────────────────────────────────────────
   const { data: touren = [], refetch } = trpc.touren.list.useQuery();
   const { data: mitarbeiterListe = [] } = trpc.admin.mitarbeiterList.useQuery(undefined, { enabled: isAdmin });
   const { data: abwesenheiten = [] } = (trpc.touren as any).listAbwesenheiten.useQuery();
   const { data: zugewieseneKunden = [] } = (trpc.touren as any).listZugewieseneKunden.useQuery();
 
-  // Effektiver Mitarbeiter-ID für Kunden-Sidebar
-  const effektivMaId = filterMaId ?? (user as any)?.mitarbeiterId ?? null;
+  const effektivMaId = filterMaId ?? (mitarbeiter as any)?.id ?? null;
 
-  // Kunden-Sidebar: gefiltert nach ausgewähltem Mitarbeiter (Admin: alle oder gefiltert)
   const sidebarKunden = useMemo(() => {
-    if (!isAdmin || !filterMaId) return zugewieseneKunden as any[];
-    // Admin mit Filter: nur Kunden des gewählten Mitarbeiters
-    return (zugewieseneKunden as any[]);
-  }, [zugewieseneKunden, isAdmin, filterMaId]);
+    let kunden = zugewieseneKunden as any[];
+    if (sidebarSearch.trim()) {
+      const q = sidebarSearch.toLowerCase();
+      kunden = kunden.filter(k => `${k.vorname} ${k.nachname}`.toLowerCase().includes(q) || (k.ort || "").toLowerCase().includes(q));
+    }
+    return kunden;
+  }, [zugewieseneKunden, sidebarSearch]);
 
-  // Touren nach Datum gruppieren
   const tourenByDatum = useMemo(() => {
     const map: Record<string, any[]> = {};
     (touren as any[]).forEach(t => {
@@ -93,7 +87,6 @@ export default function Tourenplanung() {
     return map;
   }, [touren]);
 
-  // Abwesenheiten nach Datum
   const abwesenheitenByDatum = useMemo(() => {
     const map: Record<string, Array<{ typ: string; name: string }>> = {};
     (abwesenheiten as any[]).forEach(a => {
@@ -110,33 +103,27 @@ export default function Tourenplanung() {
     return map;
   }, [abwesenheiten]);
 
-  // ── Mutations ─────────────────────────────────────────────────────────────
   const createMut = trpc.touren.create.useMutation({
     onSuccess: () => { toast.success("✅ Tour erstellt!"); setShowCreateModal(false); setCreateTitel(""); setCreateNotizen(""); setCreateMaId(null); refetch(); },
     onError: (e) => toast.error("❌ " + e.message),
   });
-
   const updateStatusMut = trpc.touren.updateStatus.useMutation({
     onSuccess: () => { toast.success("Status aktualisiert"); refetch(); },
     onError: (e) => toast.error("❌ " + e.message),
   });
-
   const moveMut = (trpc.touren as any).moveTour?.useMutation({
     onSuccess: () => { toast.success("📅 Tour verschoben"); refetch(); },
     onError: (e: any) => toast.error("❌ " + e.message),
   });
-
-  const deleteMut = (trpc.touren as any).deleteTour?.useMutation({
-    onSuccess: () => { toast.success("🗑️ Tour gelöscht"); setEditTour(null); refetch(); },
+  const deleteTourMut = (trpc.touren as any).deleteTour?.useMutation({
+    onSuccess: () => { toast.success("🗑️ Tour gelöscht"); setEditTour(null); setDeleteTourTarget(null); refetch(); },
     onError: (e: any) => toast.error("❌ " + e.message),
   });
-
   const createFromKundeMut = (trpc.touren as any).createFromKunde?.useMutation({
     onSuccess: () => { toast.success("✅ Besuchstermin erstellt!"); refetch(); },
     onError: (e: any) => toast.error("❌ " + e.message),
   });
 
-  // ── Drag-and-Drop Handler ─────────────────────────────────────────────────
   const handleTourDragStart = useCallback((e: React.DragEvent, tourId: number) => {
     setDragPayload({ type: "tour", tourId });
     e.dataTransfer.effectAllowed = "move";
@@ -162,43 +149,41 @@ export default function Tourenplanung() {
     setDragOverDate(null);
     if (!dragPayload) return;
     if (dragPayload.type === "tour") {
-      if (!moveMut) return;
-      moveMut.mutate({ id: dragPayload.tourId, newDatum: dateStr });
+      moveMut?.mutate({ id: dragPayload.tourId, newDatum: dateStr });
     } else if (dragPayload.type === "kunde") {
-      if (!createFromKundeMut) return;
-      createFromKundeMut.mutate({ mitarbeiterId: dragPayload.mitarbeiterId, kundenId: dragPayload.kundenId, datum: dateStr });
+      createFromKundeMut?.mutate({ mitarbeiterId: dragPayload.mitarbeiterId, kundenId: dragPayload.kundenId, datum: dateStr });
     }
     setDragPayload(null);
   }, [dragPayload, moveMut, createFromKundeMut]);
 
-  const handleDragEnd = useCallback(() => {
-    setDragPayload(null);
-    setDragOverDate(null);
-  }, []);
+  const handleDragEnd = useCallback(() => { setDragPayload(null); setDragOverDate(null); }, []);
 
-  // ── Kalender-Label ────────────────────────────────────────────────────────
   const rangeLabel = useMemo(() => {
-    const start = days[0];
-    const end = days[13];
-    return `${start.getDate()}. ${MONATE[start.getMonth()]} – ${end.getDate()}. ${MONATE[end.getMonth()]} ${end.getFullYear()}`;
+    const s = days[0]; const e = days[13];
+    return `${s.getDate()}. ${MONATE[s.getMonth()]} – ${e.getDate()}. ${MONATE[e.getMonth()]} ${e.getFullYear()}`;
   }, [days]);
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // Dauer-Berechnung für Create-Modal
+  const dauerMin = useMemo(() => {
+    if (!createStartzeit || !createEndzeit) return 0;
+    const [sh, sm] = createStartzeit.split(":").map(Number);
+    const [eh, em] = createEndzeit.split(":").map(Number);
+    return (eh * 60 + em) - (sh * 60 + sm);
+  }, [createStartzeit, createEndzeit]);
+
   return (
-    <div style={{ display: "flex", gap: 0, height: "100%", minHeight: "calc(100vh - 120px)", background: "#f8fafc" }}>
+    <div style={{ display: "flex", height: "100%", minHeight: "calc(100vh - 64px)", background: "#f1f5f9" }}>
 
       {/* ── Kunden-Sidebar ─────────────────────────────────────────────────── */}
-      <div style={{
-        width: 220, minWidth: 180, maxWidth: 260, background: "#fff",
-        borderRight: "1px solid #e5e7eb", display: "flex", flexDirection: "column",
-        flexShrink: 0,
-      }}>
-        <div style={{ padding: "14px 12px 8px", borderBottom: "1px solid #f3f4f6" }}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: "#111827", marginBottom: 6 }}>👥 Kunden</div>
+      <div style={{ width: 230, minWidth: 200, background: "#fff", borderRight: "1px solid #e2e8f0", display: "flex", flexDirection: "column", flexShrink: 0, boxShadow: "2px 0 8px rgba(0,0,0,0.04)" }}>
+        <div style={{ padding: "16px 14px 10px", borderBottom: "1px solid #f1f5f9", background: "#f8fafc" }}>
+          <div style={{ fontWeight: 800, fontSize: 13, color: "#0f172a", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 16 }}>👥</span> Kunden
+          </div>
           {isAdmin && (
             <Select onValueChange={v => setFilterMaId(v === "alle" ? null : Number(v))}>
-              <SelectTrigger style={{ fontSize: 11, height: 30 }}>
-                <SelectValue placeholder="Mitarbeiter filtern..." />
+              <SelectTrigger style={{ fontSize: 11, height: 30, marginBottom: 6 }}>
+                <SelectValue placeholder="Alle Mitarbeiter" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="alle">Alle Mitarbeiter</SelectItem>
@@ -208,82 +193,82 @@ export default function Tourenplanung() {
               </SelectContent>
             </Select>
           )}
-          <p style={{ fontSize: 10, color: "#9ca3af", marginTop: 6, lineHeight: 1.4 }}>
-            Kunden per Drag &amp; Drop auf einen Kalender-Tag ziehen → Besuchstermin erstellen
-          </p>
+          <input
+            value={sidebarSearch}
+            onChange={e => setSidebarSearch(e.target.value)}
+            placeholder="🔍 Suchen..."
+            style={{ width: "100%", padding: "6px 10px", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12, boxSizing: "border-box", background: "#fff", outline: "none" }}
+          />
+          <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 6, textAlign: "center" }}>↕ Auf Kalender-Tag ziehen</div>
         </div>
-        <div style={{ flex: 1, overflowY: "auto", padding: "8px 6px" }}>
-          {(sidebarKunden as any[]).length === 0 ? (
-            <div style={{ padding: "16px 8px", textAlign: "center", color: "#9ca3af", fontSize: 12 }}>
-              Keine zugewiesenen Kunden
+        <div style={{ flex: 1, overflowY: "auto", padding: "8px" }}>
+          {sidebarKunden.length === 0 ? (
+            <div style={{ textAlign: "center", color: "#94a3b8", fontSize: 12, padding: "20px 8px" }}>
+              {(zugewieseneKunden as any[]).length === 0 ? "Keine Kunden zugewiesen" : "Keine Treffer"}
             </div>
           ) : (
-            (sidebarKunden as any[]).map((k: any) => (
-              <div
-                key={k.id}
-                draggable
-                onDragStart={(e) => handleKundeDragStart(e, k.id)}
-                onDragEnd={handleDragEnd}
-                style={{
-                  background: "#f0fdfa", border: "1px solid #99f6e4",
-                  borderRadius: 8, padding: "7px 9px", marginBottom: 5,
-                  cursor: "grab", userSelect: "none",
-                  transition: "box-shadow 0.15s ease",
-                }}
-                title={`${k.vorname} ${k.nachname}${k.ort ? ` · ${k.ort}` : ''} · Pflegegrad ${k.pflegegrad}`}
+            sidebarKunden.map((k: any) => (
+              <div key={k.id} draggable onDragStart={(e) => handleKundeDragStart(e, k.id)} onDragEnd={handleDragEnd}
+                style={{ background: "#fafafa", border: "1px solid #e2e8f0", borderRadius: 10, padding: "8px 10px", marginBottom: 6, cursor: "grab", userSelect: "none", transition: "all 0.12s ease" }}
+                title={`${k.vorname} ${k.nachname}${k.ort ? ` · ${k.ort}` : ""}`}
               >
-                <div style={{ fontWeight: 600, fontSize: 12, color: "#0f766e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {k.nachname}, {k.vorname}
+                <div style={{ fontWeight: 700, fontSize: 12, color: "#0f766e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{k.nachname}, {k.vorname}</div>
+                <div style={{ display: "flex", gap: 4, marginTop: 3, flexWrap: "wrap" }}>
+                  {k.ort && <span style={{ fontSize: 10, color: "#64748b" }}>📍 {k.ort}</span>}
+                  {k.pflegegrad > 0 && <span style={{ fontSize: 10, background: "#e0f2fe", color: "#0369a1", padding: "1px 5px", borderRadius: 4, fontWeight: 700 }}>PG {k.pflegegrad}</span>}
                 </div>
-                {k.ort && <div style={{ fontSize: 10, color: "#6b7280", marginTop: 1 }}>📍 {k.ort}</div>}
-                {k.pflegegrad > 0 && (
-                  <div style={{ fontSize: 10, color: "#0d9488", marginTop: 1 }}>PG {k.pflegegrad}</div>
-                )}
               </div>
             ))
           )}
         </div>
+        <div style={{ padding: "8px 12px", borderTop: "1px solid #f1f5f9", background: "#f8fafc" }}>
+          <div style={{ fontSize: 10, color: "#94a3b8", textAlign: "center" }}>{sidebarKunden.length} Kunden</div>
+        </div>
       </div>
 
       {/* ── Kalender-Hauptbereich ───────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
 
-        {/* Header */}
-        <div style={{ padding: "12px 16px 8px", background: "#fff", borderBottom: "1px solid #e5e7eb", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        {/* Kalender-Header */}
+        <div style={{ padding: "12px 16px", background: "#fff", borderBottom: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button
-              onClick={() => { const d = new Date(currentDate); d.setDate(d.getDate() - 14); setCurrentDate(d); }}
-              style={{ background: "#f3f4f6", border: "none", borderRadius: 8, padding: "5px 10px", cursor: "pointer", fontSize: 16, color: "#374151" }}
-            >‹</button>
-            <div style={{ textAlign: "center" }}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: "#111827" }}>🗓️ {rangeLabel}</div>
-              <button onClick={() => setCurrentDate(new Date())} style={{ background: "none", border: "none", color: "#0d9488", fontSize: 11, cursor: "pointer", fontWeight: 600 }}>Heute</button>
+            <button onClick={() => { const d = new Date(currentDate); d.setDate(d.getDate() - 14); setCurrentDate(d); }}
+              style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 16, color: "#374151", fontWeight: 700 }}>‹</button>
+            <div style={{ textAlign: "center", minWidth: 220 }}>
+              <div style={{ fontWeight: 800, fontSize: 15, color: "#0f172a" }}>🗓️ {rangeLabel}</div>
+              <button onClick={() => setCurrentDate(new Date())} style={{ background: "none", border: "none", color: "#0d9488", fontSize: 11, cursor: "pointer", fontWeight: 700, marginTop: 2 }}>↩ Heute</button>
             </div>
-            <button
-              onClick={() => { const d = new Date(currentDate); d.setDate(d.getDate() + 14); setCurrentDate(d); }}
-              style={{ background: "#f3f4f6", border: "none", borderRadius: 8, padding: "5px 10px", cursor: "pointer", fontSize: 16, color: "#374151" }}
-            >›</button>
+            <button onClick={() => { const d = new Date(currentDate); d.setDate(d.getDate() + 14); setCurrentDate(d); }}
+              style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 16, color: "#374151", fontWeight: 700 }}>›</button>
           </div>
-          {isAdmin && (
-            <button
-              onClick={() => { setCreateDatum(heute); setShowCreateModal(true); }}
-              style={{ background: "#0d9488", color: "#fff", border: "none", borderRadius: 10, padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
-            >
-              + Tour erstellen
-            </button>
-          )}
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              {[{ dot: "#3b82f6", label: "Geplant" }, { dot: "#f59e0b", label: "Aktiv" }, { dot: "#22c55e", label: "Fertig" }].map(item => (
+                <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: item.dot }} />
+                  <span style={{ fontSize: 11, color: "#64748b" }}>{item.label}</span>
+                </div>
+              ))}
+            </div>
+            {isAdmin && (
+              <button onClick={() => { setCreateDatum(heute); setShowCreateModal(true); }}
+                style={{ background: "#0d9488", color: "#fff", border: "none", borderRadius: 10, padding: "8px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer", boxShadow: "0 2px 8px rgba(13,148,136,0.3)" }}>
+                + Tour erstellen
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Wochentag-Header */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-          {WOCHENTAGE_KURZ.map(w => (
-            <div key={w} style={{ textAlign: "center", padding: "6px 2px", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase" }}>{w}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", background: "#f8fafc", borderBottom: "1px solid #e2e8f0", padding: "0 8px" }}>
+          {WOCHENTAGE.map(w => (
+            <div key={w} style={{ textAlign: "center", padding: "8px 2px", fontSize: 12, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>{w}</div>
           ))}
         </div>
 
-        {/* 2-Wochen-Kalender-Grid (2 Zeilen × 7 Spalten) */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "8px" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+        {/* 2-Wochen-Kalender-Grid */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "10px 10px 16px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6 }}>
             {days.map((date, i) => {
               const dateStr = toDateStr(date);
               const isToday = dateStr === heute;
@@ -295,95 +280,79 @@ export default function Tourenplanung() {
               const isWeekend = i % 7 === 5 || i % 7 === 6;
 
               return (
-                <div
-                  key={dateStr}
+                <div key={dateStr}
                   onDragOver={(e) => !isPast && !isFuture && handleDragOver(e, dateStr)}
                   onDrop={(e) => !isPast && !isFuture && handleDrop(e, dateStr)}
                   onDragLeave={() => setDragOverDate(null)}
-                  onClick={() => {
-                    if (isAdmin && !isPast && !isFuture) {
-                      setCreateDatum(dateStr);
-                      setShowCreateModal(true);
-                    }
-                  }}
+                  onClick={() => { if (isAdmin && !isPast && !isFuture) { setCreateDatum(dateStr); setShowCreateModal(true); } }}
                   style={{
-                    borderRadius: 10,
-                    border: isDragOver ? "2px dashed #0d9488" : isToday ? "2px solid #0d9488" : "1px solid #e5e7eb",
-                    background: isDragOver ? "#f0fdf4" : isToday ? "#f0fdfa" : isWeekend ? "#fafafa" : isPast ? "#f9fafb" : "#fff",
-                    minHeight: 100,
-                    padding: "6px 5px",
+                    borderRadius: 12,
+                    border: isDragOver ? "2px dashed #0d9488" : isToday ? "2px solid #0d9488" : "1px solid #e2e8f0",
+                    background: isDragOver ? "#f0fdf4" : isToday ? "#f0fdfa" : isWeekend ? "#f8fafc" : isPast ? "#fafafa" : "#fff",
+                    minHeight: 120, padding: "8px 6px 6px",
                     cursor: isAdmin && !isPast && !isFuture ? "pointer" : "default",
-                    transition: "all 0.12s ease",
-                    opacity: isFuture ? 0.45 : 1,
+                    transition: "all 0.15s ease",
+                    opacity: isFuture ? 0.4 : 1,
                     position: "relative",
+                    boxShadow: isToday ? "0 0 0 2px rgba(13,148,136,0.15)" : isDragOver ? "0 4px 16px rgba(13,148,136,0.2)" : "none",
                   }}
                 >
-                  {/* Datum-Kopf */}
-                  <div style={{ textAlign: "center", marginBottom: 3 }}>
+                  {/* Datum-Header */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
                     <div style={{
-                      fontSize: 14, fontWeight: 700,
-                      color: isToday ? "#fff" : isPast ? "#9ca3af" : "#111827",
+                      width: 26, height: 26, borderRadius: "50%",
                       background: isToday ? "#0d9488" : "transparent",
-                      borderRadius: isToday ? "50%" : 0,
-                      width: isToday ? 24 : "auto",
-                      height: isToday ? 24 : "auto",
-                      display: "inline-flex", alignItems: "center", justifyContent: "center",
-                      margin: "0 auto",
-                    }}>
-                      {date.getDate()}
-                    </div>
-                    {/* Monatswechsel-Label */}
-                    {date.getDate() === 1 && (
-                      <div style={{ fontSize: 9, color: "#0d9488", fontWeight: 700 }}>{MONATE[date.getMonth()]}</div>
+                      color: isToday ? "#fff" : isPast ? "#94a3b8" : "#0f172a",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 13, fontWeight: isToday ? 800 : 600,
+                    }}>{date.getDate()}</div>
+                    {dayTouren.length > 0 && (
+                      <span style={{ background: "#dbeafe", color: "#1d4ed8", fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 10 }}>{dayTouren.length}</span>
                     )}
                   </div>
 
-                  {/* Abwesenheiten */}
-                  {dayAbwesenheiten.slice(0, 2).map((a: any, idx: number) => (
-                    <div key={idx} title={`${a.typ === 'urlaub' ? 'Urlaub' : 'Krank'}: ${a.name}`} style={{
-                      background: a.typ === 'urlaub' ? '#fef3c7' : '#fee2e2',
-                      color: a.typ === 'urlaub' ? '#92400e' : '#dc2626',
-                      border: `1px solid ${a.typ === 'urlaub' ? '#fcd34d' : '#fca5a5'}`,
-                      borderRadius: 4, padding: '1px 4px', fontSize: 9, fontWeight: 700,
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 2,
+                  {/* Abwesenheits-Badges */}
+                  {dayAbwesenheiten.slice(0, 2).map((a, idx) => (
+                    <div key={idx} style={{
+                      fontSize: 9, padding: "1px 4px", borderRadius: 4, marginBottom: 2,
+                      background: a.typ === "urlaub" ? "#fef3c7" : "#fee2e2",
+                      color: a.typ === "urlaub" ? "#92400e" : "#991b1b",
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 600,
                     }}>
-                      {a.typ === 'urlaub' ? '🏖' : '🤒'} {a.name.split(' ')[0]}
+                      {a.typ === "urlaub" ? "🏖️" : "🤒"} {a.name.split(" ")[1] || a.name}
                     </div>
                   ))}
 
-                  {/* Touren */}
+                  {/* Tour-Chips */}
                   {dayTouren.slice(0, 4).map((t: any) => {
-                    const sc = STATUS_COLOR[t.status] || { bg: "#f3f4f6", text: "#374151", border: "#e5e7eb" };
+                    const sc = STATUS_STYLE[t.status] || STATUS_STYLE.geplant;
                     return (
-                      <div
-                        key={t.id}
+                      <div key={t.id}
                         draggable={isAdmin}
                         onDragStart={(e) => { e.stopPropagation(); handleTourDragStart(e, t.id); }}
                         onDragEnd={handleDragEnd}
                         onClick={(e) => { e.stopPropagation(); setEditTour(t); }}
                         style={{
                           background: sc.bg, color: sc.text, border: `1px solid ${sc.border}`,
-                          borderRadius: 5, padding: "2px 4px", fontSize: 10, fontWeight: 600,
+                          borderLeft: `3px solid ${sc.dot}`, borderRadius: 6,
+                          padding: "3px 5px", fontSize: 10, fontWeight: 600,
                           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                          cursor: isAdmin ? "grab" : "pointer", marginBottom: 2,
+                          cursor: isAdmin ? "grab" : "pointer", marginBottom: 2, transition: "opacity 0.1s",
                         }}
-                        title={`${t.mitarbeiterVorname} ${t.mitarbeiterNachname}${t.titel ? ` – ${t.titel}` : ''}`}
+                        title={`${t.mitarbeiterVorname} ${t.mitarbeiterNachname}${t.titel ? ` – ${t.titel}` : ""}`}
                       >
-                        {t.mitarbeiterVorname?.[0]}{t.mitarbeiterNachname?.[0]}{t.titel ? ` ${t.titel.slice(0, 12)}` : ""}
+                        <span style={{ opacity: 0.7 }}>{t.mitarbeiterVorname?.[0]}{t.mitarbeiterNachname?.[0]}</span>
+                        {t.titel ? ` ${t.titel.slice(0, 14)}` : " Tour"}
                       </div>
                     );
                   })}
                   {dayTouren.length > 4 && (
-                    <div style={{ fontSize: 9, color: "#6b7280", textAlign: "center" }}>+{dayTouren.length - 4}</div>
+                    <div style={{ fontSize: 9, color: "#64748b", textAlign: "center", fontWeight: 600 }}>+{dayTouren.length - 4} weitere</div>
                   )}
 
-                  {/* Drag-Drop-Hinweis */}
+                  {/* Drop-Overlay */}
                   {isDragOver && (
-                    <div style={{
-                      position: "absolute", inset: 0, borderRadius: 10,
-                      background: "rgba(13,148,136,0.08)", display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 18, pointerEvents: "none",
-                    }}>📌</div>
+                    <div style={{ position: "absolute", inset: 0, borderRadius: 12, background: "rgba(13,148,136,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, pointerEvents: "none" }}>📌</div>
                   )}
                 </div>
               );
@@ -391,84 +360,85 @@ export default function Tourenplanung() {
           </div>
         </div>
 
-        {/* Legende */}
-        <div style={{ padding: "8px 12px", background: "#f9fafb", borderTop: "1px solid #f3f4f6", display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: "#6b7280" }}>Legende:</span>
-          {[
-            { bg: "#dbeafe", border: "#93c5fd", label: "Geplant" },
-            { bg: "#fef9c3", border: "#fcd34d", label: "Aktiv" },
-            { bg: "#dcfce7", border: "#86efac", label: "Fertig" },
-            { bg: "#fef3c7", border: "#fcd34d", label: "🏖️ Urlaub" },
-            { bg: "#fee2e2", border: "#fca5a5", label: "🤒 Krank" },
-          ].map(item => (
-            <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 3 }}>
-              <div style={{ width: 10, height: 10, borderRadius: 2, background: item.bg, border: `1px solid ${item.border}` }} />
-              <span style={{ fontSize: 10, color: "#374151" }}>{item.label}</span>
-            </div>
-          ))}
-          <span style={{ marginLeft: "auto", fontSize: 10, color: "#9ca3af" }}>
-            Kunden-Sidebar → Drag &amp; Drop auf Tag = Besuch planen · Tour-Chip → Drag = verschieben
-          </span>
+        {/* Footer */}
+        <div style={{ padding: "8px 16px", background: "#f8fafc", borderTop: "1px solid #e2e8f0", fontSize: 11, color: "#94a3b8", textAlign: "center" }}>
+          Kunden-Sidebar → auf Tag ziehen = Besuch planen &nbsp;·&nbsp; Tour-Chip → ziehen = verschieben &nbsp;·&nbsp; Klick auf Tag = neue Tour
         </div>
       </div>
 
       {/* ── Tour-Detail-Modal ───────────────────────────────────────────────── */}
       {editTour && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-          <div style={{ background: "#fff", borderRadius: 18, padding: 24, maxWidth: 420, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>📋 Tour-Details</h2>
-              <button onClick={() => setEditTour(null)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#6b7280" }}>✕</button>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ background: "#fff", borderRadius: 20, padding: 28, maxWidth: 440, width: "100%", boxShadow: "0 24px 64px rgba(0,0,0,0.25)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+              <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: "#0f172a" }}>📋 Tour-Details</h2>
+              <button onClick={() => setEditTour(null)} style={{ background: "#f1f5f9", border: "none", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontSize: 16, color: "#64748b" }}>✕</button>
             </div>
-            <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
-              <div style={{ fontSize: 13, color: "#374151" }}><strong>Mitarbeiter:</strong> {editTour.mitarbeiterVorname} {editTour.mitarbeiterNachname}</div>
-              <div style={{ fontSize: 13, color: "#374151" }}><strong>Datum:</strong> {new Date(editTour.datum + "T12:00:00").toLocaleDateString("de-DE", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}</div>
-              <div style={{ fontSize: 13, color: "#374151" }}>
-                <strong>Status:</strong>{" "}
-                <span style={{ background: STATUS_COLOR[editTour.status]?.bg, color: STATUS_COLOR[editTour.status]?.text, padding: "2px 8px", borderRadius: 20, fontSize: 12, fontWeight: 700 }}>
-                  {editTour.status}
-                </span>
+            <div style={{ display: "grid", gap: 10, marginBottom: 20 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div style={{ background: "#f8fafc", borderRadius: 10, padding: "10px 12px" }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", marginBottom: 2 }}>MITARBEITER</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>{editTour.mitarbeiterVorname} {editTour.mitarbeiterNachname}</div>
+                </div>
+                <div style={{ background: "#f8fafc", borderRadius: 10, padding: "10px 12px" }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", marginBottom: 2 }}>DATUM</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
+                    {new Date(editTour.datum + "T12:00:00").toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "short" })}
+                  </div>
+                </div>
               </div>
-              {editTour.titel && <div style={{ fontSize: 13, color: "#374151" }}><strong>Titel:</strong> {editTour.titel}</div>}
-              {editTour.notizen && <div style={{ fontSize: 13, color: "#374151" }}><strong>Notizen:</strong> {editTour.notizen}</div>}
+              {editTour.titel && (
+                <div style={{ background: "#f0fdfa", borderRadius: 10, padding: "10px 12px", border: "1px solid #99f6e4" }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#0d9488", marginBottom: 2 }}>TITEL</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>{editTour.titel}</div>
+                </div>
+              )}
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", marginBottom: 6 }}>STATUS ÄNDERN</div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {["geplant", "aktiv", "abgeschlossen"].map(s => {
+                    const sc = STATUS_STYLE[s];
+                    const isActive = editTour.status === s;
+                    return (
+                      <button key={s}
+                        onClick={() => { updateStatusMut.mutate({ id: editTour.id, status: s as any }); setEditTour({ ...editTour, status: s }); }}
+                        style={{ flex: 1, padding: "8px 4px", background: isActive ? sc.bg : "#f8fafc", color: isActive ? sc.text : "#64748b", border: isActive ? `2px solid ${sc.border}` : "1px solid #e2e8f0", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer", transition: "all 0.15s" }}
+                      >
+                        <div style={{ width: 6, height: 6, borderRadius: "50%", background: sc.dot, margin: "0 auto 3px" }} />
+                        {s.charAt(0).toUpperCase() + s.slice(1)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              {editTour.notizen && (
+                <div style={{ background: "#fafafa", borderRadius: 10, padding: "10px 12px", border: "1px solid #e2e8f0" }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", marginBottom: 2 }}>NOTIZEN</div>
+                  <div style={{ fontSize: 12, color: "#374151" }}>{editTour.notizen}</div>
+                </div>
+              )}
             </div>
-            {isAdmin && editTour.status !== "abgeschlossen" && (
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {editTour.status === "geplant" && (
-                  <button onClick={() => { updateStatusMut.mutate({ id: editTour.id, status: "aktiv" }); setEditTour(null); }}
-                    style={{ flex: 1, background: "#fef9c3", color: "#92400e", border: "1px solid #fcd34d", borderRadius: 10, padding: "8px 12px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-                    ▶ Starten
-                  </button>
-                )}
-                {editTour.status === "aktiv" && (
-                  <button onClick={() => { updateStatusMut.mutate({ id: editTour.id, status: "abgeschlossen" }); setEditTour(null); }}
-                    style={{ flex: 1, background: "#dcfce7", color: "#166534", border: "1px solid #86efac", borderRadius: 10, padding: "8px 12px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-                    ✅ Abschließen
-                  </button>
-                )}
-                {deleteMut && (
-                  <button onClick={() => { if (!window.confirm("Tour wirklich löschen?")) return; deleteMut.mutate({ id: editTour.id }); }}
-                    style={{ background: "#fee2e2", color: "#dc2626", border: "1px solid #fca5a5", borderRadius: 10, padding: "8px 12px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-                    🗑️ Löschen
-                  </button>
-                )}
-              </div>
+            {isAdmin && (
+              <button
+                onClick={() => setDeleteTourTarget({ id: editTour.id, label: `${editTour.mitarbeiterVorname} ${editTour.mitarbeiterNachname} – ${new Date(editTour.datum + "T12:00:00").toLocaleDateString("de-DE")}` })}
+                style={{ width: "100%", padding: "10px", background: "#fee2e2", color: "#dc2626", border: "1px solid #fca5a5", borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+              >🗑️ Tour löschen</button>
             )}
           </div>
         </div>
       )}
 
       {/* ── Tour erstellen Modal ────────────────────────────────────────────── */}
-      {showCreateModal && isAdmin && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-          <div style={{ background: "#fff", borderRadius: 18, padding: 24, maxWidth: 420, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>🗺️ Neue Tour planen</h2>
-              <button onClick={() => setShowCreateModal(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#6b7280" }}>✕</button>
+      {showCreateModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ background: "#fff", borderRadius: 20, padding: 28, maxWidth: 440, width: "100%", boxShadow: "0 24px 64px rgba(0,0,0,0.25)", maxHeight: "90vh", overflowY: "auto" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+              <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: "#0f172a" }}>🗺️ Neue Tour planen</h2>
+              <button onClick={() => setShowCreateModal(false)} style={{ background: "#f1f5f9", border: "none", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontSize: 16, color: "#64748b" }}>✕</button>
             </div>
-            <div style={{ display: "grid", gap: 12 }}>
+            <div style={{ display: "grid", gap: 14 }}>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 700, color: "#6b7280", display: "block", marginBottom: 4 }}>MITARBEITER</label>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#64748b", display: "block", marginBottom: 5, textTransform: "uppercase" }}>Mitarbeiter *</label>
                 <Select onValueChange={v => setCreateMaId(Number(v))}>
                   <SelectTrigger><SelectValue placeholder="Mitarbeiter wählen..." /></SelectTrigger>
                   <SelectContent>
@@ -479,32 +449,40 @@ export default function Tourenplanung() {
                 </Select>
               </div>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 700, color: "#6b7280", display: "block", marginBottom: 4 }}>
-                  DATUM <span style={{ color: "#0d9488" }}>(max. 2 Wochen im Voraus)</span>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#64748b", display: "block", marginBottom: 5, textTransform: "uppercase" }}>
+                  Datum * <span style={{ color: "#0d9488", fontWeight: 600, textTransform: "none" }}>(max. 2 Wochen im Voraus)</span>
                 </label>
-                <input type="date" value={createDatum} min={heute} max={maxPlanDatum}
-                  onChange={e => setCreateDatum(e.target.value)}
-                  style={{ width: "100%", padding: "10px 12px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, boxSizing: "border-box" }}
-                />
+                <input type="date" value={createDatum} min={heute} max={maxPlanDatum} onChange={e => setCreateDatum(e.target.value)}
+                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #e2e8f0", borderRadius: 10, fontSize: 14, boxSizing: "border-box", outline: "none" }} />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: "#64748b", display: "block", marginBottom: 5, textTransform: "uppercase" }}>Startzeit</label>
+                  <input type="time" value={createStartzeit} onChange={e => setCreateStartzeit(e.target.value)}
+                    style={{ width: "100%", padding: "10px 12px", border: "1px solid #e2e8f0", borderRadius: 10, fontSize: 14, boxSizing: "border-box" }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: "#64748b", display: "block", marginBottom: 5, textTransform: "uppercase" }}>Endzeit</label>
+                  <input type="time" value={createEndzeit} onChange={e => setCreateEndzeit(e.target.value)}
+                    style={{ width: "100%", padding: "10px 12px", border: "1px solid #e2e8f0", borderRadius: 10, fontSize: 14, boxSizing: "border-box" }} />
+                </div>
+              </div>
+              {dauerMin > 0 && (
+                <div style={{ background: dauerMin >= 90 ? "#f0fdf4" : "#fef9c3", border: `1px solid ${dauerMin >= 90 ? "#86efac" : "#fcd34d"}`, borderRadius: 10, padding: "8px 12px", fontSize: 12, color: dauerMin >= 90 ? "#166534" : "#92400e" }}>
+                  {dauerMin >= 90 ? "✅" : "⚠️"} Dauer: <strong>{Math.floor(dauerMin / 60) > 0 ? `${Math.floor(dauerMin / 60)}h ` : ""}{dauerMin % 60 > 0 ? `${dauerMin % 60}min` : ""}</strong>
+                  {dauerMin < 90 && " – Mindestens 1,5 Stunden erforderlich"}
+                </div>
+              )}
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#64748b", display: "block", marginBottom: 5, textTransform: "uppercase" }}>Titel (optional)</label>
+                <input type="text" value={createTitel} onChange={e => setCreateTitel(e.target.value)} placeholder="z. B. Morgenrunde Nord"
+                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #e2e8f0", borderRadius: 10, fontSize: 14, boxSizing: "border-box" }} />
               </div>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 700, color: "#6b7280", display: "block", marginBottom: 4 }}>TITEL (optional)</label>
-                <input type="text" value={createTitel} onChange={e => setCreateTitel(e.target.value)}
-                  placeholder="z. B. Morgenrunde Nord"
-                  style={{ width: "100%", padding: "10px 12px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, boxSizing: "border-box" }}
-                />
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#64748b", display: "block", marginBottom: 5, textTransform: "uppercase" }}>Notizen (optional)</label>
+                <textarea value={createNotizen} onChange={e => setCreateNotizen(e.target.value)} rows={2} placeholder="Besonderheiten, Hinweise..."
+                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #e2e8f0", borderRadius: 10, fontSize: 14, boxSizing: "border-box", resize: "vertical" }} />
               </div>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 700, color: "#6b7280", display: "block", marginBottom: 4 }}>NOTIZEN (optional)</label>
-                <textarea value={createNotizen} onChange={e => setCreateNotizen(e.target.value)}
-                  rows={2} placeholder="Besonderheiten, Hinweise..."
-                  style={{ width: "100%", padding: "10px 12px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, boxSizing: "border-box", resize: "vertical" }}
-                />
-              </div>
-              <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 10, padding: "10px 12px", fontSize: 12, color: "#166534" }}>
-                ℹ️ Jeder Einsatz muss mindestens <strong>1,5 Stunden (90 Min.)</strong> dauern.
-              </div>
-              {/* Abwesenheits-Konflikt-Warnung */}
               {createMaId && createDatum && (() => {
                 const konflikte = (abwesenheitenByDatum[createDatum] || []).filter((a: any) => {
                   const ma = (mitarbeiterListe as any[]).find(m => m.id === createMaId);
@@ -513,8 +491,8 @@ export default function Tourenplanung() {
                 if (konflikte.length === 0) return null;
                 return (
                   <div style={{ background: "#fef9c3", border: "1px solid #fcd34d", borderRadius: 10, padding: "10px 12px", fontSize: 13, color: "#92400e" }}>
-                    ⚠️ <strong>Achtung:</strong> Mitarbeiter ist am {new Date(createDatum + 'T12:00:00').toLocaleDateString('de-DE')} als{' '}
-                    {konflikte.map((k: any) => k.typ === 'urlaub' ? 'im Urlaub' : 'krank').join(', ')} eingetragen.
+                    ⚠️ <strong>Achtung:</strong> Mitarbeiter ist am {new Date(createDatum + "T12:00:00").toLocaleDateString("de-DE")} als{" "}
+                    {konflikte.map((k: any) => k.typ === "urlaub" ? "im Urlaub" : "krank").join(", ")} eingetragen.
                   </div>
                 );
               })()}
@@ -524,7 +502,7 @@ export default function Tourenplanung() {
                   createMut.mutate({ mitarbeiterId: createMaId, datum: createDatum, titel: createTitel || undefined, notizen: createNotizen || undefined });
                 }}
                 disabled={createMut.isPending}
-                style={{ background: "#0d9488", color: "#fff", border: "none", borderRadius: 12, padding: "12px", fontWeight: 700, fontSize: 15, cursor: "pointer", opacity: createMut.isPending ? 0.7 : 1 }}
+                style={{ background: "#0d9488", color: "#fff", border: "none", borderRadius: 12, padding: "13px", fontWeight: 800, fontSize: 15, cursor: createMut.isPending ? "not-allowed" : "pointer", opacity: createMut.isPending ? 0.7 : 1, boxShadow: "0 2px 8px rgba(13,148,136,0.3)" }}
               >
                 {createMut.isPending ? "Wird erstellt..." : "✅ Tour erstellen"}
               </button>
@@ -532,6 +510,26 @@ export default function Tourenplanung() {
           </div>
         </div>
       )}
+
+      {/* ── Tour-Lösch-Bestätigung ──────────────────────────────────────────── */}
+      <AlertDialog open={!!deleteTourTarget} onOpenChange={(open) => !open && setDeleteTourTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tour wirklich löschen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <span className="font-medium text-foreground">{deleteTourTarget?.label}</span>
+              <br />
+              Diese Aktion wird protokolliert und kann nicht rückgängig gemacht werden.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction onClick={() => deleteTourTarget && deleteTourMut?.mutate({ id: deleteTourTarget.id })} className="bg-red-600 hover:bg-red-700 text-white">
+              Endgültig löschen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/_core/hooks/useAuth";
+import { usePortalAuth } from "@/contexts/PortalAuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,8 +22,8 @@ const statusLabel: Record<string, string> = {
 };
 
 export default function Urlaubsverwaltung() {
-  const { user } = useAuth();
-  const isAdmin = (user as any)?.rolle === "admin";
+  const { mitarbeiter } = usePortalAuth();
+  const isAdmin = mitarbeiter?.rolle === "admin";
 
   const { data: antraege = [], refetch } = trpc.urlaub.list.useQuery();
 

@@ -1,4 +1,14 @@
 import { useState, useMemo } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import BottomSheet from "@/components/BottomSheet";
@@ -25,6 +35,8 @@ export default function Fahrtenbuch() {
   const [km, setKm] = useState("");
   const [kundenId, setKundenId] = useState("");
   const [zweck, setZweck] = useState("");
+  // Löschen-Dialog State
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; label: string } | null>(null);
 
   // ── Filter-State ──────────────────────────────────────────────────────────
   const currentMonat = today.slice(0, 7);
@@ -51,8 +63,12 @@ export default function Fahrtenbuch() {
   });
 
   const handleDeleteFahrt = (id: number, label: string) => {
-    if (!window.confirm(`Fahrt "${label}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`)) return;
-    deleteFahrt.mutate({ id });
+    setDeleteTarget({ id, label });
+  };
+  const confirmDelete = () => {
+    if (!deleteTarget) return;
+    deleteFahrt.mutate({ id: deleteTarget.id });
+    setDeleteTarget(null);
   };
 
   const rate = typ === "sonder" ? 0.35 : 0.30;
@@ -378,6 +394,29 @@ export default function Fahrtenbuch() {
           </button>
         </div>
       </BottomSheet>
+
+      {/* Löschen-Sicherheitsabfrage */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Fahrt wirklich löschen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <span className="font-medium text-foreground">{deleteTarget?.label}</span>
+              <br />
+              Diese Aktion wird im Audit-Log protokolliert und kann nicht rückgängig gemacht werden.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Endgültig löschen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

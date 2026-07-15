@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/_core/hooks/useAuth";
+import { usePortalAuth } from "@/contexts/PortalAuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,8 +11,8 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 
 export default function Krankmeldung() {
-  const { user } = useAuth();
-  const isAdmin = (user as any)?.rolle === "admin";
+  const { mitarbeiter } = usePortalAuth();
+  const isAdmin = mitarbeiter?.rolle === "admin";
 
   const { data: meldungen = [], refetch } = trpc.krank.list.useQuery();
 

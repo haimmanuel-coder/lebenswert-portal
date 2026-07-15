@@ -394,3 +394,32 @@
 - [x] Tourenplanung: Drag-and-Drop Kunde aus Sidebar auf Kalender-Tag → Tour erstellen
 - [x] Backend: touren.listZugewieseneKunden Procedure
 - [x] Backend: touren.createFromKunde Mutation für Drag-and-Drop
+
+## Phase 26 – Auth-Scan, Fahrtenbuch-Löschfunktion, Tourenplanung-Kalender
+
+### 1. Auth-Hook-Scan
+- [ ] Alle Seiten mit useAuth (Manus OAuth) statt usePortalAuth scannen
+- [ ] Falsche Imports auf usePortalAuth umstellen
+
+### 2. Fahrtenbuch-Löschfunktion
+- [ ] Backend: fahrten.delete Mutation (mit Audit-Log)
+- [ ] Frontend: Löschen-Button mit Sicherheitsabfrage (AlertDialog)
+
+### 3. Tourenplanung-Kalender (Drag-and-Drop)
+- [ ] 2-Wochen-Kalender mit Zeitraster (Stunden-Slots)
+- [ ] Kunden-Sidebar mit zugewiesenen Kunden (Drag-Quelle)
+- [ ] Drag-and-Drop: Kunde auf Zeitslot ziehen → Tour erstellen
+- [ ] Tour-Chips verschiebbar (Drag innerhalb Kalender)
+- [ ] Abwesenheits-Konflikt-Warnung (Urlaub/Krank)
+
+## Phase 26 – Auth-Scan, Fahrtenbuch-Löschfunktion, Tourenplanung-Kalender
+
+- [x] Auth-Scan: alle 4 Seiten mit falschem useAuth-Import auf usePortalAuth umgestellt (Home.tsx, Urlaubsverwaltung.tsx, Krankmeldung.tsx, Tourenplanung.tsx)
+- [x] Fahrtenbuch: Löschfunktion mit AlertDialog (Sicherheitsabfrage + Protokoll-Hinweis) statt window.confirm
+- [x] Tourenplanung: vollständiges Rewrite mit verbessertem 2-Wochen-Kalender-Design
+- [x] Tourenplanung: Kunden-Sidebar mit Suchfeld und Pflegegrad-Badge
+- [x] Tourenplanung: Tour-Chips mit farbigem linken Rand (Status-Indikator)
+- [x] Tourenplanung: Datum-Kreis-Highlight für heutigen Tag
+- [x] Tourenplanung: Startzeit/Endzeit-Felder mit Dauer-Berechnung im Create-Modal
+- [x] Tourenplanung: Tour-Lösch-Bestätigung mit AlertDialog (Admin-only)
+- [x] 0 TypeScript-Fehler, 33/33 Tests bestanden
