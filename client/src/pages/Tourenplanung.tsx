@@ -26,6 +26,33 @@ function get14Days(baseDate: Date): Date[] {
 
 function toDateStr(d: Date) { return d.toISOString().split("T")[0]; }
 
+function parseTourDatum(value: unknown) {
+  const raw = String(value ?? "");
+  const ymd = raw.match(/^(\d{4}-\d{2}-\d{2})/)?.[1];
+  const datum = new Date(ymd ? `${ymd}T12:00:00` : raw);
+  return Number.isNaN(datum.getTime()) ? null : datum;
+}
+
+function formatTourDatum(value: unknown, kurz = false) {
+  const datum = parseTourDatum(value);
+  if (!datum) return "Datum nicht verfügbar";
+  return datum.toLocaleDateString("de-DE", kurz
+    ? undefined
+    : { weekday: "short", day: "2-digit", month: "short" });
+}
+
+function tourAdresse(stopp: any) {
+  return [stopp.strasse, [stopp.plz, stopp.ort].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+}
+
+function mapsRouteUrl(stopps: any[]) {
+  const adressen = stopps.map(tourAdresse).filter(Boolean);
+  if (adressen.length === 0) return null;
+  const params = new URLSearchParams({ api: "1", destination: adressen[adressen.length - 1], travelmode: "driving" });
+  if (adressen.length > 1) params.set("waypoints", adressen.slice(0, -1).join("|"));
+  return `https://www.google.com/maps/dir/?${params.toString()}`;
+}
+
 const STATUS_STYLE: Record<string, { bg: string; text: string; border: string; dot: string }> = {
   geplant:       { bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe", dot: "#3b82f6" },
   aktiv:         { bg: "#fefce8", text: "#854d0e", border: "#fde68a", dot: "#f59e0b" },
@@ -39,6 +66,7 @@ type DragPayload =
 export default function Tourenplanung() {
   const { mitarbeiter } = usePortalAuth();
   const isAdmin = mitarbeiter?.rolle === "admin";
+  const isPlanner = isAdmin || mitarbeiter?.rolle === "teamleitung";
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const days = useMemo(() => get14Days(currentDate), [currentDate]);
@@ -65,6 +93,10 @@ export default function Tourenplanung() {
   const { data: mitarbeiterListe = [] } = trpc.admin.mitarbeiterList.useQuery(undefined, { enabled: isAdmin });
   const { data: abwesenheiten = [] } = (trpc.touren as any).listAbwesenheiten.useQuery();
   const { data: zugewieseneKunden = [] } = (trpc.touren as any).listZugewieseneKunden.useQuery();
+  const { data: tourStopps = [], isLoading: tourStoppsLaden, refetch: refetchTourStopps } = (trpc.touren as any).getEinsaetze.useQuery(
+    { tourId: editTour?.id ?? 0 },
+    { enabled: Boolean(editTour?.id) },
+  );
 
   const effektivMaId = filterMaId ?? (mitarbeiter as any)?.id ?? null;
 
@@ -122,6 +154,10 @@ export default function Tourenplanung() {
   const createFromKundeMut = (trpc.touren as any).createFromKunde?.useMutation({
     onSuccess: () => { toast.success("✅ Besuchstermin erstellt!"); refetch(); },
     onError: (e: any) => toast.error("❌ " + e.message),
+  });
+  const optimizeMut = trpc.touren.optimieren.useMutation({
+    onSuccess: async (result) => { toast.success(result.hinweis); await refetchTourStopps(); },
+    onError: (e) => toast.error("❌ " + e.message),
   });
 
   const handleTourDragStart = useCallback((e: React.DragEvent, tourId: number) => {
@@ -383,7 +419,7 @@ export default function Tourenplanung() {
                 <div style={{ background: "#f8fafc", borderRadius: 10, padding: "10px 12px" }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", marginBottom: 2 }}>DATUM</div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
-                    {new Date(editTour.datum + "T12:00:00").toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "short" })}
+                    {formatTourDatum(editTour.datum)}
                   </div>
                 </div>
               </div>
@@ -393,6 +429,39 @@ export default function Tourenplanung() {
                   <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>{editTour.titel}</div>
                 </div>
               )}
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", marginBottom: 6, flexWrap: "wrap" }}><div style={{ fontSize: 11, fontWeight: 700, color: "#64748b" }}>KARTE & NAVIGATION</div>{isPlanner && (tourStopps as any[]).length > 1 && <button disabled={optimizeMut.isPending} onClick={() => { if (confirm("Stopps jetzt datenschutzfreundlich nach Adressbereichen neu ordnen?")) optimizeMut.mutate({ tourId: editTour.id }); }} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid var(--lw-accent)", background: "var(--lw-accent-light)", color: "var(--lw-accent)", fontWeight: 800, cursor: "pointer" }}>{optimizeMut.isPending ? "Optimiert …" : "Route optimieren"}</button>}</div>
+                {tourStoppsLaden ? (
+                  <div style={{ padding: 12, background: "#f8fafc", borderRadius: 10, color: "#64748b", fontSize: 12 }}>Kartenstopps werden geladen …</div>
+                ) : (tourStopps as any[]).length > 0 ? (
+                  <div style={{ border: "1px solid #ddd6fe", borderRadius: 12, overflow: "hidden", background: "#fff" }}>
+                    {tourAdresse((tourStopps as any[])[0]) && (
+                      <iframe
+                        title="Tourenkarte"
+                        src={`https://www.google.com/maps?q=${encodeURIComponent(tourAdresse((tourStopps as any[])[0]))}&output=embed`}
+                        loading="lazy"
+                        referrerPolicy="no-referrer-when-downgrade"
+                        style={{ width: "100%", height: 180, border: 0, display: "block" }}
+                      />
+                    )}
+                    <div style={{ padding: 10, display: "grid", gap: 6 }}>
+                      {(tourStopps as any[]).map((stopp, index) => (
+                        <div key={stopp.id} style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 12 }}>
+                          <span style={{ width: 22, height: 22, flexShrink: 0, borderRadius: "50%", background: "var(--lw-accent-light)", color: "var(--lw-accent)", display: "grid", placeItems: "center", fontWeight: 800 }}>{index + 1}</span>
+                          <div><strong>{stopp.kundenVorname} {stopp.kundenNachname}</strong><br /><span style={{ color: "#64748b" }}>{tourAdresse(stopp) || "Adresse noch nicht hinterlegt"}</span></div>
+                        </div>
+                      ))}
+                      {mapsRouteUrl(tourStopps as any[]) && (
+                        <a href={mapsRouteUrl(tourStopps as any[])!} target="_blank" rel="noopener noreferrer" style={{ marginTop: 4, padding: "10px 12px", borderRadius: 9, background: "var(--lw-accent)", color: "#fff", textDecoration: "none", fontWeight: 800, textAlign: "center" }}>
+                          Navigation für die ganze Tour starten
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ padding: 12, background: "#f8fafc", borderRadius: 10, color: "#64748b", fontSize: 12 }}>Dieser Tour ist noch kein Kundenbesuch zugeordnet.</div>
+                )}
+              </div>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", marginBottom: 6 }}>STATUS ÄNDERN</div>
                 <div style={{ display: "flex", gap: 6 }}>
@@ -420,7 +489,7 @@ export default function Tourenplanung() {
             </div>
             {isAdmin && (
               <button
-                onClick={() => setDeleteTourTarget({ id: editTour.id, label: `${editTour.mitarbeiterVorname} ${editTour.mitarbeiterNachname} – ${new Date(editTour.datum + "T12:00:00").toLocaleDateString("de-DE")}` })}
+                onClick={() => setDeleteTourTarget({ id: editTour.id, label: `${editTour.mitarbeiterVorname} ${editTour.mitarbeiterNachname} – ${formatTourDatum(editTour.datum, true)}` })}
                 style={{ width: "100%", padding: "10px", background: "#fee2e2", color: "#dc2626", border: "1px solid #fca5a5", borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: "pointer" }}
               >🗑️ Tour löschen</button>
             )}

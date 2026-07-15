@@ -5,6 +5,14 @@ import BottomSheet from "@/components/BottomSheet";
 import MitarbeiterDetail from "./MitarbeiterDetail";
 
 type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss";
+type PortalRolle = "mitarbeiter" | "teamleitung" | "buchhaltung" | "admin";
+
+const ROLLEN_LABEL: Record<PortalRolle, string> = {
+  mitarbeiter: "Mitarbeiter",
+  teamleitung: "Teamleitung",
+  buchhaltung: "Buchhaltung",
+  admin: "Admin",
+};
 
 const ZERT_BADGE: Record<string, { label: string; bg: string; color: string }> = {
   erhalten: { label: "✅ Zertifikat erhalten", bg: "#e8f5e4", color: "#4a8c3f" },
@@ -23,12 +31,12 @@ export default function AdminPanel() {
 
   // ── Mitarbeiter ──────────────────────────────────────
   const [maSheet, setMaSheet] = useState(false);
-  const [editMa, setEditMa] = useState<{ id: number; vorname: string; nachname: string; email: string; rolle: "mitarbeiter" | "admin"; aktiv: number; telefon?: string | null } | null>(null);
+  const [editMa, setEditMa] = useState<{ id: number; vorname: string; nachname: string; email: string; rolle: PortalRolle; aktiv: number; telefon?: string | null } | null>(null);
   const [maVorname, setMaVorname] = useState("");
   const [maNachname, setMaNachname] = useState("");
   const [maEmail, setMaEmail] = useState("");
   const [maPasswort, setMaPasswort] = useState("");
-  const [maRolle, setMaRolle] = useState<"mitarbeiter" | "admin">("mitarbeiter");
+  const [maRolle, setMaRolle] = useState<PortalRolle>("mitarbeiter");
   const [maTelefon, setMaTelefon] = useState("");
 
   const { data: maList = [], refetch: refetchMa } = trpc.admin.mitarbeiterList.useQuery();
@@ -241,11 +249,11 @@ export default function AdminPanel() {
             <div key={ma.id} style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 10px rgba(0,0,0,.08)", padding: 14, marginBottom: 10 }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
                 <div style={{ width: 42, height: 42, borderRadius: "50%", background: ma.rolle === "admin" ? "#4a8c3f" : "#e8f5e4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
-                  {ma.rolle === "admin" ? "👑" : "👤"}
+                  {ma.rolle === "admin" ? "A" : ma.rolle === "teamleitung" ? "T" : ma.rolle === "buchhaltung" ? "B" : "M"}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 700 }}>{ma.vorname} {ma.nachname}</div>
-                  <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 2 }}>{(ma as any).position ?? ma.email}</div>
+                  <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 2 }}>{(ma as any).position ?? ROLLEN_LABEL[ma.rolle]}</div>
                   <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 6 }}>{ma.email}</div>
                   {/* Badges */}
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
@@ -456,8 +464,10 @@ export default function AdminPanel() {
           </div>
           <div>
             <label style={labelStyle}>Rolle</label>
-            <select value={maRolle} onChange={(e) => setMaRolle(e.target.value as "mitarbeiter" | "admin")} style={inputStyle}>
+            <select value={maRolle} onChange={(e) => setMaRolle(e.target.value as PortalRolle)} style={inputStyle}>
               <option value="mitarbeiter">Mitarbeiter</option>
+              <option value="teamleitung">Teamleitung</option>
+              <option value="buchhaltung">Buchhaltung</option>
               <option value="admin">Admin</option>
             </select>
           </div>

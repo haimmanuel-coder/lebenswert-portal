@@ -31,9 +31,7 @@ import Vertretungen from "./Vertretungen";
 import AdminDashboard from "./AdminDashboard";
 import Rollenverwaltung from "./Rollenverwaltung";
 import Kundenzuteilung from "./Kundenzuteilung";
-import Besuchsberichte from "./Besuchsberichte";
-import Datenschutz from "./Datenschutz";
-import Integrationen from "./Integrationen";
+import PflichtenheftCenter from "./PflichtenheftCenter";
 import OnboardingTour, { useOnboardingTour } from "@/components/OnboardingTour";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 
@@ -45,8 +43,7 @@ type PageId =
   | "urlaub" | "krank" | "touren" | "benachrichtigungen"
   | "profil" | "leistungsfreigabe" | "buchhaltung"
   | "mitarbeiterakte" | "logbuch" | "vertretungen"
-  | "admindashboard" | "rollenverwaltung" | "kundenzuteilung"
-  | "besuchsberichte" | "datenschutz" | "integrationen";
+  | "admindashboard" | "rollenverwaltung" | "kundenzuteilung" | "arbeitszentrum";
 
 interface NavItem {
   id: PageId;
@@ -102,6 +99,7 @@ export default function PortalApp() {
         { id: "home", icon: "🏠", label: "Dashboard" },
         { id: "benachrichtigungen", icon: "🔔", label: "Benachrichtigungen", badge: unreadCount },
         { id: "kalender", icon: "📆", label: "Kalender" },
+        { id: "arbeitszentrum", icon: "◆", label: "Digitales Arbeitszentrum" },
       ],
     },
     {
@@ -142,9 +140,6 @@ export default function PortalApp() {
           { id: "textbausteine" as PageId, icon: "📝", label: "Textbausteine", adminOnly: true },
           { id: "logbuch" as PageId, icon: "🗒️", label: "Logbuch", adminOnly: true },
           { id: "kundenzuteilung" as PageId, icon: "📌", label: "Kundenzuteilung", adminOnly: true },
-          { id: "besuchsberichte" as PageId, icon: "📋", label: "Besuchsberichte" },
-          { id: "integrationen" as PageId, icon: "🔌", label: "Integrationen", adminOnly: true },
-          { id: "datenschutz" as PageId, icon: "🔐", label: "Datenschutz" },
         ] : [
           { id: "export" as PageId, icon: "📮", label: "Export & Briefe" },
         ]),
@@ -185,9 +180,7 @@ export default function PortalApp() {
       case "admindashboard": return <AdminDashboard />;
       case "rollenverwaltung": return <Rollenverwaltung />;
       case "kundenzuteilung": return <Kundenzuteilung />;
-      case "besuchsberichte": return <Besuchsberichte />;
-      case "datenschutz": return <Datenschutz />;
-      case "integrationen": return <Integrationen />;
+      case "arbeitszentrum": return <PflichtenheftCenter />;
       default: return <Dashboard />;
     }
   };
@@ -305,7 +298,7 @@ export default function PortalApp() {
               {mitarbeiter ? `${mitarbeiter.vorname} ${mitarbeiter.nachname}` : "Mitarbeiter"}
             </div>
             <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>
-              {isAdmin ? "Administrator" : "Mitarbeiter"}
+              {mitarbeiter?.rolle === "admin" ? "Administrator" : mitarbeiter?.rolle === "teamleitung" ? "Teamleitung" : mitarbeiter?.rolle === "buchhaltung" ? "Buchhaltung" : "Mitarbeiter"}
             </div>
           </div>
           <button onClick={logout} title="Abmelden" style={{

@@ -228,7 +228,7 @@ export async function getEinsaetzeByKunde(kundenId: number) {
 export async function createEinsatz(data: InsertEinsatz & { mitarbeiterId: number }) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.insert(einsaetze).values({
+  const result = await db.insert(einsaetze).values({
     mitarbeiterId: data.mitarbeiterId,
     kundenId: data.kundenId,
     datum: new Date(data.datum as unknown as string),
@@ -237,6 +237,7 @@ export async function createEinsatz(data: InsertEinsatz & { mitarbeiterId: numbe
     paragraph: data.paragraph,
     status: "geplant",
   });
+  return Number(result[0].insertId);
 }
 
 export async function updateEinsatzStatus(
@@ -1022,16 +1023,37 @@ export async function deleteKrankmeldung(id: number) {
 }
 
 // ── TOURENPLANUNG ──────────────────────────────────────────────────────────
+const tourMitMitarbeiterAuswahl = {
+  id: touren.id,
+  mitarbeiterId: touren.mitarbeiterId,
+  datum: touren.datum,
+  status: touren.status,
+  notizen: touren.notizen,
+  titel: touren.titel,
+  startzeit: touren.startzeit,
+  endzeit: touren.endzeit,
+  angelegtVon: touren.angelegtVon,
+  createdAt: touren.createdAt,
+  updatedAt: touren.updatedAt,
+  mitarbeiterVorname: mitarbeiter.vorname,
+  mitarbeiterNachname: mitarbeiter.nachname,
+};
+
 export async function getAllTouren() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(touren).orderBy(desc(touren.datum));
+  return db.select(tourMitMitarbeiterAuswahl)
+    .from(touren)
+    .leftJoin(mitarbeiter, eq(touren.mitarbeiterId, mitarbeiter.id))
+    .orderBy(desc(touren.datum));
 }
 
 export async function getTourenByMitarbeiter(mitarbeiterId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(touren)
+  return db.select(tourMitMitarbeiterAuswahl)
+    .from(touren)
+    .leftJoin(mitarbeiter, eq(touren.mitarbeiterId, mitarbeiter.id))
     .where(eq(touren.mitarbeiterId, mitarbeiterId))
     .orderBy(desc(touren.datum));
 }
@@ -1046,7 +1068,7 @@ export async function createTour(data: InsertTour) {
   const db = await getDb();
   if (!db) throw new Error('DB not available');
   const result = await db.insert(touren).values(data);
-  return result;
+  return Number(result[0].insertId);
 }
 
 export async function updateTourStatus(id: number, status: 'geplant' | 'aktiv' | 'abgeschlossen') {
@@ -1058,7 +1080,22 @@ export async function updateTourStatus(id: number, status: 'geplant' | 'aktiv' |
 export async function getTourEinsaetze(tourId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(tourEinsaetze)
+  return db.select({
+    id: tourEinsaetze.id,
+    tourId: tourEinsaetze.tourId,
+    einsatzId: tourEinsaetze.einsatzId,
+    reihenfolge: tourEinsaetze.reihenfolge,
+    kundenId: einsaetze.kundenId,
+    datum: einsaetze.datum,
+    startzeit: einsaetze.startzeit,
+    kundenVorname: kunden.vorname,
+    kundenNachname: kunden.nachname,
+    strasse: kunden.strasse,
+    plz: kunden.plz,
+    ort: kunden.ort,
+  }).from(tourEinsaetze)
+    .innerJoin(einsaetze, eq(tourEinsaetze.einsatzId, einsaetze.id))
+    .innerJoin(kunden, eq(einsaetze.kundenId, kunden.id))
     .where(eq(tourEinsaetze.tourId, tourId))
     .orderBy(tourEinsaetze.reihenfolge);
 }
@@ -1074,6 +1111,19 @@ export async function removeEinsatzFromTour(tourId: number, einsatzId: number) {
   if (!db) return;
   await db.delete(tourEinsaetze)
     .where(and(eq(tourEinsaetze.tourId, tourId), eq(tourEinsaetze.einsatzId, einsatzId)));
+}
+
+export async function updateTourReihenfolge(tourId: number, geordneteZuordnungsIds: number[]) {
+  const db = await getDb();
+  if (!db) throw new Error('DB not available');
+  await db.transaction(async tx => {
+    for (let index = 0; index < geordneteZuordnungsIds.length; index += 1) {
+      const id = geordneteZuordnungsIds[index];
+      await tx.update(tourEinsaetze)
+        .set({ reihenfolge: index })
+        .where(and(eq(tourEinsaetze.id, id), eq(tourEinsaetze.tourId, tourId)));
+    }
+  });
 }
 
 // ── IN-APP-BENACHRICHTIGUNGEN ─────────────────────────────────────────────

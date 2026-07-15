@@ -9,8 +9,8 @@
   --g: #4a8c3f;
   --g2: #3a7030;
   --gl: #e8f5e4;
-  --t: #2a9d8f;
-  --p: #6b4c9a;
+  --t: #2E8B9A;
+  --p: #6B3FA0;
   --red: #dc2626;
   --yellow: #f59e0b;
   --green: #16a34a;
@@ -45,6 +45,9 @@
   --lw-primary: var(--lw-green-600);
   --lw-primary-hover: var(--lw-green-700);
   --lw-primary-light: var(--lw-green-50);
+  --lw-secondary: #2E8B9A;
+  --lw-accent: #6B3FA0;
+  --lw-accent-light: #F1EAF8;
   --lw-red:    oklch(58% 0.22 25);
   --lw-yellow: oklch(78% 0.18 85);
   --lw-shadow-xs: 0 1px 2px oklch(0% 0 0 / 0.05);
@@ -172,6 +175,7 @@ h1,h2,h3,h4,h5,h6 { font-family: 'DM Sans', 'Inter', sans-serif; font-weight: 70
 .lw-badge-yellow { background: oklch(96% 0.08 85);  color: oklch(42% 0.15 75); }
 .lw-badge-red    { background: oklch(95% 0.06 25);  color: oklch(42% 0.20 25); }
 .lw-badge-blue   { background: oklch(93% 0.05 240); color: oklch(38% 0.16 240); }
+.lw-badge-purple { background: var(--lw-accent-light); color: var(--lw-accent); }
 .lw-badge-gray   { background: var(--lw-gray-100);  color: var(--lw-gray-600); }
 
 .lw-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
@@ -361,3 +365,105 @@ canvas.sig-canvas {
   to { opacity: 1; transform: translateY(0); }
 }
 .page-enter { animation: slideUp 0.2s ease; }
+
+/* Pflichtenheft: Kundenansicht mit drei Informationsspalten */
+.kunden-detail-dreispalten {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.kunden-detail-spalte {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #d9e6d6;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(25, 59, 32, 0.06);
+}
+.kunden-detail-spalte-titel {
+  margin-bottom: 10px;
+  color: #193b20;
+  font-size: 14px;
+  font-weight: 800;
+}
+.kunden-detail-zeile,
+.kunden-detail-budget,
+.kunden-detail-termin {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid #eef3ed;
+  font-size: 12px;
+}
+.kunden-detail-zeile span,
+.kunden-detail-budget span,
+.kunden-detail-termin span,
+.kunden-detail-leer {
+  color: #64748b;
+}
+.kunden-detail-zeile strong,
+.kunden-detail-budget strong,
+.kunden-detail-termin strong {
+  color: #193b20;
+  text-align: right;
+}
+.kunden-detail-termin > div {
+  display: grid;
+  gap: 2px;
+}
+.kunden-detail-termin > div strong,
+.kunden-detail-termin > div span {
+  text-align: left;
+}
+@media (max-width: 820px) {
+  .kunden-detail-dreispalten {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Mobile Cookie- und Login-Sicherheit: Der Hinweis darf keine Anmeldung verdecken. */
+@media (max-width: 640px) {
+  .lw-cookie-banner {
+    max-height: 45vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0.875rem 1rem !important;
+    gap: 0.5rem !important;
+  }
+
+  .lw-cookie-summary:not(:has(+ div)) {
+    font-size: 0 !important;
+    line-height: 1 !important;
+  }
+
+  .lw-cookie-summary button {
+    font-size: 0.8125rem !important;
+  }
+
+  .lw-cookie-legal {
+    display: none;
+  }
+
+  .lw-cookie-actions {
+    display: grid !important;
+    grid-template-columns: 1fr 1.35fr;
+    width: 100%;
+    align-items: stretch !important;
+  }
+
+  .lw-cookie-actions .lw-btn {
+    min-height: 44px;
+    white-space: normal;
+    line-height: 1.2;
+  }
+
+  body.lw-cookie-open .lw-login-page {
+    justify-content: flex-start !important;
+    min-height: calc(100vh + 180px) !important;
+    padding-top: 20px !important;
+    padding-bottom: 180px !important;
+  }
+}

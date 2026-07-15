@@ -33,7 +33,13 @@ export const mitarbeiter = mysqlTable("mitarbeiter", {
   nachname: varchar("nachname", { length: 100 }).notNull(),
   email: varchar("email", { length: 320 }).notNull().unique(),
   passwortHash: varchar("passwortHash", { length: 255 }).notNull(),
-  rolle: mysqlEnum("rolle", ["mitarbeiter", "admin"]).default("mitarbeiter").notNull(),
+  rolle: mysqlEnum("rolle", ["mitarbeiter", "teamleitung", "buchhaltung", "admin"]).default("mitarbeiter").notNull(),
+  berechtigungen: text("berechtigungen"), // optionales JSON-Array für zusätzliche Einzelrechte
+  zweiFaktorAktiv: boolean("zweiFaktorAktiv").default(false).notNull(),
+  zweiFaktorSecret: varchar("zweiFaktorSecret", { length: 255 }),
+  zweiFaktorBestaetigtAt: timestamp("zweiFaktorBestaetigtAt"),
+  datevEinwilligung: boolean("datevEinwilligung").default(false).notNull(),
+  datevEinwilligungAt: timestamp("datevEinwilligungAt"),
   aktiv: int("aktiv").default(1).notNull(),
   // Stammdaten
   telefon: varchar("telefon", { length: 50 }),
@@ -127,6 +133,9 @@ export const kunden = mysqlTable("kunden", {
   wunschtag1: mysqlEnum("wunschtag1", ["montag","dienstag","mittwoch","donnerstag","freitag","samstag"]),
   wunschtag2: mysqlEnum("wunschtag2", ["montag","dienstag","mittwoch","donnerstag","freitag","samstag"]),
   aktiv: int("aktiv").default(1).notNull(),
+  geloeschtAt: timestamp("geloeschtAt"),
+  geloeschtVon: int("geloeschtVon"),
+  loeschgrund: text("loeschgrund"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -177,7 +186,12 @@ export const einsaetze = mysqlTable("einsaetze", {
   startzeit: time("startzeit"),
   dauerStunden: decimal("dauerStunden", { precision: 4, scale: 2 }),
   paragraph: mysqlEnum("paragraph", ["45b", "45a", "39"]).default("45b").notNull(),
-  status: mysqlEnum("status", ["geplant", "abgeschlossen", "abgesagt"]).default("geplant").notNull(),
+  status: mysqlEnum("status", ["geplant", "bestaetigt", "aenderung_angefragt", "abgeschlossen", "abgesagt"]).default("geplant").notNull(),
+  bestaetigtAt: timestamp("bestaetigtAt"),
+  absagegrund: text("absagegrund"),
+  aenderungswunsch: text("aenderungswunsch"),
+  tatsaechlicherStart: timestamp("tatsaechlicherStart"),
+  tatsaechlichesEnde: timestamp("tatsaechlichesEnde"),
   bericht: text("bericht"),
   gesundheit: mysqlEnum("gesundheit", ["gut", "stabil", "auffaellig", "kritisch"]),
   bemerkung: text("bemerkung"),
@@ -483,122 +497,63 @@ export const vertretungsUebernahmen = mysqlTable("vertretungsUebernahmen", {
 export type VertretungsUebernahme = typeof vertretungsUebernahmen.$inferSelect;
 export type InsertVertretungsUebernahme = typeof vertretungsUebernahmen.$inferInsert;
 
-// ── MODUL: ROLLEN-ERWEITERUNG (Stufe 1) ──────────────────────────────────────
-// mitarbeiter.rolle wird per ALTER TABLE auf 4 Werte erweitert (Migration unten)
-
-// ── MODUL: ZWEI-FAKTOR-AUTHENTIFIZIERUNG (TOTP) ───────────────────────────────
-export const mitarbeiterZweiFaktor = mysqlTable("mitarbeiterZweiFaktor", {
-  id: int("id").autoincrement().primaryKey(),
-  mitarbeiterId: int("mitarbeiterId").notNull().unique(),
-  twoFactorEnabled: boolean("twoFactorEnabled").default(false).notNull(),
-  twoFactorSecret: varchar("twoFactorSecret", { length: 255 }), // verschlüsselt gespeichert
-  twoFactorActivatedAt: timestamp("twoFactorActivatedAt"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
-export type MitarbeiterZweiFaktor = typeof mitarbeiterZweiFaktor.$inferSelect;
-export type InsertMitarbeiterZweiFaktor = typeof mitarbeiterZweiFaktor.$inferInsert;
-
-export const zweiFaktorCodes = mysqlTable("zweiFaktorCodes", {
-  id: int("id").autoincrement().primaryKey(),
-  mitarbeiterId: int("mitarbeiterId").notNull(),
-  codeHash: varchar("codeHash", { length: 255 }).notNull(), // bcrypt-gehasht
-  verwendet: boolean("verwendet").default(false).notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
-export type ZweiFaktorCode = typeof zweiFaktorCodes.$inferSelect;
-export type InsertZweiFaktorCode = typeof zweiFaktorCodes.$inferInsert;
-
-// ── MODUL: MITARBEITER-BERECHTIGUNGEN (optionale Ausnahmen) ───────────────────
-export const mitarbeiterBerechtigungen = mysqlTable("mitarbeiterBerechtigungen", {
-  id: int("id").autoincrement().primaryKey(),
-  mitarbeiterId: int("mitarbeiterId").notNull(),
-  modul: varchar("modul", { length: 100 }).notNull(), // z.B. "buchhaltung", "analysen"
-  zugriff: mysqlEnum("zugriff", ["erlaubt", "verweigert"]).notNull(),
-  gesetztVonId: int("gesetztVonId"), // Admin-ID
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
-export type MitarbeiterBerechtigung = typeof mitarbeiterBerechtigungen.$inferSelect;
-export type InsertMitarbeiterBerechtigung = typeof mitarbeiterBerechtigungen.$inferInsert;
-
-// ── MODUL: DATENSCHUTZ-VEREINBARUNGEN ─────────────────────────────────────────
-export const datenschutzDokumente = mysqlTable("datenschutzDokumente", {
-  id: int("id").autoincrement().primaryKey(),
-  version: varchar("version", { length: 20 }).notNull(), // z.B. "2026-07"
-  titel: varchar("titel", { length: 200 }).notNull(),
-  inhalt: text("inhalt").notNull(), // Volltext der Vereinbarung
-  aktiv: boolean("aktiv").default(true).notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
-export type DatenschutzDokument = typeof datenschutzDokumente.$inferSelect;
-export type InsertDatenschutzDokument = typeof datenschutzDokumente.$inferInsert;
-
-export const datenschutzZustimmungen = mysqlTable("datenschutzZustimmungen", {
-  id: int("id").autoincrement().primaryKey(),
-  mitarbeiterId: int("mitarbeiterId").notNull(),
-  dokumentId: int("dokumentId").notNull(),
-  dokumentVersion: varchar("dokumentVersion", { length: 20 }).notNull(),
-  ipHash: varchar("ipHash", { length: 64 }), // SHA-256 der IP
-  zugestimmtAt: timestamp("zugestimmtAt").defaultNow().notNull(),
-});
-export type DatenschutzZustimmung = typeof datenschutzZustimmungen.$inferSelect;
-export type InsertDatenschutzZustimmung = typeof datenschutzZustimmungen.$inferInsert;
-
-// ── MODUL: BACKUP-PROTOKOLLE ──────────────────────────────────────────────────
-export const backupProtokolle = mysqlTable("backupProtokolle", {
-  id: int("id").autoincrement().primaryKey(),
-  typ: varchar("typ", { length: 50 }).default("auto").notNull(), // "auto" | "manuell"
-  status: mysqlEnum("status", ["erfolgreich", "fehlgeschlagen", "laufend"]).notNull(),
-  fehlerMeldung: text("fehlerMeldung"),
-  datenbankGroesse: varchar("datenbankGroesse", { length: 50 }),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
-export type BackupProtokoll = typeof backupProtokolle.$inferSelect;
-export type InsertBackupProtokoll = typeof backupProtokolle.$inferInsert;
-
-// ── MODUL: VERFÜGBARKEITEN (Stufe 2) ─────────────────────────────────────────
+// ── PFLICHTENHEFT 2026: VERFÜGBARKEIT & ARBEITSZEIT ─────────────────────
 export const verfuegbarkeiten = mysqlTable("verfuegbarkeiten", {
   id: int("id").autoincrement().primaryKey(),
   mitarbeiterId: int("mitarbeiterId").notNull(),
-  wochentag: mysqlEnum("wochentag", ["mo", "di", "mi", "do", "fr", "sa", "so"]).notNull(),
-  zeitVon: time("zeitVon").notNull(), // z.B. "08:00:00"
-  zeitBis: time("zeitBis").notNull(), // z.B. "16:00:00"
-  sollstunden: decimal("sollstunden", { precision: 4, scale: 2 }).default("0.00"),
+  wochentag: int("wochentag").notNull(), // 1=Montag ... 7=Sonntag
+  vonZeit: time("vonZeit").notNull(),
+  bisZeit: time("bisZeit").notNull(),
   gueltigVon: date("gueltigVon"),
   gueltigBis: date("gueltigBis"),
-  aktiv: boolean("aktiv").default(true).notNull(),
+  status: mysqlEnum("status", ["verfuegbar", "nicht_verfuegbar", "bevorzugt"]).default("verfuegbar").notNull(),
+  notiz: text("notiz"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 export type Verfuegbarkeit = typeof verfuegbarkeiten.$inferSelect;
 export type InsertVerfuegbarkeit = typeof verfuegbarkeiten.$inferInsert;
 
-// ── MODUL: EINSATZ-ÄNDERUNGSHISTORIE (Stufe 2) ────────────────────────────────
-export const einsatzAenderungen = mysqlTable("einsatzAenderungen", {
+export const arbeitszeitKonten = mysqlTable("arbeitszeitKonten", {
+  id: int("id").autoincrement().primaryKey(),
+  mitarbeiterId: int("mitarbeiterId").notNull(),
+  monat: varchar("monat", { length: 7 }).notNull(),
+  sollStunden: decimal("sollStunden", { precision: 7, scale: 2 }).default("0").notNull(),
+  istStunden: decimal("istStunden", { precision: 7, scale: 2 }).default("0").notNull(),
+  ueberstunden: decimal("ueberstunden", { precision: 7, scale: 2 }).default("0").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type ArbeitszeitKonto = typeof arbeitszeitKonten.$inferSelect;
+
+// ── PFLICHTENHEFT 2026: TERMINBESTÄTIGUNG & BESUCHSBERICHTE ───────────
+export const terminRueckmeldungen = mysqlTable("terminRueckmeldungen", {
   id: int("id").autoincrement().primaryKey(),
   einsatzId: int("einsatzId").notNull(),
-  aenderungstyp: mysqlEnum("aenderungstyp", ["erstellt", "geaendert", "abgesagt", "verschoben", "bestaetigt", "abgelehnt"]).notNull(),
-  aenderungsgrund: text("aenderungsgrund"),
-  alteDaten: text("alteDaten"), // JSON-Snapshot vor der Änderung
-  neueDaten: text("neueDaten"), // JSON-Snapshot nach der Änderung
-  geaendertVonId: int("geaendertVonId"), // Mitarbeiter-ID
-  benachrichtigtAt: timestamp("benachrichtigtAt"),
+  mitarbeiterId: int("mitarbeiterId").notNull(),
+  aktion: mysqlEnum("aktion", ["bestaetigt", "abgesagt", "aenderung_angefragt"]).notNull(),
+  grund: text("grund"),
+  wunschDatum: date("wunschDatum"),
+  wunschZeit: time("wunschZeit"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
-export type EinsatzAenderung = typeof einsatzAenderungen.$inferSelect;
-export type InsertEinsatzAenderung = typeof einsatzAenderungen.$inferInsert;
+export type TerminRueckmeldung = typeof terminRueckmeldungen.$inferSelect;
 
-// ── MODUL: BESUCHSBERICHTE (Stufe 3) ─────────────────────────────────────────
 export const besuchsberichte = mysqlTable("besuchsberichte", {
   id: int("id").autoincrement().primaryKey(),
-  einsatzId: int("einsatzId").notNull(),
+  einsatzId: int("einsatzId"),
   kundenId: int("kundenId").notNull(),
   mitarbeiterId: int("mitarbeiterId").notNull(),
-  formularVersionId: int("formularVersionId"),
-  inhalt: text("inhalt"), // JSON-Formularinhalt
-  zustand: mysqlEnum("zustand", ["entwurf", "eingereicht", "freigegeben", "abgelehnt"]).default("entwurf").notNull(),
-  unterschriftMitarbeiter: text("unterschriftMitarbeiter"), // Base64 SVG
-  unterschriftKunde: text("unterschriftKunde"), // Base64 SVG
-  freigegebenVonId: int("freigegebenVonId"),
+  datum: date("datum").notNull(),
+  dauerMinuten: int("dauerMinuten"),
+  taetigkeiten: text("taetigkeiten").notNull(),
+  beobachtungen: text("beobachtungen"),
+  besonderheiten: text("besonderheiten"),
+  naechsteSchritte: text("naechsteSchritte"),
+  kiVorschlag: text("kiVorschlag"),
+  anhangUrls: text("anhangUrls"), // JSON-Liste
+  status: mysqlEnum("status", ["entwurf", "eingereicht", "freigegeben", "korrektur"]).default("entwurf").notNull(),
+  freigegebenVon: int("freigegebenVon"),
   freigegebenAt: timestamp("freigegebenAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -606,70 +561,97 @@ export const besuchsberichte = mysqlTable("besuchsberichte", {
 export type Besuchsbericht = typeof besuchsberichte.$inferSelect;
 export type InsertBesuchsbericht = typeof besuchsberichte.$inferInsert;
 
-export const besuchsberichtDateien = mysqlTable("besuchsberichtDateien", {
-  id: int("id").autoincrement().primaryKey(),
-  berichtId: int("berichtId").notNull(),
-  dateiKey: varchar("dateiKey", { length: 500 }).notNull(), // S3-Key
-  dateiUrl: text("dateiUrl").notNull(),
-  dateiname: varchar("dateiname", { length: 255 }),
-  mimeType: varchar("mimeType", { length: 100 }),
-  groesse: int("groesse"), // Bytes
-  kategorie: mysqlEnum("kategorie", ["foto", "dokument", "unterschrift", "sonstiges"]).default("foto"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
-export type BesuchsberichtDatei = typeof besuchsberichtDateien.$inferSelect;
-export type InsertBesuchsberichtDatei = typeof besuchsberichtDateien.$inferInsert;
-
-// ── MODUL: FORMULARVORLAGEN (Stufe 3) ─────────────────────────────────────────
-export const formularVorlagen = mysqlTable("formularVorlagen", {
-  id: int("id").autoincrement().primaryKey(),
-  name: varchar("name", { length: 200 }).notNull(),
-  version: varchar("version", { length: 20 }).notNull(), // z.B. "1.0"
-  felder: text("felder").notNull(), // JSON: Array von Felddefinitionen
-  aktiv: boolean("aktiv").default(true).notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
-export type FormularVorlage = typeof formularVorlagen.$inferSelect;
-export type InsertFormularVorlage = typeof formularVorlagen.$inferInsert;
-
-// ── MODUL: INTEGRATIONEN (Stufe 5) ────────────────────────────────────────────
+// ── PFLICHTENHEFT 2026: INTEGRATIONSZENTRUM ────────────────────────────
 export const integrationen = mysqlTable("integrationen", {
   id: int("id").autoincrement().primaryKey(),
-  anbieter: varchar("anbieter", { length: 100 }).notNull(), // "optadata", "datev", "lexware", "kasse"
-  name: varchar("name", { length: 200 }).notNull(),
-  modus: mysqlEnum("modus", ["vorbereitet", "aktiv", "deaktiviert", "fehler"]).default("vorbereitet").notNull(),
-  endpoint: varchar("endpoint", { length: 500 }),
-  konfiguration: text("konfiguration"), // verschlüsseltes JSON
-  letzterTest: timestamp("letzterTest"),
-  letzterTestStatus: mysqlEnum("letzterTestStatus", ["ok", "fehler", "unbekannt"]).default("unbekannt"),
+  anbieter: mysqlEnum("anbieter", ["datev", "optadata", "pflegekassen", "gehaltsprogramm", "email", "ebrief", "redis", "maps", "ki"]).notNull(),
+  bezeichnung: varchar("bezeichnung", { length: 200 }).notNull(),
+  status: mysqlEnum("status", ["nicht_eingerichtet", "testmodus", "aktiv", "fehler", "pausiert"]).default("nicht_eingerichtet").notNull(),
+  basisUrl: text("basisUrl"),
+  verschluesselteZugangsdaten: text("verschluesselteZugangsdaten"),
+  zugangHinweis: varchar("zugangHinweis", { length: 100 }),
+  konfiguration: text("konfiguration"), // JSON ohne Geheimnisse
+  letzterTestAt: timestamp("letzterTestAt"),
+  letzterTestStatus: mysqlEnum("letzterTestStatus", ["erfolg", "fehler"]),
+  letzterFehler: text("letzterFehler"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 export type Integration = typeof integrationen.$inferSelect;
-export type InsertIntegration = typeof integrationen.$inferInsert;
 
 export const integrationsLaeufe = mysqlTable("integrationsLaeufe", {
   id: int("id").autoincrement().primaryKey(),
   integrationId: int("integrationId").notNull(),
-  status: mysqlEnum("status", ["gestartet", "erfolgreich", "fehlgeschlagen", "wiederholt"]).notNull(),
-  datensaetze: int("datensaetze").default(0),
-  fehlerCode: varchar("fehlerCode", { length: 50 }),
-  fehlerMeldung: text("fehlerMeldung"),
-  fachlicheReferenz: varchar("fachlicheReferenz", { length: 200 }), // z.B. Monat/Dateiname
-  wiederholungen: int("wiederholungen").default(0),
+  gestartetVon: int("gestartetVon"),
+  typ: mysqlEnum("typ", ["test", "export", "import", "synchronisation", "backup"]).notNull(),
+  status: mysqlEnum("status", ["gestartet", "erfolg", "fehler", "teilweise"]).default("gestartet").notNull(),
+  anzahlDatensaetze: int("anzahlDatensaetze").default(0),
+  meldung: text("meldung"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
+  beendetAt: timestamp("beendetAt"),
 });
 export type IntegrationsLauf = typeof integrationsLaeufe.$inferSelect;
-export type InsertIntegrationsLauf = typeof integrationsLaeufe.$inferInsert;
 
-// ── MODUL: ANALYSE-SNAPSHOTS (Stufe 4) ────────────────────────────────────────
-export const analyseSnapshots = mysqlTable("analyseSnapshots", {
+// ── PFLICHTENHEFT 2026: DATENSCHUTZ & SICHERHEIT ──────────────────────
+export const datenschutzDokumente = mysqlTable("datenschutzDokumente", {
   id: int("id").autoincrement().primaryKey(),
-  monat: varchar("monat", { length: 7 }).notNull(), // YYYY-MM
-  typ: varchar("typ", { length: 50 }).notNull(), // "auslastung", "kundenzuwachs", "umsatz", "pflegegrad", "puenktlichkeit"
-  daten: text("daten").notNull(), // JSON-Snapshot der Kennzahlen
+  typ: mysqlEnum("typ", ["datenschutzerklaerung", "avv", "einwilligung", "loeschkonzept", "verarbeitungsverzeichnis"]).notNull(),
+  titel: varchar("titel", { length: 255 }).notNull(),
+  version: varchar("version", { length: 40 }).notNull(),
+  inhalt: text("inhalt"),
+  dateiUrl: text("dateiUrl"),
+  aktiv: boolean("aktiv").default(true).notNull(),
+  gueltigAb: date("gueltigAb"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
-export type AnalyseSnapshot = typeof analyseSnapshots.$inferSelect;
-export type InsertAnalyseSnapshot = typeof analyseSnapshots.$inferInsert;
+export type DatenschutzDokument = typeof datenschutzDokumente.$inferSelect;
+
+export const einwilligungen = mysqlTable("einwilligungen", {
+  id: int("id").autoincrement().primaryKey(),
+  personTyp: mysqlEnum("personTyp", ["mitarbeiter", "kunde"]).notNull(),
+  personId: int("personId").notNull(),
+  zweck: mysqlEnum("zweck", ["datev", "optadata", "pflegekasse", "email", "ki", "allgemein"]).notNull(),
+  erteilt: boolean("erteilt").notNull(),
+  dokumentVersion: varchar("dokumentVersion", { length: 40 }),
+  ipAddress: varchar("ipAddress", { length: 45 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  widerrufenAt: timestamp("widerrufenAt"),
+});
+export type Einwilligung = typeof einwilligungen.$inferSelect;
+
+export const loeschAnfragen = mysqlTable("loeschAnfragen", {
+  id: int("id").autoincrement().primaryKey(),
+  personTyp: mysqlEnum("personTyp", ["mitarbeiter", "kunde"]).notNull(),
+  personId: int("personId").notNull(),
+  grund: text("grund"),
+  status: mysqlEnum("status", ["angefragt", "geprueft", "gesperrt", "anonymisiert", "abgelehnt"]).default("angefragt").notNull(),
+  bearbeitetVon: int("bearbeitetVon"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type LoeschAnfrage = typeof loeschAnfragen.$inferSelect;
+
+export const backupLaeufe = mysqlTable("backupLaeufe", {
+  id: int("id").autoincrement().primaryKey(),
+  typ: mysqlEnum("typ", ["datenbank", "dokumente", "vollbackup"]).notNull(),
+  status: mysqlEnum("status", ["gestartet", "erfolg", "fehler"]).default("gestartet").notNull(),
+  speicherort: varchar("speicherort", { length: 255 }),
+  pruefsumme: varchar("pruefsumme", { length: 128 }),
+  meldung: text("meldung"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  beendetAt: timestamp("beendetAt"),
+});
+export type BackupLauf = typeof backupLaeufe.$inferSelect;
+
+// ── PFLICHTENHEFT 2026: ANALYSE & PROGNOSE ────────────────────────────
+export const prognoseSnapshots = mysqlTable("prognoseSnapshots", {
+  id: int("id").autoincrement().primaryKey(),
+  monat: varchar("monat", { length: 7 }).notNull(),
+  typ: mysqlEnum("typ", ["budget", "personal", "auslastung", "umsatz"]).notNull(),
+  prognoseWert: decimal("prognoseWert", { precision: 12, scale: 2 }).notNull(),
+  basisWert: decimal("basisWert", { precision: 12, scale: 2 }).notNull(),
+  vertrauenProzent: int("vertrauenProzent").default(70).notNull(),
+  details: text("details"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type PrognoseSnapshot = typeof prognoseSnapshots.$inferSelect;

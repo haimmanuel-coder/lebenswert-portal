@@ -13,6 +13,11 @@ export default function CookieBanner() {
     if (stored) setConsent(stored);
   }, []);
 
+  useEffect(() => {
+    document.body.classList.toggle("lw-cookie-open", consent === null);
+    return () => document.body.classList.remove("lw-cookie-open");
+  }, [consent]);
+
   const accept = () => {
     localStorage.setItem(COOKIE_KEY, "accepted");
     setConsent("accepted");
@@ -27,6 +32,7 @@ export default function CookieBanner() {
 
   return (
     <div
+      className="lw-cookie-banner"
       style={{
         position: "fixed",
         bottom: 0,
@@ -47,7 +53,7 @@ export default function CookieBanner() {
           <div style={{ fontWeight: 700, fontSize: "1rem", color: "var(--lw-green-700)", marginBottom: "0.25rem" }}>
             🍪 Datenschutz & Cookies
           </div>
-          <div style={{ fontSize: "0.875rem", color: "var(--lw-gray-600)", lineHeight: 1.5 }}>
+          <div className="lw-cookie-summary" style={{ fontSize: "0.875rem", color: "var(--lw-gray-600)", lineHeight: 1.5 }}>
             Dieses Portal verwendet ausschließlich technisch notwendige Cookies für die Anmeldung und Sitzungsverwaltung.
             Es werden keine Tracking- oder Werbe-Cookies eingesetzt.
             {" "}
@@ -86,7 +92,7 @@ export default function CookieBanner() {
           )}
         </div>
 
-        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexShrink: 0 }}>
+        <div className="lw-cookie-actions" style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexShrink: 0 }}>
           <button
             onClick={reject}
             className="lw-btn lw-btn-secondary lw-btn-sm"
@@ -103,7 +109,7 @@ export default function CookieBanner() {
         </div>
       </div>
 
-      <div style={{ fontSize: "0.75rem", color: "var(--lw-gray-400)", borderTop: "1px solid var(--lw-gray-100)", paddingTop: "0.5rem" }}>
+      <div className="lw-cookie-legal" style={{ fontSize: "0.75rem", color: "var(--lw-gray-400)", borderTop: "1px solid var(--lw-gray-100)", paddingTop: "0.5rem" }}>
         Dieses Portal ist ein internes Mitarbeitersystem. Alle Daten werden DSGVO-konform verarbeitet.
         Gemäß Art. 13 DSGVO haben Sie das Recht auf Auskunft, Berichtigung, Löschung und Datenübertragbarkeit.
       </div>
