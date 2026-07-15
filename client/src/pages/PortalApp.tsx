@@ -30,6 +30,7 @@ import Logbuch from "./Logbuch";
 import Vertretungen from "./Vertretungen";
 import AdminDashboard from "./AdminDashboard";
 import Rollenverwaltung from "./Rollenverwaltung";
+import Kundenzuteilung from "./Kundenzuteilung";
 import OnboardingTour, { useOnboardingTour } from "@/components/OnboardingTour";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 
@@ -41,7 +42,7 @@ type PageId =
   | "urlaub" | "krank" | "touren" | "benachrichtigungen"
   | "profil" | "leistungsfreigabe" | "buchhaltung"
   | "mitarbeiterakte" | "logbuch" | "vertretungen"
-  | "admindashboard" | "rollenverwaltung";
+  | "admindashboard" | "rollenverwaltung" | "kundenzuteilung";
 
 interface NavItem {
   id: PageId;
@@ -136,6 +137,7 @@ export default function PortalApp() {
           { id: "export" as PageId, icon: "📮", label: "Export & Briefe", adminOnly: true },
           { id: "textbausteine" as PageId, icon: "📝", label: "Textbausteine", adminOnly: true },
           { id: "logbuch" as PageId, icon: "🗒️", label: "Logbuch", adminOnly: true },
+          { id: "kundenzuteilung" as PageId, icon: "📌", label: "Kundenzuteilung", adminOnly: true },
         ] : [
           { id: "export" as PageId, icon: "📮", label: "Export & Briefe" },
         ]),
@@ -175,6 +177,7 @@ export default function PortalApp() {
       case "vertretungen": return <Vertretungen />;
       case "admindashboard": return <AdminDashboard />;
       case "rollenverwaltung": return <Rollenverwaltung />;
+      case "kundenzuteilung": return <Kundenzuteilung />;
       default: return <Dashboard />;
     }
   };

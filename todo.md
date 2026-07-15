@@ -357,3 +357,40 @@
 - [x] Prozessabgleich P4: Mindestbetreuungszeit-Hinweis beim Planen einer Tour ergänzt
 - [x] Vollständigen PDF-Abgleich P1–P5 dokumentiert und alle Punkte abgehakt
 
+
+## Phase 25 – Heartbeat, Kundenzuteilung & Tourenplanung-Dashboard
+
+### 1. Heartbeat-Jobs (Backend)
+- [ ] SDK-Patch: server/_core/sdk.ts – CRON_OPEN_ID_PREFIX + AuthenticatedUser + buildCronUser + cron short-circuit
+- [ ] SDK-Patch: server/_core/types/manusTypes.ts – taskUid Feld hinzufügen
+- [ ] Handler: /api/scheduled/neukunden-eskalation (POST) in server/_core/index.ts registrieren
+- [ ] Handler: /api/scheduled/vertretung-bereinigung (POST) in server/_core/index.ts registrieren
+- [ ] Heartbeat-Job per CLI: nightly-neukunden-eskalation (täglich 02:00 UTC)
+- [ ] Heartbeat-Job per CLI: nightly-vertretung-bereinigung (täglich 02:05 UTC)
+
+### 2. Admin-Kundenzuteilung (DB + Backend + Frontend)
+- [ ] DB-Schema: kunden.zugewiesenerMitarbeiterId (FK auf mitarbeiter) hinzufügen
+- [ ] DB-Migration ausführen
+- [ ] Backend: kunden.zuweisen Mutation (Admin only)
+- [ ] Backend: kunden.listMitZuweisung Query (Admin: alle, Mitarbeiter: nur eigene)
+- [ ] Frontend: Admin-Seite Kundenzuteilung – Tabelle mit Dropdown pro Kunde
+- [ ] Frontend: Kundenliste zeigt zugewiesenen Mitarbeiter
+
+### 3. Tourenplanung-Dashboard (Frontend)
+- [ ] 2-Wochen-Kalenderansicht (Montag–Sonntag, 14 Tage)
+- [ ] Kunden-Sidebar: nur dem ausgewählten Mitarbeiter zugewiesene Kunden
+- [ ] Drag-and-Drop: Kunde aus Sidebar auf Kalender-Tag ziehen → Tour/Besuch erstellen
+- [ ] Performance: Kundendaten im Hintergrund laden (keine UI-Blockierung)
+- [ ] Responsive: Desktop-optimiert, kein horizontales Scrollen
+
+## Phase 25 – Heartbeat, Kundenzuteilung, 2-Wochen-Kalender (ERLEDIGT ✅)
+- [x] Heartbeat-Handler in server/scheduledHandlers.ts erstellen (Neukunden-Eskalation + Vertretungs-Bereinigung)
+- [x] Heartbeat-Handler in server/_core/index.ts registrieren
+- [x] Heartbeat-Jobs per CLI registrieren (täglich 02:00 UTC Neukunden-Eskalation, 02:05 UTC Vertretungs-Bereinigung)
+- [x] Admin-Kundenzuteilungs-Seite (Kundenzuteilung.tsx) implementiert
+- [x] Kundenzuteilung in PortalApp.tsx Route und Navigation eingebunden
+- [x] Tourenplanung: 2-Wochen-Kalender-Ansicht (14 Tage in 2×7-Grid)
+- [x] Tourenplanung: Kunden-Sidebar mit zugewiesenen Kunden (links)
+- [x] Tourenplanung: Drag-and-Drop Kunde aus Sidebar auf Kalender-Tag → Tour erstellen
+- [x] Backend: touren.listZugewieseneKunden Procedure
+- [x] Backend: touren.createFromKunde Mutation für Drag-and-Drop

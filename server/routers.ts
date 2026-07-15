@@ -399,6 +399,64 @@ export const tourenRouter = router({
       return { success: true };
     }),
 
+  // Erstellt eine Tour aus Drag-and-Drop (Kunde aus Sidebar auf Kalender-Tag)
+  createFromKunde: portalProtected
+    .input(z.object({
+      mitarbeiterId: z.number().int().positive(),
+      kundenId: z.number().int().positive(),
+      datum: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const tourDatum = new Date(input.datum);
+      tourDatum.setHours(0, 0, 0, 0);
+      const heute = new Date(); heute.setHours(0, 0, 0, 0);
+      const maxDatum = new Date(heute); maxDatum.setDate(maxDatum.getDate() + 14);
+      if (tourDatum < heute) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Touren können nicht in der Vergangenheit angelegt werden.' });
+      if (tourDatum > maxDatum) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Touren können maximal 2 Wochen im Voraus geplant werden.' });
+      const kunde = (await getAllKunden()).find((k: any) => k.id === input.kundenId);
+      const titel = kunde ? `Besuch ${kunde.vorname} ${kunde.nachname}` : `Besuch Kunden-ID ${input.kundenId}`;
+      await createTour({
+        mitarbeiterId: input.mitarbeiterId,
+        datum: tourDatum,
+        titel,
+        angelegtVon: ctx.mitarbeiterId,
+        status: 'geplant',
+      });
+      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'CREATE', ressource: 'tour', details: `createFromKunde kundenId=${input.kundenId} datum=${input.datum}`, status: 'success' });
+      return { success: true };
+    }),
+
+  // Liefert die dem Mitarbeiter zugewiesenen Kunden (für Kunden-Sidebar im Tourenplanung-Dashboard)
+  listZugewieseneKunden: portalProtected.query(async ({ ctx }) => {
+    const ma = await getMitarbeiterById(ctx.mitarbeiterId);
+    if (!ma) return [];
+    // Admin sieht alle Kunden
+    if (ma.rolle === 'admin') {
+      const alle = await getAllKunden();
+      return alle.map((k: any) => ({
+        id: k.id,
+        vorname: k.vorname,
+        nachname: k.nachname,
+        ort: k.ort ?? '',
+        pflegegrad: k.pflegegrad ?? 0,
+      }));
+    }
+    // Mitarbeiter sieht nur zugewiesene Kunden
+    const zuordnungen = await getZuordnungenForMitarbeiter(ctx.mitarbeiterId);
+    if (zuordnungen.length === 0) return [];
+    const alle = await getAllKunden();
+    const zugewieseneIds = new Set(zuordnungen.map((z: any) => z.kundenId));
+    return alle
+      .filter((k: any) => zugewieseneIds.has(k.id))
+      .map((k: any) => ({
+        id: k.id,
+        vorname: k.vorname,
+        nachname: k.nachname,
+        ort: k.ort ?? '',
+        pflegegrad: k.pflegegrad ?? 0,
+      }));
+  }),
+
   // Liefert alle genehmigten Urlaubsanträge und Krankmeldungen für den Kalender
   listAbwesenheiten: portalProtected.query(async ({ ctx }) => {
     const ma = await getMitarbeiterById(ctx.mitarbeiterId);

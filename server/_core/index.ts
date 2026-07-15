@@ -9,6 +9,7 @@ import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { neukundenEskalationHandler, vertretungBereinigungHandler } from "../scheduledHandlers";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -40,6 +41,10 @@ async function startServer() {
   app.use(cookieParser());
   registerStorageProxy(app);
   registerOAuthRoutes(app);
+  // ⏱ Heartbeat-Handler (Cron-only, vor tRPC registrieren)
+  app.post("/api/scheduled/neukunden-eskalation", neukundenEskalationHandler);
+  app.post("/api/scheduled/vertretung-bereinigung", vertretungBereinigungHandler);
+
   // tRPC API
   app.use(
     "/api/trpc",
