@@ -482,3 +482,194 @@ export const vertretungsUebernahmen = mysqlTable("vertretungsUebernahmen", {
 });
 export type VertretungsUebernahme = typeof vertretungsUebernahmen.$inferSelect;
 export type InsertVertretungsUebernahme = typeof vertretungsUebernahmen.$inferInsert;
+
+// ── MODUL: ROLLEN-ERWEITERUNG (Stufe 1) ──────────────────────────────────────
+// mitarbeiter.rolle wird per ALTER TABLE auf 4 Werte erweitert (Migration unten)
+
+// ── MODUL: ZWEI-FAKTOR-AUTHENTIFIZIERUNG (TOTP) ───────────────────────────────
+export const mitarbeiterZweiFaktor = mysqlTable("mitarbeiterZweiFaktor", {
+  id: int("id").autoincrement().primaryKey(),
+  mitarbeiterId: int("mitarbeiterId").notNull().unique(),
+  twoFactorEnabled: boolean("twoFactorEnabled").default(false).notNull(),
+  twoFactorSecret: varchar("twoFactorSecret", { length: 255 }), // verschlüsselt gespeichert
+  twoFactorActivatedAt: timestamp("twoFactorActivatedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type MitarbeiterZweiFaktor = typeof mitarbeiterZweiFaktor.$inferSelect;
+export type InsertMitarbeiterZweiFaktor = typeof mitarbeiterZweiFaktor.$inferInsert;
+
+export const zweiFaktorCodes = mysqlTable("zweiFaktorCodes", {
+  id: int("id").autoincrement().primaryKey(),
+  mitarbeiterId: int("mitarbeiterId").notNull(),
+  codeHash: varchar("codeHash", { length: 255 }).notNull(), // bcrypt-gehasht
+  verwendet: boolean("verwendet").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ZweiFaktorCode = typeof zweiFaktorCodes.$inferSelect;
+export type InsertZweiFaktorCode = typeof zweiFaktorCodes.$inferInsert;
+
+// ── MODUL: MITARBEITER-BERECHTIGUNGEN (optionale Ausnahmen) ───────────────────
+export const mitarbeiterBerechtigungen = mysqlTable("mitarbeiterBerechtigungen", {
+  id: int("id").autoincrement().primaryKey(),
+  mitarbeiterId: int("mitarbeiterId").notNull(),
+  modul: varchar("modul", { length: 100 }).notNull(), // z.B. "buchhaltung", "analysen"
+  zugriff: mysqlEnum("zugriff", ["erlaubt", "verweigert"]).notNull(),
+  gesetztVonId: int("gesetztVonId"), // Admin-ID
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type MitarbeiterBerechtigung = typeof mitarbeiterBerechtigungen.$inferSelect;
+export type InsertMitarbeiterBerechtigung = typeof mitarbeiterBerechtigungen.$inferInsert;
+
+// ── MODUL: DATENSCHUTZ-VEREINBARUNGEN ─────────────────────────────────────────
+export const datenschutzDokumente = mysqlTable("datenschutzDokumente", {
+  id: int("id").autoincrement().primaryKey(),
+  version: varchar("version", { length: 20 }).notNull(), // z.B. "2026-07"
+  titel: varchar("titel", { length: 200 }).notNull(),
+  inhalt: text("inhalt").notNull(), // Volltext der Vereinbarung
+  aktiv: boolean("aktiv").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type DatenschutzDokument = typeof datenschutzDokumente.$inferSelect;
+export type InsertDatenschutzDokument = typeof datenschutzDokumente.$inferInsert;
+
+export const datenschutzZustimmungen = mysqlTable("datenschutzZustimmungen", {
+  id: int("id").autoincrement().primaryKey(),
+  mitarbeiterId: int("mitarbeiterId").notNull(),
+  dokumentId: int("dokumentId").notNull(),
+  dokumentVersion: varchar("dokumentVersion", { length: 20 }).notNull(),
+  ipHash: varchar("ipHash", { length: 64 }), // SHA-256 der IP
+  zugestimmtAt: timestamp("zugestimmtAt").defaultNow().notNull(),
+});
+export type DatenschutzZustimmung = typeof datenschutzZustimmungen.$inferSelect;
+export type InsertDatenschutzZustimmung = typeof datenschutzZustimmungen.$inferInsert;
+
+// ── MODUL: BACKUP-PROTOKOLLE ──────────────────────────────────────────────────
+export const backupProtokolle = mysqlTable("backupProtokolle", {
+  id: int("id").autoincrement().primaryKey(),
+  typ: varchar("typ", { length: 50 }).default("auto").notNull(), // "auto" | "manuell"
+  status: mysqlEnum("status", ["erfolgreich", "fehlgeschlagen", "laufend"]).notNull(),
+  fehlerMeldung: text("fehlerMeldung"),
+  datenbankGroesse: varchar("datenbankGroesse", { length: 50 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type BackupProtokoll = typeof backupProtokolle.$inferSelect;
+export type InsertBackupProtokoll = typeof backupProtokolle.$inferInsert;
+
+// ── MODUL: VERFÜGBARKEITEN (Stufe 2) ─────────────────────────────────────────
+export const verfuegbarkeiten = mysqlTable("verfuegbarkeiten", {
+  id: int("id").autoincrement().primaryKey(),
+  mitarbeiterId: int("mitarbeiterId").notNull(),
+  wochentag: mysqlEnum("wochentag", ["mo", "di", "mi", "do", "fr", "sa", "so"]).notNull(),
+  zeitVon: time("zeitVon").notNull(), // z.B. "08:00:00"
+  zeitBis: time("zeitBis").notNull(), // z.B. "16:00:00"
+  sollstunden: decimal("sollstunden", { precision: 4, scale: 2 }).default("0.00"),
+  gueltigVon: date("gueltigVon"),
+  gueltigBis: date("gueltigBis"),
+  aktiv: boolean("aktiv").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type Verfuegbarkeit = typeof verfuegbarkeiten.$inferSelect;
+export type InsertVerfuegbarkeit = typeof verfuegbarkeiten.$inferInsert;
+
+// ── MODUL: EINSATZ-ÄNDERUNGSHISTORIE (Stufe 2) ────────────────────────────────
+export const einsatzAenderungen = mysqlTable("einsatzAenderungen", {
+  id: int("id").autoincrement().primaryKey(),
+  einsatzId: int("einsatzId").notNull(),
+  aenderungstyp: mysqlEnum("aenderungstyp", ["erstellt", "geaendert", "abgesagt", "verschoben", "bestaetigt", "abgelehnt"]).notNull(),
+  aenderungsgrund: text("aenderungsgrund"),
+  alteDaten: text("alteDaten"), // JSON-Snapshot vor der Änderung
+  neueDaten: text("neueDaten"), // JSON-Snapshot nach der Änderung
+  geaendertVonId: int("geaendertVonId"), // Mitarbeiter-ID
+  benachrichtigtAt: timestamp("benachrichtigtAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type EinsatzAenderung = typeof einsatzAenderungen.$inferSelect;
+export type InsertEinsatzAenderung = typeof einsatzAenderungen.$inferInsert;
+
+// ── MODUL: BESUCHSBERICHTE (Stufe 3) ─────────────────────────────────────────
+export const besuchsberichte = mysqlTable("besuchsberichte", {
+  id: int("id").autoincrement().primaryKey(),
+  einsatzId: int("einsatzId").notNull(),
+  kundenId: int("kundenId").notNull(),
+  mitarbeiterId: int("mitarbeiterId").notNull(),
+  formularVersionId: int("formularVersionId"),
+  inhalt: text("inhalt"), // JSON-Formularinhalt
+  zustand: mysqlEnum("zustand", ["entwurf", "eingereicht", "freigegeben", "abgelehnt"]).default("entwurf").notNull(),
+  unterschriftMitarbeiter: text("unterschriftMitarbeiter"), // Base64 SVG
+  unterschriftKunde: text("unterschriftKunde"), // Base64 SVG
+  freigegebenVonId: int("freigegebenVonId"),
+  freigegebenAt: timestamp("freigegebenAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type Besuchsbericht = typeof besuchsberichte.$inferSelect;
+export type InsertBesuchsbericht = typeof besuchsberichte.$inferInsert;
+
+export const besuchsberichtDateien = mysqlTable("besuchsberichtDateien", {
+  id: int("id").autoincrement().primaryKey(),
+  berichtId: int("berichtId").notNull(),
+  dateiKey: varchar("dateiKey", { length: 500 }).notNull(), // S3-Key
+  dateiUrl: text("dateiUrl").notNull(),
+  dateiname: varchar("dateiname", { length: 255 }),
+  mimeType: varchar("mimeType", { length: 100 }),
+  groesse: int("groesse"), // Bytes
+  kategorie: mysqlEnum("kategorie", ["foto", "dokument", "unterschrift", "sonstiges"]).default("foto"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type BesuchsberichtDatei = typeof besuchsberichtDateien.$inferSelect;
+export type InsertBesuchsberichtDatei = typeof besuchsberichtDateien.$inferInsert;
+
+// ── MODUL: FORMULARVORLAGEN (Stufe 3) ─────────────────────────────────────────
+export const formularVorlagen = mysqlTable("formularVorlagen", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 200 }).notNull(),
+  version: varchar("version", { length: 20 }).notNull(), // z.B. "1.0"
+  felder: text("felder").notNull(), // JSON: Array von Felddefinitionen
+  aktiv: boolean("aktiv").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type FormularVorlage = typeof formularVorlagen.$inferSelect;
+export type InsertFormularVorlage = typeof formularVorlagen.$inferInsert;
+
+// ── MODUL: INTEGRATIONEN (Stufe 5) ────────────────────────────────────────────
+export const integrationen = mysqlTable("integrationen", {
+  id: int("id").autoincrement().primaryKey(),
+  anbieter: varchar("anbieter", { length: 100 }).notNull(), // "optadata", "datev", "lexware", "kasse"
+  name: varchar("name", { length: 200 }).notNull(),
+  modus: mysqlEnum("modus", ["vorbereitet", "aktiv", "deaktiviert", "fehler"]).default("vorbereitet").notNull(),
+  endpoint: varchar("endpoint", { length: 500 }),
+  konfiguration: text("konfiguration"), // verschlüsseltes JSON
+  letzterTest: timestamp("letzterTest"),
+  letzterTestStatus: mysqlEnum("letzterTestStatus", ["ok", "fehler", "unbekannt"]).default("unbekannt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type Integration = typeof integrationen.$inferSelect;
+export type InsertIntegration = typeof integrationen.$inferInsert;
+
+export const integrationsLaeufe = mysqlTable("integrationsLaeufe", {
+  id: int("id").autoincrement().primaryKey(),
+  integrationId: int("integrationId").notNull(),
+  status: mysqlEnum("status", ["gestartet", "erfolgreich", "fehlgeschlagen", "wiederholt"]).notNull(),
+  datensaetze: int("datensaetze").default(0),
+  fehlerCode: varchar("fehlerCode", { length: 50 }),
+  fehlerMeldung: text("fehlerMeldung"),
+  fachlicheReferenz: varchar("fachlicheReferenz", { length: 200 }), // z.B. Monat/Dateiname
+  wiederholungen: int("wiederholungen").default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type IntegrationsLauf = typeof integrationsLaeufe.$inferSelect;
+export type InsertIntegrationsLauf = typeof integrationsLaeufe.$inferInsert;
+
+// ── MODUL: ANALYSE-SNAPSHOTS (Stufe 4) ────────────────────────────────────────
+export const analyseSnapshots = mysqlTable("analyseSnapshots", {
+  id: int("id").autoincrement().primaryKey(),
+  monat: varchar("monat", { length: 7 }).notNull(), // YYYY-MM
+  typ: varchar("typ", { length: 50 }).notNull(), // "auslastung", "kundenzuwachs", "umsatz", "pflegegrad", "puenktlichkeit"
+  daten: text("daten").notNull(), // JSON-Snapshot der Kennzahlen
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type AnalyseSnapshot = typeof analyseSnapshots.$inferSelect;
+export type InsertAnalyseSnapshot = typeof analyseSnapshots.$inferInsert;

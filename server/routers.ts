@@ -88,6 +88,11 @@ import {
 import { SignJWT, jwtVerify } from "jose";
 import { ENV } from "./_core/env";
 import { VAPID_PUBLIC, sendBudgetWarnungPush } from "./webpush";
+import { twoFactorRouter } from "./routers/twoFactorRouter";
+import { datenschutzRouter } from "./routers/datenschutzRouter";
+import { verfuegbarkeitenRouter } from "./routers/verfuegbarkeitenRouter";
+import { besuchsberichteRouter } from "./routers/besuchsberichteRouter";
+import { integrationenRouter, analysenRouter } from "./routers/integrationenRouter";
 import {
   savePushSubscription,
   deletePushSubscription,
@@ -2163,6 +2168,13 @@ export const appRouter = router({
         return { success: true };
       }),
   }),
+
+  twoFactor: twoFactorRouter,
+  datenschutz: datenschutzRouter,
+  verfuegbarkeiten: verfuegbarkeitenRouter,
+  besuchsberichte: besuchsberichteRouter,
+  integrationen: integrationenRouter,
+  analysen: analysenRouter,
 
 });
 

@@ -14,7 +14,26 @@ const DOK_TYPEN: Record<string, string> = {
 
 export default function MeinProfil() {
   const { mitarbeiter, refreshAuth } = usePortalAuth() as any;
-  const [tab, setTab] = useState<"profil" | "passwort" | "dokumente">("profil");
+  const [tab, setTab] = useState<"profil" | "passwort" | "dokumente" | "sicherheit">("profil");
+
+  // ── 2FA-State ──────────────────────────────────────────────────────────────
+  const [twoFASetup, setTwoFASetup] = useState<{ secret: string; qrCodeDataUrl: string } | null>(null);
+  const [twoFAToken, setTwoFAToken] = useState("");
+  const [twoFARecoveryCodes, setTwoFARecoveryCodes] = useState<string[]>([]);
+  const [twoFADeactivateToken, setTwoFADeactivateToken] = useState("");
+  const { data: twoFAStatus, refetch: refetchTwoFA } = (trpc.twoFactor as any).getStatus.useQuery(undefined, { enabled: tab === "sicherheit" });
+  const twoFASetupGenerate = (trpc.twoFactor as any).setupGenerate.useMutation({
+    onSuccess: (data: any) => setTwoFASetup(data),
+    onError: (e: any) => toast.error(e.message),
+  });
+  const twoFAActivate = (trpc.twoFactor as any).activate.useMutation({
+    onSuccess: (data: any) => { setTwoFARecoveryCodes(data.recoveryCodes); setTwoFASetup(null); refetchTwoFA(); toast.success("2FA erfolgreich aktiviert!"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const twoFADeactivate = (trpc.twoFactor as any).deactivate.useMutation({
+    onSuccess: () => { refetchTwoFA(); toast.success("2FA deaktiviert."); },
+    onError: (e: any) => toast.error(e.message),
+  });
 
   // ── Profil-Formular ──────────────────────────────────────────────────────
   const [form, setForm] = useState({
@@ -207,6 +226,7 @@ export default function MeinProfil() {
           { id: "profil", label: "👤 Meine Daten" },
           { id: "passwort", label: "🔒 Passwort" },
           { id: "dokumente", label: "📁 Dokumente" },
+          { id: "sicherheit", label: "🛡️ Sicherheit" },
         ].map(t => (
           <button
             key={t.id}
@@ -503,6 +523,120 @@ export default function MeinProfil() {
               </div>
             )}
           </div>
+        </div>
+            )}
+
+      {/* ── Sicherheit-Tab (2FA) ── */}
+      {tab === "sicherheit" && (
+        <div style={{ display: "grid", gap: 16 }}>
+          {/* 2FA-Status-Karte */}
+          <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #e5e7eb", overflow: "hidden" }}>
+            <div style={{ padding: "14px 18px", borderBottom: "1px solid #f3f4f6", fontWeight: 700, fontSize: 14, color: "#111827" }}>
+              🛡️ Zwei-Faktor-Authentifizierung (2FA)
+            </div>
+            <div style={{ padding: "16px 18px" }}>
+              {twoFAStatus?.enabled ? (
+                <div style={{ display: "grid", gap: 14 }}>
+                  <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 10, padding: "12px 16px", fontSize: 13, color: "#166534" }}>
+                    ✅ 2FA ist aktiv seit {twoFAStatus.activatedAt ? new Date(twoFAStatus.activatedAt).toLocaleDateString("de-DE") : "unbekannt"}.
+                    Dein Konto ist durch einen Authenticator-Code geschützt.
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", display: "block", marginBottom: 6 }}>2FA deaktivieren</label>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <input
+                        type="text"
+                        placeholder="TOTP-Code oder Wiederherstellungscode"
+                        value={twoFADeactivateToken}
+                        onChange={e => setTwoFADeactivateToken(e.target.value)}
+                        style={{ flex: 1, padding: "10px 12px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14 }}
+                      />
+                      <button
+                        onClick={() => twoFADeactivate.mutate({ token: twoFADeactivateToken })}
+                        disabled={twoFADeactivate.isPending || !twoFADeactivateToken}
+                        style={{ background: "#fee2e2", color: "#dc2626", border: "1px solid #fca5a5", borderRadius: 10, padding: "10px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+                      >
+                        {twoFADeactivate.isPending ? "..." : "🔓 Deaktivieren"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : twoFASetup ? (
+                <div style={{ display: "grid", gap: 16 }}>
+                  <div style={{ background: "#eff6ff", border: "1px solid #93c5fd", borderRadius: 10, padding: "12px 16px", fontSize: 12, color: "#1e40af" }}>
+                    📱 Scanne diesen QR-Code mit deiner Authenticator-App (z.B. Google Authenticator, Authy).
+                  </div>
+                  <div style={{ textAlign: "center" }}>
+                    <img src={twoFASetup.qrCodeDataUrl} alt="QR-Code" style={{ width: 200, height: 200, border: "1px solid #e5e7eb", borderRadius: 12 }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", display: "block", marginBottom: 4 }}>Manueller Schlüssel</label>
+                    <code style={{ fontSize: 12, background: "#f3f4f6", padding: "8px 12px", borderRadius: 8, display: "block", wordBreak: "break-all", color: "#374151" }}>{twoFASetup.secret}</code>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", display: "block", marginBottom: 4 }}>Bestätigungscode eingeben</label>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <input
+                        type="text"
+                        placeholder="6-stelliger Code"
+                        value={twoFAToken}
+                        onChange={e => setTwoFAToken(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                        maxLength={6}
+                        style={{ flex: 1, padding: "10px 12px", border: "2px solid #0d9488", borderRadius: 10, fontSize: 18, letterSpacing: 4, textAlign: "center" }}
+                      />
+                      <button
+                        onClick={() => twoFAActivate.mutate({ secret: twoFASetup!.secret, token: twoFAToken })}
+                        disabled={twoFAActivate.isPending || twoFAToken.length !== 6}
+                        style={{ background: "#0d9488", color: "#fff", border: "none", borderRadius: 10, padding: "10px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer", opacity: twoFAToken.length !== 6 ? 0.5 : 1 }}
+                      >
+                        {twoFAActivate.isPending ? "..." : "✅ Aktivieren"}
+                      </button>
+                    </div>
+                  </div>
+                  <button onClick={() => setTwoFASetup(null)} style={{ background: "#f3f4f6", color: "#6b7280", border: "none", borderRadius: 10, padding: "10px", cursor: "pointer", fontSize: 13 }}>Abbrechen</button>
+                </div>
+              ) : (
+                <div style={{ display: "grid", gap: 14 }}>
+                  <div style={{ background: "#fef9c3", border: "1px solid #fcd34d", borderRadius: 10, padding: "12px 16px", fontSize: 12, color: "#92400e" }}>
+                    ⚠️ 2FA ist noch nicht aktiviert. Aktiviere es für zusätzliche Sicherheit.
+                  </div>
+                  <button
+                    onClick={() => twoFASetupGenerate.mutate()}
+                    disabled={twoFASetupGenerate.isPending}
+                    style={{ background: "#0d9488", color: "#fff", border: "none", borderRadius: 12, padding: "14px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}
+                  >
+                    {twoFASetupGenerate.isPending ? "Wird vorbereitet..." : "🛡️ 2FA einrichten"}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Wiederherstellungscodes */}
+          {twoFARecoveryCodes.length > 0 && (
+            <div style={{ background: "#fff", borderRadius: 16, border: "2px solid #f59e0b", overflow: "hidden" }}>
+              <div style={{ padding: "14px 18px", borderBottom: "1px solid #fef3c7", fontWeight: 700, fontSize: 14, color: "#92400e", background: "#fef9c3" }}>
+                🔑 Wiederherstellungscodes – Jetzt sichern!
+              </div>
+              <div style={{ padding: "16px 18px" }}>
+                <div style={{ fontSize: 12, color: "#92400e", marginBottom: 12 }}>
+                  ⚠️ Diese Codes werden nur einmal angezeigt. Speichere sie an einem sicheren Ort.
+                  Jeder Code kann nur einmal verwendet werden.
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+                  {twoFARecoveryCodes.map((code, i) => (
+                    <code key={i} style={{ background: "#f3f4f6", padding: "8px 12px", borderRadius: 8, fontSize: 13, fontFamily: "monospace", textAlign: "center", letterSpacing: 2 }}>{code}</code>
+                  ))}
+                </div>
+                <button
+                  onClick={() => { navigator.clipboard.writeText(twoFARecoveryCodes.join("\n")); toast.success("Codes kopiert!"); }}
+                  style={{ background: "#f59e0b", color: "#fff", border: "none", borderRadius: 10, padding: "10px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer", width: "100%" }}
+                >
+                  📋 Alle Codes kopieren
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

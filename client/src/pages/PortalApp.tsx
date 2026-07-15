@@ -31,6 +31,9 @@ import Vertretungen from "./Vertretungen";
 import AdminDashboard from "./AdminDashboard";
 import Rollenverwaltung from "./Rollenverwaltung";
 import Kundenzuteilung from "./Kundenzuteilung";
+import Besuchsberichte from "./Besuchsberichte";
+import Datenschutz from "./Datenschutz";
+import Integrationen from "./Integrationen";
 import OnboardingTour, { useOnboardingTour } from "@/components/OnboardingTour";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 
@@ -42,7 +45,8 @@ type PageId =
   | "urlaub" | "krank" | "touren" | "benachrichtigungen"
   | "profil" | "leistungsfreigabe" | "buchhaltung"
   | "mitarbeiterakte" | "logbuch" | "vertretungen"
-  | "admindashboard" | "rollenverwaltung" | "kundenzuteilung";
+  | "admindashboard" | "rollenverwaltung" | "kundenzuteilung"
+  | "besuchsberichte" | "datenschutz" | "integrationen";
 
 interface NavItem {
   id: PageId;
@@ -138,6 +142,9 @@ export default function PortalApp() {
           { id: "textbausteine" as PageId, icon: "📝", label: "Textbausteine", adminOnly: true },
           { id: "logbuch" as PageId, icon: "🗒️", label: "Logbuch", adminOnly: true },
           { id: "kundenzuteilung" as PageId, icon: "📌", label: "Kundenzuteilung", adminOnly: true },
+          { id: "besuchsberichte" as PageId, icon: "📋", label: "Besuchsberichte" },
+          { id: "integrationen" as PageId, icon: "🔌", label: "Integrationen", adminOnly: true },
+          { id: "datenschutz" as PageId, icon: "🔐", label: "Datenschutz" },
         ] : [
           { id: "export" as PageId, icon: "📮", label: "Export & Briefe" },
         ]),
@@ -178,6 +185,9 @@ export default function PortalApp() {
       case "admindashboard": return <AdminDashboard />;
       case "rollenverwaltung": return <Rollenverwaltung />;
       case "kundenzuteilung": return <Kundenzuteilung />;
+      case "besuchsberichte": return <Besuchsberichte />;
+      case "datenschutz": return <Datenschutz />;
+      case "integrationen": return <Integrationen />;
       default: return <Dashboard />;
     }
   };
