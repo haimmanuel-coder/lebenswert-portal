@@ -40,7 +40,7 @@ export default function Einsaetze() {
   const [signaturMitarbeiter, setSignaturMitarbeiter] = useState<string | null>(null);
   const [signaturKunde, setSignaturKunde] = useState<string | null>(null);
 
-  const { data: einsaetze = [], refetch } = trpc.einsaetze.list.useQuery();
+  const { data: einsaetze = [], refetch } = trpc.einsaetze.listWithKunden.useQuery();
   const { data: kunden = [] } = trpc.kunden.list.useQuery();
   const getKundeName = (id: number) => { const k = kunden.find((c) => c.id === id); return k ? `${k.vorname} ${k.nachname}` : `Kunde #${id}`; };
   const updateStatus = trpc.einsaetze.updateStatus.useMutation({
@@ -157,6 +157,17 @@ export default function Einsaetze() {
                   </div>
                   <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2, display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
                     {fmtDate(datum)} · {(e.startzeit || "").slice(0, 5)} Uhr · {e.dauerStunden}h
+                    {(e as any).kundeStrasse && (e as any).kundeOrt && (
+                      <a
+                        href={`https://maps.google.com/?q=${encodeURIComponent(`${(e as any).kundeStrasse}, ${(e as any).kundePlz ?? ''} ${(e as any).kundeOrt}`)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(ev) => ev.stopPropagation()}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 7px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', textDecoration: 'none', marginLeft: 2 }}
+                      >
+                        🗺️ Navigation
+                      </a>
+                    )}
                     <span className={pb.cls} style={{ display: "inline-block", padding: "2px 6px", borderRadius: 20, fontSize: 10, fontWeight: 700 }}>
                       {pb.label}
                     </span>

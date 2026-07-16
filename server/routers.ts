@@ -27,6 +27,7 @@ import {
   isMitarbeiterZugeordnet,
   getEinsaetzeByMitarbeiter,
   getAllEinsaetze,
+  getEinsaetzeWithKunden,
   getEinsaetzeByKunde,
   createEinsatz,
   updateEinsatzStatus,
@@ -951,6 +952,11 @@ export const appRouter = router({
       const ma = await getMitarbeiterById(ctx.mitarbeiterId);
       if (ma?.rolle === "admin") return getAllEinsaetze();
       return getEinsaetzeByMitarbeiter(ctx.mitarbeiterId);
+    }),
+    listWithKunden: portalProtected.query(async ({ ctx }) => {
+      const ma = await getMitarbeiterById(ctx.mitarbeiterId);
+      if (ma?.rolle === "admin") return getEinsaetzeWithKunden();
+      return getEinsaetzeWithKunden(ctx.mitarbeiterId);
     }),
 
     create: portalProtected

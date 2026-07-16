@@ -229,6 +229,35 @@ export async function getEinsaetzeByKunde(kundenId: number) {
   return db.select().from(einsaetze).where(eq(einsaetze.kundenId, kundenId)).orderBy(desc(einsaetze.datum));
 }
 
+export async function getEinsaetzeWithKunden(mitarbeiterId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const query = db
+    .select({
+      id: einsaetze.id,
+      mitarbeiterId: einsaetze.mitarbeiterId,
+      kundenId: einsaetze.kundenId,
+      datum: einsaetze.datum,
+      startzeit: einsaetze.startzeit,
+      dauerStunden: einsaetze.dauerStunden,
+      paragraph: einsaetze.paragraph,
+      status: einsaetze.status,
+      anfahrtPauschale: (einsaetze as any).anfahrtPauschale,
+      createdAt: einsaetze.createdAt,
+      kundeVorname: kunden.vorname,
+      kundeNachname: kunden.nachname,
+      kundeStrasse: kunden.strasse,
+      kundePlz: kunden.plz,
+      kundeOrt: kunden.ort,
+    })
+    .from(einsaetze)
+    .leftJoin(kunden, eq(einsaetze.kundenId, kunden.id));
+  if (mitarbeiterId) {
+    return query.where(eq(einsaetze.mitarbeiterId, mitarbeiterId)).orderBy(desc(einsaetze.datum));
+  }
+  return query.orderBy(desc(einsaetze.datum));
+}
+
 export async function createEinsatz(data: InsertEinsatz & { mitarbeiterId: number }) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
