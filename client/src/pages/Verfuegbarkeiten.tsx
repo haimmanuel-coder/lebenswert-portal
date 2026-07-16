@@ -157,7 +157,7 @@ export default function Verfuegbarkeiten() {
         </>
       )}
       {/* Wochenübersicht */}
-      {!isLoading && <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {!isLoading && (<div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {grouped.map(tag => (
           <div key={tag.value} style={{ background: "#fff", borderRadius: 12, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
             <div style={{ background: "#f9fafb", padding: "10px 16px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 10 }}>
@@ -192,7 +192,7 @@ export default function Verfuegbarkeiten() {
             )}
           </div>
         ))}
-      </div>}
+      </div>)}
     </div>
   );
 }

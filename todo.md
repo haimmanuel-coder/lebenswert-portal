@@ -525,3 +525,16 @@
 - [x] Besuchsberichte: Filter nach Status (alle/eingereicht/genehmigt/korrektur), Sortierung nach Datum (neueste/älteste zuerst), Suchfeld nach Kundenname
 - [x] Ladeanimation (Skeleton) für Besuchsberichte beim Datenabruf
 - [x] Ladeanimation (Skeleton) für Verfügbarkeiten beim Datenabruf
+
+## Phase 30 – Granulares RBAC-System
+- [ ] DB: employment_type Spalte auf mitarbeiter-Tabelle (nullable, minijob/teilzeit/vollzeit)
+- [ ] DB: roles, permissions, role_permissions, employee_roles Tabellen anlegen
+- [ ] DB: Seed-Daten: Basis-Rollen (admin, teamleitung, buchhaltung, mitarbeiter) + 8 Berechtigungen
+- [ ] DB: Backfill bestehende Mitarbeiter → employee_roles (admin→admin, rest→mitarbeiter)
+- [ ] Drizzle-Schema: alle 4 neuen Tabellen + employment_type Spalte ergänzen
+- [ ] Backend: requirePermission-Middleware als tRPC-Middleware (Token-Cache)
+- [ ] Backend: requirePermissionFresh-Middleware für sensible Routen (Live-DB-Check)
+- [ ] Backend: JWT-Payload mit roles[] und permissions[] erweitern
+- [ ] Backend: tRPC-Routen für roles.list, permissions.list, employeeRoles.assign, employeeRoles.list
+- [ ] Frontend: Rollenverwaltung auf Mehrfachrollen umstellen (Checkboxen statt Dropdown)
+- [ ] Frontend: navPermissions-Guard für geschützte Menüpunkte

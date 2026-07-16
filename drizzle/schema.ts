@@ -774,3 +774,35 @@ export type ZweiFaktorCode = typeof zweiFaktorCodes.$inferSelect;
 export type InsertZweiFaktorCode = typeof zweiFaktorCodes.$inferInsert;
 
 // ── MODUL: MITARBEITER-BERECHTIGUNGEN (optionale Ausnahmen) ───────────────────
+
+// ── MODUL: RBAC – Granulares Rollen-Berechtigungs-System ──────────────────────
+export const roles = mysqlTable("roles", {
+  id: int("id").autoincrement().primaryKey(),
+  key: varchar("key", { length: 50 }).notNull().unique(),
+  label: varchar("label", { length: 100 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type Role = typeof roles.$inferSelect;
+export type InsertRole = typeof roles.$inferInsert;
+
+export const permissions = mysqlTable("permissions", {
+  id: int("id").autoincrement().primaryKey(),
+  key: varchar("key", { length: 100 }).notNull().unique(),
+  description: varchar("description", { length: 255 }),
+});
+export type Permission = typeof permissions.$inferSelect;
+export type InsertPermission = typeof permissions.$inferInsert;
+
+export const rolePermissions = mysqlTable("role_permissions", {
+  roleId: int("role_id").notNull(),
+  permissionId: int("permission_id").notNull(),
+});
+export type RolePermission = typeof rolePermissions.$inferSelect;
+
+export const employeeRoles = mysqlTable("employee_roles", {
+  employeeId: int("employee_id").notNull(),
+  roleId: int("role_id").notNull(),
+  assignedAt: timestamp("assigned_at").defaultNow().notNull(),
+  assignedBy: int("assigned_by"),
+});
+export type EmployeeRole = typeof employeeRoles.$inferSelect;

@@ -50,7 +50,7 @@ type PageId =
   | "urlaub" | "krank" | "touren" | "benachrichtigungen"
   | "profil" | "leistungsfreigabe" | "buchhaltung"
   | "mitarbeiterakte" | "logbuch" | "vertretungen"
-  | "admindashboard" | "rollenverwaltung" | "kundenzuteilung"
+  | "admindashboard" | "rollenverwaltung" | "kundenzuteilung" | "rbacverwaltung"
   | "besuchsberichte" | "datenschutz" | "integrationen" | "arbeitszentrum"
   | "zweifaktor" | "verfuegbarkeiten" | "analysen" | "backupstatus";
 
@@ -142,6 +142,7 @@ export default function PortalApp() {
           { id: "leistungsfreigabe" as PageId, icon: "✅", label: "LNW-Freigabe", adminOnly: true },
           { id: "mitarbeiterakte" as PageId, icon: "📂", label: "Mitarbeiterakte", adminOnly: true },
           { id: "rollenverwaltung" as PageId, icon: "🔑", label: "Rollenverwaltung", adminOnly: true },
+          { id: "rbacverwaltung" as PageId, icon: "🛡️", label: "Rollen & Rechte", adminOnly: true },
           { id: "vertretungen" as PageId, icon: "🔄", label: "Vertretungen", adminOnly: true },
           { id: "buchhaltung" as PageId, icon: "💼", label: "Buchhaltungs-Export", adminOnly: true },
           { id: "export" as PageId, icon: "📮", label: "Export & Briefe", adminOnly: true },

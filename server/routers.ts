@@ -96,6 +96,7 @@ import { datenschutzRouter } from "./routers/datenschutzRouter";
 import { verfuegbarkeitenRouter } from "./routers/verfuegbarkeitenRouter";
 import { besuchsberichteRouter } from "./routers/besuchsberichteRouter";
 import { integrationenRouter, analysenRouter } from "./routers/integrationenRouter";
+import { rbacRouter } from "./routers/rbacRouter";
 import {
   savePushSubscription,
   deletePushSubscription,
@@ -2249,6 +2250,7 @@ export const appRouter = router({
   besuchsberichte: besuchsberichteRouter,
   integrationen: integrationenRouter,
   analysen: analysenRouter,
+  rbac: rbacRouter,
 
 });
 
