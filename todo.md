@@ -443,24 +443,24 @@
 - [x] Backend: Backup-Protokoll-Statusseite (letzter Lauf, Fehlerstatus)
 - [ ] Backend: Pagination für alle großen Listen (kunden, mitarbeiter, einsaetze, fahrten)
 - [x] Frontend: Rollenverwaltung.tsx um teamleitung und buchhaltung erweitern
-- [ ] Frontend: 2FA-Einrichtungsseite (QR-Code, Code eingeben, Wiederherstellungscodes anzeigen)
-- [ ] Frontend: 2FA-Code-Eingabe beim Login
+- [x] Frontend: 2FA-Einrichtungsseite (QR-Code, Code eingeben, Wiederherstellungscodes anzeigen)
+- [x] Frontend: 2FA-Code-Eingabe beim Login
 - [ ] Frontend: DSGVO-Zustimmungsdialog beim ersten Login und bei neuer Version
-- [ ] Frontend: Backup-Statusseite im Admin-Bereich
+- [x] Frontend: Backup-Statusseite im Admin-Bereich
 - [ ] Frontend: Pagination/Infinite Scroll in Kundenliste, Mitarbeiterliste, Einsätze
 
 ### Stufe 2 – Verfügbarkeit, Terminstatus, Navigation, Benachrichtigungen
 - [x] DB: verfuegbarkeiten Tabelle (Wochentag, Zeitfenster, Gültigkeit, Sollstunden)
-- [ ] DB: einsatzAenderungen Tabelle (Änderungs-/Absagehistorie, Bestätigungsstatus)
+- [x] DB: einsatzAenderungen Tabelle (Änderungs-/Absagehistorie, Bestätigungsstatus)
 - [x] Backend: Verfügbarkeits-CRUD (create, list, update, delete)
-- [ ] Backend: Einsatz-Änderungshistorie (recordChange, listChanges)
+- [x] Backend: Einsatz-Änderungshistorie (recordChange, listChanges)
 - [ ] Backend: Automatische Terminbestätigung (In-App + Push bei Einsatz-Erstellung)
 - [ ] Backend: SMTP E-Mail-Benachrichtigungen (Konfiguration, Vorlagen, Versandprotokoll)
-- [ ] Frontend: Verfügbarkeits-Verwaltung im Mitarbeiterprofil (Wochentage, Zeitfenster)
+- [x] Frontend: Verfügbarkeits-Verwaltung im Mitarbeiterprofil (Wochentage, Zeitfenster)
 - [ ] Frontend: Einsatz-Änderungshistorie im Einsatz-Detail
 - [ ] Frontend: Google Maps / Apple Maps Navigations-Button in Einsatz-Karte
 - [ ] Frontend: Tourenoptimierung-Button (Reihenfolge nach Adresse/Zeitfenster)
-- [ ] Frontend: Echtzeit-Polling für Benachrichtigungen (alle 30s)
+- [x] Frontend: Echtzeit-Polling für Benachrichtigungen (alle 30s)
 
 ### Stufe 3 – Besuchsberichte, Fotos, Formulare, PDFs
 - [x] DB: besuchsberichte Tabelle (Inhalt, Zustand, Freigabe, Formularversion, Unterschriften)
@@ -470,7 +470,7 @@
 - [ ] Backend: Foto-Upload für Besuchsberichte (S3)
 - [x] Backend: Formularvorlagen CRUD
 - [ ] Backend: Serverseitige PDF-Generierung (Leistungsnachweise, Besuchsberichte, DSGVO)
-- [ ] Frontend: Besuchsbericht-Seite (Bericht pro Einsatz, Fotos, Kategorien, Unterschrift)
+- [x] Frontend: Besuchsbericht-Seite (Bericht pro Einsatz, Fotos, Kategorien, Unterschrift)
 - [ ] Frontend: Formularvorlagen-Verwaltung (Admin)
 - [ ] Frontend: Besuchsbericht-Freigabe (Teamleitung/Admin)
 
@@ -482,7 +482,7 @@
 - [ ] Backend: Pflegegradanalyse (Verteilung, Entwicklung, Budgetwirkung)
 - [ ] Backend: Wirtschaftliche Berichte (Umsatz, offene Leistungen, Fahrkosten, Personal)
 - [ ] Backend: Pünktlichkeitsanalyse (geplant vs. tatsächlich, Toleranz, Trend)
-- [ ] Frontend: Analyse-Dashboard mit allen 5 Auswertungen (Tabs)
+- [x] Frontend: Analyse-Dashboard mit allen 5 Auswertungen (Tabs)
 - [ ] Frontend: PDF/CSV-Export für alle Analysen
 
 ### Stufe 5 – Integrationen (vorbereitet, Zugang fehlt)
@@ -527,14 +527,14 @@
 - [x] Ladeanimation (Skeleton) für Verfügbarkeiten beim Datenabruf
 
 ## Phase 30 – Granulares RBAC-System
-- [ ] DB: employment_type Spalte auf mitarbeiter-Tabelle (nullable, minijob/teilzeit/vollzeit)
-- [ ] DB: roles, permissions, role_permissions, employee_roles Tabellen anlegen
-- [ ] DB: Seed-Daten: Basis-Rollen (admin, teamleitung, buchhaltung, mitarbeiter) + 8 Berechtigungen
-- [ ] DB: Backfill bestehende Mitarbeiter → employee_roles (admin→admin, rest→mitarbeiter)
-- [ ] Drizzle-Schema: alle 4 neuen Tabellen + employment_type Spalte ergänzen
-- [ ] Backend: requirePermission-Middleware als tRPC-Middleware (Token-Cache)
-- [ ] Backend: requirePermissionFresh-Middleware für sensible Routen (Live-DB-Check)
-- [ ] Backend: JWT-Payload mit roles[] und permissions[] erweitern
-- [ ] Backend: tRPC-Routen für roles.list, permissions.list, employeeRoles.assign, employeeRoles.list
-- [ ] Frontend: Rollenverwaltung auf Mehrfachrollen umstellen (Checkboxen statt Dropdown)
-- [ ] Frontend: navPermissions-Guard für geschützte Menüpunkte
+- [x] DB: employment_type Spalte auf mitarbeiter-Tabelle (nullable, minijob/teilzeit/vollzeit)
+- [x] DB: roles, permissions, role_permissions, employee_roles Tabellen anlegen
+- [x] DB: Seed-Daten: Basis-Rollen (admin, teamleitung, buchhaltung, mitarbeiter) + 15 Berechtigungen
+- [x] DB: Backfill bestehende Mitarbeiter → employee_roles (admin→admin, rest→mitarbeiter)
+- [x] Drizzle-Schema: alle 4 neuen Tabellen + employment_type Spalte ergänzen
+- [x] Backend: requirePermission-Middleware als tRPC-Middleware (Token-Cache)
+- [x] Backend: requirePermissionFresh-Middleware für sensible Routen (Live-DB-Check)
+- [x] Backend: JWT-Payload mit roles[] und permissions[] erweitern
+- [x] Backend: tRPC-Routen für roles.list, permissions.list, employeeRoles.assign, employeeRoles.list
+- [x] Frontend: Rollenverwaltung auf Mehrfachrollen umstellen (Checkboxen statt Dropdown)
+- [x] Frontend: navPermissions-Guard für geschützte Menüpunkte
