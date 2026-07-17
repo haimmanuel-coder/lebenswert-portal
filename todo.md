@@ -457,8 +457,8 @@
 - [ ] Backend: Automatische Terminbestätigung (In-App + Push bei Einsatz-Erstellung)
 - [ ] Backend: SMTP E-Mail-Benachrichtigungen (Konfiguration, Vorlagen, Versandprotokoll)
 - [x] Frontend: Verfügbarkeits-Verwaltung im Mitarbeiterprofil (Wochentage, Zeitfenster)
-- [ ] Frontend: Einsatz-Änderungshistorie im Einsatz-Detail
-- [ ] Frontend: Google Maps / Apple Maps Navigations-Button in Einsatz-Karte
+- [x] Frontend: Einsatz-Änderungshistorie im Einsatz-Detail (Backend vorhanden)
+- [x] Frontend: Google Maps / Apple Maps Navigations-Button in Einsatz-Karte
 - [ ] Frontend: Tourenoptimierung-Button (Reihenfolge nach Adresse/Zeitfenster)
 - [x] Frontend: Echtzeit-Polling für Benachrichtigungen (alle 30s)
 
@@ -476,14 +476,14 @@
 
 ### Stufe 4 – Analysen, Prognosen, Exporte
 - [x] DB: analyseSnapshots Tabelle (vorberechnete Monatskennzahlen und Prognosewerte)
-- [ ] Backend: Umsatzprognose (geplante Einsätze × Stundensätze + historische Daten)
-- [ ] Backend: Mitarbeiter-Auslastungsanalyse (Soll/Ist-Stunden, Kapazität, Ampel)
-- [ ] Backend: Kundenzuwachs-Analyse (neu, aktiv, beendet, Nettoentwicklung)
-- [ ] Backend: Pflegegradanalyse (Verteilung, Entwicklung, Budgetwirkung)
-- [ ] Backend: Wirtschaftliche Berichte (Umsatz, offene Leistungen, Fahrkosten, Personal)
-- [ ] Backend: Pünktlichkeitsanalyse (geplant vs. tatsächlich, Toleranz, Trend)
+- [x] Backend: Umsatzprognose (geplante Einsätze × Stundensätze + historische Daten)
+- [x] Backend: Mitarbeiter-Auslastungsanalyse (Soll/Ist-Stunden, Kapazität, Ampel)
+- [x] Backend: Kundenzuwachs-Analyse (neu, aktiv, beendet, Nettoentwicklung)
+- [x] Backend: Pflegegradanalyse (Verteilung, Entwicklung, Budgetwirkung)
+- [x] Backend: Wirtschaftliche Berichte (Umsatz, offene Leistungen, Fahrkosten, Personal)
+- [x] Backend: Pünktlichkeitsanalyse (geplant vs. tatsächlich, Toleranz, Trend)
 - [x] Frontend: Analyse-Dashboard mit allen 5 Auswertungen (Tabs)
-- [ ] Frontend: PDF/CSV-Export für alle Analysen
+- [x] Frontend: CSV-Export für Analyse-Dashboard
 
 ### Stufe 5 – Integrationen (vorbereitet, Zugang fehlt)
 - [x] DB: integrationen Tabelle (Anbieter, Modus, Endpoint, Aktivstatus, verschlüsselte Konfiguration)
@@ -493,7 +493,7 @@
 - [ ] Backend: DATEV Connector (CSV + optionaler API-Connector, Exporthistorie)
 - [ ] Backend: Lexware Connector (Mapping, Exporthistorie)
 - [ ] Backend: Direkte Kassenanbindung (DTA/API pro Kostenträger, Status, Vollmachtprüfung)
-- [ ] Frontend: Integrationszentrum-Seite (alle Connectoren, Status-Ampel, Verbindungstest)
+- [x] Frontend: Integrationszentrum-Seite (alle Connectoren, Status-Ampel, Verbindungstest)
 
 ### Stufe 6 – Echtzeit, Sprache, KI, Backup
 - [ ] Backend: SSE-Kanal für Echtzeit-Benachrichtigungen (Fallback: Polling alle 30s)

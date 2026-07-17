@@ -2,21 +2,18 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 
 const TABS = [
-  { id: "uebersicht", label: "📊 Übersicht", icon: "📊" },
-  { id: "personal", label: "👥 Personal", icon: "👥" },
-  { id: "kunden", label: "👴 Kunden", icon: "👴" },
-  { id: "finanzen", label: "💰 Finanzen", icon: "💰" },
-  { id: "prognose", label: "📈 Prognose", icon: "📈" },
+  { id: "uebersicht", label: "📊 Übersicht" },
+  { id: "personal", label: "👥 Personal" },
+  { id: "kunden", label: "👴 Kunden" },
+  { id: "finanzen", label: "💰 Finanzen" },
+  { id: "prognose", label: "📈 Prognose" },
 ];
 
 function KennzahlKarte({ label, wert, einheit = "", farbe = "#4a8c3f", icon = "📌" }: {
   label: string; wert: string | number; einheit?: string; farbe?: string; icon?: string;
 }) {
   return (
-    <div style={{
-      background: "#fff", borderRadius: 12, padding: "16px 18px",
-      boxShadow: "0 1px 6px rgba(0,0,0,0.07)", borderLeft: `4px solid ${farbe}`,
-    }}>
+    <div style={{ background: "#fff", borderRadius: 12, padding: "16px 18px", boxShadow: "0 1px 6px rgba(0,0,0,0.07)", borderLeft: `4px solid ${farbe}` }}>
       <div style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", marginBottom: 4 }}>{icon} {label}</div>
       <div style={{ fontSize: 26, fontWeight: 900, color: farbe }}>
         {wert}<span style={{ fontSize: 14, fontWeight: 600, color: "#9ca3af", marginLeft: 4 }}>{einheit}</span>
@@ -35,44 +32,53 @@ function AmpelBadge({ wert, schwelle1, schwelle2, label }: { wert: number; schwe
   );
 }
 
+function SkeletonKarte() {
+  return (
+    <div style={{ background: "#f3f4f6", borderRadius: 12, padding: "16px 18px", height: 72, animation: "pulse 1.5s ease-in-out infinite" }} />
+  );
+}
+
 export default function AnalyseDashboard() {
   const [activeTab, setActiveTab] = useState("uebersicht");
 
-  const { data: dashData, isLoading } = (trpc as any).pflichtenheft.analyse.dashboard.useQuery();
+  // Neue Analyse-Procedures
+  const { data: dashData, isLoading: dashLoading } = (trpc as any).analysen.getDashboard.useQuery();
+  const { data: auslastung = [], isLoading: auslastungLoading } = (trpc as any).analysen.mitarbeiterAuslastung.useQuery(
+    undefined, { enabled: activeTab === "personal" }
+  );
+  const { data: kundenzuwachs = [], isLoading: kundenzuwachsLoading } = (trpc as any).analysen.kundenzuwachs.useQuery(
+    { monate: 6 }, { enabled: activeTab === "kunden" }
+  );
+  const { data: pflegegrad = [], isLoading: pflegegradLoading } = (trpc as any).analysen.pflegegradAnalyse.useQuery(
+    undefined, { enabled: activeTab === "kunden" }
+  );
+  const { data: umsatz, isLoading: umsatzLoading } = (trpc as any).analysen.umsatzPrognose.useQuery(
+    { monate: 3 }, { enabled: activeTab === "finanzen" || activeTab === "prognose" }
+  );
+  const { data: puenktlichkeit } = (trpc as any).analysen.puenktlichkeit.useQuery(
+    undefined, { enabled: activeTab === "uebersicht" }
+  );
   const { data: snapshots = [] } = (trpc as any).analysen.list.useQuery({});
 
-  const k = dashData?.kennzahlen ?? {};
-  const trend = dashData?.trend ?? {};
+  const d = dashData ?? {};
 
   const exportCSV = () => {
     const rows = [
       ["Kennzahl", "Wert"],
-      ["Kunden", k.kunden ?? 0],
-      ["Mitarbeiter", k.mitarbeiter ?? 0],
-      ["Geplante Einsätze", k.geplanteEinsaetze ?? 0],
-      ["Abgeschlossene Einsätze", k.abgeschlosseneEinsaetze ?? 0],
-      ["Absagen", k.absagen ?? 0],
-      ["Auslastung %", k.auslastungProzent ?? 0],
-      ["Budget €", k.budget ?? 0],
-      ["Verbrauch €", k.verbrauch ?? 0],
+      ["Aktive Kunden", d.aktiveKunden ?? 0],
+      ["Aktive Mitarbeiter", d.aktiveMitarbeiter ?? 0],
+      ["Monatseinsätze", d.monatsEinsaetze ?? 0],
+      ["Abgeschlossene Einsätze", d.abgeschlosseneEinsaetze ?? 0],
+      ["Monatsstunden", d.monatsStunden ?? 0],
+      ["Monats-km", d.monatsKm ?? 0],
+      ["Umsatzprognose €", d.umsatzPrognose ?? 0],
     ];
     const csv = rows.map(r => r.join(";")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url;
-    a.download = `analysen_${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
+    a.href = url; a.download = `analysen_${new Date().toISOString().slice(0, 10)}.csv`; a.click();
   };
-
-  if (isLoading) {
-    return (
-      <div style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>
-        <div style={{ fontSize: 32, marginBottom: 8 }}>⏳</div>
-        <div>Daten werden geladen...</div>
-      </div>
-    );
-  }
 
   return (
     <div style={{ padding: "24px 20px", maxWidth: 1000, margin: "0 auto" }}>
@@ -80,37 +86,24 @@ export default function AnalyseDashboard() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: "#1f2937", margin: 0 }}>📊 Analyse-Dashboard</h1>
-          <p style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>
-            Auswertungen und Kennzahlen für Lebensnah Betreuung
-          </p>
+          <p style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>Auswertungen und Kennzahlen für Lebenswert Betreuung</p>
         </div>
-        <button
-          onClick={exportCSV}
-          style={{
-            background: "#f3f4f6", color: "#374151", border: "1px solid #e5e7eb",
-            borderRadius: 8, padding: "8px 16px", fontSize: 12, fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
+        <button onClick={exportCSV} style={{ background: "#f3f4f6", color: "#374151", border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
           📥 CSV-Export
         </button>
       </div>
 
       {/* Tabs */}
-      <div style={{ display: "flex", gap: 4, marginBottom: 24, background: "#f3f4f6", borderRadius: 12, padding: 4 }}>
+      <div style={{ display: "flex", gap: 4, marginBottom: 24, background: "#f3f4f6", borderRadius: 12, padding: 4, overflowX: "auto" }}>
         {TABS.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              flex: 1, padding: "8px 4px", borderRadius: 8, border: "none",
-              background: activeTab === tab.id ? "#fff" : "transparent",
-              boxShadow: activeTab === tab.id ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
-              color: activeTab === tab.id ? "#1f2937" : "#6b7280",
-              fontSize: 12, fontWeight: activeTab === tab.id ? 700 : 500,
-              cursor: "pointer", transition: "all 0.15s",
-            }}
-          >
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
+            flex: 1, padding: "8px 4px", borderRadius: 8, border: "none",
+            background: activeTab === tab.id ? "#fff" : "transparent",
+            boxShadow: activeTab === tab.id ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+            color: activeTab === tab.id ? "#1f2937" : "#6b7280",
+            fontSize: 12, fontWeight: activeTab === tab.id ? 700 : 500,
+            cursor: "pointer", transition: "all 0.15s", whiteSpace: "nowrap",
+          }}>
             {tab.label}
           </button>
         ))}
@@ -119,71 +112,93 @@ export default function AnalyseDashboard() {
       {/* Tab: Übersicht */}
       {activeTab === "uebersicht" && (
         <div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 20 }}>
-            <KennzahlKarte label="Aktive Kunden" wert={k.kunden ?? 0} icon="👴" farbe="#4a8c3f" />
-            <KennzahlKarte label="Mitarbeiter" wert={k.mitarbeiter ?? 0} icon="👥" farbe="#7c3aed" />
-            <KennzahlKarte label="Kunden/Mitarbeiter" wert={k.kundenProMitarbeiter ?? 0} icon="📊" farbe="#b45309" />
-            <KennzahlKarte label="Geplante Einsätze" wert={k.geplanteEinsaetze ?? 0} icon="📅" farbe="#0891b2" />
-            <KennzahlKarte label="Abgeschlossene Einsätze" wert={k.abgeschlosseneEinsaetze ?? 0} icon="✅" farbe="#4a8c3f" />
-            <KennzahlKarte label="Absagen" wert={k.absagen ?? 0} icon="❌" farbe="#dc2626" />
-          </div>
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <AmpelBadge wert={k.auslastungProzent ?? 0} schwelle1={70} schwelle2={90} label="Auslastung" />
-            {k.berichteOffen > 0 && (
-              <span style={{ fontSize: 12, fontWeight: 700, color: "#f59e0b", background: "#fffbeb", padding: "3px 10px", borderRadius: 20, border: "1px solid #f59e0b" }}>
-                ⚠️ {k.berichteOffen} offene Besuchsberichte
-              </span>
-            )}
-          </div>
+          {dashLoading ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 20 }}>
+              {[...Array(6)].map((_, i) => <SkeletonKarte key={i} />)}
+            </div>
+          ) : (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 20 }}>
+                <KennzahlKarte label="Aktive Kunden" wert={d.aktiveKunden ?? 0} icon="👴" farbe="#4a8c3f" />
+                <KennzahlKarte label="Mitarbeiter" wert={d.aktiveMitarbeiter ?? 0} icon="👥" farbe="#7c3aed" />
+                <KennzahlKarte label="Monatseinsätze" wert={d.monatsEinsaetze ?? 0} icon="📅" farbe="#0891b2" />
+                <KennzahlKarte label="Abgeschlossen" wert={d.abgeschlosseneEinsaetze ?? 0} icon="✅" farbe="#4a8c3f" />
+                <KennzahlKarte label="Monatsstunden" wert={d.monatsStunden ?? 0} einheit="h" icon="⏱️" farbe="#b45309" />
+                <KennzahlKarte label="Umsatzprognose" wert={(d.umsatzPrognose ?? 0).toLocaleString("de-DE")} einheit="€" icon="💶" farbe="#059669" />
+              </div>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                {puenktlichkeit && <AmpelBadge wert={100 - (puenktlichkeit.quote ?? 100)} schwelle1={10} schwelle2={25} label="Ausfallquote" />}
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#0891b2", background: "#e0f2fe", padding: "3px 10px", borderRadius: 20 }}>
+                  🚗 {d.monatsKm ?? 0} km diesen Monat
+                </span>
+              </div>
+            </>
+          )}
         </div>
       )}
 
       {/* Tab: Personal */}
       {activeTab === "personal" && (
         <div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12, marginBottom: 20 }}>
-            <KennzahlKarte label="Mitarbeiter gesamt" wert={k.mitarbeiter ?? 0} icon="👥" farbe="#7c3aed" />
-            <KennzahlKarte label="Auslastung" wert={`${k.auslastungProzent ?? 0}`} einheit="%" icon="⚡" farbe={k.auslastungProzent > 85 ? "#dc2626" : "#4a8c3f"} />
-          </div>
-          <div style={{ background: "#fff", borderRadius: 12, padding: "16px 18px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-            <h3 style={{ fontSize: 14, fontWeight: 700, color: "#1f2937", marginBottom: 12 }}>Auslastungs-Ampel</h3>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-              <div style={{ flex: 1, height: 12, background: "#f3f4f6", borderRadius: 6, overflow: "hidden" }}>
-                <div style={{
-                  height: "100%", borderRadius: 6,
-                  width: `${Math.min(k.auslastungProzent ?? 0, 100)}%`,
-                  background: (k.auslastungProzent ?? 0) > 85 ? "#dc2626" : (k.auslastungProzent ?? 0) > 70 ? "#f59e0b" : "#4a8c3f",
-                  transition: "width 0.5s",
-                }} />
-              </div>
-              <span style={{ fontSize: 14, fontWeight: 800, color: "#374151", minWidth: 40 }}>{k.auslastungProzent ?? 0}%</span>
+          {auslastungLoading ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {[...Array(4)].map((_, i) => <SkeletonKarte key={i} />)}
             </div>
-            <div style={{ fontSize: 11, color: "#9ca3af" }}>
-              🟢 &lt;70% optimal · 🟡 70–85% erhöht · 🔴 &gt;85% kritisch
+          ) : (
+            <div style={{ background: "#fff", borderRadius: 12, padding: "16px 18px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: "#1f2937", marginBottom: 12 }}>Mitarbeiter-Auslastung (aktueller Monat)</h3>
+              {(auslastung as any[]).length === 0 ? (
+                <div style={{ fontSize: 13, color: "#9ca3af", fontStyle: "italic" }}>Keine Daten vorhanden</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {(auslastung as any[]).map((ma: any) => (
+                    <div key={ma.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div style={{ minWidth: 130, fontSize: 13, fontWeight: 600, color: "#374151", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ma.name}</div>
+                      <div style={{ flex: 1, height: 10, background: "#f3f4f6", borderRadius: 5, overflow: "hidden" }}>
+                        <div style={{ height: "100%", borderRadius: 5, width: `${ma.auslastungProzent}%`, background: ma.ampel === "gruen" ? "#4a8c3f" : ma.ampel === "gelb" ? "#f59e0b" : "#dc2626", transition: "width 0.5s" }} />
+                      </div>
+                      <span style={{ fontSize: 12, fontWeight: 700, minWidth: 50, textAlign: "right", color: ma.ampel === "gruen" ? "#4a8c3f" : ma.ampel === "gelb" ? "#f59e0b" : "#dc2626" }}>
+                        {ma.auslastungProzent}%
+                      </span>
+                      <span style={{ fontSize: 11, color: "#9ca3af", minWidth: 70 }}>{ma.istStunden}h / {ma.sollStunden}h</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ marginTop: 12, fontSize: 11, color: "#9ca3af" }}>🟢 &lt;60% · 🟡 60–89% · 🔴 ≥90%</div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
       {/* Tab: Kunden */}
       {activeTab === "kunden" && (
-        <div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 20 }}>
-            <KennzahlKarte label="Aktive Kunden" wert={k.kunden ?? 0} icon="👴" farbe="#4a8c3f" />
-            <KennzahlKarte label="Kunden/Mitarbeiter" wert={k.kundenProMitarbeiter ?? 0} icon="📊" farbe="#b45309" />
-            <KennzahlKarte label="Absagen" wert={k.absagen ?? 0} icon="❌" farbe="#dc2626" />
-          </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* Pflegegrad-Verteilung */}
           <div style={{ background: "#fff", borderRadius: 12, padding: "16px 18px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-            <h3 style={{ fontSize: 14, fontWeight: 700, color: "#1f2937", marginBottom: 8 }}>Trend (letzte 3 Monate)</h3>
-            {(trend as any[]).length === 0 ? (
-              <div style={{ fontSize: 13, color: "#9ca3af", fontStyle: "italic" }}>Noch keine Trenddaten vorhanden</div>
-            ) : (
+            <h3 style={{ fontSize: 14, fontWeight: 700, color: "#1f2937", marginBottom: 12 }}>Pflegegrad-Verteilung</h3>
+            {pflegegradLoading ? <SkeletonKarte /> : (
               <div style={{ display: "flex", gap: 8 }}>
-                {(trend as any[]).map((t: any, i: number) => (
-                  <div key={i} style={{ flex: 1, background: "#f9fafb", borderRadius: 8, padding: "10px 12px", textAlign: "center" }}>
-                    <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 4 }}>{t.monat}</div>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: "#4a8c3f" }}>{t.kunden}</div>
-                    <div style={{ fontSize: 10, color: "#9ca3af" }}>Kunden</div>
+                {(pflegegrad as any[]).map((pg: any) => (
+                  <div key={pg.pflegegrad} style={{ flex: 1, background: "#f9fafb", borderRadius: 8, padding: "10px 8px", textAlign: "center" }}>
+                    <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 4 }}>PG {pg.pflegegrad}</div>
+                    <div style={{ fontSize: 20, fontWeight: 900, color: "#4a8c3f" }}>{pg.aktiv}</div>
+                    <div style={{ fontSize: 10, color: "#9ca3af" }}>aktiv</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          {/* Kundenzuwachs */}
+          <div style={{ background: "#fff", borderRadius: 12, padding: "16px 18px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+            <h3 style={{ fontSize: 14, fontWeight: 700, color: "#1f2937", marginBottom: 12 }}>Kundenzuwachs (letzte 6 Monate)</h3>
+            {kundenzuwachsLoading ? <SkeletonKarte /> : (
+              <div style={{ display: "flex", gap: 8 }}>
+                {(kundenzuwachs as any[]).map((m: any) => (
+                  <div key={m.monat} style={{ flex: 1, background: "#f9fafb", borderRadius: 8, padding: "10px 8px", textAlign: "center" }}>
+                    <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 4 }}>{m.monat.slice(5)}</div>
+                    <div style={{ fontSize: 18, fontWeight: 900, color: "#4a8c3f" }}>{m.aktiv}</div>
+                    {m.neu > 0 && <div style={{ fontSize: 10, color: "#059669", fontWeight: 700 }}>+{m.neu} neu</div>}
                   </div>
                 ))}
               </div>
@@ -194,30 +209,32 @@ export default function AnalyseDashboard() {
 
       {/* Tab: Finanzen */}
       {activeTab === "finanzen" && (
-        <div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12, marginBottom: 20 }}>
-            <KennzahlKarte label="Gesamtbudget" wert={`${(k.budget ?? 0).toLocaleString("de-DE")}`} einheit="€" icon="💰" farbe="#4a8c3f" />
-            <KennzahlKarte label="Verbrauch" wert={`${(k.verbrauch ?? 0).toLocaleString("de-DE")}`} einheit="€" icon="📉" farbe="#b45309" />
-          </div>
-          <div style={{ background: "#fff", borderRadius: 12, padding: "16px 18px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-            <h3 style={{ fontSize: 14, fontWeight: 700, color: "#1f2937", marginBottom: 12 }}>Budget-Auslastung</h3>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-              <div style={{ flex: 1, height: 16, background: "#f3f4f6", borderRadius: 8, overflow: "hidden" }}>
-                <div style={{
-                  height: "100%", borderRadius: 8,
-                  width: `${k.budget > 0 ? Math.min(Math.round((k.verbrauch / k.budget) * 100), 100) : 0}%`,
-                  background: "#4a8c3f", transition: "width 0.5s",
-                }} />
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {umsatzLoading ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+              {[...Array(4)].map((_, i) => <SkeletonKarte key={i} />)}
+            </div>
+          ) : (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+                <KennzahlKarte label="Umsatzprognose (3 Monate)" wert={((umsatz as any)?.gesamt ?? 0).toLocaleString("de-DE")} einheit="€" icon="💶" farbe="#059669" />
+                <KennzahlKarte label="Monatsstunden" wert={d.monatsStunden ?? 0} einheit="h" icon="⏱️" farbe="#b45309" />
               </div>
-              <span style={{ fontSize: 14, fontWeight: 800, color: "#374151", minWidth: 50 }}>
-                {k.budget > 0 ? Math.round((k.verbrauch / k.budget) * 100) : 0}%
-              </span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#9ca3af" }}>
-              <span>0 €</span>
-              <span>{(k.budget ?? 0).toLocaleString("de-DE")} €</span>
-            </div>
-          </div>
+              <div style={{ background: "#fff", borderRadius: 12, padding: "16px 18px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: "#1f2937", marginBottom: 12 }}>Monatliche Umsatzentwicklung</h3>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {((umsatz as any)?.prognose ?? []).map((m: any) => (
+                    <div key={m.monat} style={{ flex: 1, background: "#f9fafb", borderRadius: 8, padding: "12px 8px", textAlign: "center" }}>
+                      <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 4 }}>{m.monat.slice(5)}</div>
+                      <div style={{ fontSize: 16, fontWeight: 900, color: "#059669" }}>{m.umsatz.toLocaleString("de-DE")} €</div>
+                      <div style={{ fontSize: 10, color: "#9ca3af" }}>{m.abgeschlossen} Einsätze</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginTop: 10, fontSize: 11, color: "#9ca3af" }}>* Berechnung: Stunden × 28,50 € Stundensatz</div>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -228,7 +245,7 @@ export default function AnalyseDashboard() {
             <h3 style={{ fontSize: 14, fontWeight: 700, color: "#1f2937", marginBottom: 12 }}>📈 Gespeicherte Prognosen</h3>
             {(snapshots as any[]).length === 0 ? (
               <div style={{ fontSize: 13, color: "#9ca3af", fontStyle: "italic", padding: "20px 0" }}>
-                Noch keine Prognosen erstellt. Prognosen werden über das Arbeitszentrum (Pflichtenheft) erstellt.
+                Noch keine Prognosen erstellt. Prognosen werden über das Arbeitszentrum erstellt.
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -236,9 +253,7 @@ export default function AnalyseDashboard() {
                   <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", background: "#f9fafb", borderRadius: 8 }}>
                     <span style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", minWidth: 70 }}>{s.monat}</span>
                     <span style={{ fontSize: 11, color: "#374151", flex: 1 }}>{s.typ}</span>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: "#4a8c3f" }}>
-                      {Number(s.prognoseWert).toLocaleString("de-DE")}
-                    </span>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: "#4a8c3f" }}>{Number(s.prognoseWert).toLocaleString("de-DE")}</span>
                     <span style={{ fontSize: 10, color: "#9ca3af" }}>{s.vertrauenProzent}% Konfidenz</span>
                   </div>
                 ))}

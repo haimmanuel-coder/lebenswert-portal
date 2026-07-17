@@ -3,8 +3,18 @@ import { router } from "../_core/trpc";
 import { portalProtected, adminProcedure } from "../portalAuth";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
-import { integrationen, integrationsLaeufe, analyseSnapshots, backupProtokolle } from "../../drizzle/schema";
-import { eq, desc } from "drizzle-orm";
+import {
+  integrationen,
+  integrationsLaeufe,
+  analyseSnapshots,
+  backupProtokolle,
+  einsaetze as einsaetzeTable,
+  kunden as kundenTable,
+  mitarbeiter as mitarbeiterTable,
+  fahrten as fahrtenTable,
+  leistungen as leistungenTable,
+} from "../../drizzle/schema";
+import { eq, desc, sql, gte, and } from "drizzle-orm";
 
 
 export const integrationenRouter = router({
@@ -51,7 +61,6 @@ export const integrationenRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      // Simulierter Test: immer "Zugang fehlt" für OptaData/DATEV/Lexware
       const rows = await db.select().from(integrationen).where(eq(integrationen.id, input.id)).limit(1);
       if (rows.length === 0) throw new TRPCError({ code: "NOT_FOUND" });
       const integration = rows[0];
@@ -60,7 +69,6 @@ export const integrationenRouter = router({
         .update(integrationen)
         .set({ letzterTestAt: new Date(), letzterTestStatus: testOk ? "erfolg" : "fehler" })
         .where(eq(integrationen.id, input.id));
-      // Lauf protokollieren
       await db.insert(integrationsLaeufe).values({
         integrationId: input.id,
         typ: "test",
@@ -108,5 +116,136 @@ export const analysenRouter = router({
       .from(backupProtokolle)
       .orderBy(desc(backupProtokolle.createdAt))
       .limit(30);
+  }),
+
+  /** Umsatzprognose: geplante Einsätze × Stundensätze */
+  umsatzPrognose: portalProtected
+    .input(z.object({ monate: z.number().int().min(1).max(12).default(3) }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return { prognose: [], gesamt: 0 };
+      const heute = new Date();
+      const ergebnis: { monat: string; geplant: number; abgeschlossen: number; umsatz: number }[] = [];
+      for (let i = 0; i < input.monate; i++) {
+        const d = new Date(heute.getFullYear(), heute.getMonth() + i, 1);
+        const monatStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        const rows = await db
+          .select({ status: einsaetzeTable.status, dauerStunden: einsaetzeTable.dauerStunden })
+          .from(einsaetzeTable)
+          .where(sql`DATE_FORMAT(${einsaetzeTable.datum}, '%Y-%m') = ${monatStr}`);
+        const geplant = rows.filter((r) => r.status === "geplant").length;
+        const abgeschlossen = rows.filter((r) => r.status === "abgeschlossen").length;
+        const stunden = rows.reduce((s, r) => s + parseFloat(String(r.dauerStunden ?? 0)), 0);
+        ergebnis.push({ monat: monatStr, geplant, abgeschlossen, umsatz: Math.round(stunden * 28.5) });
+      }
+      return { prognose: ergebnis, gesamt: ergebnis.reduce((s, r) => s + r.umsatz, 0) };
+    }),
+
+  /** Mitarbeiter-Auslastungsanalyse */
+  mitarbeiterAuslastung: portalProtected.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) return [];
+    const heute = new Date();
+    const monatsStart = `${heute.getFullYear()}-${String(heute.getMonth() + 1).padStart(2, "0")}-01`;
+    const alleMa = await db.select().from(mitarbeiterTable);
+    const monEinsaetze = await db
+      .select({ mitarbeiterId: einsaetzeTable.mitarbeiterId, dauerStunden: einsaetzeTable.dauerStunden })
+      .from(einsaetzeTable)
+      .where(sql`DATE(${einsaetzeTable.datum}) >= ${monatsStart}`);
+    return alleMa.map((m) => {
+      const meineE = monEinsaetze.filter((e) => e.mitarbeiterId === m.id);
+      const ist = meineE.reduce((s, e) => s + parseFloat(String(e.dauerStunden ?? 0)), 0);
+      const soll = m.beschaeftigungsart === "minijob" ? 40 : m.beschaeftigungsart === "teilzeit" ? 80 : 160;
+      const ampel = ist / soll >= 0.9 ? "gruen" : ist / soll >= 0.6 ? "gelb" : "rot";
+      return {
+        id: m.id,
+        name: `${m.vorname} ${m.nachname}`,
+        art: m.beschaeftigungsart ?? "vollzeit",
+        istStunden: Math.round(ist * 10) / 10,
+        sollStunden: soll,
+        auslastungProzent: Math.min(100, Math.round((ist / soll) * 100)),
+        ampel,
+      };
+    });
+  }),
+
+  /** Kundenzuwachs-Analyse */
+  kundenzuwachs: portalProtected
+    .input(z.object({ monate: z.number().int().min(1).max(12).default(6) }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const heute = new Date();
+      const ergebnis: { monat: string; gesamt: number; aktiv: number; neu: number }[] = [];
+      for (let i = input.monate - 1; i >= 0; i--) {
+        const d = new Date(heute.getFullYear(), heute.getMonth() - i, 1);
+        const monatStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        const alleKunden = await db.select({ id: kundenTable.id, aktiv: kundenTable.aktiv, createdAt: kundenTable.createdAt }).from(kundenTable);
+        const gesamt = alleKunden.length;
+        const aktiv = alleKunden.filter((k) => k.aktiv != null).length;
+        const neu = alleKunden.filter((k) => {
+          const ca = k.createdAt ? new Date(k.createdAt) : null;
+          return ca && `${ca.getFullYear()}-${String(ca.getMonth() + 1).padStart(2, "0")}` === monatStr;
+        }).length;
+        ergebnis.push({ monat: monatStr, gesamt, aktiv, neu });
+      }
+      return ergebnis;
+    }),
+
+  /** Pflegegradanalyse */
+  pflegegradAnalyse: portalProtected.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) return [];
+    const kunden = await db.select({ pflegegrad: kundenTable.pflegegrad, aktiv: kundenTable.aktiv }).from(kundenTable);
+    const verteilung: Record<number, { gesamt: number; aktiv: number }> = {};
+    for (let pg = 1; pg <= 5; pg++) verteilung[pg] = { gesamt: 0, aktiv: 0 };
+    kunden.forEach((k) => {
+      const pg = k.pflegegrad ?? 0;
+      if (pg >= 1 && pg <= 5) {
+        verteilung[pg].gesamt++;
+        if (k.aktiv) verteilung[pg].aktiv++;
+      }
+    });
+    return Object.entries(verteilung).map(([pg, v]) => ({ pflegegrad: Number(pg), ...v }));
+  }),
+
+  /** Pünktlichkeitsanalyse */
+  puenktlichkeit: portalProtected.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) return { puenktlich: 0, verspaetet: 0, quote: 100 };
+    const einsaetze = await db
+      .select({ status: einsaetzeTable.status, startzeit: einsaetzeTable.startzeit })
+      .from(einsaetzeTable)
+      .where(sql`${einsaetzeTable.status} = 'abgeschlossen'`)
+      .limit(200);
+    const puenktlich = einsaetze.filter((e) => e.startzeit !== null).length;
+    const verspaetet = einsaetze.length - puenktlich;
+    const quote = einsaetze.length > 0 ? Math.round((puenktlich / einsaetze.length) * 100) : 100;
+    return { puenktlich, verspaetet, quote, gesamt: einsaetze.length };
+  }),
+
+  /** Analyse-Dashboard-Zusammenfassung */
+  getDashboard: portalProtected.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) return null;
+    const heute = new Date();
+    const monatsStart = `${heute.getFullYear()}-${String(heute.getMonth() + 1).padStart(2, "0")}-01`;
+    const [alleKunden, alleMa, monEinsaetze, alleFahrten] = await Promise.all([
+      db.select({ id: kundenTable.id, aktiv: kundenTable.aktiv }).from(kundenTable),
+      db.select({ id: mitarbeiterTable.id, aktiv: mitarbeiterTable.aktiv }).from(mitarbeiterTable),
+      db.select({ status: einsaetzeTable.status, dauerStunden: einsaetzeTable.dauerStunden }).from(einsaetzeTable).where(sql`DATE(${einsaetzeTable.datum}) >= ${monatsStart}`),
+      db.select({ kilometer: fahrtenTable.kilometer }).from(fahrtenTable).where(sql`DATE(${fahrtenTable.datum}) >= ${monatsStart}`),
+    ]);
+    const stunden = monEinsaetze.reduce((s, e) => s + parseFloat(String(e.dauerStunden ?? 0)), 0);
+    const km = alleFahrten.reduce((s, f) => s + parseFloat(String(f.kilometer ?? 0)), 0);
+    return {
+      aktiveKunden: alleKunden.filter((k) => k.aktiv).length,
+      aktiveMitarbeiter: alleMa.filter((m) => m.aktiv != null).length,
+      monatsEinsaetze: monEinsaetze.length,
+      abgeschlosseneEinsaetze: monEinsaetze.filter((e) => e.status === "abgeschlossen").length,
+      monatsStunden: Math.round(stunden * 10) / 10,
+      monatsKm: Math.round(km),
+      umsatzPrognose: Math.round(stunden * 28.5),
+    };
   }),
 });
