@@ -50,6 +50,7 @@ export default function Besuchsberichte() {
     massnahmen: "",
     naechsterTermin: "",
     unterschriftKunde: false,
+    fotos: [] as { url: string; key: string; name: string }[],
   });
 
   const transkribierenMut = (trpc.besuchsberichte as any).transkribieren.useMutation({
@@ -107,7 +108,7 @@ export default function Besuchsberichte() {
     onSuccess: () => {
       toast.success("✅ Besuchsbericht gespeichert!");
       setShowCreate(false);
-      setForm({ kundeId: 0, datum: new Date().toISOString().split("T")[0], startzeit: "09:00", endzeit: "10:00", inhalt: "", stimmung: "gut", massnahmen: "", naechsterTermin: "", unterschriftKunde: false });
+      setForm({ kundeId: 0, datum: new Date().toISOString().split("T")[0], startzeit: "09:00", endzeit: "10:00", inhalt: "", stimmung: "gut", massnahmen: "", naechsterTermin: "", unterschriftKunde: false, fotos: [] });
       if (tab === "meine") refetchMeine(); else refetchAlle();
     },
     onError: (e: any) => toast.error("❌ " + e.message),
@@ -397,6 +398,46 @@ export default function Besuchsberichte() {
                 <input type="date" value={form.naechsterTermin} onChange={e => setForm(f => ({ ...f, naechsterTermin: e.target.value }))} style={{ width: "100%", padding: "10px 12px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, boxSizing: "border-box" }} />
               </div>
 
+              {/* Foto-Upload */}
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", display: "block", marginBottom: 4 }}>📷 Fotos hinzufügen</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={async (e) => {
+                    const files = Array.from(e.target.files || []);
+                    for (const file of files) {
+                      if (file.size > 5 * 1024 * 1024) { toast.error("Datei zu groß (max. 5 MB)"); continue; }
+                      const fd = new FormData();
+                      fd.append("file", file);
+                      try {
+                        const res = await fetch("/api/upload/foto", { method: "POST", body: fd });
+                        if (res.ok) {
+                          const { url, key } = await res.json();
+                          setForm(f => ({ ...f, fotos: [...(f.fotos || []), { url, key, name: file.name }] }));
+                          toast.success("📷 Foto hinzugefügt");
+                        } else { toast.error("Upload fehlgeschlagen"); }
+                      } catch { toast.error("Upload fehlgeschlagen"); }
+                    }
+                  }}
+                  style={{ width: "100%", padding: "10px 12px", border: "2px dashed #e5e7eb", borderRadius: 10, fontSize: 13, boxSizing: "border-box", cursor: "pointer" }}
+                />
+                {(form as any).fotos?.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+                    {((form as any).fotos || []).map((foto: any, i: number) => (
+                      <div key={i} style={{ position: "relative" }}>
+                        <img src={foto.url} alt={foto.name} style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 8, border: "2px solid #e5e7eb" }} />
+                        <button
+                          type="button"
+                          onClick={() => setForm(f => ({ ...f, fotos: ((f as any).fotos || []).filter((_: any, j: number) => j !== i) }))}
+                          style={{ position: "absolute", top: -6, right: -6, background: "#dc2626", color: "#fff", border: "none", borderRadius: "50%", width: 18, height: 18, fontSize: 10, cursor: "pointer", fontWeight: 700 }}
+                        >×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
               <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", padding: "12px 14px", background: "#f9fafb", borderRadius: 10, border: "1px solid #e5e7eb" }}>
                 <input
                   type="checkbox"

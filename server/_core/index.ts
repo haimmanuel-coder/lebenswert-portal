@@ -10,6 +10,8 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { neukundenEskalationHandler, vertretungBereinigungHandler } from "../scheduledHandlers";
+import multer from "multer";
+import { storagePut } from "../storage";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -41,6 +43,24 @@ async function startServer() {
   app.use(cookieParser());
   registerStorageProxy(app);
   registerOAuthRoutes(app);
+  // Foto/Audio-Upload-Endpoints
+  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 16 * 1024 * 1024 } });
+  app.post("/api/upload/foto", upload.single("file"), async (req: any, res: any) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: "Keine Datei" });
+      const key = `fotos/${Date.now()}-${(req.file.originalname as string).replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+      const { url } = await storagePut(key, req.file.buffer, req.file.mimetype);
+      return res.json({ url, key });
+    } catch (e: any) { return res.status(500).json({ error: e.message }); }
+  });
+  app.post("/api/upload/audio", upload.single("file"), async (req: any, res: any) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: "Keine Datei" });
+      const key = `audio/${Date.now()}-${(req.file.originalname as string).replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+      const { url } = await storagePut(key, req.file.buffer, req.file.mimetype);
+      return res.json({ url, key });
+    } catch (e: any) { return res.status(500).json({ error: e.message }); }
+  });
   // ⏱ Heartbeat-Handler (Cron-only, vor tRPC registrieren)
   app.post("/api/scheduled/neukunden-eskalation", neukundenEskalationHandler);
   app.post("/api/scheduled/vertretung-bereinigung", vertretungBereinigungHandler);

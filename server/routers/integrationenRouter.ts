@@ -248,4 +248,22 @@ export const analysenRouter = router({
       umsatzPrognose: Math.round(stunden * 28.5),
     };
   }),
+  /** KI-Erklärtext für Analyse-Dashboard (LLM-gestützt) */
+  kiErklaertext: portalProtected
+    .input(z.object({ typ: z.string(), daten: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const { invokeLLM } = await import("../_core/llm");
+        const result = await invokeLLM({
+          messages: [
+            { role: "system", content: "Du bist ein Analyse-Assistent für einen ambulanten Pflegedienst. Erkläre Kennzahlen kurz, prägnant und handlungsorientiert auf Deutsch. Maximal 3 Sätze. Keine Formatierung, nur Fließtext." },
+            { role: "user", content: `Analysiere diese ${input.typ}-Daten und gib eine kurze Einschätzung mit Handlungsempfehlung: ${input.daten}` },
+          ],
+        });
+        const text = (result as any)?.choices?.[0]?.message?.content ?? "Keine Analyse verfügbar.";
+        return { text };
+      } catch {
+        return { text: "KI-Analyse temporär nicht verfügbar." };
+      }
+    }),
 });

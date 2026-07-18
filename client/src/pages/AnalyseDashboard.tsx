@@ -59,7 +59,16 @@ export default function AnalyseDashboard() {
     undefined, { enabled: activeTab === "uebersicht" }
   );
   const { data: snapshots = [] } = (trpc as any).analysen.list.useQuery({});
-
+  const [kiText, setKiText] = useState("");
+  const [kiLoading, setKiLoading] = useState(false);
+  const kiMut = (trpc as any).analysen.kiErklaertext.useMutation({
+    onSuccess: (data: any) => { setKiText(data.text); setKiLoading(false); },
+    onError: () => { setKiText("KI-Analyse temporär nicht verfügbar."); setKiLoading(false); },
+  });
+  const analyseAnfragen = (typ: string, daten: object) => {
+    setKiLoading(true); setKiText("");
+    kiMut.mutate({ typ, daten: JSON.stringify(daten) });
+  };
   const d = dashData ?? {};
 
   const exportCSV = () => {
@@ -126,11 +135,25 @@ export default function AnalyseDashboard() {
                 <KennzahlKarte label="Monatsstunden" wert={d.monatsStunden ?? 0} einheit="h" icon="⏱️" farbe="#b45309" />
                 <KennzahlKarte label="Umsatzprognose" wert={(d.umsatzPrognose ?? 0).toLocaleString("de-DE")} einheit="€" icon="💶" farbe="#059669" />
               </div>
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
                 {puenktlichkeit && <AmpelBadge wert={100 - (puenktlichkeit.quote ?? 100)} schwelle1={10} schwelle2={25} label="Ausfallquote" />}
                 <span style={{ fontSize: 12, fontWeight: 700, color: "#0891b2", background: "#e0f2fe", padding: "3px 10px", borderRadius: 20 }}>
                   🚗 {d.monatsKm ?? 0} km diesen Monat
                 </span>
+              </div>
+              {/* KI-Erklärtext-Box */}
+              <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 12, padding: "14px 16px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: kiText ? 10 : 0 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#166534" }}>🤖 KI-Analyse</span>
+                  <button
+                    onClick={() => analyseAnfragen("Monatsübersicht", d)}
+                    disabled={kiLoading}
+                    style={{ background: kiLoading ? "#e5e7eb" : "#4a8c3f", color: "#fff", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 11, fontWeight: 700, cursor: kiLoading ? "default" : "pointer" }}
+                  >
+                    {kiLoading ? "⏳ Analysiere..." : "✨ KI-Einschätzung"}
+                  </button>
+                </div>
+                {kiText && <p style={{ fontSize: 13, color: "#166534", lineHeight: 1.6, margin: 0 }}>{kiText}</p>}
               </div>
             </>
           )}
