@@ -65,6 +65,32 @@ async function startServer() {
   app.post("/api/scheduled/neukunden-eskalation", neukundenEskalationHandler);
   app.post("/api/scheduled/vertretung-bereinigung", vertretungBereinigungHandler);
 
+  // 📡 SSE-Kanal für Echtzeit-Benachrichtigungen
+  const sseClients = new Map<number, Set<any>>();
+  app.get("/api/sse", (req: any, res: any) => {
+    const mitarbeiterId = parseInt(req.query.mitarbeiterId ?? "0");
+    if (!mitarbeiterId) return res.status(400).end();
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders();
+    res.write('data: {"type":"connected"}\n\n');
+    if (!sseClients.has(mitarbeiterId)) sseClients.set(mitarbeiterId, new Set());
+    sseClients.get(mitarbeiterId)!.add(res);
+    const heartbeat = setInterval(() => { try { res.write(": ping\n\n"); } catch { clearInterval(heartbeat); } }, 25000);
+    req.on("close", () => {
+      clearInterval(heartbeat);
+      sseClients.get(mitarbeiterId)?.delete(res);
+    });
+  });
+  (global as any).sseBroadcast = (mitarbeiterId: number, event: string, data: object) => {
+    const clients = sseClients.get(mitarbeiterId);
+    if (!clients) return;
+    const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+    clients.forEach((res: any) => { try { res.write(msg); } catch { clients.delete(res); } });
+  };
+
   // tRPC API
   app.use(
     "/api/trpc",

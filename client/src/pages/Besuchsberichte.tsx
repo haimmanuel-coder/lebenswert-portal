@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import React from "react";
 import { trpc } from "@/lib/trpc";
 import { usePortalAuth } from "@/contexts/PortalAuthContext";
 import { toast } from "sonner";
@@ -117,6 +118,15 @@ export default function Besuchsberichte() {
   const updateStatus = (trpc.besuchsberichte as any).updateStatus.useMutation({
     onSuccess: () => { toast.success("Status aktualisiert"); refetchAlle(); },
     onError: (e: any) => toast.error("❌ " + e.message),
+  });
+  const generatePdf = (trpc.besuchsberichte as any).generatePdf.useMutation({
+    onSuccess: (data: any) => { window.open(data.url, "_blank"); toast.success("📄 PDF geöffnet"); },
+    onError: (e: any) => toast.error("❌ PDF-Fehler: " + e.message),
+  });
+  const [emailDialog, setEmailDialog] = React.useState<{ berichtId: number; empfaenger: string } | null>(null);
+  const sendEmailMut = (trpc.besuchsberichte as any).sendEmail.useMutation({
+    onSuccess: () => { toast.success("✉️ E-Mail versendet"); setEmailDialog(null); },
+    onError: (e: any) => toast.error("❌ E-Mail-Fehler: " + e.message),
   });
 
   const isLoading = tab === "meine" ? loadingMeine : loadingAlle;
@@ -286,12 +296,53 @@ export default function Besuchsberichte() {
                       📤 Einreichen
                     </button>
                   )}
+                  {/* PDF & E-Mail Aktionen */}
+                  <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+                    <button
+                      onClick={() => generatePdf.mutate({ id: b.id })}
+                      disabled={generatePdf.isPending}
+                      style={{ background: "#f9fafb", color: "#374151", border: "1px solid #d1d5db", borderRadius: 8, padding: "5px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer", opacity: generatePdf.isPending ? 0.6 : 1 }}
+                    >
+                      📄 PDF
+                    </button>
+                    <button
+                      onClick={() => setEmailDialog({ berichtId: b.id, empfaenger: "" })}
+                      style={{ background: "#f9fafb", color: "#374151", border: "1px solid #d1d5db", borderRadius: 8, padding: "5px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}
+                    >
+                      ✉️ E-Mail
+                    </button>
+                  </div>
                 </div>
               </div>
             );
           })
         )}
       </div>}
+      {/* E-Mail-Dialog */}
+      {emailDialog && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: 24, maxWidth: 400, width: "100%" }}>
+            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 800 }}>✉️ Bericht per E-Mail senden</h3>
+            <input
+              type="email"
+              placeholder="E-Mail-Adresse des Empfängers"
+              value={emailDialog.empfaenger}
+              onChange={e => setEmailDialog(d => d ? { ...d, empfaenger: e.target.value } : null)}
+              style={{ width: "100%", padding: "10px 14px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 13, boxSizing: "border-box", marginBottom: 16 }}
+            />
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button onClick={() => setEmailDialog(null)} style={{ padding: "8px 16px", border: "1px solid #d1d5db", borderRadius: 8, background: "#f9fafb", cursor: "pointer", fontSize: 13 }}>Abbrechen</button>
+              <button
+                onClick={() => sendEmailMut.mutate({ id: emailDialog.berichtId, empfaenger: emailDialog.empfaenger })}
+                disabled={!emailDialog.empfaenger || sendEmailMut.isPending}
+                style={{ padding: "8px 16px", border: "none", borderRadius: 8, background: "#0d9488", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 700, opacity: (!emailDialog.empfaenger || sendEmailMut.isPending) ? 0.6 : 1 }}
+              >
+                {sendEmailMut.isPending ? "Sende..." : "✉️ Senden"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Neuer Bericht Modal */}
       {showCreate && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>

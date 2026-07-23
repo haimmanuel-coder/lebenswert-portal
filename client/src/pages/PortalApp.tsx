@@ -41,6 +41,8 @@ import AnalyseDashboard from "./AnalyseDashboard";
 import BackupStatus from "./BackupStatus";
 import OnboardingTour, { useOnboardingTour } from "@/components/OnboardingTour";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
+import { useSSENotifications } from "@/hooks/useSSENotifications";
+import DsgvoErstDialog from "@/components/DsgvoErstDialog";
 
 type PageId =
   | "home" | "einsaetze" | "zeit" | "lnw" | "fahrt"
@@ -81,10 +83,16 @@ export default function PortalApp() {
   const offenCount = leistungen.filter((l) => l.status === "offen").length;
   const unreadCount = (unreadNotifs as any[]).filter((n: any) => !n.gelesenAt).length;
   const neukundenPushCount = (neukundenPushOffen as any[]).length;
-  const isAdmin = mitarbeiter?.rolle === "admin";
+    const isAdmin = mitarbeiter?.rolle === "admin";
   const { isOnline, offlineCount } = useOfflineSync();
   const { show: showTour, startTour, closeTour } = useOnboardingTour();
-
+  useSSENotifications(mitarbeiter?.id);
+  // DSGVO-Erstanmeldungs-Dialog
+  const { data: dsgvoCheck } = (trpc.datenschutz as any).checkZustimmung.useQuery(
+    undefined, { enabled: !!mitarbeiter }
+  );
+  const [dsgvoDialogGeschlossen, setDsgvoDialogGeschlossen] = useState(false);
+  const showDsgvoDialog = !!mitarbeiter && !!dsgvoCheck && dsgvoCheck.required && !dsgvoCheck.zugestimmt && !dsgvoDialogGeschlossen;
   const initials = mitarbeiter
     ? `${mitarbeiter.vorname?.[0] ?? ""}${mitarbeiter.nachname?.[0] ?? ""}`.toUpperCase()
     : "MA";
@@ -421,6 +429,7 @@ export default function PortalApp() {
       </div>
 
       <OnboardingTour forceShow={showTour} onClose={closeTour} />
+      {showDsgvoDialog && <DsgvoErstDialog onClose={() => setDsgvoDialogGeschlossen(true)} />}
       <Toaster
         position="top-right"
         richColors

@@ -3,7 +3,7 @@ import { router } from "../_core/trpc";
 import { portalProtected } from "../portalAuth";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
-import { datenschutzDokumente, datenschutzZustimmungen } from "../../drizzle/schema";
+import { datenschutzDokumente, datenschutzZustimmungen, mitarbeiter as mitarbeiterTable } from "../../drizzle/schema";
 import { eq, desc, and } from "drizzle-orm";
 
 
@@ -70,6 +70,74 @@ export const datenschutzRouter = router({
         dokumentId: dok.id,
         dokumentVersion: dok.version,
       });
+      return { success: true };
+    }),
+
+  /** Meine Zustimmungen abrufen (Frontend-kompatibel) */
+  getMeineZustimmungen: portalProtected.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) return [];
+    const dokumente = await db.select().from(datenschutzDokumente).where(eq(datenschutzDokumente.aktiv, true));
+    const meineZ = await db.select().from(datenschutzZustimmungen).where(eq(datenschutzZustimmungen.mitarbeiterId, ctx.mitarbeiterId));
+    const zugestimmteIds = new Set(meineZ.map(z => z.dokumentId));
+    return dokumente.map(d => ({
+      id: d.id, typ: d.typ, titel: d.titel, version: d.version,
+      zugestimmt: zugestimmteIds.has(d.id),
+      zugestimmtAt: meineZ.find(z => z.dokumentId === d.id)?.zugestimmtAt ?? null,
+    }));
+  }),
+
+  /** Alle Zustimmungen abrufen (Admin) */
+  getAlleZustimmungen: portalProtected.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) return [];
+    const alleMa = await db.select({ id: mitarbeiterTable.id, vorname: mitarbeiterTable.vorname, nachname: mitarbeiterTable.nachname }).from(mitarbeiterTable);
+    const alleZ = await db.select().from(datenschutzZustimmungen);
+    const dokumente = await db.select().from(datenschutzDokumente).where(eq(datenschutzDokumente.aktiv, true));
+    return alleMa.map(ma => ({
+      mitarbeiterId: ma.id,
+      name: `${ma.vorname} ${ma.nachname}`,
+      zustimmungen: dokumente.map(d => ({
+        dokumentId: d.id, typ: d.typ, titel: d.titel,
+        zugestimmt: alleZ.some(z => z.mitarbeiterId === ma.id && z.dokumentId === d.id),
+      })),
+    }));
+  }),
+
+  /** Frontend-kompatible zustimmen-Procedure (DsgvoErstDialog nutzt typ/version) */
+  zustimmenByTyp: portalProtected
+    .input(z.object({
+      typ: z.enum(["datenschutzerklaerung", "avv", "einwilligung", "loeschkonzept", "verarbeitungsverzeichnis"]),
+      zugestimmt: z.boolean(),
+      version: z.string().default("1.0"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (!input.zugestimmt) return { success: true };
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      let dokRows = await db.select().from(datenschutzDokumente)
+        .where(and(eq(datenschutzDokumente.typ, input.typ), eq(datenschutzDokumente.aktiv, true))).limit(1);
+      if (dokRows.length === 0) {
+        const titelMap: Record<string, string> = {
+          datenschutzerklaerung: "Datenschutzerkl\u00e4rung", avv: "Auftragsverarbeitungsvertrag",
+          einwilligung: "Einwilligung Datenverarbeitung", loeschkonzept: "L\u00f6schkonzept",
+          verarbeitungsverzeichnis: "Verarbeitungsverzeichnis",
+        };
+        await db.insert(datenschutzDokumente).values({
+          typ: input.typ, version: input.version,
+          titel: titelMap[input.typ] ?? input.typ, inhalt: "", aktiv: true,
+        });
+        dokRows = await db.select().from(datenschutzDokumente)
+          .where(and(eq(datenschutzDokumente.typ, input.typ), eq(datenschutzDokumente.aktiv, true))).limit(1);
+      }
+      const dok = dokRows[0];
+      const existing = await db.select().from(datenschutzZustimmungen)
+        .where(and(eq(datenschutzZustimmungen.mitarbeiterId, ctx.mitarbeiterId), eq(datenschutzZustimmungen.dokumentId, dok.id))).limit(1);
+      if (existing.length === 0) {
+        await db.insert(datenschutzZustimmungen).values({
+          mitarbeiterId: ctx.mitarbeiterId, dokumentId: dok.id, dokumentVersion: dok.version,
+        });
+      }
       return { success: true };
     }),
 

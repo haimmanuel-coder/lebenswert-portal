@@ -538,3 +538,14 @@
 - [x] Backend: tRPC-Routen für roles.list, permissions.list, employeeRoles.assign, employeeRoles.list
 - [x] Frontend: Rollenverwaltung auf Mehrfachrollen umstellen (Checkboxen statt Dropdown)
 - [x] Frontend: navPermissions-Guard für geschützte Menüpunkte
+
+## Session: PDF, E-Mail, SSE, DSGVO-Dialog (Jul 2026)
+- [x] Besuchsberichte: create und updateStatus Procedures
+- [x] Besuchsberichte: PDF-Generierung (pdfkit) + E-Mail-Versand (nodemailer)
+- [x] Besuchsberichte: PDF-Button und E-Mail-Dialog im Frontend
+- [x] SSE-Kanal: /api/sse Endpunkt + useSSENotifications Hook
+- [x] DSGVO-Erstanmeldungs-Dialog: DsgvoErstDialog.tsx (4-Schritte-Wizard)
+- [x] DSGVO: getMeineZustimmungen, getAlleZustimmungen, zustimmenByTyp
+- [x] DsgvoErstDialog in PortalApp.tsx eingebunden
+- [x] Connector-Stubs: save/test Procedures im integrationenRouter
+- [x] TypeScript: 0 Fehler | Tests: 33/33 bestanden
