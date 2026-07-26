@@ -7,6 +7,10 @@ import { besuchsberichte, besuchsberichtDateien, formularVorlagen } from "../../
 import { eq, desc, and } from "drizzle-orm";
 import { createAuditLog } from "../db";
 import { transcribeAudio } from "../_core/voiceTranscription";
+import { generateBesuchsberichtPdf } from "../pdfGenerator";
+import { sendEmail, buildBesuchsberichtEmail } from "../emailService";
+import { getMitarbeiterById, getKundeById } from "../db";
+import { storagePut } from "../storage";
 
 
 export const besuchsberichteRouter = router({
@@ -209,5 +213,70 @@ export const besuchsberichteRouter = router({
       } catch (e: any) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Transkription fehlgeschlagen: " + e.message });
       }
+    }),
+
+  /** PDF eines Besuchsberichts generieren und als URL zurückgeben */
+  generatePdf: portalProtected
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const rows = await db.select().from(besuchsberichte).where(eq(besuchsberichte.id, input.id)).limit(1);
+      if (!rows.length) throw new TRPCError({ code: "NOT_FOUND" });
+      const b = rows[0];
+      const kunde = await getKundeById(b.kundenId);
+      const ma = await getMitarbeiterById(b.mitarbeiterId);
+      const pdfBuf = await generateBesuchsberichtPdf({
+        id: b.id,
+        datum: b.datum,
+        kundeVorname: kunde?.vorname ?? "Unbekannt",
+        kundeNachname: kunde?.nachname ?? "",
+        mitarbeiterVorname: ma?.vorname ?? "Unbekannt",
+        mitarbeiterNachname: ma?.nachname ?? "",
+        taetigkeiten: b.taetigkeiten,
+        beobachtungen: b.beobachtungen,
+        besonderheiten: b.besonderheiten,
+        naechsteSchritte: b.naechsteSchritte,
+        status: b.status,
+        dauerMinuten: b.dauerMinuten,
+      });
+      const key = `besuchsberichte/bericht-${b.id}-${Date.now()}.pdf`;
+      const { url } = await storagePut(key, pdfBuf, "application/pdf");
+      return { url, key };
+    }),
+
+  /** Besuchsbericht per E-Mail versenden */
+  sendEmail: portalProtected
+    .input(z.object({ id: z.number().int().positive(), empfaenger: z.string().email() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const rows = await db.select().from(besuchsberichte).where(eq(besuchsberichte.id, input.id)).limit(1);
+      if (!rows.length) throw new TRPCError({ code: "NOT_FOUND" });
+      const b = rows[0];
+      const kunde = await getKundeById(b.kundenId);
+      const ma = await getMitarbeiterById(b.mitarbeiterId);
+      const pdfBuf = await generateBesuchsberichtPdf({
+        id: b.id, datum: b.datum,
+        kundeVorname: kunde?.vorname ?? "Unbekannt", kundeNachname: kunde?.nachname ?? "",
+        mitarbeiterVorname: ma?.vorname ?? "Unbekannt", mitarbeiterNachname: ma?.nachname ?? "",
+        taetigkeiten: b.taetigkeiten, beobachtungen: b.beobachtungen,
+        besonderheiten: b.besonderheiten, naechsteSchritte: b.naechsteSchritte,
+        status: b.status, dauerMinuten: b.dauerMinuten,
+      });
+      const datum = b.datum instanceof Date ? b.datum.toLocaleDateString("de-DE") : String(b.datum);
+      const html = buildBesuchsberichtEmail({
+        kundeVorname: kunde?.vorname ?? "", kundeNachname: kunde?.nachname ?? "",
+        mitarbeiterVorname: ma?.vorname ?? "", mitarbeiterNachname: ma?.nachname ?? "",
+        datum, berichtId: b.id,
+      });
+      const result = await sendEmail({
+        to: input.empfaenger,
+        subject: `Besuchsbericht #${b.id} – ${datum}`,
+        html,
+        attachments: [{ filename: `besuchsbericht-${b.id}.pdf`, content: pdfBuf, contentType: "application/pdf" }],
+      });
+      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "EMAIL", ressource: "besuchsbericht", details: `id=${b.id} to=${input.empfaenger}`, status: result.success ? "success" : "failure" });
+      return result;
     }),
 });

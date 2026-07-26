@@ -9,6 +9,8 @@ const INTEGRATION_TYPEN = [
   { id: "email", name: "E-Mail SMTP", icon: "📧", beschreibung: "Automatische E-Mail-Benachrichtigungen", farbe: "#f59e0b" },
   { id: "sms", name: "SMS-Gateway", icon: "📱", beschreibung: "SMS-Benachrichtigungen an Kunden", farbe: "#8b5cf6" },
   { id: "kalender", name: "Kalender-Sync", icon: "📅", beschreibung: "Google Calendar / Outlook-Synchronisation", farbe: "#ef4444" },
+  { id: "lexware", name: "Lexware", icon: "📒", beschreibung: "Lohnbuchhaltung und Finanzbuchhaltung (Lexware)", farbe: "#0ea5e9" },
+  { id: "kasse", name: "Kassenanbindung", icon: "🏦", beschreibung: "DTA/API-Direktabrechnung mit Kostenträgern", farbe: "#d97706" },
 ];
 
 export default function Integrationen() {

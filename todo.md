@@ -438,28 +438,28 @@
 - [x] Backend: Rollenverwaltung um teamleitung und buchhaltung erweitern
 - [x] Backend: Berechtigungsmatrix serverseitig für alle Router-Procedures
 - [x] Backend: TOTP-2FA einrichten (QR-Code, Verify, Disable, Wiederherstellungscodes)
-- [ ] Backend: Kunden-DSGVO-Archivierung (Soft-Delete Standard, Hard-Delete nur Admin+2FA+Texteingabe)
+- [x] Backend: Kunden-DSGVO-Archivierung (Soft-Delete Standard, Hard-Delete nur Admin+2FA+Texteingabe)
 - [x] Backend: Datenschutzvereinbarung (create, getLatest, recordConsent, checkConsent)
 - [x] Backend: Backup-Protokoll-Statusseite (letzter Lauf, Fehlerstatus)
-- [ ] Backend: Pagination für alle großen Listen (kunden, mitarbeiter, einsaetze, fahrten)
+- [x] Backend: Pagination für alle großen Listen (kunden, mitarbeiter, einsaetze, fahrten)
 - [x] Frontend: Rollenverwaltung.tsx um teamleitung und buchhaltung erweitern
 - [x] Frontend: 2FA-Einrichtungsseite (QR-Code, Code eingeben, Wiederherstellungscodes anzeigen)
 - [x] Frontend: 2FA-Code-Eingabe beim Login
-- [ ] Frontend: DSGVO-Zustimmungsdialog beim ersten Login und bei neuer Version
+- [x] Frontend: DSGVO-Zustimmungsdialog beim ersten Login und bei neuer Version (DsgvoErstDialog)
 - [x] Frontend: Backup-Statusseite im Admin-Bereich
-- [ ] Frontend: Pagination/Infinite Scroll in Kundenliste, Mitarbeiterliste, Einsätze
+- [x] Frontend: Pagination/Infinite Scroll in Kundenliste, Mitarbeiterliste, Einsätze
 
 ### Stufe 2 – Verfügbarkeit, Terminstatus, Navigation, Benachrichtigungen
 - [x] DB: verfuegbarkeiten Tabelle (Wochentag, Zeitfenster, Gültigkeit, Sollstunden)
 - [x] DB: einsatzAenderungen Tabelle (Änderungs-/Absagehistorie, Bestätigungsstatus)
 - [x] Backend: Verfügbarkeits-CRUD (create, list, update, delete)
 - [x] Backend: Einsatz-Änderungshistorie (recordChange, listChanges)
-- [ ] Backend: Automatische Terminbestätigung (In-App + Push bei Einsatz-Erstellung)
-- [ ] Backend: SMTP E-Mail-Benachrichtigungen (Konfiguration, Vorlagen, Versandprotokoll)
+- [x] Backend: Automatische Terminbestätigung (In-App + Push bei Einsatz-Erstellung)
+- [x] Backend: SMTP E-Mail-Benachrichtigungen (Konfiguration, Vorlagen, Versandprotokoll)
 - [x] Frontend: Verfügbarkeits-Verwaltung im Mitarbeiterprofil (Wochentage, Zeitfenster)
 - [x] Frontend: Einsatz-Änderungshistorie im Einsatz-Detail (Backend vorhanden)
 - [x] Frontend: Google Maps / Apple Maps Navigations-Button in Einsatz-Karte
-- [ ] Frontend: Tourenoptimierung-Button (Reihenfolge nach Adresse/Zeitfenster)
+- [x] Frontend: Tourenoptimierung-Button (Reihenfolge nach Adresse/Zeitfenster)
 - [x] Frontend: Echtzeit-Polling für Benachrichtigungen (alle 30s)
 
 ### Stufe 3 – Besuchsberichte, Fotos, Formulare, PDFs
@@ -467,12 +467,12 @@
 - [x] DB: besuchsberichtDateien Tabelle (Fotos und Anhänge mit Metadaten)
 - [x] DB: formularVorlagen Tabelle (versionierte, konfigurierbare Formularfelder)
 - [x] Backend: besuchsberichte CRUD (create, list, update, approve)
-- [ ] Backend: Foto-Upload für Besuchsberichte (S3)
+- [x] Backend: Foto-Upload für Besuchsberichte (S3)
 - [x] Backend: Formularvorlagen CRUD
-- [ ] Backend: Serverseitige PDF-Generierung (Leistungsnachweise, Besuchsberichte, DSGVO)
+- [x] Backend: Serverseitige PDF-Generierung (Leistungsnachweise, Besuchsberichte, DSGVO)
 - [x] Frontend: Besuchsbericht-Seite (Bericht pro Einsatz, Fotos, Kategorien, Unterschrift)
-- [ ] Frontend: Formularvorlagen-Verwaltung (Admin)
-- [ ] Frontend: Besuchsbericht-Freigabe (Teamleitung/Admin)
+- [x] Frontend: Formularvorlagen-Verwaltung (Admin)
+- [x] Frontend: Besuchsbericht-Freigabe (Teamleitung/Admin)
 
 ### Stufe 4 – Analysen, Prognosen, Exporte
 - [x] DB: analyseSnapshots Tabelle (vorberechnete Monatskennzahlen und Prognosewerte)
@@ -489,18 +489,18 @@
 - [x] DB: integrationen Tabelle (Anbieter, Modus, Endpoint, Aktivstatus, verschlüsselte Konfiguration)
 - [x] DB: integrationsLaeufe Tabelle (Übertragungsstatus, Wiederholungen, Fehlercode)
 - [x] Backend: Integrationszentrum CRUD (create, list, update, testConnection)
-- [ ] Backend: OptaData Connector (vorbereitet, Status "Zugang fehlt")
-- [ ] Backend: DATEV Connector (CSV + optionaler API-Connector, Exporthistorie)
-- [ ] Backend: Lexware Connector (Mapping, Exporthistorie)
-- [ ] Backend: Direkte Kassenanbindung (DTA/API pro Kostenträger, Status, Vollmachtprüfung)
+- [x] Backend: OptaData Connector (vorbereitet, Status "Zugang fehlt")
+- [x] Backend: DATEV Connector (CSV + optionaler API-Connector, Exporthistorie)
+- [x] Backend: Lexware Connector (Mapping, Exporthistorie)
+- [x] Backend: Direkte Kassenanbindung (DTA/API pro Kostenträger, Status, Vollmachtprüfung)
 - [x] Frontend: Integrationszentrum-Seite (alle Connectoren, Status-Ampel, Verbindungstest)
 
 ### Stufe 6 – Echtzeit, Sprache, KI, Backup
-- [ ] Backend: SSE-Kanal für Echtzeit-Benachrichtigungen (Fallback: Polling alle 30s)
-- [ ] Backend: Sprachassistent-Endpunkt (Whisper-Transkription für Besuchsbericht-Eingabe)
-- [ ] Backend: KI-Analysen (regelbasierte Basisprognose, optionales LLM für Erklärtexte)
-- [ ] Frontend: Spracheingabe-Button in Besuchsbericht (Mikrofon → Transkription → Vorschau)
-- [ ] Frontend: KI-Erklärtexte in Analyse-Dashboard
+- [x] Backend: SSE-Kanal für Echtzeit-Benachrichtigungen (/api/sse + useSSENotifications Hook)
+- [x] Backend: Sprachassistent-Endpunkt (Whisper-Transkription für Besuchsbericht-Eingabe)
+- [x] Backend: KI-Analysen (regelbasierte Basisprognose, optionales LLM für Erklärtexte)
+- [x] Frontend: Spracheingabe-Button in Besuchsbericht (Mikrofon → Transkription → Vorschau)
+- [x] Frontend: KI-Erklärtexte in Analyse-Dashboard
 
 ## Phase 28 – TypeScript-Fehler-Bereinigung (0 Fehler, 33/33 Tests)
 

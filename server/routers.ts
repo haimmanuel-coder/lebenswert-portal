@@ -8,7 +8,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { sql, eq, desc } from "drizzle-orm";
 import { getDb } from "./db";
-import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, einsatzAenderungen } from "../drizzle/schema";
+import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, einsatzAenderungen, kunden as kundenTable } from "../drizzle/schema";
 import {
   getMitarbeiterByEmail,
   getMitarbeiterById,
@@ -944,6 +944,60 @@ export const appRouter = router({
     budgetHistorie: adminProcedure
       .input(z.object({ kundenId: z.number().int().positive() }))
       .query(async ({ input }) => getBudgetHistorie(input.kundenId)),
+
+    /** DSGVO-Archivierung: Soft-Delete */
+    archivieren: adminProcedure
+      .input(z.object({
+        id: z.number().int().positive(),
+        loeschgrund: z.string().min(10),
+      }))
+            .mutation(async ({ input, ctx }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        await db.update(kundenTable).set({
+          aktiv: 0,
+          geloeschtAt: new Date(),
+          geloeschtVon: ctx.adminId,
+          loeschgrund: input.loeschgrund,
+        }).where(eq(kundenTable.id, input.id));
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'DSGVO_ARCHIV', ressource: 'kunde', details: `id=${input.id}`, status: 'success' });
+        return { success: true };
+      }),
+    /** DSGVO-Hardlöschung: Anonymisierung + Audit */
+    hardDelete: adminProcedure
+      .input(z.object({
+        id: z.number().int().positive(),
+        bestaetigung: z.literal('ENDGUELTIG LOESCHEN'),
+        loeschgrund: z.string().min(10),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        const kundeRows = await db.select({ vorname: kundenTable.vorname, nachname: kundenTable.nachname }).from(kundenTable).where(eq(kundenTable.id, input.id)).limit(1);
+        if (kundeRows.length === 0) throw new TRPCError({ code: 'NOT_FOUND' });
+        const k = kundeRows[0];
+        await db.update(kundenTable).set({
+          vorname: 'GELOESCHT', nachname: `ID-${input.id}`,
+          geburtsdatum: null, strasse: null, plz: null, ort: null,
+          telefon: null, mobil: null, email: null, versicherungsnummer: null,
+          vollmachtSignatur: null, aktiv: 0,
+          geloeschtAt: new Date(), geloeschtVon: ctx.adminId,
+          loeschgrund: `HARD-DELETE: ${input.loeschgrund}`,
+        }).where(eq(kundenTable.id, input.id));
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'DSGVO_HARD_DELETE', ressource: 'kunde', details: `id=${input.id} name=${k.vorname} ${k.nachname}`, status: 'success' });
+        return { success: true };
+      }),
+
+    /** Paginierte Kundenliste */
+    listPaginiert: portalProtected
+      .input(z.object({ seite: z.number().int().min(1).default(1), proSeite: z.number().int().min(5).max(100).default(20) }))
+      .query(async ({ input }) => {
+        const alle = await getAllKunden();
+        const aktive = alle.filter((k: any) => k.aktiv !== 0);
+        const total = aktive.length;
+        const start = (input.seite - 1) * input.proSeite;
+        return { kunden: aktive.slice(start, start + input.proSeite), total, seiten: Math.ceil(total / input.proSeite), seite: input.seite };
+      }),
   }),
 
   // ── EINSÄTZE ─────────────────────────────────────────────────────────────
@@ -1035,11 +1089,26 @@ export const appRouter = router({
           } catch (e) { console.warn('[P3] Eskalation fehlgeschlagen:', e); }
         }
 
-        await createEinsatz(einsatzData);
+                const neuerEinsatz = await createEinsatz(einsatzData);
         await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "CREATE", ressource: "einsatz", status: "success" });
+        // 📅 Automatische Terminbestätigung: In-App-Benachrichtigung an Mitarbeiter
+        try {
+          const kunde = await getKundeById(input.kundenId);
+          await createNotification({
+            empfaengerId: ctx.mitarbeiterId,
+            titel: '✅ Einsatz bestätigt',
+            nachricht: `Ihr Einsatz am ${input.datum} bei ${kunde?.vorname ?? ''} ${kunde?.nachname ?? ''} wurde erfolgreich eingetragen.`,
+            typ: 'info',
+          });
+          // SSE-Echtzeit-Push
+          if ((global as any).sseBroadcast) {
+            (global as any).sseBroadcast(ctx.mitarbeiterId, 'einsatz_update', {
+              message: `Neuer Einsatz am ${input.datum} eingetragen.`,
+            });
+          }
+        } catch (e) { console.warn('[Terminbestätigung] Fehler:', e); }
         return { success: true };
       }),
-
     updateStatus: portalProtected
       .input(z.object({
         id: z.number().int().positive(),

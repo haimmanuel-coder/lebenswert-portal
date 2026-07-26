@@ -1,10 +1,11 @@
+import { FormularVorlagenTab } from "./FormularVorlagenTab";
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import BottomSheet from "@/components/BottomSheet";
 import MitarbeiterDetail from "./MitarbeiterDetail";
 
-type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss";
+type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen";
 type PortalRolle = "mitarbeiter" | "teamleitung" | "buchhaltung" | "admin";
 
 const ROLLEN_LABEL: Record<PortalRolle, string> = {
@@ -228,6 +229,7 @@ export default function AdminPanel() {
           { key: "kunden" as AdminTab, label: "🏠 Kunden" },
           { key: "zuordnung" as AdminTab, label: "🔗 Zuordnung" },
           { key: "abschluss" as AdminTab, label: "📊 Abschluss" },
+          { key: "vorlagen" as AdminTab, label: "📋 Formularvorlagen" },
         ].map((t) => (
           <button key={t.key} style={tabStyle(t.key)} onClick={() => setTab(t.key)}>{t.label}</button>
         ))}
@@ -520,6 +522,11 @@ export default function AdminPanel() {
       </BottomSheet>
 
       {/* ── Budget-Sheet ── */}
+
+      {tab === "vorlagen" && (
+        <FormularVorlagenTab />
+      )}
+
       <BottomSheet open={budgetSheet} onClose={() => setBudgetSheet(false)} title={budgetKunde ? `Budget: ${budgetKunde.vorname} ${budgetKunde.nachname}` : "Budget bearbeiten"}>
         {/* §45b */}
         <div style={{ background: "#f0fdf4", borderRadius: 10, padding: 12, marginBottom: 10 }}>
