@@ -12,6 +12,7 @@ import {
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import BottomSheet from "@/components/BottomSheet";
+import { usePortalAuth } from "@/contexts/PortalAuthContext";
 
 function fmtDate(d: string | Date | null) {
   if (!d) return "–";
@@ -71,8 +72,12 @@ export default function Fahrtenbuch() {
     setDeleteTarget(null);
   };
 
+  const { mitarbeiter } = usePortalAuth();
+  const hatDienstwagen = !!(mitarbeiter as any)?.dienstwagen;
   const rate = typ === "sonder" ? 0.35 : 0.30;
-  const eurPreview = ((parseFloat(km) || 0) * rate).toFixed(2);
+  // Befund 5: Vorschau muss dieselbe Dienstwagen-Logik wie der Server abbilden,
+  // sonst sähe der Mitarbeiter eine Vergütung, die er tatsächlich nicht erhält.
+  const eurPreview = hatDienstwagen ? "0.00" : ((parseFloat(km) || 0) * rate).toFixed(2);
 
   // Auto-Berechnung via Google Maps
   const [autoBerechnung, setAutoBerechnung] = useState<{ km: number; verguetung: number; distanzText: string | null; dauerText: string | null } | null>(null);
@@ -380,10 +385,12 @@ export default function Fahrtenbuch() {
             style={{ width: "100%", padding: "12px 13px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 15, outline: "none", boxSizing: "border-box" }} />
         </div>
 
-        {/* Vergütungsvorschau */}
+        {/* Vergütungsvorschau (interne Mitarbeiter-Erstattung, Entscheidung 12) */}
         {parseFloat(km) > 0 && (
-          <div style={{ background: "#dbeafe", border: "1px solid #93c5fd", color: "#1e40af", padding: "11px 13px", borderRadius: 10, fontSize: 13, marginBottom: 14 }}>
-            Vergütung: {eurPreview} € ({km} km × {rate} €)
+          <div style={{ background: hatDienstwagen ? "#fef3c7" : "#dbeafe", border: `1px solid ${hatDienstwagen ? "#fcd34d" : "#93c5fd"}`, color: hatDienstwagen ? "#92400e" : "#1e40af", padding: "11px 13px", borderRadius: 10, fontSize: 13, marginBottom: 14 }}>
+            {hatDienstwagen
+              ? "Erstattung: 0,00 € (Dienstwagen, 1%-Regelung)"
+              : `Erstattung: ${eurPreview} € (${km} km × ${rate} €)`}
           </div>
         )}
 

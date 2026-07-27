@@ -29,7 +29,7 @@ type FilterType = "alle" | "geplant" | "abgeschlossen";
 export default function Einsaetze() {
   const [filter, setFilter] = useState<FilterType>("alle");
   const [abschlussOpen, setAbschlussOpen] = useState(false);
-  const [activeEinsatz, setActiveEinsatz] = useState<{ id: number; name: string; datum: string; dauerStunden?: number | null } | null>(null);
+  const [activeEinsatz, setActiveEinsatz] = useState<{ id: number; kundenId: number; name: string; datum: string; dauerStunden?: number | null } | null>(null);
   const [bericht, setBericht] = useState("");
   const [gesundheit, setGesundheit] = useState<"gut" | "stabil" | "auffaellig" | "kritisch">("gut");
   const [bemerkung, setBemerkung] = useState("");
@@ -74,20 +74,41 @@ export default function Einsaetze() {
     return db2.localeCompare(da);
   });
 
-  const handleAbschluss = (id: number, name: string, datum: string, dauerStunden?: number | null) => {
-    setActiveEinsatz({ id, name, datum, dauerStunden });
+  const [kundeNichtUnterschriftsfaehig, setKundeNichtUnterschriftsfaehig] = useState(false);
+  const [ersatzName, setErsatzName] = useState("");
+  const [begruendung, setBegruendung] = useState("");
+
+  const handleAbschluss = (id: number, kundenId: number, name: string, datum: string, dauerStunden?: number | null) => {
+    setActiveEinsatz({ id, kundenId, name, datum, dauerStunden });
     setBericht(""); setBemerkung(""); setGesundheit("gut");
     setSignaturMitarbeiter(null);
     setSignaturKunde(null);
     setPreviewMitarbeiter(null);
     setPreviewKunde(null);
+    setKundeNichtUnterschriftsfaehig(false);
+    setErsatzName("");
+    setBegruendung("");
     setAbschlussOpen(true);
   };
+
+  const selectedKundeVollmacht = !!(kunden as any[]).find((k) => k.id === activeEinsatz?.kundenId)?.vollmachtErteilt;
 
   const saveAbschluss = () => {
     if (!activeEinsatz) return;
     const unterschriftMitarbeiter = signaturMitarbeiter ?? undefined;
-    const unterschriftKunde = signaturKunde ?? undefined;
+    // Entscheidung 15: Bei fehlender Unterschriftsfähigkeit entweder Ersatz-
+    // unterschrift durch bevollmächtigte Person (Kundenunterschrift-Canvas
+    // wird dann als Unterschrift der bevollmächtigten Person verwendet) oder
+    // Mitarbeiter-Vermerk mit Begründung, ohne Unterschrift.
+    if (kundeNichtUnterschriftsfaehig && selectedKundeVollmacht && !ersatzName.trim()) {
+      toast.error("Bitte Name der bevollmächtigten Person angeben.");
+      return;
+    }
+    if (kundeNichtUnterschriftsfaehig && !selectedKundeVollmacht && !begruendung.trim()) {
+      toast.error("Bitte Begründung angeben, warum der Kunde nicht unterschriftsfähig ist.");
+      return;
+    }
+    const unterschriftKunde = kundeNichtUnterschriftsfaehig && !selectedKundeVollmacht ? undefined : (signaturKunde ?? undefined);
     updateStatus.mutate({
       id: activeEinsatz.id,
       status: "abgeschlossen",
@@ -96,6 +117,9 @@ export default function Einsaetze() {
       bemerkung,
       unterschriftMitarbeiter,
       unterschriftKunde,
+      unterschriftErsatzTyp: !kundeNichtUnterschriftsfaehig ? "keine" : selectedKundeVollmacht ? "vollmacht" : "mitarbeiter_vermerk",
+      unterschriftErsatzName: kundeNichtUnterschriftsfaehig && selectedKundeVollmacht ? ersatzName.trim() : undefined,
+      unterschriftBegruendung: kundeNichtUnterschriftsfaehig && !selectedKundeVollmacht ? begruendung.trim() : undefined,
     });
   };
 
@@ -192,7 +216,7 @@ export default function Einsaetze() {
                   {e.status === "geplant" && (
                     <div>
                       <button
-                        onClick={() => handleAbschluss(e.id, getKundeName(e.kundenId), fmtDate(datum), e.dauerStunden != null ? parseFloat(String(e.dauerStunden)) : null)}
+                        onClick={() => handleAbschluss(e.id, e.kundenId, getKundeName(e.kundenId), fmtDate(datum), e.dauerStunden != null ? parseFloat(String(e.dauerStunden)) : null)}
                         style={{
                           marginTop: 6, padding: "7px 12px", background: "#4a8c3f", color: "#fff",
                           border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer",
@@ -274,6 +298,41 @@ export default function Einsaetze() {
           </div>
         </div>
         <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#374151" }}>
+            <input type="checkbox" checked={kundeNichtUnterschriftsfaehig}
+              onChange={(e) => { setKundeNichtUnterschriftsfaehig(e.target.checked); sigKundeRef.current?.clear(); }} />
+            Kunde kann nicht unterschreiben
+          </label>
+        </div>
+
+        {kundeNichtUnterschriftsfaehig ? (
+          selectedKundeVollmacht ? (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ background: "#eff6ff", border: "2px solid #93c5fd", borderRadius: 10, padding: "10px 12px", marginBottom: 10, fontSize: 12, color: "#1e40af" }}>
+                ℹ️ Für diesen Kunden liegt eine Vollmacht vor. Die bevollmächtigte Person unterschreibt stellvertretend.
+              </div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>Name der bevollmächtigten Person</label>
+              <input type="text" value={ersatzName} onChange={(e) => setErsatzName(e.target.value)} placeholder="Vor- und Nachname"
+                style={{ width: "100%", padding: "12px 13px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 15, outline: "none", boxSizing: "border-box", marginBottom: 10 }} />
+              <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>Unterschrift der bevollmächtigten Person</label>
+              <div style={{ background: "#f0fdf4", border: "2px solid #86efac", borderRadius: 10, padding: "10px 10px 6px" }}>
+                <SignatureCanvas ref={sigKundeRef} height={130} value={signaturKunde}
+                  onDrawEnd={(url) => { setSignaturKunde(url); setPreviewKunde(url); }}
+                  onClear={() => { setSignaturKunde(null); setPreviewKunde(null); }} />
+              </div>
+            </div>
+          ) : (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ background: "#fef2f2", border: "2px solid #fca5a5", borderRadius: 10, padding: "10px 12px", marginBottom: 10, fontSize: 12, color: "#991b1b" }}>
+                ⚠️ Für diesen Kunden liegt keine Vollmacht vor. Dieser Einsatz erfordert eine Freigabe durch die Teamleitung, bevor der Leistungsnachweis eingereicht werden kann.
+              </div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>Begründung (Pflichtfeld)</label>
+              <textarea value={begruendung} onChange={(e) => setBegruendung(e.target.value)} placeholder="z.B. Kunde akut erkrankt, nicht ansprechbar..."
+                style={{ width: "100%", padding: "12px 13px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 15, outline: "none", resize: "none", minHeight: 70, fontFamily: "inherit", boxSizing: "border-box" }} />
+            </div>
+          )
+        ) : (
+        <div style={{ marginBottom: 14 }}>
           <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>
             Unterschrift Kunde
             <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 400, color: "#9ca3af", textTransform: "none" }}>(optional)</span>
@@ -309,6 +368,7 @@ export default function Einsaetze() {
             )}
           </div>
         </div>
+        )}
         <div style={{ display: "flex", gap: 10, marginTop: 20, paddingTop: 16, borderTop: "1px solid #e5e7eb" }}>
           <button onClick={() => setAbschlussOpen(false)} style={{ flex: 1, padding: 13, background: "#f4f6f3", color: "#6b7280", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>Abbrechen</button>
           <button onClick={saveAbschluss} disabled={updateStatus.isPending} style={{ flex: 1, padding: 13, background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>

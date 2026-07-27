@@ -198,6 +198,15 @@ export const einsaetze = mysqlTable("einsaetze", {
   // Unterschriften (Modul 3)
   unterschriftMitarbeiter: text("unterschriftMitarbeiter"),
   unterschriftKunde: text("unterschriftKunde"),
+  // Vollmacht-Ersatzunterschrift bei fehlender Unterschriftsfähigkeit des Kunden
+  // (Entscheidung 15): primär Ersatzunterschrift durch hinterlegte Vollmacht,
+  // sonst Mitarbeiter-Vermerk mit obligatorischer Teamleitung-Freigabe.
+  unterschriftErsatzTyp: mysqlEnum("unterschriftErsatzTyp", ["keine", "vollmacht", "mitarbeiter_vermerk"]).default("keine"),
+  unterschriftErsatzName: varchar("unterschriftErsatzName", { length: 200 }),
+  unterschriftBegruendung: text("unterschriftBegruendung"),
+  unterschriftFreigabeStatus: mysqlEnum("unterschriftFreigabeStatus", ["nicht_erforderlich", "ausstehend", "freigegeben"]).default("nicht_erforderlich"),
+  unterschriftFreigegebenVon: int("unterschriftFreigegebenVon"),
+  unterschriftFreigegebenAm: timestamp("unterschriftFreigegebenAm"),
   // Textbaustein-Referenz (Modul 3)
   textbausteinIds: text("textbausteinIds"), // JSON-Array der verwendeten Bausteine
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -225,6 +234,13 @@ export const leistungen = mysqlTable("leistungen", {
   bemerkung: text("bemerkung"),
   unterschriftLeister: text("unterschriftLeister"),
   unterschriftKunde: text("unterschriftKunde"),
+  // Vollmacht-Ersatzunterschrift (Entscheidung 15) – analog zu einsaetze
+  unterschriftErsatzTyp: mysqlEnum("unterschriftErsatzTyp", ["keine", "vollmacht", "mitarbeiter_vermerk"]).default("keine"),
+  unterschriftErsatzName: varchar("unterschriftErsatzName", { length: 200 }),
+  unterschriftBegruendung: text("unterschriftBegruendung"),
+  unterschriftFreigabeStatus: mysqlEnum("unterschriftFreigabeStatus", ["nicht_erforderlich", "ausstehend", "freigegeben"]).default("nicht_erforderlich"),
+  unterschriftFreigegebenVon: int("unterschriftFreigegebenVon"),
+  unterschriftFreigegebenAm: timestamp("unterschriftFreigegebenAm"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

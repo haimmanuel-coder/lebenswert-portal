@@ -23,13 +23,26 @@ export default function Zeiterfassung() {
   const { data: kunden = [] } = trpc.kunden.list.useQuery();
   const getKundeName = (id: number) => { const k = kunden.find((c) => c.id === id); return k ? `${k.vorname} ${k.nachname}` : `Kunde #${id}`; };
   const { data: einsaetze = [], refetch } = trpc.einsaetze.list.useQuery();
+  const [budgetFehler, setBudgetFehler] = useState<{ para: string; kosten: string; rest: string } | null>(null);
   const createEinsatz = trpc.einsaetze.create.useMutation({
     onSuccess: () => {
       refetch();
       toast.success("✅ Zeit gespeichert");
       setVon(""); setBis("");
+      setBudgetFehler(null);
     },
-    onError: (e) => toast.error("❌ " + e.message),
+    onError: (e) => {
+      // Entscheidung 14: Budget-Fehlermeldung erscheint als Inline-Hinweis direkt an
+      // der betroffenen §-Position, nicht als globaler Toast/Modal (Entscheidung 8:
+      // granular je Position — andere Positionen bleiben unabhängig speicherbar).
+      const teile = e.message.split("|");
+      if (teile[0] === "BUDGETUEBERSCHREITUNG") {
+        setBudgetFehler({ para: teile[1], kosten: teile[2], rest: teile[3] });
+      } else {
+        setBudgetFehler(null);
+        toast.error("❌ " + e.message);
+      }
+    },
   });
 
   const todayE = einsaetze.filter((e) => {
@@ -38,6 +51,7 @@ export default function Zeiterfassung() {
   });
 
   const saveZeit = () => {
+    setBudgetFehler(null);
     if (!datum || !kundenId || !von || !bis) { toast.error("Alle Felder ausfüllen!"); return; }
     const [vh, vm] = von.split(":").map(Number);
     const [bh, bm] = bis.split(":").map(Number);
@@ -121,11 +135,16 @@ export default function Zeiterfassung() {
           </div>
           <div style={{ marginBottom: "0.75rem" }}>
             <label className="lw-label">Paragraph</label>
-            <select className="lw-input" value={para} onChange={(e) => setPara(e.target.value as typeof para)}>
+            <select className="lw-input" value={para} onChange={(e) => { setPara(e.target.value as typeof para); setBudgetFehler(null); }}>
               <option value="45b">§45b SGB XI – Entlastungsleistung</option>
               <option value="45a">§45a SGB XI – Entlastungsleistung</option>
               <option value="39">§39 SGB XI – Verhinderungspflege</option>
             </select>
+            {budgetFehler && budgetFehler.para === para && (
+              <div style={{ marginTop: 8, padding: "10px 12px", background: "#fef2f2", border: "2px solid #fca5a5", borderRadius: 8, fontSize: 13, color: "#991b1b" }}>
+                ⚠️ Budgetüberschreitung §{budgetFehler.para}: Dieser Einsatz kostet ca. {budgetFehler.kosten} €, das Restbudget beträgt nur {budgetFehler.rest} €. Bitte Admin kontaktieren.
+              </div>
+            )}
           </div>
           <button onClick={saveZeit} disabled={createEinsatz.isPending} className="lw-btn lw-btn-primary" style={{ width: "100%" }}>
             {createEinsatz.isPending ? "Speichern…" : "💾 Zeit speichern"}

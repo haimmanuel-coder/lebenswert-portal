@@ -84,6 +84,7 @@ export default function PortalApp() {
   const unreadCount = (unreadNotifs as any[]).filter((n: any) => !n.gelesenAt).length;
   const neukundenPushCount = (neukundenPushOffen as any[]).length;
     const isAdmin = mitarbeiter?.rolle === "admin";
+  const isTeamleitung = mitarbeiter?.rolle === "teamleitung";
   const { isOnline, offlineCount } = useOfflineSync();
   const { show: showTour, startTour, closeTour } = useOnboardingTour();
   useSSENotifications(mitarbeiter?.id);
@@ -110,40 +111,47 @@ export default function PortalApp() {
   };
 
   const sections: NavSection[] = [
+    // ── Entscheidung 7: Kern-Arbeitsablauf in der Reihenfolge, die der
+    // Mitarbeiter tatsächlich durchläuft (Planung → Besuch → Nachbereitung).
+    // Dashboard bleibt als Startpunkt (Timer, Tages-KPIs, "Heute"-Liste).
     {
-      title: "Übersicht",
+      title: "Arbeitsablauf",
       items: [
         { id: "home", icon: "🏠", label: "Dashboard" },
-        { id: "benachrichtigungen", icon: "🔔", label: "Benachrichtigungen", badge: unreadCount },
-        { id: "kalender", icon: "📆", label: "Kalender" },
+        { id: "touren", icon: "🗺️", label: "Tourenplanung" },
+        { id: "einsaetze", icon: "📅", label: "Einsätze" },
+        { id: "zeit", icon: "⏱", label: "Zeiterfassung" },
+        { id: "lnw", icon: "📋", label: "Leistungsnachweise", badge: offenCount > 0 ? offenCount : undefined },
+        { id: "fahrt", icon: "🚗", label: "Fahrtenbuch" },
       ],
     },
+    // ── Entscheidung 7: Nebenfunktionen als separater, visuell abgesetzter
+    // Block – bewusst getrennt von der workflow-geordneten Hauptsequenz,
+    // damit deren Reihenfolge nicht verwässert wird.
     {
-      title: "Kunden & Einsätze",
+      title: "Kunden & Verwaltung",
       items: [
+        { id: "benachrichtigungen", icon: "🔔", label: "Benachrichtigungen", badge: unreadCount },
+        { id: "kalender", icon: "📆", label: "Kalender" },
         { id: "kunden", icon: "👥", label: "Kundenliste", badge: warnungen.length > 0 ? warnungen.length : undefined },
-        { id: "einsaetze", icon: "📅", label: "Einsätze" },
-        { id: "lnw", icon: "📋", label: "Leistungsnachweise", badge: offenCount > 0 ? offenCount : undefined },
         { id: "kassenanfrage", icon: "🏥", label: "Kassenanfragen" },
         { id: "neukundenaufnahme", icon: "➕", label: "Neukundenaufnahme", badge: neukundenPushCount > 0 ? neukundenPushCount : undefined },
         { id: "kostentraeger", icon: "🏦", label: "Kostenträger" },
-      ],
-    },
-    {
-      title: "Personal",
-      items: [
-        { id: "zeit", icon: "⏱", label: "Zeiterfassung" },
-        { id: "fahrt", icon: "🚗", label: "Fahrtenbuch" },
         { id: "urlaub", icon: "🌴", label: "Urlaubsverwaltung" },
         { id: "krank", icon: "🤒", label: "Krankmeldung" },
-        { id: "touren", icon: "🗺️", label: "Tourenplanung" },
         { id: "fuehrerschein", icon: "🪪", label: "Führerschein-Check" },
         { id: "profil", icon: "👤", label: "Mein Profil" },
       ],
     },
     {
-      title: "Verwaltung",
+      title: "Administration",
       items: [
+        // Entscheidung 4: Teamleitung erhält Freigaberecht für Leistungsnachweise
+        // und benötigt daher sichtbaren Zugriff auf diesen Menüpunkt, auch ohne
+        // volle Admin-Rechte.
+        ...(isTeamleitung && !isAdmin ? [
+          { id: "leistungsfreigabe" as PageId, icon: "✅", label: "LNW-Freigabe" },
+        ] : []),
         ...(isAdmin ? [
           { id: "admindashboard" as PageId, icon: "📊", label: "Ampel-Dashboard", adminOnly: true },
           { id: "management" as PageId, icon: "📈", label: "Management", adminOnly: true },
