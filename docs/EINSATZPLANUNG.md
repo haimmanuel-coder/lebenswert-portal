@@ -193,9 +193,40 @@ betroffene Änderung übersprungen statt abzubrechen. Die von der
 Datenmigration benötigte Spalte `einsaetze.anfahrtPauschale` wird bei Bedarf
 nachgezogen.
 
-Unabhängig davon empfiehlt sich, den Schemastand einmalig mit
-`drizzle-kit generate` in eine Basismigration zu überführen – das ist bewusst
-**nicht** Teil dieses Änderungssatzes, da es alle Module betrifft.
+Zusätzlich liegt jetzt eine Basismigration bei:
+**`drizzle/baseline/0000_basisschema.sql`** (51 Tabellen).
+
+Sie wurde mit `npx drizzle-kit export --sql` unmittelbar aus
+`drizzle/schema.ts` erzeugt – nicht von Hand gepflegt – und schließt die
+Lücke im Migrationsverzeichnis.
+
+**Neue Datenbank aufsetzen:**
+
+```bash
+mysql "$DATABASE_URL" < drizzle/baseline/0000_basisschema.sql
+mysql "$DATABASE_URL" < drizzle/0007_einsatzplanung.sql
+```
+
+Der zweite Schritt ergänzt die Spalten der Einsatzplanung sowie die drei
+Tabellen, die ausschließlich per SQL angesprochen werden und deshalb nicht im
+Drizzle-Schema stehen (`kassenanfragen`, `neukundenaufnahmen`,
+`fuehrerschein_checks`). Ergebnis: 54 Tabellen.
+
+**Sicherheit:** Alle Anweisungen verwenden `CREATE TABLE IF NOT EXISTS`. Die
+Datei verändert, löscht oder überschreibt nichts und kann daher auch gegen
+eine bestehende Datenbank ausgeführt werden – dort ergänzt sie ausschließlich
+fehlende Tabellen.
+
+Gegengeprüft am 28.07.2026:
+
+| Ausgangslage | Ergebnis |
+|---|---|
+| Leere Datenbank | 54 Tabellen, anschließend `0007` fehlerfrei |
+| Bestehende Datenbank mit Daten (24 Tabellen) | 27 fehlende Tabellen ergänzt, **Daten unverändert** |
+
+Die Basismigration ist **kein Ersatz** für die nummerierten Migrationen und
+wird nicht in deren Reihenfolge eingereiht – sie liegt deshalb im eigenen
+Verzeichnis `drizzle/baseline/`.
 
 ---
 
@@ -348,6 +379,7 @@ gebucht – bestehendes Verhalten bleibt erhalten.
 | `client/src/contexts/NavigationContext.tsx` | Seitenübergreifende Navigation |
 | `client/src/pages/Einsatzplanung.tsx` | Planungsoberfläche mit Terminassistent |
 | `client/src/pages/MeineTour.tsx` | Manuelle Tourenplanung durch den Mitarbeiter |
+| `drizzle/baseline/0000_basisschema.sql` | Basisschema aller 51 Tabellen (aus dem Schema erzeugt) |
 
 ### Geändert
 
