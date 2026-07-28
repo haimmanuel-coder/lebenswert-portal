@@ -214,6 +214,42 @@ export const einsaetze = mysqlTable("einsaetze", {
   anfahrtPauschale: decimal("anfahrtPauschale", { precision: 5, scale: 2 }).default("6.00"),
   // Mindestzeit-Eskalation (P3: nach 3× Unterschreitung Admin-Alert)
   unterschreitungEskaliert: boolean("unterschreitungEskaliert").default(false),
+
+  // ── EINSATZPLANUNG (Phase 31) ────────────────────────────────────────────
+  // Endzeit des Einsatzes. Aus startzeit + endzeit werden die Stunden IMMER
+  // automatisch berechnet; dauerStunden bleibt als berechneter Wert erhalten,
+  // damit alle bestehenden Auswertungen unverändert weiterlaufen.
+  endzeit: time("endzeit"),
+  // Zweiter Abrechnungsparagraph, falls das Budget eines Paragraphen für den
+  // Einsatz nicht ausreicht. Beide Paragraphen werden getrennt gespeichert,
+  // sind aber im selben Termin sichtbar.
+  paragraph2: mysqlEnum("paragraph2", ["45b", "45a", "39"]),
+  // Stundenaufteilung: stunden1 entfällt auf `paragraph`, stunden2 auf `paragraph2`.
+  stunden1: decimal("stunden1", { precision: 5, scale: 2 }),
+  stunden2: decimal("stunden2", { precision: 5, scale: 2 }),
+  // Budgetwirksame Kosten je Paragraph (inkl. anteiliger Anfahrtspauschale)
+  kosten1: decimal("kosten1", { precision: 8, scale: 2 }),
+  kosten2: decimal("kosten2", { precision: 8, scale: 2 }),
+  // Interne Personalkosten: Gesamtstunden × Stundenlohn (16 €)
+  lohnkosten: decimal("lohnkosten", { precision: 8, scale: 2 }),
+  /**
+   * Kennzeichnet, ob das Kundenbudget für diesen Einsatz bereits abgebucht
+   * wurde.
+   *
+   * Über die Einsatzplanung angelegte Termine reservieren das Budget sofort
+   * bei der Planung. Ohne dieses Kennzeichen würde der Abschluss des
+   * Einsatzes (updateEinsatzStatus) ein zweites Mal abbuchen. Altdatensätze
+   * stehen auf false und werden weiterhin erst beim Abschluss gebucht.
+   */
+  budgetGebucht: boolean("budgetGebucht").default(false),
+  // Freie Notizen zum Termin (Planungshinweise für die Teamleitung)
+  notizen: text("notizen"),
+  // Wer hat den Termin geplant (Teamleitung/Admin)
+  geplantVon: int("geplantVon"),
+  // Soft-Delete: Termine werden nie physisch entfernt (Nachvollziehbarkeit)
+  geloeschtAt: timestamp("geloeschtAt"),
+  geloeschtVon: int("geloeschtVon"),
+  loeschgrund: text("loeschgrund"),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
@@ -242,6 +278,9 @@ export const leistungen = mysqlTable("leistungen", {
   unterschriftFreigegebenVon: int("unterschriftFreigegebenVon"),
   unterschriftFreigegebenAm: timestamp("unterschriftFreigegebenAm"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
+  // Soft-Delete (Phase 31)
+  geloeschtAt: timestamp("geloeschtAt"),
+  geloeschtVon: int("geloeschtVon"),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
@@ -266,6 +305,11 @@ export const fahrten = mysqlTable("fahrten", {
   // Abrechnungsstatus (Modul 4)
   abrechnungsStatus: mysqlEnum("abrechnungsStatus", ["offen", "eingereicht", "erstattet"]).default("offen"),
   monat: varchar("monat", { length: 7 }), // YYYY-MM für Monatsabrechnung
+  // Verknüpfung zum Einsatz, falls die Fahrt zu einem geplanten Termin gehört
+  einsatzId: int("einsatzId"),
+  // Soft-Delete (Phase 31)
+  geloeschtAt: timestamp("geloeschtAt"),
+  geloeschtVon: int("geloeschtVon"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -360,6 +404,9 @@ export const urlaubsantraege = mysqlTable("urlaubsantraege", {
   status: mysqlEnum("status", ["beantragt", "genehmigt", "abgelehnt"]).default("beantragt").notNull(),
   adminNotiz: text("adminNotiz"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
+  // Soft-Delete (Phase 31)
+  geloeschtAt: timestamp("geloeschtAt"),
+  geloeschtVon: int("geloeschtVon"),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 export type Urlaubsantrag = typeof urlaubsantraege.$inferSelect;
@@ -375,6 +422,9 @@ export const krankmeldungen = mysqlTable("krankmeldungen", {
   notizen: text("notizen"),
   auAttest: boolean("auAttest").default(false),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
+  // Soft-Delete (Phase 31)
+  geloeschtAt: timestamp("geloeschtAt"),
+  geloeschtVon: int("geloeschtVon"),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 export type Krankmeldung = typeof krankmeldungen.$inferSelect;
@@ -399,6 +449,12 @@ export const touren = mysqlTable("touren", {
   endzeit: time("endzeit"),
   // Wer hat die Tour angelegt
   angelegtVon: int("angelegtVon"),
+  // Wer hat die Reihenfolge zuletzt geändert (Mitarbeiter plant selbst)
+  reihenfolgeGeaendertVon: int("reihenfolgeGeaendertVon"),
+  reihenfolgeGeaendertAt: timestamp("reihenfolgeGeaendertAt"),
+  // Soft-Delete (Phase 31)
+  geloeschtAt: timestamp("geloeschtAt"),
+  geloeschtVon: int("geloeschtVon"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -412,6 +468,7 @@ export const tourEinsaetze = mysqlTable("tourEinsaetze", {
   reihenfolge: int("reihenfolge").default(0).notNull(),
 });
 export type TourEinsatz = typeof tourEinsaetze.$inferSelect;
+export type InsertTourEinsatz = typeof tourEinsaetze.$inferInsert;
 
 // ── MODUL 15: IN-APP-BENACHRICHTIGUNGEN ───────────────────────────
 export const notifications = mysqlTable("notifications", {
@@ -822,3 +879,68 @@ export const employeeRoles = mysqlTable("employee_roles", {
   assignedBy: int("assigned_by"),
 });
 export type EmployeeRole = typeof employeeRoles.$inferSelect;
+
+// ── PHASE 31: EINSATZPLANUNG ────────────────────────────────────────────────
+
+/**
+ * Verrechnungssätze je Abrechnungsparagraph (€ pro Betreuungsstunde).
+ *
+ * Ausschließlich dieser Satz bestimmt, wie viele Betreuungsstunden aus dem
+ * Restbudget eines Kunden noch finanzierbar sind (z. B. 347 € ÷ 36 € = 9,64 h).
+ * Der Stundenlohn der Mitarbeiter (16 €) ist davon strikt getrennt und wird
+ * nur für Lohn- und Minijob-Berechnungen verwendet.
+ *
+ * Historisierung: Ein Satz gilt ab `gueltigAb`. Der jeweils jüngste Eintrag
+ * mit gueltigAb <= heute und aktiv = true ist maßgeblich.
+ */
+export const paragraphSaetze = mysqlTable("paragraphSaetze", {
+  id: int("id").autoincrement().primaryKey(),
+  paragraph: mysqlEnum("paragraph", ["45b", "45a", "39"]).notNull(),
+  /** Verrechnungssatz gegenüber dem Kostenträger in € pro Stunde */
+  satzProStunde: decimal("satzProStunde", { precision: 6, scale: 2 }).notNull(),
+  /** Interner Stundenlohn der Betreuungskraft in € pro Stunde */
+  lohnProStunde: decimal("lohnProStunde", { precision: 6, scale: 2 }).default("16.00").notNull(),
+  /** Anfahrtspauschale, die je Einsatz budgetwirksam angesetzt wird */
+  anfahrtPauschale: decimal("anfahrtPauschale", { precision: 6, scale: 2 }).default("6.00").notNull(),
+  gueltigAb: date("gueltigAb").notNull(),
+  aktiv: boolean("aktiv").default(true).notNull(),
+  geaendertVon: int("geaendertVon"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type ParagraphSatz = typeof paragraphSaetze.$inferSelect;
+export type InsertParagraphSatz = typeof paragraphSaetze.$inferInsert;
+
+/**
+ * Planungswarnungen (Minijob-Überschreitung, Budgetüberschreitung,
+ * Doppelbuchung, Abwesenheitskonflikt …).
+ *
+ * Warnungen werden protokolliert, damit die Teamleitung sie bestätigen kann.
+ * Nach der Bestätigung dürfen sie vollständig gelöscht werden (Soft-Delete),
+ * damit bestätigte Meldungen den Arbeitsbereich nicht dauerhaft blockieren.
+ */
+export const planungsWarnungen = mysqlTable("planungsWarnungen", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Maschinenlesbarer Code, z. B. "minijob_ueberschritten" */
+  code: varchar("code", { length: 60 }).notNull(),
+  schwere: mysqlEnum("schwere", ["blockierend", "warnung", "hinweis"]).default("warnung").notNull(),
+  titel: varchar("titel", { length: 200 }).notNull(),
+  nachricht: text("nachricht").notNull(),
+  /** Betroffener Mitarbeiter (z. B. bei Minijob-Warnungen) */
+  mitarbeiterId: int("mitarbeiterId"),
+  /** Betroffener Kunde (z. B. bei Budgetwarnungen) */
+  kundenId: int("kundenId"),
+  /** Auslösender Einsatz, falls vorhanden */
+  einsatzId: int("einsatzId"),
+  /** Bezugsmonat "YYYY-MM" (Minijob, Budget) */
+  monat: varchar("monat", { length: 7 }),
+  /** Bestätigung durch Teamleitung/Admin */
+  bestaetigtAt: timestamp("bestaetigtAt"),
+  bestaetigtVon: int("bestaetigtVon"),
+  /** Soft-Delete nach Bestätigung */
+  geloeschtAt: timestamp("geloeschtAt"),
+  geloeschtVon: int("geloeschtVon"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type PlanungsWarnung = typeof planungsWarnungen.$inferSelect;
+export type InsertPlanungsWarnung = typeof planungsWarnungen.$inferInsert;

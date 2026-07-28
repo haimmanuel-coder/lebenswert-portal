@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { usePortalAuth } from "@/contexts/PortalAuthContext";
 import { toast } from "sonner";
-import { BookOpen, Search, Plus, Copy, Check, X, Loader2, Edit2, Filter } from "lucide-react";
+import { BookOpen, Search, Plus, Copy, Check, X, Loader2, Edit2, Filter, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +53,11 @@ export default function Textbausteine() {
   });
   const updateMut = trpc.admin.textbausteineUpdate.useMutation({
     onSuccess: () => { toast.success("Gespeichert"); setEditItem(null); refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
+  // Löschfunktion für Administratoren (Punkt 12: überall löschbar)
+  const deleteMut = trpc.admin.textbausteineDelete.useMutation({
+    onSuccess: () => { toast.success("Textbaustein gelöscht"); refetch(); },
     onError: (e) => toast.error(e.message),
   });
 
@@ -159,8 +164,23 @@ export default function Textbausteine() {
                     <button
                       className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600"
                       onClick={() => setEditItem(t)}
+                      title="Bearbeiten"
                     >
                       <Edit2 className="w-4 h-4" />
+                    </button>
+                  )}
+                  {isAdmin && (
+                    <button
+                      className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600"
+                      title="Textbaustein löschen"
+                      disabled={deleteMut.isPending}
+                      onClick={() => {
+                        if (window.confirm(`Textbaustein „${t.titel}" wirklich löschen?`)) {
+                          deleteMut.mutate({ id: t.id });
+                        }
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   )}
                 </div>

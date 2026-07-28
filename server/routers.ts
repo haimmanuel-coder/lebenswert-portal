@@ -18,9 +18,9 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
-import { sql, eq, desc } from "drizzle-orm";
+import { sql, eq, desc, and } from "drizzle-orm";
 import { getDb } from "./db";
-import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, einsatzAenderungen, kunden as kundenTable } from "../drizzle/schema";
+import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, einsatzAenderungen, kunden as kundenTable, notifications as notificationsTable } from "../drizzle/schema";
 import {
   getMitarbeiterByEmail,
   getMitarbeiterById,
@@ -107,6 +107,7 @@ import { adminProcedure, decryptSecret, encryptSecret, portalProcedure, portalPr
 import * as OTPAuth from "otpauth";
 import QRCode from "qrcode";
 import { pflichtenheftRouter } from "./pflichtenheftRouter";
+import { planungRouter } from "./planungRouter";
 import { VAPID_PUBLIC, sendBudgetWarnungPush } from "./webpush";
 import { twoFactorRouter } from "./routers/twoFactorRouter";
 import { datenschutzRouter } from "./routers/datenschutzRouter";
@@ -524,6 +525,30 @@ export const notificationsRouter = router({
     await markAllNotificationsRead(ctx.mitarbeiterId);
     return { success: true };
   }),
+  /**
+   * Löscht eine eigene Benachrichtigung.
+   * Bestätigte Meldungen sollen den Arbeitsbereich nicht dauerhaft belegen.
+   */
+  delete: portalProtected
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Nur eigene Benachrichtigungen dürfen entfernt werden.
+      await db.delete(notificationsTable).where(
+        and(eq(notificationsTable.id, input.id), eq(notificationsTable.empfaengerId, ctx.mitarbeiterId)),
+      );
+      return { success: true };
+    }),
+  /** Entfernt alle bereits gelesenen Benachrichtigungen des Nutzers. */
+  deleteGelesene: portalProtected.mutation(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    await db.delete(notificationsTable).where(
+      and(eq(notificationsTable.empfaengerId, ctx.mitarbeiterId), eq(notificationsTable.gelesen, true)),
+    );
+    return { success: true };
+  }),
 });
 
 // ── MODUL 16: MITARBEITERAKTE ─────────────────────────────────────
@@ -637,6 +662,8 @@ const vertretungenRouter = router({
 export const appRouter = router({
   system: systemRouter,
   pflichtenheft: pflichtenheftRouter,
+  /** Einsatzplanung: Termine, Budgetstunden, Lohnkosten, Warnungen, Touren */
+  planung: planungRouter,
   urlaub: urlaubRouter,
   krank: krankRouter,
   touren: tourenRouter,
@@ -1932,6 +1959,15 @@ export const appRouter = router({
         const { id, ...data } = input;
         await updateTextbaustein(id, data as any);
         await createAuditLog({ mitarbeiterId: ctx.adminId, action: "ADMIN", ressource: "textbaustein", details: `update id=${id}`, status: "success" });
+        return { success: true };
+      }),
+
+    /** Löscht einen Textbaustein (Admin). */
+    textbausteineDelete: adminProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(async ({ input, ctx }) => {
+        await deleteTextbaustein(input.id);
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "DELETE", ressource: "textbaustein", details: `id=${input.id}`, status: "success" });
         return { success: true };
       }),
 

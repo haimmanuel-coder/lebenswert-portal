@@ -1,4 +1,4 @@
-import { and, eq, gte, lte, desc, sql, like, or } from "drizzle-orm";
+import { and, eq, gte, lte, desc, sql, like, or, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users, mitarbeiter, kunden, einsaetze, leistungen, fahrten, auditLogs, kundenZuordnung, monatsabschluesse, passwordResets, kostentraeger, textbausteine, ebriefLog, pushSubscriptions, urlaubsantraege, krankmeldungen, touren, tourEinsaetze, notifications, refreshTokens, budgetTransaktionen, neukundenPushBestaetigung, vertretungsUebernahmen } from "../drizzle/schema";
 import type { InsertMitarbeiter, InsertKunde, InsertEinsatz, InsertLeistung, InsertFahrt, InsertAuditLog, InsertKostentraeger, InsertTextbaustein, InsertEbriefLog, InsertPushSubscription, InsertUrlaubsantrag, InsertKrankmeldung, InsertTour, InsertNotification, InsertRefreshToken } from "../drizzle/schema";
@@ -215,19 +215,23 @@ export async function isMitarbeiterZugeordnet(mitarbeiterId: number, kundenId: n
 export async function getEinsaetzeByMitarbeiter(mitarbeiterId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(einsaetze).where(eq(einsaetze.mitarbeiterId, mitarbeiterId)).orderBy(desc(einsaetze.datum));
+  return db.select().from(einsaetze)
+    .where(and(eq(einsaetze.mitarbeiterId, mitarbeiterId), isNull(einsaetze.geloeschtAt)))
+    .orderBy(desc(einsaetze.datum));
 }
 
 export async function getAllEinsaetze() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(einsaetze).orderBy(desc(einsaetze.datum));
+  return db.select().from(einsaetze).where(isNull(einsaetze.geloeschtAt)).orderBy(desc(einsaetze.datum));
 }
 
 export async function getEinsaetzeByKunde(kundenId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(einsaetze).where(eq(einsaetze.kundenId, kundenId)).orderBy(desc(einsaetze.datum));
+  return db.select().from(einsaetze)
+    .where(and(eq(einsaetze.kundenId, kundenId), isNull(einsaetze.geloeschtAt)))
+    .orderBy(desc(einsaetze.datum));
 }
 
 export async function getEinsaetzeWithKunden(mitarbeiterId?: number) {
@@ -241,7 +245,12 @@ export async function getEinsaetzeWithKunden(mitarbeiterId?: number) {
       datum: einsaetze.datum,
       startzeit: einsaetze.startzeit,
       dauerStunden: einsaetze.dauerStunden,
+      endzeit: einsaetze.endzeit,
       paragraph: einsaetze.paragraph,
+      paragraph2: einsaetze.paragraph2,
+      stunden2: einsaetze.stunden2,
+      lohnkosten: einsaetze.lohnkosten,
+      notizen: einsaetze.notizen,
       status: einsaetze.status,
       anfahrtPauschale: (einsaetze as any).anfahrtPauschale,
       unterschriftFreigabeStatus: (einsaetze as any).unterschriftFreigabeStatus,
@@ -255,9 +264,11 @@ export async function getEinsaetzeWithKunden(mitarbeiterId?: number) {
     .from(einsaetze)
     .leftJoin(kunden, eq(einsaetze.kundenId, kunden.id));
   if (mitarbeiterId) {
-    return query.where(eq(einsaetze.mitarbeiterId, mitarbeiterId)).orderBy(desc(einsaetze.datum));
+    return query
+      .where(and(eq(einsaetze.mitarbeiterId, mitarbeiterId), isNull(einsaetze.geloeschtAt)))
+      .orderBy(desc(einsaetze.datum));
   }
-  return query.orderBy(desc(einsaetze.datum));
+  return query.where(isNull(einsaetze.geloeschtAt)).orderBy(desc(einsaetze.datum));
 }
 
 export async function createEinsatz(data: InsertEinsatz & { mitarbeiterId: number }) {
@@ -336,6 +347,10 @@ export async function updateEinsatzStatus(
   if (data.status === "abgeschlossen") {
     const result = await db.select().from(einsaetze).where(eq(einsaetze.id, id)).limit(1);
     const einsatz = result[0];
+    // Über die Einsatzplanung angelegte Termine haben das Budget bereits bei
+    // der Planung reserviert. Ohne diese Prüfung würde hier ein zweites Mal
+    // abgebucht. Altdatensätze stehen auf false und werden wie bisher gebucht.
+    if (einsatz?.budgetGebucht) return;
     if (einsatz && einsatz.kundenId && einsatz.dauerStunden) {
       const stunden = parseFloat(String(einsatz.dauerStunden));
       const paragraph = einsatz.paragraph as "45b" | "45a" | "39";
@@ -360,6 +375,8 @@ export async function updateEinsatzStatus(
           const neu = parseFloat(String(kunde.verbraucht39 ?? 0)) + betrag;
           await db.update(kunden).set({ verbraucht39: String(Math.round(neu * 100) / 100) }).where(eq(kunden.id, einsatz.kundenId));
         }
+        // Buchung vermerken, damit ein erneuter Abschluss nicht doppelt bucht.
+        await db.update(einsaetze).set({ budgetGebucht: true }).where(eq(einsaetze.id, id));
       }
     }
   }
@@ -405,19 +422,23 @@ export async function getKundenMitBudgetWarnung() {
 export async function getLeistungenByMitarbeiter(mitarbeiterId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(leistungen).where(eq(leistungen.mitarbeiterId, mitarbeiterId)).orderBy(desc(leistungen.createdAt));
+  return db.select().from(leistungen)
+    .where(and(eq(leistungen.mitarbeiterId, mitarbeiterId), isNull(leistungen.geloeschtAt)))
+    .orderBy(desc(leistungen.createdAt));
 }
 
 export async function getAllLeistungen() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(leistungen).orderBy(desc(leistungen.createdAt));
+  return db.select().from(leistungen).where(isNull(leistungen.geloeschtAt)).orderBy(desc(leistungen.createdAt));
 }
 
 export async function getLeistungenByKunde(kundenId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(leistungen).where(eq(leistungen.kundenId, kundenId)).orderBy(desc(leistungen.createdAt));
+  return db.select().from(leistungen)
+    .where(and(eq(leistungen.kundenId, kundenId), isNull(leistungen.geloeschtAt)))
+    .orderBy(desc(leistungen.createdAt));
 }
 
 /**
@@ -562,25 +583,31 @@ export async function updateLeistungStatus(id: number, status: "offen" | "pruefu
 export async function getFahrtenByMitarbeiter(mitarbeiterId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(fahrten).where(eq(fahrten.mitarbeiterId, mitarbeiterId)).orderBy(desc(fahrten.datum));
+  return db.select().from(fahrten)
+    .where(and(eq(fahrten.mitarbeiterId, mitarbeiterId), isNull(fahrten.geloeschtAt)))
+    .orderBy(desc(fahrten.datum));
 }
 
 export async function getAllFahrten() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(fahrten).orderBy(desc(fahrten.datum));
+  return db.select().from(fahrten).where(isNull(fahrten.geloeschtAt)).orderBy(desc(fahrten.datum));
 }
 
 export async function getFahrtenByKunde(kundenId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(fahrten).where(eq(fahrten.kundenId, kundenId)).orderBy(desc(fahrten.datum));
+  return db.select().from(fahrten)
+    .where(and(eq(fahrten.kundenId, kundenId), isNull(fahrten.geloeschtAt)))
+    .orderBy(desc(fahrten.datum));
 }
 
 export async function getFahrtenByMonat(monat: string) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(fahrten).where(eq(fahrten.monat, monat)).orderBy(desc(fahrten.datum));
+  return db.select().from(fahrten)
+    .where(and(eq(fahrten.monat, monat), isNull(fahrten.geloeschtAt)))
+    .orderBy(desc(fahrten.datum));
 }
 
 /**
@@ -1063,14 +1090,14 @@ export async function updateKassenanfrageStatus(id: number, status: 'offen' | 'g
 export async function getAllUrlaubsantraege() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(urlaubsantraege).orderBy(desc(urlaubsantraege.createdAt));
+  return db.select().from(urlaubsantraege).where(isNull(urlaubsantraege.geloeschtAt)).orderBy(desc(urlaubsantraege.createdAt));
 }
 
 export async function getUrlaubsantraegeByMitarbeiter(mitarbeiterId: number) {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(urlaubsantraege)
-    .where(eq(urlaubsantraege.mitarbeiterId, mitarbeiterId))
+    .where(and(eq(urlaubsantraege.mitarbeiterId, mitarbeiterId), isNull(urlaubsantraege.geloeschtAt)))
     .orderBy(desc(urlaubsantraege.createdAt));
 }
 
@@ -1102,14 +1129,14 @@ export async function deleteUrlaubsantrag(id: number) {
 export async function getAllKrankmeldungen() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(krankmeldungen).orderBy(desc(krankmeldungen.createdAt));
+  return db.select().from(krankmeldungen).where(isNull(krankmeldungen.geloeschtAt)).orderBy(desc(krankmeldungen.createdAt));
 }
 
 export async function getKrankmeldungenByMitarbeiter(mitarbeiterId: number) {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(krankmeldungen)
-    .where(eq(krankmeldungen.mitarbeiterId, mitarbeiterId))
+    .where(and(eq(krankmeldungen.mitarbeiterId, mitarbeiterId), isNull(krankmeldungen.geloeschtAt)))
     .orderBy(desc(krankmeldungen.createdAt));
 }
 
@@ -1148,6 +1175,7 @@ export async function getAllTouren() {
   return db.select(tourMitMitarbeiterAuswahl)
     .from(touren)
     .leftJoin(mitarbeiter, eq(touren.mitarbeiterId, mitarbeiter.id))
+    .where(isNull(touren.geloeschtAt))
     .orderBy(desc(touren.datum));
 }
 
@@ -1157,14 +1185,14 @@ export async function getTourenByMitarbeiter(mitarbeiterId: number) {
   return db.select(tourMitMitarbeiterAuswahl)
     .from(touren)
     .leftJoin(mitarbeiter, eq(touren.mitarbeiterId, mitarbeiter.id))
-    .where(eq(touren.mitarbeiterId, mitarbeiterId))
+    .where(and(eq(touren.mitarbeiterId, mitarbeiterId), isNull(touren.geloeschtAt)))
     .orderBy(desc(touren.datum));
 }
 
 export async function getTourenByDatum(datum: string) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(touren).where(sql`DATE(${touren.datum}) = ${datum}`);
+  return db.select().from(touren).where(and(sql`DATE(${touren.datum}) = ${datum}`, isNull(touren.geloeschtAt)));
 }
 
 export async function createTour(data: InsertTour) {

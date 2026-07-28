@@ -1,13 +1,15 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
+import { usePortalAuth } from "@/contexts/PortalAuthContext";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import SignatureCanvas from "@/components/SignatureCanvas";
+import AuswahlFeld, { kundenZuOptionen, kostentraegerZuOptionen } from "@/components/AuswahlFeld";
 import jsPDF from "jspdf";
 
 const ANFRAGE_TYPEN: Record<string, string> = {
@@ -190,11 +192,14 @@ function erstellePDF(anfrage: any) {
 
 // ── Hauptkomponente ───────────────────────────────────────────────
 export default function Kassenanfrage() {
+  const { mitarbeiter } = usePortalAuth();
   const [showForm, setShowForm] = useState(false);
-  const [selectedKundeId, setSelectedKundeId] = useState<string>("");
-  const [selectedKostentraegerId, setSelectedKostentraegerId] = useState<string>("");
+  // IDs werden als Zahl geführt – so kann kein leerer String gespeichert werden.
+  const [selectedKundeId, setSelectedKundeId] = useState<number | null>(null);
+  const [selectedKostentraegerId, setSelectedKostentraegerId] = useState<number | null>(null);
   const [anfrageTyp, setAnfrageTyp] = useState<string>("");
   const [notizen, setNotizen] = useState("");
+  const [suche, setSuche] = useState("");
   const [unterschriftKunde, setUnterschriftKunde] = useState<string | undefined>();
   const [unterschriftMitarbeiter, setUnterschriftMitarbeiter] = useState<string | undefined>();
   const [vorschauKunde, setVorschauKunde] = useState<string | undefined>();
@@ -203,12 +208,18 @@ export default function Kassenanfrage() {
   const sigMitarbeiterRef = useRef<import("@/components/SignatureCanvas").SignatureCanvasRef>(null);
 
   const { data: anfragen, isLoading, error, refetch } = trpc.kassenanfrage.list.useQuery();
-  const { data: kunden } = trpc.kunden.list.useQuery();
-  const { data: kostentraeger } = trpc.kostentraeger.list.useQuery();
+  const { data: kunden, isLoading: kundenLaden, error: kundenFehler } = trpc.kunden.list.useQuery();
+  const { data: kostentraeger, isLoading: ktLaden } = trpc.kostentraeger.list.useQuery();
+
+  const darfLoeschen = mitarbeiter?.rolle === "admin" || mitarbeiter?.rolle === "teamleitung";
+
+  // Auswahllisten aufbereiten: leere Einträge werden dabei herausgefiltert.
+  const kundenOptionen = useMemo(() => kundenZuOptionen(kunden as any[]), [kunden]);
+  const kassenOptionen = useMemo(() => kostentraegerZuOptionen(kostentraeger as any[]), [kostentraeger]);
 
   const createMutation = trpc.kassenanfrage.create.useMutation({
     onSuccess: () => {
-      toast.success("Vollmacht gespeichert und PDF kann heruntergeladen werden!");
+      toast.success("Vollmacht gespeichert – PDF kann jetzt heruntergeladen werden.");
       refetch();
       resetForm();
       setShowForm(false);
@@ -221,9 +232,14 @@ export default function Kassenanfrage() {
     onError: (e) => toast.error(e.message),
   });
 
+  const loeschenMutation = (trpc as any).planung.loescheDatensatz.useMutation({
+    onSuccess: () => { toast.success("Kassenanfrage gelöscht"); refetch(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   function resetForm() {
-    setSelectedKundeId("");
-    setSelectedKostentraegerId("");
+    setSelectedKundeId(null);
+    setSelectedKostentraegerId(null);
     setAnfrageTyp("");
     setNotizen("");
     setUnterschriftKunde(undefined);
@@ -233,26 +249,28 @@ export default function Kassenanfrage() {
   }
 
   function handleSubmit() {
-    if (!selectedKundeId) { toast.error("Bitte einen Kunden auswaehlen"); return; }
-    if (!anfrageTyp) { toast.error("Bitte einen Anfrage-Typ auswaehlen"); return; }
-    if (!unterschriftKunde) { toast.error("Bitte Kunden-Unterschrift einholen"); return; }
-    if (!unterschriftMitarbeiter) { toast.error("Bitte eigene Unterschrift leisten"); return; }
+    // Pflichtfelder prüfen, bevor die Mutation losläuft.
+    if (!selectedKundeId) { toast.error("Bitte einen Kunden auswählen."); return; }
+    if (!anfrageTyp) { toast.error("Bitte einen Anfrage-Typ auswählen."); return; }
+    if (!unterschriftKunde) { toast.error("Bitte die Unterschrift des Kunden einholen."); return; }
+    if (!unterschriftMitarbeiter) { toast.error("Bitte als Betreuer/in unterschreiben."); return; }
 
-    const kunde = kunden?.find(k => k.id === parseInt(selectedKundeId));
-    const kt = kostentraeger?.find(k => k.id === parseInt(selectedKostentraegerId));
+    const kunde = kunden?.find((k) => k.id === selectedKundeId);
+    if (!kunde) { toast.error("Der ausgewählte Kunde ist nicht mehr verfügbar. Bitte erneut auswählen."); return; }
+    const kt = kostentraeger?.find((k: any) => k.id === selectedKostentraegerId);
 
     const vollmachtText = generiereVollmachtText(
-      `${kunde?.vorname} ${kunde?.nachname}`,
-      kunde?.versicherungsnummer || "",
+      `${kunde.vorname} ${kunde.nachname}`,
+      kunde.versicherungsnummer || "",
       kt?.name || "unbekannte Kasse",
       anfrageTyp,
-      "Mitarbeiter/in",
+      mitarbeiter ? `${mitarbeiter.vorname} ${mitarbeiter.nachname}` : "Mitarbeiter/in",
       new Date().toLocaleDateString("de-DE")
     );
 
     createMutation.mutate({
-      kundenId: parseInt(selectedKundeId),
-      kostentraegerId: selectedKostentraegerId ? parseInt(selectedKostentraegerId) : undefined,
+      kundenId: selectedKundeId,
+      kostentraegerId: selectedKostentraegerId ?? undefined,
       anfrageTyp: anfrageTyp as any,
       vollmachtText,
       unterschriftKunde,
@@ -260,6 +278,18 @@ export default function Kassenanfrage() {
       notizen: notizen || undefined,
     });
   }
+
+  // Archiv nach Kundenname und Kasse durchsuchbar machen
+  const gefilterteAnfragen = useMemo(() => {
+    const liste = (anfragen ?? []) as any[];
+    const begriff = suche.trim().toLowerCase();
+    if (!begriff) return liste;
+    return liste.filter((a) =>
+      [a.vorname, a.nachname, a.kasseName, ANFRAGE_TYPEN[a.anfrageTyp]]
+        .filter(Boolean)
+        .some((feld: string) => String(feld).toLowerCase().includes(begriff)),
+    );
+  }, [anfragen, suche]);
 
   if (isLoading) return (
     <div className="flex items-center justify-center h-48">
@@ -302,16 +332,30 @@ export default function Kassenanfrage() {
         ))}
       </div>
 
+      {/* Suche im Archiv */}
+      {(anfragen?.length ?? 0) > 0 && (
+        <input
+          value={suche}
+          onChange={(e) => setSuche(e.target.value)}
+          placeholder="Anfragen durchsuchen (Kunde, Kasse, Anfragetyp) …"
+          className="w-full mb-3 px-3 py-2 border-2 border-gray-200 rounded-lg text-sm outline-none focus:border-green-600"
+        />
+      )}
+
       {/* Anfragen-Liste */}
-      {!anfragen || anfragen.length === 0 ? (
+      {gefilterteAnfragen.length === 0 ? (
         <div className="text-center py-12 text-gray-400">
           <div className="text-4xl mb-3">📋</div>
-          <p className="font-medium">Noch keine Kassenanfragen</p>
-          <p className="text-sm mt-1">Erstelle die erste Vollmacht zur Budget-Abfrage</p>
+          <p className="font-medium">
+            {suche ? `Kein Treffer für „${suche}“` : "Noch keine Kassenanfragen"}
+          </p>
+          <p className="text-sm mt-1">
+            {suche ? "Bitte Suchbegriff anpassen." : "Erstelle die erste Vollmacht zur Budget-Abfrage"}
+          </p>
         </div>
       ) : (
         <div className="space-y-3">
-          {anfragen.map((a: any) => (
+          {gefilterteAnfragen.map((a: any) => (
             <Card key={a.id} className="border border-gray-200">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between mb-2">
@@ -355,6 +399,27 @@ export default function Kassenanfrage() {
                         Beantwortet
                       </Button>
                     )}
+                    {darfLoeschen && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs h-7 text-red-600 border-red-300 hover:bg-red-50"
+                        disabled={loeschenMutation.isPending}
+                        onClick={() => {
+                          const name = `${a.vorname ?? ""} ${a.nachname ?? ""}`.trim();
+                          if (
+                            window.confirm(
+                              `Kassenanfrage für ${name} endgültig aus dem Arbeitsbereich entfernen?\n\n` +
+                                `Der Vorgang wird protokolliert und bleibt im Audit-Log nachvollziehbar.`,
+                            )
+                          ) {
+                            loeschenMutation.mutate({ bereich: "kassenanfrage", id: a.id });
+                          }
+                        }}
+                      >
+                        Löschen
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -377,38 +442,41 @@ export default function Kassenanfrage() {
               Budget-Informationen bei der Krankenkasse abzufragen. Bitte Kunden-Unterschrift einholen.
             </div>
 
-            {/* Kunde */}
+            {/* Kunde – durchsuchbare Auswahl über alle Kunden */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Kunde *</label>
-              <Select value={selectedKundeId} onValueChange={setSelectedKundeId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Kunden auswaehlen..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {kunden?.map(k => (
-                    <SelectItem key={k.id} value={String(k.id)}>
-                      {k.nachname}, {k.vorname} {k.pflegegrad ? `(PG ${k.pflegegrad})` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <AuswahlFeld
+                optionen={kundenOptionen}
+                wert={selectedKundeId}
+                onChange={setSelectedKundeId}
+                platzhalter="Kunden auswählen …"
+                suchPlatzhalter="Name, Ort oder Versicherungsnummer …"
+                laedt={kundenLaden}
+                pflicht
+                fehler={
+                  kundenFehler
+                    ? `Kundenliste konnte nicht geladen werden: ${kundenFehler.message}`
+                    : !kundenLaden && kundenOptionen.length === 0
+                      ? "Es sind keine aktiven Kunden vorhanden."
+                      : null
+                }
+                testId="kassenanfrage-kunde"
+              />
             </div>
 
-            {/* Krankenkasse */}
+            {/* Krankenkasse – Suche über Name und IK-Nummer */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Krankenkasse</label>
-              <Select value={selectedKostentraegerId} onValueChange={setSelectedKostentraegerId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Krankenkasse auswaehlen..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {kostentraeger?.filter((k: any) => k.aktiv).map((k: any) => (
-                    <SelectItem key={k.id} value={String(k.id)}>
-                      {k.name} {k.ikNummer ? `(IK: ${k.ikNummer})` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <AuswahlFeld
+                optionen={kassenOptionen}
+                wert={selectedKostentraegerId}
+                onChange={setSelectedKostentraegerId}
+                platzhalter="Krankenkasse auswählen …"
+                suchPlatzhalter="Name oder IK-Nummer …"
+                laedt={ktLaden}
+                loeschbar
+                testId="kassenanfrage-kasse"
+              />
             </div>
 
             {/* Anfrage-Typ */}
