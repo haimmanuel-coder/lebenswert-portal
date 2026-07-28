@@ -2,6 +2,18 @@ import bcrypt from "bcryptjs";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
+import { STUNDENSATZ, ANFAHRT_PAUSCHALE, berechneEinsatzkostenInklPauschale } from "@shared/leistungssaetze";
+
+/**
+ * Entscheidung 4: Die Rolle "buchhaltung" darf abrechnungsrelevante Daten sehen,
+ * aber keine Pflegedokumentation oder Gesundheitsdaten. Diese Funktion entfernt
+ * die entsprechenden Felder aus einem Einsatz-Datensatz, bevor er an die
+ * Buchhaltung ausgeliefert wird.
+ */
+function entferneGesundheitsdaten<T extends Record<string, any>>(einsatz: T): T {
+  const { bericht, gesundheit, bemerkung, unterschriftMitarbeiter, unterschriftKunde, ...rest } = einsatz as any;
+  return rest as T;
+}
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
@@ -20,6 +32,9 @@ import {
   createKunde,
   updateKunde,
   getKundenByMitarbeiter,
+  getEinsatzById,
+  getEinsaetzeMitAusstehenderFreigabe,
+  setUnterschriftFreigabe,
   setKundenZuordnung,
   getZuordnungenForMitarbeiter,
   getZuordnungenForKunde,
@@ -54,6 +69,7 @@ import {
   updateMitarbeiterPasswort,
   updateKundeBudget,
   getKundenMitBudgetWarnung,
+  istBudgetKritisch,
   getAllKostentraeger,
   searchKostentraeger,
   getKostentraegerById,
@@ -87,7 +103,7 @@ import {
   getUnterschreitungsZaehler,
 } from "./db";
 import { ENV } from "./_core/env";
-import { adminProcedure, decryptSecret, encryptSecret, portalProcedure, portalProtected, PORTAL_COOKIE, signPortalToken, verifyPortalToken } from "./portalAuth";
+import { adminProcedure, decryptSecret, encryptSecret, portalProcedure, portalProtected, PORTAL_COOKIE, signPortalToken, verifyPortalToken, roleProcedure } from "./portalAuth";
 import * as OTPAuth from "otpauth";
 import QRCode from "qrcode";
 import { pflichtenheftRouter } from "./pflichtenheftRouter";
@@ -436,6 +452,7 @@ export const tourenRouter = router({
         nachname: k.nachname,
         ort: k.ort ?? '',
         pflegegrad: k.pflegegrad ?? 0,
+        budgetKritisch: istBudgetKritisch(k),
       }));
     }
     // Mitarbeiter sieht nur zugewiesene Kunden
@@ -451,6 +468,7 @@ export const tourenRouter = router({
         nachname: k.nachname,
         ort: k.ort ?? '',
         pflegegrad: k.pflegegrad ?? 0,
+        budgetKritisch: istBudgetKritisch(k),
       }));
   }),
 
@@ -709,7 +727,7 @@ export const appRouter = router({
       if (!ctx.mitarbeiterId) return null;
       const ma = await getMitarbeiterById(ctx.mitarbeiterId);
       if (!ma) return null;
-      return { id: ma.id, vorname: ma.vorname, nachname: ma.nachname, email: ma.email, rolle: ma.rolle, zweiFaktorAktiv: ma.zweiFaktorAktiv };
+      return { id: ma.id, vorname: ma.vorname, nachname: ma.nachname, email: ma.email, rolle: ma.rolle, zweiFaktorAktiv: ma.zweiFaktorAktiv, dienstwagen: !!(ma as any).dienstwagen };
     }),
 
     requestPasswordReset: publicProcedure
@@ -844,11 +862,29 @@ export const appRouter = router({
 
   // ── KUNDEN ───────────────────────────────────────────
   kunden: router({
-    list: portalProtected.query(async () => getAllKunden()),
+    // Entscheidung 4: Rollenabhängig gestaffelter Zugriff.
+    // Mitarbeiter: strikt nur die eigenen zugewiesenen Kunden (kundenZuordnung).
+    // Teamleitung/Buchhaltung/Admin: vollständige Kundenübersicht (Buchhaltung
+    // erhält dieselben Stammdaten, da diese abrechnungsrelevant sind – die
+    // Einschränkung für Buchhaltung greift bei Pflegedokumentation/Gesundheits-
+    // daten in den Einsätzen, siehe einsaetze.list/listWithKunden unten).
+    list: portalProtected.query(async ({ ctx }) => {
+      const ma = await getMitarbeiterById(ctx.mitarbeiterId);
+      if (ma?.rolle === "mitarbeiter") return getKundenByMitarbeiter(ctx.mitarbeiterId);
+      return getAllKunden();
+    }),
 
     detail: portalProtected
       .input(z.object({ id: z.number().int().positive() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
+        const ma = await getMitarbeiterById(ctx.mitarbeiterId);
+        if (ma?.rolle === "mitarbeiter") {
+          const zuordnungen = await getZuordnungenForMitarbeiter(ctx.mitarbeiterId);
+          const erlaubt = zuordnungen.some((z: any) => z.kundenId === input.id);
+          if (!erlaubt) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Kein Zugriff auf diesen Kunden – nicht zugewiesen." });
+          }
+        }
         const [kunde, eis, leis, fahr] = await Promise.all([
           getKundeById(input.id),
           getEinsaetzeByKunde(input.id),
@@ -1031,12 +1067,16 @@ export const appRouter = router({
   einsaetze: router({
     list: portalProtected.query(async ({ ctx }) => {
       const ma = await getMitarbeiterById(ctx.mitarbeiterId);
-      if (ma?.rolle === "admin") return getAllEinsaetze();
+      // Entscheidung 4: Teamleitung benötigt Team-Übersicht für die
+      // Leistungsnachweis-Freigabe; Admin ohnehin Vollzugriff.
+      if (ma?.rolle === "admin" || ma?.rolle === "teamleitung") return getAllEinsaetze();
+      if (ma?.rolle === "buchhaltung") return (await getAllEinsaetze()).map(entferneGesundheitsdaten);
       return getEinsaetzeByMitarbeiter(ctx.mitarbeiterId);
     }),
     listWithKunden: portalProtected.query(async ({ ctx }) => {
       const ma = await getMitarbeiterById(ctx.mitarbeiterId);
-      if (ma?.rolle === "admin") return getEinsaetzeWithKunden();
+      if (ma?.rolle === "admin" || ma?.rolle === "teamleitung") return getEinsaetzeWithKunden();
+      if (ma?.rolle === "buchhaltung") return (await getEinsaetzeWithKunden()).map(entferneGesundheitsdaten);
       return getEinsaetzeWithKunden(ctx.mitarbeiterId);
     }),
 
@@ -1073,27 +1113,38 @@ export const appRouter = router({
         }
 
         // ── GESCHÄFTSREGEL 3: Budget-Sperre bei Überschreitung ──
-        if (input.dauerStunden && !input.adminOverride) {
-          const ma = await getMitarbeiterById(ctx.mitarbeiterId);
-          const isAdmin = ma?.rolle === 'admin';
-          if (!isAdmin) {
-            const kunde = await getKundeById(input.kundenId);
-            if (kunde) {
-              const stundensatz = input.paragraph === '45b' ? 28 : input.paragraph === '45a' ? 28 : 25;
-              const kosten = input.dauerStunden * stundensatz;
-              const para = input.paragraph as '45b' | '45a' | '39';
-              const budget = parseFloat(String(para === '45b' ? kunde.budget45b : para === '45a' ? kunde.budget45a : kunde.budget39) || '0');
-              const verbraucht = parseFloat(String(para === '45b' ? kunde.verbraucht45b : para === '45a' ? kunde.verbraucht45a : kunde.verbraucht39) || '0');
-              const restbudget = budget - verbraucht;
-              if (kosten > restbudget) {
-                throw new Error(`Budgetüberschreitung: Dieser Einsatz kostet ca. ${kosten.toFixed(2)}€, aber das Restbudget (\u00a7${para} SGB XI) beträgt nur ${restbudget.toFixed(2)}€. Bitte Admin kontaktieren.`);
-              }
+        // Sicherheitshinweis: isAdmin wird IMMER serverseitig aus der Rolle des
+        // authentifizierten Mitarbeiters ermittelt. adminOverride ist kein Freifahrtschein
+        // für beliebige Nutzer, sondern nur eine UI-Bestätigung, die ausschließlich für
+        // tatsächliche Admins wirksam ist (siehe Entscheidung 1: Admin-Ausnahme bleibt
+        // bestehen, aber nur für die Rolle "admin").
+        const ma = await getMitarbeiterById(ctx.mitarbeiterId);
+        const isAdmin = ma?.rolle === 'admin';
+        const adminUeberschreibt = isAdmin && !!input.adminOverride;
+
+        // Granulare Prüfung je einzelner §-Position (Entscheidung 8): ein Einsatz
+        // trägt genau eine §-Position, daher blockiert diese Prüfung ausschließlich
+        // die konkret betroffene Position und keine anderen, bereits gespeicherten
+        // Positionen desselben Besuchs.
+        if (input.dauerStunden && !adminUeberschreibt) {
+          const kunde = await getKundeById(input.kundenId);
+          if (kunde) {
+            const para = input.paragraph as '45b' | '45a' | '39';
+            // Kosten inkl. budgetwirksamer Anfahrtspauschale (Entscheidung 2 + 11).
+            const kosten = berechneEinsatzkostenInklPauschale(input.dauerStunden, para);
+            const budget = parseFloat(String(para === '45b' ? kunde.budget45b : para === '45a' ? kunde.budget45a : kunde.budget39) || '0');
+            const verbraucht = parseFloat(String(para === '45b' ? kunde.verbraucht45b : para === '45a' ? kunde.verbraucht45a : kunde.verbraucht39) || '0');
+            const restbudget = budget - verbraucht;
+            if (kosten > restbudget) {
+              throw new Error(`BUDGETUEBERSCHREITUNG|${para}|${kosten.toFixed(2)}|${restbudget.toFixed(2)}`);
             }
           }
         }
 
-        // P3: Anfahrtspauschale 6€ automatisch setzen
-        const einsatzData: any = { ...input, mitarbeiterId: ctx.mitarbeiterId, anfahrtPauschale: '6.00' };
+        // Anfahrtspauschale automatisch setzen (Entscheidung 13: pro Einzelbesuch,
+        // unabhängig von der Tourenzusammenstellung; Entscheidung 11: ersetzt die
+        // kilometerbasierte Kundenabrechnung vollständig).
+        const einsatzData: any = { ...input, mitarbeiterId: ctx.mitarbeiterId, anfahrtPauschale: ANFAHRT_PAUSCHALE.toFixed(2) };
 
         // P3: Mindestzeit-Eskalation (< 1,5h → Zähler erhöhen, ab 3× → Admin-Alert)
         if (input.dauerStunden !== undefined && input.dauerStunden < 1.5) {
@@ -1103,7 +1154,6 @@ export const appRouter = router({
             if (zaehler >= 2) { // 3. Unterschreitung (0-indexed: 0,1,2)
               const alleMa = await getAllMitarbeiter();
               const admins = alleMa.filter((m: { rolle: string }) => m.rolle === 'admin');
-              const ma = await getMitarbeiterById(ctx.mitarbeiterId);
               for (const admin of admins) {
                 await createNotification({
                   empfaengerId: admin.id,
@@ -1146,10 +1196,53 @@ export const appRouter = router({
         unterschriftMitarbeiter: z.string().optional(),
         unterschriftKunde: z.string().optional(),
         textbausteinIds: z.string().optional(),
+        // Entscheidung 15: Vollmacht-Ersatzunterschrift bei fehlender
+        // Unterschriftsfähigkeit des Kunden.
+        unterschriftErsatzTyp: z.enum(["keine", "vollmacht", "mitarbeiter_vermerk"]).optional(),
+        unterschriftErsatzName: z.string().optional(),
+        unterschriftBegruendung: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
-        await updateEinsatzStatus(input.id, ctx.mitarbeiterId, input);
-        await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "UPDATE", ressource: "einsatz", details: `id=${input.id} status=${input.status}`, status: "success" });
+        const updateData: any = { ...input };
+        // Primär: Ersatzunterschrift durch bevollmächtigte Person — setzt eine
+        // hinterlegte Vollmacht des Kunden voraus (kunden.vollmachtErteilt).
+        if (input.unterschriftErsatzTyp === "vollmacht") {
+          if (!input.unterschriftErsatzName?.trim()) {
+            throw new Error("Name der bevollmächtigten Person ist erforderlich.");
+          }
+          const einsatzVorher = await getEinsatzById(input.id);
+          const kunde = einsatzVorher ? await getKundeById(einsatzVorher.kundenId) : null;
+          if (!(kunde as any)?.vollmachtErteilt) {
+            throw new Error("Für diesen Kunden liegt keine hinterlegte Vollmacht vor — bitte stattdessen Mitarbeiter-Vermerk verwenden.");
+          }
+          updateData.unterschriftFreigabeStatus = "nicht_erforderlich";
+        }
+        // Fallback: Mitarbeiter-Vermerk ohne Vollmacht — erfordert zwingend eine
+        // Freitextbegründung und löst eine obligatorische Teamleitung-Freigabe aus.
+        if (input.unterschriftErsatzTyp === "mitarbeiter_vermerk") {
+          if (!input.unterschriftBegruendung?.trim()) {
+            throw new Error("Begründung ist erforderlich, wenn der Kunde nicht unterschriftsfähig ist und keine Vollmacht vorliegt.");
+          }
+          updateData.unterschriftFreigabeStatus = "ausstehend";
+        }
+        await updateEinsatzStatus(input.id, ctx.mitarbeiterId, updateData);
+        await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "UPDATE", ressource: "einsatz", details: `id=${input.id} status=${input.status}${input.unterschriftErsatzTyp && input.unterschriftErsatzTyp !== "keine" ? ` unterschriftErsatzTyp=${input.unterschriftErsatzTyp}` : ""}`, status: "success" });
+
+        // Bei ausstehender Freigabe: Teamleitung/Admin per Notification informieren.
+        if (updateData.unterschriftFreigabeStatus === "ausstehend") {
+          try {
+            const alleMa = await getAllMitarbeiter();
+            const freigeber = alleMa.filter((m: { rolle: string }) => m.rolle === "admin" || m.rolle === "teamleitung");
+            for (const f of freigeber) {
+              await createNotification({
+                empfaengerId: f.id,
+                titel: "✍️ Unterschrift-Freigabe erforderlich",
+                nachricht: `Einsatz #${input.id}: Kunde nicht unterschriftsfähig, keine Vollmacht hinterlegt. Bitte Begründung prüfen und freigeben.`,
+                typ: "warnung",
+              });
+            }
+          } catch (e) { console.warn("[Entscheidung 15] Freigabe-Benachrichtigung fehlgeschlagen:", e); }
+        }
 
         // Automatischer Push bei Budget-Warnung nach Einsatz-Abschluss
         if (input.status === "abgeschlossen") {
@@ -1174,6 +1267,18 @@ export const appRouter = router({
         }
 
                 return { success: true };
+      }),
+    // Entscheidung 15: Obligatorische Freigabe eines Mitarbeiter-Vermerks
+    // ("Kunde nicht unterschriftsfähig") durch Teamleitung/Admin.
+    listUnterschriftFreigaben: roleProcedure(["admin", "teamleitung"]).query(async () => {
+      return getEinsaetzeMitAusstehenderFreigabe();
+    }),
+    freigebenUnterschrift: roleProcedure(["admin", "teamleitung"])
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(async ({ input, ctx }) => {
+        await setUnterschriftFreigabe(input.id, ctx.mitarbeiterId);
+        await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "UPDATE", ressource: "unterschrift_freigabe", details: `einsatzId=${input.id}`, status: "success" });
+        return { success: true };
       }),
     listChanges: portalProtected
       .input(z.object({ einsatzId: z.number().int().positive() }))
@@ -1229,14 +1334,14 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    updateStatus: adminProcedure
+    updateStatus: roleProcedure(["admin", "teamleitung"])
       .input(z.object({
         id: z.number().int().positive(),
         status: z.enum(["offen", "pruefung", "freigegeben", "versendet"]),
       }))
       .mutation(async ({ input, ctx }) => {
         await updateLeistungStatus(input.id, input.status);
-        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "UPDATE", ressource: "leistung", details: `id=${input.id} status=${input.status}`, status: "success" });
+        await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "UPDATE", ressource: "leistung", details: `id=${input.id} status=${input.status}`, status: "success" });
         return { success: true };
       }),
 
@@ -1278,13 +1383,12 @@ export const appRouter = router({
         kilometerRueck: z.number().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
-        // P3: Dienstwagen-Prüfung – Mitarbeiter mit Dienstwagen erhalten keine km-Erstattung
-        const fahrtData: any = { ...input, mitarbeiterId: ctx.mitarbeiterId };
+        // Entscheidung 12 + Befund 5: Mitarbeiter mit Dienstwagen erhalten keine
+        // km-Erstattung (1%-Regelung). Das Flag wird jetzt direkt an createFahrt
+        // übergeben, das es tatsächlich auswertet (zuvor wirkungslos).
         const ma = await getMitarbeiterById(ctx.mitarbeiterId);
-        if ((ma as any)?.dienstwagen === true || (ma as any)?.dienstwagen === 1) {
-          fahrtData.verguetung = '0.00'; // 1%-Regelung: keine km-Erstattung
-        }
-        await createFahrt(fahrtData);
+        const hatDienstwagen = (ma as any)?.dienstwagen === true || (ma as any)?.dienstwagen === 1;
+        await createFahrt({ ...input, mitarbeiterId: ctx.mitarbeiterId, hatDienstwagen } as any);
         await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "CREATE", ressource: "fahrt", status: "success" });
         return { success: true };
       }),
@@ -2021,14 +2125,14 @@ export const appRouter = router({
       }),
 
     // ── LEISTUNGSNACHWEIS-FREIGABE ───────────────────────
-    leistungenFreigabe: adminProcedure
+    leistungenFreigabe: roleProcedure(["admin", "teamleitung"])
       .input(z.object({ limit: z.number().int().min(1).max(200).default(100) }))
       .query(async ({ input }) => {
         const alle = await getAllLeistungen();
         return alle.filter((l: any) => l.status === 'pruefung' || l.status === 'offen').slice(0, input.limit);
       }),
 
-    leistungFreigeben: adminProcedure
+    leistungFreigeben: roleProcedure(["admin", "teamleitung"])
       .input(z.object({
         id: z.number().int().positive(),
         aktion: z.enum(['freigeben', 'ablehnen']),
@@ -2037,7 +2141,7 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         const neuerStatus = input.aktion === 'freigeben' ? 'freigegeben' : 'offen';
         await updateLeistungStatus(input.id, neuerStatus as any);
-        await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'UPDATE', ressource: 'leistung', details: `id=${input.id} aktion=${input.aktion}`, status: 'success' });
+        await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'UPDATE', ressource: 'leistung', details: `id=${input.id} aktion=${input.aktion}`, status: 'success' });
         return { success: true };
       }),
   }),

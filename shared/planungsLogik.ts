@@ -24,6 +24,8 @@
  * ════════════════════════════════════════════════════════════════════════════
  */
 
+import { ANFAHRT_PAUSCHALE as ANFAHRT_PAUSCHALE_SATZ, STUNDENSATZ } from "./leistungssaetze";
+
 // ── Typen ───────────────────────────────────────────────────────────────────
 
 /** Abrechnungsparagraphen nach SGB XI, die im Portal geplant werden können. */
@@ -37,16 +39,17 @@ export const PARAGRAPHEN: readonly Paragraph[] = ["45b", "45a", "39"] as const;
 /**
  * Verrechnungssätze je Abrechnungsparagraph in Euro pro Betreuungsstunde.
  *
- * Diese Werte sind die Standardvorgabe. Sie können pro Betrieb über die
- * Tabelle `paragraphSaetze` überschrieben werden (Admin-Einstellung); die
- * Backend-Routen lesen den jeweils gültigen Satz und reichen ihn an die
- * Berechnungsfunktionen weiter.
+ * Die Werte stammen aus `shared/leistungssaetze.ts` – der einzigen gültigen
+ * Preisquelle des Systems (§45a/§45b 36 €, §39 46 €). Hier wird bewusst
+ * kein eigener Satz definiert, damit nicht erneut zwei voneinander
+ * abweichende Preismodelle entstehen.
+ *
+ * Betriebsindividuell lassen sich die Sätze über die Tabelle
+ * `paragraphSaetze` überschreiben (Admin-Einstellung); die Backend-Routen
+ * lesen den jeweils gültigen Satz und reichen ihn an die Berechnungs-
+ * funktionen weiter.
  */
-export const PARAGRAPH_SAETZE: Record<Paragraph, number> = {
-  "45b": 36.0,
-  "45a": 36.0,
-  "39": 36.0,
-};
+export const PARAGRAPH_SAETZE: Record<Paragraph, number> = { ...STUNDENSATZ };
 
 /** Interner Stundenlohn der Betreuungskräfte (nur Lohn-/Minijob-Berechnung). */
 export const LOHN_PRO_STUNDE = 16.0;
@@ -61,8 +64,11 @@ export const MINIJOB_GRENZE = 603.0;
 /** Ab diesem Anteil der Minijob-Grenze wird vorwarnend (gelb) hingewiesen. */
 export const MINIJOB_VORWARNUNG_ANTEIL = 0.85;
 
-/** Anfahrtspauschale je Einsatz in Euro (budgetwirksam). */
-export const ANFAHRT_PAUSCHALE = 6.0;
+/**
+ * Anfahrtspauschale je Einsatz in Euro (budgetwirksam).
+ * Stammt ebenfalls aus der zentralen Preisquelle `leistungssaetze.ts`.
+ */
+export const ANFAHRT_PAUSCHALE = ANFAHRT_PAUSCHALE_SATZ;
 
 /** Mindestbetreuungszeit je Einsatz in Stunden. */
 export const MINDEST_DAUER_STUNDEN = 1.5;

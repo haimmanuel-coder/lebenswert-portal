@@ -12,6 +12,7 @@ const paraLabel: Record<string, string> = {
 
 export default function LeistungsFreigabe() {
   const { data: leistungen = [], refetch } = trpc.admin.leistungenFreigabe.useQuery({ limit: 100 });
+  const { data: unterschriftFreigaben = [], refetch: refetchUnterschrift } = (trpc.einsaetze as any).listUnterschriftFreigaben.useQuery();
 
   const freigebeMut = trpc.admin.leistungFreigeben.useMutation({
     onSuccess: (_, vars) => {
@@ -19,6 +20,11 @@ export default function LeistungsFreigabe() {
       refetch();
     },
     onError: (e) => toast.error(e.message),
+  });
+
+  const unterschriftFreigebeMut = (trpc.einsaetze as any).freigebenUnterschrift.useMutation({
+    onSuccess: () => { toast.success("Unterschrift-Ausnahme freigegeben ✅"); refetchUnterschrift(); },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const offen = (leistungen as any[]).filter(l => l.status === "offen").length;
@@ -29,6 +35,39 @@ export default function LeistungsFreigabe() {
       <div className="flex items-center gap-2 mb-4">
         <h1 className="text-xl font-bold text-gray-900">✅ Leistungsnachweis-Freigabe</h1>
       </div>
+
+      {/* Entscheidung 15: Ausstehende Freigaben für Mitarbeiter-Vermerke ("Kunde
+          nicht unterschriftsfähig", keine Vollmacht hinterlegt) */}
+      {(unterschriftFreigaben as any[]).length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-sm font-bold text-red-700 mb-2">✍️ Ausstehende Unterschrift-Freigaben</h2>
+          <div className="space-y-3">
+            {(unterschriftFreigaben as any[]).map((e) => (
+              <Card key={e.id} className="border border-red-300 bg-red-50">
+                <CardContent className="p-4">
+                  <p className="text-sm font-semibold text-gray-900">
+                    Einsatz #{e.id} · {e.kundeVorname} {e.kundeNachname}
+                  </p>
+                  <p className="text-xs text-gray-600 mb-2">
+                    Datum: {new Date(e.datum).toLocaleDateString("de-DE")}
+                  </p>
+                  <p className="text-xs text-gray-700 bg-white rounded-lg p-2 border border-gray-100 mb-3">
+                    „{e.unterschriftBegruendung}"
+                  </p>
+                  <Button
+                    size="sm"
+                    className="w-full bg-green-600 hover:bg-green-700 text-white text-xs"
+                    onClick={() => unterschriftFreigebeMut.mutate({ id: e.id })}
+                    disabled={unterschriftFreigebeMut.isPending}
+                  >
+                    ✓ Freigeben
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Statistik */}
       <div className="grid grid-cols-2 gap-3 mb-4">

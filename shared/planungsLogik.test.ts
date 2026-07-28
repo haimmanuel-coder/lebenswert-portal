@@ -7,8 +7,10 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { ANFAHRT_PAUSCHALE as ANFAHRT_PAUSCHALE_SATZ, STUNDENSATZ } from "./leistungssaetze";
 import {
   ANFAHRT_PAUSCHALE,
+  PARAGRAPH_SAETZE,
   LOHN_PRO_STUNDE,
   MINIJOB_GRENZE,
   addTage,
@@ -104,6 +106,14 @@ describe("Budgetberechnung nach Verrechnungssatz", () => {
     expect(lage.verfuegbareStunden).toBe(0);
   });
 
+  it("nutzt für §39 den abweichenden Satz von 46 €/Std.", () => {
+    // Die Sätze stammen aus shared/leistungssaetze.ts – der einzigen
+    // gültigen Preisquelle. §39 liegt bewusst über §45a/§45b.
+    const lage = berechneBudgetLage({ paragraph: "39", budget: 460, verbraucht: 0 });
+    expect(lage.stundensatz).toBe(46);
+    expect(lage.verfuegbareStunden).toBe(10);
+  });
+
   it("markiert Budgets unter 10 % als kritisch", () => {
     expect(berechneBudgetLage({ paragraph: "45b", budget: 1000, verbraucht: 950 }).kritisch).toBe(true);
     expect(berechneBudgetLage({ paragraph: "45b", budget: 1000, verbraucht: 500 }).kritisch).toBe(false);
@@ -122,7 +132,8 @@ describe("Budgetberechnung nach Verrechnungssatz", () => {
     });
     expect(lagen["45b"].verfuegbareStunden).toBe(9.64);
     expect(lagen["45a"].restbudget).toBe(200);
-    expect(lagen["39"].verfuegbareStunden).toBe(8.19);
+    // §39 rechnet mit 46 €/Std.: 295 € ÷ 46 € = 6,41 Std.
+    expect(lagen["39"].verfuegbareStunden).toBe(6.41);
   });
 
   it("berücksichtigt betriebsindividuelle Sätze", () => {
@@ -160,7 +171,8 @@ describe("Einsatzkosten und Fahrtkosten", () => {
     expect(kosten.anteile[1].fahrtkosten).toBe(1.5); // 6 € × 1/4
     // Summe der Anteile entspricht der Gesamtpauschale
     expect(runde2(kosten.anteile[0].fahrtkosten + kosten.anteile[1].fahrtkosten)).toBe(ANFAHRT_PAUSCHALE);
-    expect(kosten.gesamtKosten).toBe(150); // 4 × 36 € + 6 €
+    // Je Paragraph gilt der eigene Satz: 3 × 36 € + 1 × 46 € + 6 € = 160 €
+    expect(kosten.gesamtKosten).toBe(160);
   });
 
   it("erlaubt das Abschalten der Anfahrtspauschale", () => {
@@ -186,7 +198,7 @@ describe("Budgetvorschau vor und nach dem Einsatz", () => {
   });
 
   it("erkennt fehlende Budgetdeckung und beziffert den Fehlbetrag", () => {
-    const lage = berechneBudgetLage({ paragraph: "39", budget: 50, verbraucht: 0 });
+    const lage = berechneBudgetLage({ paragraph: "45b", budget: 50, verbraucht: 0 });
     const vorschau = berechneBudgetVorschau({ lage, kosten: 96 });
     expect(vorschau.reichtNicht).toBe(true);
     expect(vorschau.fehlbetrag).toBe(46);
@@ -340,15 +352,15 @@ describe("Stundenverteilung auf zwei Paragraphen", () => {
     expect(anteile).toEqual([{ paragraph: "39", stunden: 2 }]);
   });
 
-  it("bildet das Beispiel §45a 300 € + §39 120 € = 420 € Gesamtbudget ab", () => {
+  it("rechnet bei zwei Paragraphen mit dem jeweils eigenen Satz", () => {
     const kosten = berechneEinsatzKosten({
       anteile: verteileStunden({ gesamtStunden: 10, paragraph: "45a", paragraph2: "39", stunden2: 3 }),
       anfahrtPauschale: 0,
     });
-    // 7 Std. × 36 € = 252 € über §45a, 3 Std. × 36 € = 108 € über §39
+    // 7 Std. × 36 € = 252 € über §45a, 3 Std. × 46 € = 138 € über §39
     expect(kosten.anteile[0].betreuungsKosten).toBe(252);
-    expect(kosten.anteile[1].betreuungsKosten).toBe(108);
-    expect(kosten.gesamtKosten).toBe(360);
+    expect(kosten.anteile[1].betreuungsKosten).toBe(138);
+    expect(kosten.gesamtKosten).toBe(390);
   });
 });
 
@@ -430,6 +442,16 @@ describe("Datums- und Kalenderhilfen", () => {
 });
 
 // ── Sonstige Hilfsfunktionen ────────────────────────────────────────────────
+
+describe("Zentrale Preisquelle", () => {
+  it("übernimmt die Sätze aus shared/leistungssaetze.ts", () => {
+    // Es darf keine zweite, abweichende Preisquelle entstehen.
+    expect(PARAGRAPH_SAETZE).toEqual(STUNDENSATZ);
+    expect(ANFAHRT_PAUSCHALE).toBe(ANFAHRT_PAUSCHALE_SATZ);
+    expect(getStundensatz("39")).toBe(46);
+    expect(getStundensatz("45b")).toBe(36);
+  });
+});
 
 describe("Hilfsfunktionen", () => {
   it("wandelt Datenbankwerte robust in Zahlen", () => {

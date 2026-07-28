@@ -73,6 +73,9 @@ CALL lw_add_column('einsaetze', 'stunden2',     'decimal(5,2) NULL');
 CALL lw_add_column('einsaetze', 'kosten1',      'decimal(8,2) NULL');
 CALL lw_add_column('einsaetze', 'kosten2',      'decimal(8,2) NULL');
 CALL lw_add_column('einsaetze', 'lohnkosten',   'decimal(8,2) NULL');
+-- Verhindert doppelte Budgetabbuchung: über die Planung angelegte Termine
+-- reservieren das Budget sofort, der spätere Abschluss darf nicht erneut buchen.
+CALL lw_add_column('einsaetze', 'budgetGebucht', 'boolean NULL DEFAULT false');
 CALL lw_add_column('einsaetze', 'notizen',      'text NULL');
 CALL lw_add_column('einsaetze', 'geplantVon',   'int NULL');
 CALL lw_add_column('einsaetze', 'geloeschtAt',  'timestamp NULL');
@@ -129,11 +132,12 @@ CREATE TABLE IF NOT EXISTS `paragraphSaetze` (
 );
 
 -- Standardsätze anlegen (nur beim ersten Lauf – danach ist die Tabelle gefüllt)
+-- Sätze entsprechen shared/leistungssaetze.ts (§45a/§45b 36 €, §39 46 €)
 INSERT INTO `paragraphSaetze` (`paragraph`, `satzProStunde`, `lohnProStunde`, `anfahrtPauschale`, `gueltigAb`, `aktiv`)
 SELECT * FROM (
   SELECT '45b' AS p, 36.00 AS s, 16.00 AS l, 6.00 AS a, '2020-01-01' AS g, true AS ak
   UNION ALL SELECT '45a', 36.00, 16.00, 6.00, '2020-01-01', true
-  UNION ALL SELECT '39',  36.00, 16.00, 6.00, '2020-01-01', true
+  UNION ALL SELECT '39',  46.00, 16.00, 6.00, '2020-01-01', true
 ) AS standard
 WHERE NOT EXISTS (SELECT 1 FROM `paragraphSaetze`);
 
@@ -266,11 +270,24 @@ SET `lohnkosten` = ROUND(`dauerStunden` * 16.00, 2)
 WHERE `lohnkosten` IS NULL
   AND `dauerStunden` IS NOT NULL;
 
--- Budgetwirksame Kosten = Stunden × 36 € + Anfahrtspauschale
+-- Budgetwirksame Kosten = Stunden × Verrechnungssatz + Anfahrtspauschale
+-- Der Satz richtet sich nach dem Paragraphen (§45a/§45b 36 €, §39 46 €).
 UPDATE `einsaetze`
-SET `kosten1` = ROUND(`dauerStunden` * 36.00 + COALESCE(`anfahrtPauschale`, 6.00), 2)
+SET `kosten1` = ROUND(
+      `dauerStunden` * (CASE `paragraph` WHEN '39' THEN 46.00 ELSE 36.00 END)
+      + COALESCE(`anfahrtPauschale`, 6.00), 2)
 WHERE `kosten1` IS NULL
   AND `dauerStunden` IS NOT NULL;
+
+-- Bereits abgeschlossene Einsätze wurden beim Abschluss gebucht.
+UPDATE `einsaetze`
+SET `budgetGebucht` = true
+WHERE `budgetGebucht` IS NULL
+  AND `status` = 'abgeschlossen';
+
+UPDATE `einsaetze`
+SET `budgetGebucht` = false
+WHERE `budgetGebucht` IS NULL;
 
 -- ── Aufräumen ─────────────────────────────────────────────────────────────
 

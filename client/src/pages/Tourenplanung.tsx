@@ -248,10 +248,14 @@ export default function Tourenplanung() {
                 style={{ background: "#fafafa", border: "1px solid #e2e8f0", borderRadius: 10, padding: "8px 10px", marginBottom: 6, cursor: "grab", userSelect: "none", transition: "all 0.12s ease" }}
                 title={`${k.vorname} ${k.nachname}${k.ort ? ` · ${k.ort}` : ""}`}
               >
-                <div style={{ fontWeight: 700, fontSize: 12, color: "#0f766e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{k.nachname}, {k.vorname}</div>
+                <div style={{ fontWeight: 700, fontSize: 12, color: "#0f766e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 4 }}>
+                  {k.budgetKritisch && <span title="Restbudget unter 10% – Leistung ggf. nicht mehr abrechenbar">🔴</span>}
+                  {k.nachname}, {k.vorname}
+                </div>
                 <div style={{ display: "flex", gap: 4, marginTop: 3, flexWrap: "wrap" }}>
                   {k.ort && <span style={{ fontSize: 10, color: "#64748b" }}>📍 {k.ort}</span>}
                   {k.pflegegrad > 0 && <span style={{ fontSize: 10, background: "#e0f2fe", color: "#0369a1", padding: "1px 5px", borderRadius: 4, fontWeight: 700 }}>PG {k.pflegegrad}</span>}
+                  {k.budgetKritisch && <span style={{ fontSize: 10, background: "#fee2e2", color: "#dc2626", padding: "1px 5px", borderRadius: 4, fontWeight: 700 }}>Budget knapp</span>}
                 </div>
               </div>
             ))

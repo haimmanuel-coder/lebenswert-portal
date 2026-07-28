@@ -14,8 +14,13 @@ Die wichtigste fachliche Unterscheidung im gesamten System:
 
 | Begriff | Wert | Verwendung |
 |---|---|---|
-| **Verrechnungssatz** | 36,00 €/Std. | Abrechnung gegenüber dem Kostenträger. **Nur dieser Satz** bestimmt, wie viele Betreuungsstunden aus dem Kundenbudget finanzierbar sind. |
+| **Verrechnungssatz** | §45a/§45b 36,00 €/Std.<br>§39 46,00 €/Std. | Abrechnung gegenüber dem Kostenträger. **Nur dieser Satz** bestimmt, wie viele Betreuungsstunden aus dem Kundenbudget finanzierbar sind. |
 | **Stundenlohn** | 16,00 €/Std. | Interne Personalkosten. **Nur** für Lohnkosten- und Minijob-Berechnung. |
+
+Die Sätze stammen aus `shared/leistungssaetze.ts` – der einzigen gültigen
+Preisquelle des Systems. `shared/planungsLogik.ts` importiert sie von dort und
+definiert bewusst **keine** eigenen Werte, damit nicht erneut zwei
+voneinander abweichende Preismodelle entstehen.
 
 Die verfügbaren Betreuungsstunden ergeben sich **ausschließlich** aus dem
 Verrechnungssatz des jeweiligen Paragraphen:
@@ -75,15 +80,17 @@ Stundenanteile aufgeteilt.
 ```
 Beispiel: 4 Std. gesamt, davon 1 Std. über §39
   §45a: 3 Std. × 36 € = 108,00 € + 4,50 € Anfahrt = 112,50 €
-  §39 : 1 Std. × 36 € =  36,00 € + 1,50 € Anfahrt =  37,50 €
-  Summe: 150,00 €
+  §39 : 1 Std. × 46 € =  46,00 € + 1,50 € Anfahrt =  47,50 €
+  Summe: 160,00 €
 ```
+
+Jeder Paragraph rechnet mit seinem eigenen Satz.
 
 ---
 
 ## 2. Datenbankänderungen
 
-Migration: `drizzle/0006_einsatzplanung.sql`
+Migration: `drizzle/0007_einsatzplanung.sql`
 
 Die Migration ist **additiv, idempotent und rückwärtskompatibel**:
 
@@ -104,6 +111,7 @@ Die Migration ist **additiv, idempotent und rückwärtskompatibel**:
 | `kosten1` / `kosten2` | `decimal(8,2)` | Budgetwirksame Kosten je Paragraph |
 | `lohnkosten` | `decimal(8,2)` | Gesamtstunden × Stundenlohn |
 | `notizen` | `text` | Planungshinweise (Schlüssel, Haustiere, Medikamente) |
+| `budgetGebucht` | `boolean` | Verhindert doppelte Budgetabbuchung (siehe 6.1) |
 | `geplantVon` | `int` | Wer den Termin angelegt hat |
 | `geloeschtAt`/`geloeschtVon`/`loeschgrund` | | Soft-Delete |
 
@@ -153,7 +161,7 @@ Neu angelegt für die Planungsabfragen: `idx_einsaetze_datum`,
 ### 2.7 Migration ausführen
 
 ```bash
-mysql "$DATABASE_URL" < drizzle/0006_einsatzplanung.sql
+mysql "$DATABASE_URL" < drizzle/0007_einsatzplanung.sql
 ```
 
 ---
@@ -256,6 +264,30 @@ Damit blockieren bestätigte Meldungen den Arbeitsbereich nicht dauerhaft.
 
 ## 6. Budgetbuchung und Transaktionssicherheit
 
+### 6.1 Schutz vor doppelter Abbuchung
+
+Es existieren zwei Buchungswege:
+
+* **Einsatzplanung** (`planung.erstelle`) reserviert das Budget **sofort bei
+  der Planung**, damit parallele Planungen dasselbe Guthaben nicht doppelt
+  verplanen.
+* **Einsatzabschluss** (`einsaetze.updateStatus`) bucht traditionell erst
+  beim Abschluss ab.
+
+Ohne Absicherung würde ein über die Planung angelegter Termin beim Abschluss
+ein **zweites Mal** abgebucht. Das Feld `einsaetze.budgetGebucht` verhindert
+das:
+
+* Die Planung setzt es beim Anlegen auf `true`.
+* `updateEinsatzStatus` bricht die Abbuchung ab, wenn es bereits gesetzt ist,
+  und setzt es andernfalls nach erfolgreicher Buchung.
+* Eine Stornierung setzt es zurück, damit eine spätere Buchung wieder möglich
+  ist.
+
+Altdatensätze stehen auf `false` und werden unverändert erst beim Abschluss
+gebucht – bestehendes Verhalten bleibt erhalten.
+
+
 * Beim Anlegen eines Termins wird das Budget **sofort reserviert**, damit
   parallele Planungen dasselbe Guthaben nicht doppelt verplanen.
 * Beim Ändern wird die alte Buchung zunächst storniert und anschließend neu
@@ -278,7 +310,7 @@ Damit blockieren bestätigte Meldungen den Arbeitsbereich nicht dauerhaft.
 | `shared/planungsLogik.test.ts` | 51 Tests der Berechnungs- und Validierungsregeln |
 | `server/planungDb.ts` | Datenzugriff der Einsatzplanung |
 | `server/planungRouter.ts` | tRPC-Router `planung.*` |
-| `drizzle/0006_einsatzplanung.sql` | Migration |
+|  `drizzle/0007_einsatzplanung.sql` | Migration |
 | `client/src/components/AuswahlFeld.tsx` | Durchsuchbare Auswahl (Kunden, Mitarbeiter, Kassen) |
 | `client/src/contexts/NavigationContext.tsx` | Seitenübergreifende Navigation |
 | `client/src/pages/Einsatzplanung.tsx` | Planungsoberfläche mit Terminassistent |

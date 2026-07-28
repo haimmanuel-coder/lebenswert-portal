@@ -198,6 +198,15 @@ export const einsaetze = mysqlTable("einsaetze", {
   // Unterschriften (Modul 3)
   unterschriftMitarbeiter: text("unterschriftMitarbeiter"),
   unterschriftKunde: text("unterschriftKunde"),
+  // Vollmacht-Ersatzunterschrift bei fehlender Unterschriftsfähigkeit des Kunden
+  // (Entscheidung 15): primär Ersatzunterschrift durch hinterlegte Vollmacht,
+  // sonst Mitarbeiter-Vermerk mit obligatorischer Teamleitung-Freigabe.
+  unterschriftErsatzTyp: mysqlEnum("unterschriftErsatzTyp", ["keine", "vollmacht", "mitarbeiter_vermerk"]).default("keine"),
+  unterschriftErsatzName: varchar("unterschriftErsatzName", { length: 200 }),
+  unterschriftBegruendung: text("unterschriftBegruendung"),
+  unterschriftFreigabeStatus: mysqlEnum("unterschriftFreigabeStatus", ["nicht_erforderlich", "ausstehend", "freigegeben"]).default("nicht_erforderlich"),
+  unterschriftFreigegebenVon: int("unterschriftFreigegebenVon"),
+  unterschriftFreigegebenAm: timestamp("unterschriftFreigegebenAm"),
   // Textbaustein-Referenz (Modul 3)
   textbausteinIds: text("textbausteinIds"), // JSON-Array der verwendeten Bausteine
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -223,6 +232,16 @@ export const einsaetze = mysqlTable("einsaetze", {
   kosten2: decimal("kosten2", { precision: 8, scale: 2 }),
   // Interne Personalkosten: Gesamtstunden × Stundenlohn (16 €)
   lohnkosten: decimal("lohnkosten", { precision: 8, scale: 2 }),
+  /**
+   * Kennzeichnet, ob das Kundenbudget für diesen Einsatz bereits abgebucht
+   * wurde.
+   *
+   * Über die Einsatzplanung angelegte Termine reservieren das Budget sofort
+   * bei der Planung. Ohne dieses Kennzeichen würde der Abschluss des
+   * Einsatzes (updateEinsatzStatus) ein zweites Mal abbuchen. Altdatensätze
+   * stehen auf false und werden weiterhin erst beim Abschluss gebucht.
+   */
+  budgetGebucht: boolean("budgetGebucht").default(false),
   // Freie Notizen zum Termin (Planungshinweise für die Teamleitung)
   notizen: text("notizen"),
   // Wer hat den Termin geplant (Teamleitung/Admin)
@@ -251,6 +270,13 @@ export const leistungen = mysqlTable("leistungen", {
   bemerkung: text("bemerkung"),
   unterschriftLeister: text("unterschriftLeister"),
   unterschriftKunde: text("unterschriftKunde"),
+  // Vollmacht-Ersatzunterschrift (Entscheidung 15) – analog zu einsaetze
+  unterschriftErsatzTyp: mysqlEnum("unterschriftErsatzTyp", ["keine", "vollmacht", "mitarbeiter_vermerk"]).default("keine"),
+  unterschriftErsatzName: varchar("unterschriftErsatzName", { length: 200 }),
+  unterschriftBegruendung: text("unterschriftBegruendung"),
+  unterschriftFreigabeStatus: mysqlEnum("unterschriftFreigabeStatus", ["nicht_erforderlich", "ausstehend", "freigegeben"]).default("nicht_erforderlich"),
+  unterschriftFreigegebenVon: int("unterschriftFreigegebenVon"),
+  unterschriftFreigegebenAm: timestamp("unterschriftFreigegebenAm"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   // Soft-Delete (Phase 31)
   geloeschtAt: timestamp("geloeschtAt"),

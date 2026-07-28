@@ -533,6 +533,9 @@ export async function erstellePlanungsEinsatz(
     notizen: daten.notizen ?? null,
     geplantVon,
     status: "geplant",
+    // Die Planung reserviert das Budget sofort; der spätere Abschluss darf
+    // deshalb kein zweites Mal abbuchen.
+    budgetGebucht: true,
   });
   return Number((ergebnis as any)[0].insertId);
 }
@@ -561,6 +564,8 @@ export async function aktualisierePlanungsEinsatz(
       lohnkosten: String(daten.lohnkosten),
       anfahrtPauschale: String(daten.anfahrtPauschale),
       notizen: daten.notizen ?? null,
+      // Budget wird beim Aktualisieren storniert und neu gebucht.
+      budgetGebucht: true,
     })
     .where(and(eq(einsaetze.id, id), isNull(einsaetze.geloeschtAt)));
 }
@@ -652,6 +657,8 @@ export async function bucheBudget(args: {
 export async function storniereEinsatzBudget(einsatzId: number, mitarbeiterId: number | null): Promise<void> {
   const einsatz = await getEinsatzById(einsatzId);
   if (!einsatz) return;
+  // Nur zurückbuchen, was tatsächlich gebucht wurde.
+  if (!einsatz.budgetGebucht) return;
   const kosten1 = zuZahl(einsatz.kosten1);
   const kosten2 = zuZahl(einsatz.kosten2);
   if (kosten1 > 0) {
@@ -676,6 +683,9 @@ export async function storniereEinsatzBudget(einsatzId: number, mitarbeiterId: n
       beschreibung: `Stornierung Einsatz #${einsatzId} (2. Paragraph)`,
     });
   }
+  // Buchungsvermerk aufheben, damit eine spätere Buchung wieder möglich ist.
+  const verbindung = await db();
+  await verbindung.update(einsaetze).set({ budgetGebucht: false }).where(eq(einsaetze.id, einsatzId));
 }
 
 // ── Planungswarnungen ───────────────────────────────────────────────────────

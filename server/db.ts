@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users, mitarbeiter, kunden, einsaetze, leistungen, fahrten, auditLogs, kundenZuordnung, monatsabschluesse, passwordResets, kostentraeger, textbausteine, ebriefLog, pushSubscriptions, urlaubsantraege, krankmeldungen, touren, tourEinsaetze, notifications, refreshTokens, budgetTransaktionen, neukundenPushBestaetigung, vertretungsUebernahmen } from "../drizzle/schema";
 import type { InsertMitarbeiter, InsertKunde, InsertEinsatz, InsertLeistung, InsertFahrt, InsertAuditLog, InsertKostentraeger, InsertTextbaustein, InsertEbriefLog, InsertPushSubscription, InsertUrlaubsantrag, InsertKrankmeldung, InsertTour, InsertNotification, InsertRefreshToken } from "../drizzle/schema";
 import { ENV } from "./_core/env";
+import { STUNDENSATZ, ANFAHRT_PAUSCHALE } from "../shared/leistungssaetze";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -252,6 +253,7 @@ export async function getEinsaetzeWithKunden(mitarbeiterId?: number) {
       notizen: einsaetze.notizen,
       status: einsaetze.status,
       anfahrtPauschale: (einsaetze as any).anfahrtPauschale,
+      unterschriftFreigabeStatus: (einsaetze as any).unterschriftFreigabeStatus,
       createdAt: einsaetze.createdAt,
       kundeVorname: kunden.vorname,
       kundeNachname: kunden.nachname,
@@ -284,6 +286,44 @@ export async function createEinsatz(data: InsertEinsatz & { mitarbeiterId: numbe
   return Number(result[0].insertId);
 }
 
+export async function getEinsatzById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(einsaetze).where(eq(einsaetze.id, id)).limit(1);
+  return result[0] ?? null;
+}
+
+/** Entscheidung 15: Alle Einsätze mit ausstehender Teamleitung-Freigabe der Ersatzunterschrift. */
+export async function getEinsaetzeMitAusstehenderFreigabe() {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      id: einsaetze.id,
+      kundenId: einsaetze.kundenId,
+      datum: einsaetze.datum,
+      mitarbeiterId: einsaetze.mitarbeiterId,
+      unterschriftBegruendung: (einsaetze as any).unterschriftBegruendung,
+      kundeVorname: kunden.vorname,
+      kundeNachname: kunden.nachname,
+    })
+    .from(einsaetze)
+    .leftJoin(kunden, eq(einsaetze.kundenId, kunden.id))
+    .where(eq((einsaetze as any).unterschriftFreigabeStatus, "ausstehend"))
+    .orderBy(desc(einsaetze.datum));
+}
+
+/** Entscheidung 15: Freigabe eines Mitarbeiter-Vermerks durch Teamleitung/Admin. */
+export async function setUnterschriftFreigabe(einsatzId: number, freigebendMitarbeiterId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(einsaetze).set({
+    unterschriftFreigabeStatus: "freigegeben",
+    unterschriftFreigegebenVon: freigebendMitarbeiterId,
+    unterschriftFreigegebenAm: new Date(),
+  } as any).where(eq(einsaetze.id, einsatzId));
+}
+
 export async function updateEinsatzStatus(
   id: number,
   mitarbeiterId: number,
@@ -295,6 +335,10 @@ export async function updateEinsatzStatus(
     unterschriftMitarbeiter?: string;
     unterschriftKunde?: string;
     textbausteinIds?: string;
+    unterschriftErsatzTyp?: "keine" | "vollmacht" | "mitarbeiter_vermerk";
+    unterschriftErsatzName?: string;
+    unterschriftBegruendung?: string;
+    unterschriftFreigabeStatus?: "nicht_erforderlich" | "ausstehend" | "freigegeben";
   }
 ) {
   const db = await getDb();
@@ -303,11 +347,21 @@ export async function updateEinsatzStatus(
   if (data.status === "abgeschlossen") {
     const result = await db.select().from(einsaetze).where(eq(einsaetze.id, id)).limit(1);
     const einsatz = result[0];
+    // Über die Einsatzplanung angelegte Termine haben das Budget bereits bei
+    // der Planung reserviert. Ohne diese Prüfung würde hier ein zweites Mal
+    // abgebucht. Altdatensätze stehen auf false und werden wie bisher gebucht.
+    if (einsatz?.budgetGebucht) return;
     if (einsatz && einsatz.kundenId && einsatz.dauerStunden) {
       const stunden = parseFloat(String(einsatz.dauerStunden));
-      const stundensatz = 28;
-      const betrag = stunden * stundensatz;
-      const paragraph = einsatz.paragraph;
+      const paragraph = einsatz.paragraph as "45b" | "45a" | "39";
+      const stundensatz = STUNDENSATZ[paragraph] ?? STUNDENSATZ["45b"];
+      // Anfahrtspauschale ist budgetwirksam (Entscheidung 2): tatsächlich am
+      // Einsatz gespeicherter Wert wird herangezogen, Fallback auf die
+      // zentrale Konstante, falls historisch nicht gesetzt.
+      const pauschale = einsatz.anfahrtPauschale !== undefined && einsatz.anfahrtPauschale !== null
+        ? parseFloat(String(einsatz.anfahrtPauschale))
+        : ANFAHRT_PAUSCHALE;
+      const betrag = stunden * stundensatz + pauschale;
       const kundeResult = await db.select().from(kunden).where(eq(kunden.id, einsatz.kundenId)).limit(1);
       const kunde = kundeResult[0];
       if (kunde) {
@@ -321,6 +375,8 @@ export async function updateEinsatzStatus(
           const neu = parseFloat(String(kunde.verbraucht39 ?? 0)) + betrag;
           await db.update(kunden).set({ verbraucht39: String(Math.round(neu * 100) / 100) }).where(eq(kunden.id, einsatz.kundenId));
         }
+        // Buchung vermerken, damit ein erneuter Abschluss nicht doppelt bucht.
+        await db.update(einsaetze).set({ budgetGebucht: true }).where(eq(einsaetze.id, id));
       }
     }
   }
@@ -341,22 +397,25 @@ export async function updateKundeBudget(
 }
 
 // Kunden mit kritischem Budget (< 10% verfügbar in mind. einem Paragraph)
+/** Prüft, ob ein Kunde in mindestens einem Budgettopf unter 10% Restbudget liegt. */
+export function istBudgetKritisch(k: any): boolean {
+  const b45b = parseFloat(String(k.budget45b ?? 0));
+  const v45b = parseFloat(String(k.verbraucht45b ?? 0));
+  const b45a = parseFloat(String(k.budget45a ?? 0));
+  const v45a = parseFloat(String(k.verbraucht45a ?? 0));
+  const b39 = parseFloat(String(k.budget39 ?? 0));
+  const v39 = parseFloat(String(k.verbraucht39 ?? 0));
+  const kritisch45b = b45b > 0 && (b45b - v45b) / b45b < 0.10;
+  const kritisch45a = b45a > 0 && (b45a - v45a) / b45a < 0.10;
+  const kritisch39 = b39 > 0 && (b39 - v39) / b39 < 0.10;
+  return kritisch45b || kritisch45a || kritisch39;
+}
+
 export async function getKundenMitBudgetWarnung() {
   const db = await getDb();
   if (!db) return [];
   const alle = await db.select().from(kunden).where(eq(kunden.aktiv, 1));
-  return alle.filter(k => {
-    const b45b = parseFloat(String(k.budget45b ?? 0));
-    const v45b = parseFloat(String(k.verbraucht45b ?? 0));
-    const b45a = parseFloat(String(k.budget45a ?? 0));
-    const v45a = parseFloat(String(k.verbraucht45a ?? 0));
-    const b39 = parseFloat(String(k.budget39 ?? 0));
-    const v39 = parseFloat(String(k.verbraucht39 ?? 0));
-    const kritisch45b = b45b > 0 && (b45b - v45b) / b45b < 0.10;
-    const kritisch45a = b45a > 0 && (b45a - v45a) / b45a < 0.10;
-    const kritisch39 = b39 > 0 && (b39 - v39) / b39 < 0.10;
-    return kritisch45b || kritisch45a || kritisch39;
-  });
+  return alle.filter(istBudgetKritisch);
 }
 
 // ── LEISTUNGEN ───────────────────────────────────────
@@ -551,11 +610,28 @@ export async function getFahrtenByMonat(monat: string) {
     .orderBy(desc(fahrten.datum));
 }
 
-export async function createFahrt(data: InsertFahrt & { mitarbeiterId: number }) {
+/**
+ * Erstellt einen Fahrtenbuch-Eintrag.
+ *
+ * WICHTIG (Entscheidung 12): Das Feld `verguetung` bildet ausschließlich die
+ * interne Mitarbeiter-Fahrtkostenerstattung ab (kilometerbasiert, 0€ bei
+ * Dienstwagen gemäß 1%-Regelung). Die Kundenabrechnung erfolgt getrennt davon
+ * über die feste Anfahrtspauschale (ANFAHRT_PAUSCHALE) auf Einsatz-Ebene
+ * (einsaetze.anfahrtPauschale) – siehe Entscheidung 11/13. Beide Beträge
+ * dürfen nicht miteinander vermischt werden.
+ */
+export async function createFahrt(data: InsertFahrt & { mitarbeiterId: number; hatDienstwagen?: boolean }) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
+  // Befund 5: Zuvor wurde ein vom Aufrufer übergebener verguetung-Override
+  // (z.B. '0.00' bei Dienstwagen) hier stillschweigend ignoriert und die
+  // Vergütung immer aus km × Satz neu berechnet – die Dienstwagen-0€-Regel
+  // war dadurch seit ihrer Einführung wirkungslos. Jetzt: Dienstwagen-Flag
+  // wird direkt und unmittelbar hier geprüft, kein Override-Umweg mehr nötig.
   const rate = data.typ === "sonder" ? 0.35 : 0.30;
-  const verguetung = (parseFloat(String(data.kilometer)) * rate).toFixed(2);
+  const verguetung = data.hatDienstwagen
+    ? "0.00"
+    : (parseFloat(String(data.kilometer)) * rate).toFixed(2);
   const monat = (data.datum as unknown as string).slice(0, 7);
   await db.insert(fahrten).values({
     mitarbeiterId: data.mitarbeiterId,

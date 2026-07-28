@@ -1,10 +1,11 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { usePortalAuth } from "@/contexts/PortalAuthContext";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import BottomSheet from "@/components/BottomSheet";
 import SignatureCanvas from "@/components/SignatureCanvas";
 import { generateLeistungsnachweisPdf } from "@/lib/pdfGenerator";
+import { STUNDENSATZ, ANFAHRT_PAUSCHALE } from "@shared/leistungssaetze";
 
 function fmtMonat(m: string) {
   if (!m) return "–";
@@ -39,6 +40,32 @@ export default function Leistungsnachweise() {
   const { data: kunden = [] } = trpc.kunden.list.useQuery();
   const getKundeName = (id: number) => { const k = kunden.find((c) => c.id === id); return k ? `${k.vorname} ${k.nachname}` : `Kunde #${id}`; };
   const { data: leistungen = [], refetch } = trpc.leistungen.list.useQuery();
+  const { data: alleEinsaetze = [] } = trpc.einsaetze.listWithKunden.useQuery();
+
+  // Entscheidung 9 (Teil 1): Der Leistungsnachweis übernimmt automatisch alle im
+  // Einsatz erfassten, abgeschlossenen Positionen für den gewählten Kunden/Monat/
+  // Paragraph – Stunden und Anzahl werden nicht mehr frei getippt, sondern aus den
+  // tatsächlichen einsaetze-Datensätzen aggregiert.
+  const passendeEinsaetze = useMemo(() => {
+    if (!kundenId || !monat || !para) return [];
+    return (alleEinsaetze as any[]).filter(
+      (e) =>
+        String(e.kundenId) === kundenId &&
+        e.status === "abgeschlossen" &&
+        typeof e.datum === "string" &&
+        e.datum.slice(0, 7) === monat &&
+        e.paragraph === para
+    );
+  }, [alleEinsaetze, kundenId, monat, para]);
+
+  const stundenAuto = passendeEinsaetze.reduce((s, e) => s + (parseFloat(String(e.dauerStunden ?? 0)) || 0), 0);
+  const anzahlAuto = passendeEinsaetze.length;
+
+  useEffect(() => {
+    setStunden(stundenAuto > 0 ? stundenAuto.toFixed(2) : "0");
+    setAnzahl(String(anzahlAuto));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kundenId, monat, para, alleEinsaetze.length]);
   const deleteLeistung = trpc.leistungen.delete.useMutation({
     onSuccess: () => { refetch(); toast.success("🗑️ Leistungsnachweis gelöscht"); },
     onError: (e) => toast.error("❌ " + e.message),
@@ -59,8 +86,8 @@ export default function Leistungsnachweise() {
     onError: (e) => toast.error("❌ " + e.message),
   });
 
-  const rate = para === "39" ? 50 : 39;
-  const betragPreview = ((parseFloat(stunden) || 0) * rate + (parseInt(anzahl) || 0) * 6).toFixed(2);
+  const rate = STUNDENSATZ[para];
+  const betragPreview = ((parseFloat(stunden) || 0) * rate + (parseInt(anzahl) || 0) * ANFAHRT_PAUSCHALE).toFixed(2);
 
   // Budget-Anzeige für ausgewählten Kunden
   const selectedKunde = kunden.find((k) => String(k.id) === kundenId);
@@ -71,11 +98,19 @@ export default function Leistungsnachweise() {
   const budgetRest = Math.max(0, budgetGesamt - budgetVerbraucht);
   const budgetProzent = budgetGesamt > 0 ? Math.min(100, (budgetVerbraucht / budgetGesamt) * 100) : 0;
   const budgetKritisch = budgetProzent >= 90;
-  const neuerBetrag = para === "39" ? 1612 : (parseFloat(stunden) || 0) * 125;
+  // Restbudget-Vorschau nach diesem Eintrag: dieselbe Formel wie betragPreview,
+  // damit Vorschau und tatsächlich abgerechneter Betrag konsistent sind
+  // (Befund 3: zuvor eine abweichende, fehlerhafte Formel mit 125€/1612€).
+  const neuerBetrag = parseFloat(betragPreview);
   const budgetNachEintrag = Math.max(0, budgetRest - neuerBetrag);
 
   const saveLnw = () => {
     if (!monat || !kundenId) { toast.error("Bitte alle Felder ausfüllen!"); return; }
+    if (passendeEinsaetze.length === 0) { toast.error("Keine abgeschlossenen Einsätze für diesen Kunden/Monat/Paragraph gefunden."); return; }
+    if (passendeEinsaetze.some((e: any) => e.unterschriftFreigabeStatus === "ausstehend")) {
+      toast.error("Mindestens ein Einsatz wartet noch auf die Teamleitung-Freigabe der Ersatzunterschrift. Bitte zunächst freigeben lassen.");
+      return;
+    }
     createLeistung.mutate({
       kundenId: parseInt(kundenId),
       monat,
@@ -239,16 +274,25 @@ export default function Leistungsnachweise() {
             </select>
           </div>
           <div>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>Stunden</label>
-            <input type="number" value={stunden} onChange={(e) => setStunden(e.target.value)} min="0.5" step="0.5" inputMode="decimal"
-              style={{ width: "100%", padding: "12px 13px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 15, outline: "none", boxSizing: "border-box" }} />
+            <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>
+              Stunden <span style={{ fontWeight: 400, textTransform: "none", color: "#9ca3af" }}>(automatisch aus Einsätzen)</span>
+            </label>
+            <input type="number" value={stunden} readOnly disabled
+              style={{ width: "100%", padding: "12px 13px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 15, outline: "none", boxSizing: "border-box", background: "#f3f4f6", color: "#374151" }} />
           </div>
         </div>
 
         <div style={{ marginBottom: 14 }}>
-          <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>Anzahl Einsätze</label>
-          <input type="number" value={anzahl} onChange={(e) => setAnzahl(e.target.value)} min="1" inputMode="numeric"
-            style={{ width: "100%", padding: "12px 13px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 15, outline: "none", boxSizing: "border-box" }} />
+          <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>
+            Anzahl Einsätze <span style={{ fontWeight: 400, textTransform: "none", color: "#9ca3af" }}>(automatisch aus Einsätzen)</span>
+          </label>
+          <input type="number" value={anzahl} readOnly disabled
+            style={{ width: "100%", padding: "12px 13px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 15, outline: "none", boxSizing: "border-box", background: "#f3f4f6", color: "#374151" }} />
+          {kundenId && monat && passendeEinsaetze.length === 0 && (
+            <div style={{ marginTop: 6, fontSize: 12, color: "#dc2626" }}>
+              ⚠️ Keine abgeschlossenen Einsätze für diesen Kunden/Monat/Paragraph gefunden. Bitte zuerst Einsätze dokumentieren.
+            </div>
+          )}
         </div>
 
         <div style={{ marginBottom: 14 }}>
