@@ -97,8 +97,8 @@ Die Migration ist **additiv, idempotent und rückwärtskompatibel**:
 * Es werden nur neue Spalten und Tabellen angelegt.
 * Keine bestehende Spalte wird umbenannt, verkleinert oder gelöscht.
 * Alle neuen Spalten sind NULL-fähig oder haben Standardwerte.
-* Hilfsprozeduren (`lw_add_column`, `lw_add_index`) prüfen vor jedem `ALTER`,
-  ob die Spalte bereits existiert – die Migration kann gefahrlos mehrfach
+* Jede Spalten- und Indexanlage prüft vorher, ob das Objekt bereits existiert,
+  und ob die Zieltabelle vorhanden ist – die Migration kann gefahrlos mehrfach
   laufen.
 
 ### 2.1 Erweiterte Tabelle `einsaetze`
@@ -163,6 +163,39 @@ Neu angelegt für die Planungsabfragen: `idx_einsaetze_datum`,
 ```bash
 mysql "$DATABASE_URL" < drizzle/0007_einsatzplanung.sql
 ```
+
+Die Migration wurde am 28.07.2026 gegen eine echte MySQL-kompatible Datenbank
+verprobt: leere Datenbank, alle vorherigen Migrationen eingespielt, danach
+0007 – fehlerfrei. Ein zweiter Lauf bestätigt die Idempotenz.
+
+Die Datenmigration der Bestandsdaten wurde stichprobenartig geprüft:
+
+| Ausgangsdaten | Ergebnis |
+|---|---|
+| §45b, 09:00, 2,5 Std. | Endzeit 11:30 · Lohn 40,00 € · Budget 96,00 € (2,5 × 36 € + 6 €) |
+| §39, 14:00, 3 Std. | Endzeit 17:00 · Lohn 48,00 € · Budget 144,00 € (3 × **46 €** + 6 €) |
+| ohne Zeitangaben | bleibt unverändert (`NULL`) |
+
+### 2.8 Hinweis zum Migrationsverzeichnis
+
+Beim Verproben ist aufgefallen, dass **27 der 51 im Drizzle-Schema definierten
+Tabellen keine Migrationsdatei besitzen** – darunter `urlaubsantraege`,
+`krankmeldungen`, `touren`, `notifications` und die RBAC-Tabellen. Ebenso
+fehlen einzelne Spalten wie `kunden.budget45b` oder `einsaetze.anfahrtPauschale`.
+Sie wurden historisch per `drizzle-kit push` direkt aus dem Schema erzeugt.
+
+Auf einer gewachsenen Produktionsdatenbank existieren diese Objekte
+höchstwahrscheinlich. Eine neu aufgesetzte Datenbank lässt sich aus dem
+Migrationsverzeichnis allein jedoch **nicht** vollständig herstellen.
+
+Diese Migration geht damit defensiv um: Fehlt eine Zieltabelle, wird die
+betroffene Änderung übersprungen statt abzubrechen. Die von der
+Datenmigration benötigte Spalte `einsaetze.anfahrtPauschale` wird bei Bedarf
+nachgezogen.
+
+Unabhängig davon empfiehlt sich, den Schemastand einmalig mit
+`drizzle-kit generate` in eine Basismigration zu überführen – das ist bewusst
+**nicht** Teil dieses Änderungssatzes, da es alle Module betrifft.
 
 ---
 

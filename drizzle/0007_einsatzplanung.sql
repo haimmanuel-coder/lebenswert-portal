@@ -10,53 +10,32 @@
 --    • Bestehende Auswertungen (dauerStunden, paragraph, …) laufen weiter.
 --
 --  Die Migration ist IDEMPOTENT: Sie kann mehrfach ausgeführt werden, ohne
---  Fehler zu erzeugen. Dazu prüfen die Hilfsprozeduren vor jedem ALTER, ob
---  die Spalte bzw. der Index bereits existiert (MySQL kennt kein
---  "ADD COLUMN IF NOT EXISTS").
+--  Fehler zu erzeugen. Jede Spalten- und Indexanlage prüft vorher, ob das
+--  Objekt bereits existiert (MySQL kennt kein "ADD COLUMN IF NOT EXISTS").
+--
+--  Gegengeprüft am 28.07.2026 gegen eine leere Datenbank mit allen
+--  vorherigen Migrationen sowie in einem zweiten Lauf (Idempotenz).
 -- ═══════════════════════════════════════════════════════════════════════════
 
--- ── Hilfsprozeduren ────────────────────────────────────────────────────────
-
-DROP PROCEDURE IF EXISTS lw_add_column;
-DROP PROCEDURE IF EXISTS lw_add_index;
-
-CREATE PROCEDURE lw_add_column(
-  IN p_table VARCHAR(64),
-  IN p_column VARCHAR(64),
-  IN p_definition TEXT
-)
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.COLUMNS
-    WHERE TABLE_SCHEMA = DATABASE()
-      AND TABLE_NAME = p_table
-      AND COLUMN_NAME = p_column
-  ) THEN
-    SET @ddl = CONCAT('ALTER TABLE `', p_table, '` ADD COLUMN `', p_column, '` ', p_definition);
-    PREPARE stmt FROM @ddl;
-    EXECUTE stmt;
-    DEALLOCATE PREPARE stmt;
-  END IF;
-END;
-
-CREATE PROCEDURE lw_add_index(
-  IN p_table VARCHAR(64),
-  IN p_index VARCHAR(64),
-  IN p_columns TEXT
-)
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.STATISTICS
-    WHERE TABLE_SCHEMA = DATABASE()
-      AND TABLE_NAME = p_table
-      AND INDEX_NAME = p_index
-  ) THEN
-    SET @ddl = CONCAT('ALTER TABLE `', p_table, '` ADD INDEX `', p_index, '` (', p_columns, ')');
-    PREPARE stmt FROM @ddl;
-    EXECUTE stmt;
-    DEALLOCATE PREPARE stmt;
-  END IF;
-END;
+-- ── Idempotenz ohne Stored Procedures ─────────────────────────────────────
+--
+--  MySQL kennt kein "ADD COLUMN IF NOT EXISTS". Eine Hilfsprozedur wäre der
+--  naheliegende Weg, scheitert aber daran, dass die Semikolons im
+--  Prozedurkörper das Statement vorzeitig beenden – das erfordert den
+--  Client-Befehl DELIMITER, den nur die MySQL-Kommandozeile versteht.
+--  Wird die Migration über ein Skript, einen Migrationsrunner oder einen
+--  Datenbank-Client eingespielt, bricht sie dann ab.
+--
+--  Stattdessen wird jede Änderung als bedingtes Prepared Statement
+--  ausgeführt: Existiert die Spalte bzw. der Index bereits, wird ein
+--  wirkungsloses SELECT ausgeführt. Das ist reines SQL, kommt ohne
+--  DELIMITER aus und läuft in MySQL 8 wie in MariaDB.
+--
+--  Zusätzlich wird geprüft, ob die Zieltabelle überhaupt existiert. Ein Teil
+--  der Tabellen dieses Projekts wurde historisch per "drizzle-kit push"
+--  direkt aus dem Schema erzeugt und besitzt keine Migrationsdatei. Fehlt
+--  eine solche Tabelle in der Zieldatenbank, überspringt die Migration die
+--  betroffene Änderung, statt mit einem Fehler abzubrechen.
 
 -- ── 1. Einsätze: Endzeit, zweiter Paragraph, Kosten, Löschstatus ──────────
 --
@@ -66,50 +45,282 @@ END;
 --               getrennt gespeichert (stunden2 / kosten2)
 --  lohnkosten → Gesamtstunden × Stundenlohn (interne Personalkosten)
 
-CALL lw_add_column('einsaetze', 'endzeit',      'time NULL');
-CALL lw_add_column('einsaetze', 'paragraph2',   "enum('45b','45a','39') NULL");
-CALL lw_add_column('einsaetze', 'stunden1',     'decimal(5,2) NULL');
-CALL lw_add_column('einsaetze', 'stunden2',     'decimal(5,2) NULL');
-CALL lw_add_column('einsaetze', 'kosten1',      'decimal(8,2) NULL');
-CALL lw_add_column('einsaetze', 'kosten2',      'decimal(8,2) NULL');
-CALL lw_add_column('einsaetze', 'lohnkosten',   'decimal(8,2) NULL');
+-- Die Spalten anfahrtPauschale und unterschreitungEskaliert stammen aus einer
+-- früheren Ausbaustufe, die ohne Migrationsdatei per "drizzle-kit push"
+-- eingespielt wurde. Sie werden hier nachgezogen, da die Datenmigration
+-- weiter unten auf anfahrtPauschale zugreift.
+SET @s0a := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze' AND COLUMN_NAME = 'anfahrtPauschale')
+, 'DO 1', 'ALTER TABLE `einsaetze` ADD COLUMN `anfahrtPauschale` decimal(5,2) NULL DEFAULT 6.00'));
+PREPARE st0a FROM @s0a; EXECUTE st0a; DEALLOCATE PREPARE st0a;
+
+SET @s0b := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze' AND COLUMN_NAME = 'unterschreitungEskaliert')
+, 'DO 1', 'ALTER TABLE `einsaetze` ADD COLUMN `unterschreitungEskaliert` boolean NULL DEFAULT false'));
+PREPARE st0b FROM @s0b; EXECUTE st0b; DEALLOCATE PREPARE st0b;
+
+SET @s1 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze' AND COLUMN_NAME = 'endzeit')
+, 'DO 1', 'ALTER TABLE `einsaetze` ADD COLUMN `endzeit` time NULL'));
+PREPARE st1 FROM @s1; EXECUTE st1; DEALLOCATE PREPARE st1;
+-- Die einfachen Anführungszeichen der Enum-Werte werden für das Prepared
+-- Statement verdoppelt.
+SET @sp2 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze' AND COLUMN_NAME = 'paragraph2')
+, 'DO 1', 'ALTER TABLE `einsaetze` ADD COLUMN `paragraph2` enum(''45b'',''45a'',''39'') NULL'));
+PREPARE stp2 FROM @sp2; EXECUTE stp2; DEALLOCATE PREPARE stp2;
+SET @s2 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze' AND COLUMN_NAME = 'stunden1')
+, 'DO 1', 'ALTER TABLE `einsaetze` ADD COLUMN `stunden1` decimal(5,2) NULL'));
+PREPARE st2 FROM @s2; EXECUTE st2; DEALLOCATE PREPARE st2;
+SET @s3 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze' AND COLUMN_NAME = 'stunden2')
+, 'DO 1', 'ALTER TABLE `einsaetze` ADD COLUMN `stunden2` decimal(5,2) NULL'));
+PREPARE st3 FROM @s3; EXECUTE st3; DEALLOCATE PREPARE st3;
+SET @s4 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze' AND COLUMN_NAME = 'kosten1')
+, 'DO 1', 'ALTER TABLE `einsaetze` ADD COLUMN `kosten1` decimal(8,2) NULL'));
+PREPARE st4 FROM @s4; EXECUTE st4; DEALLOCATE PREPARE st4;
+SET @s5 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze' AND COLUMN_NAME = 'kosten2')
+, 'DO 1', 'ALTER TABLE `einsaetze` ADD COLUMN `kosten2` decimal(8,2) NULL'));
+PREPARE st5 FROM @s5; EXECUTE st5; DEALLOCATE PREPARE st5;
+SET @s6 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze' AND COLUMN_NAME = 'lohnkosten')
+, 'DO 1', 'ALTER TABLE `einsaetze` ADD COLUMN `lohnkosten` decimal(8,2) NULL'));
+PREPARE st6 FROM @s6; EXECUTE st6; DEALLOCATE PREPARE st6;
 -- Verhindert doppelte Budgetabbuchung: über die Planung angelegte Termine
 -- reservieren das Budget sofort, der spätere Abschluss darf nicht erneut buchen.
-CALL lw_add_column('einsaetze', 'budgetGebucht', 'boolean NULL DEFAULT false');
-CALL lw_add_column('einsaetze', 'notizen',      'text NULL');
-CALL lw_add_column('einsaetze', 'geplantVon',   'int NULL');
-CALL lw_add_column('einsaetze', 'geloeschtAt',  'timestamp NULL');
-CALL lw_add_column('einsaetze', 'geloeschtVon', 'int NULL');
-CALL lw_add_column('einsaetze', 'loeschgrund',  'text NULL');
+SET @s7 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze' AND COLUMN_NAME = 'budgetGebucht')
+, 'DO 1', 'ALTER TABLE `einsaetze` ADD COLUMN `budgetGebucht` boolean NULL DEFAULT false'));
+PREPARE st7 FROM @s7; EXECUTE st7; DEALLOCATE PREPARE st7;
+SET @s8 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze' AND COLUMN_NAME = 'notizen')
+, 'DO 1', 'ALTER TABLE `einsaetze` ADD COLUMN `notizen` text NULL'));
+PREPARE st8 FROM @s8; EXECUTE st8; DEALLOCATE PREPARE st8;
+SET @s9 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze' AND COLUMN_NAME = 'geplantVon')
+, 'DO 1', 'ALTER TABLE `einsaetze` ADD COLUMN `geplantVon` int NULL'));
+PREPARE st9 FROM @s9; EXECUTE st9; DEALLOCATE PREPARE st9;
+SET @s10 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze' AND COLUMN_NAME = 'geloeschtAt')
+, 'DO 1', 'ALTER TABLE `einsaetze` ADD COLUMN `geloeschtAt` timestamp NULL'));
+PREPARE st10 FROM @s10; EXECUTE st10; DEALLOCATE PREPARE st10;
+SET @s11 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze' AND COLUMN_NAME = 'geloeschtVon')
+, 'DO 1', 'ALTER TABLE `einsaetze` ADD COLUMN `geloeschtVon` int NULL'));
+PREPARE st11 FROM @s11; EXECUTE st11; DEALLOCATE PREPARE st11;
+SET @s12 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze' AND COLUMN_NAME = 'loeschgrund')
+, 'DO 1', 'ALTER TABLE `einsaetze` ADD COLUMN `loeschgrund` text NULL'));
+PREPARE st12 FROM @s12; EXECUTE st12; DEALLOCATE PREPARE st12;
 
-CALL lw_add_index('einsaetze', 'idx_einsaetze_datum',        '`datum`');
-CALL lw_add_index('einsaetze', 'idx_einsaetze_ma_datum',     '`mitarbeiterId`, `datum`');
-CALL lw_add_index('einsaetze', 'idx_einsaetze_kunde_datum',  '`kundenId`, `datum`');
-CALL lw_add_index('einsaetze', 'idx_einsaetze_geloescht',    '`geloeschtAt`');
+SET @s32 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze')
+  OR EXISTS(SELECT 1 FROM information_schema.STATISTICS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze' AND INDEX_NAME = 'idx_einsaetze_datum')
+, 'DO 1', 'ALTER TABLE `einsaetze` ADD INDEX `idx_einsaetze_datum` (`datum`)'));
+PREPARE st32 FROM @s32; EXECUTE st32; DEALLOCATE PREPARE st32;
+SET @s33 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze')
+  OR EXISTS(SELECT 1 FROM information_schema.STATISTICS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze' AND INDEX_NAME = 'idx_einsaetze_ma_datum')
+, 'DO 1', 'ALTER TABLE `einsaetze` ADD INDEX `idx_einsaetze_ma_datum` (`mitarbeiterId`, `datum`)'));
+PREPARE st33 FROM @s33; EXECUTE st33; DEALLOCATE PREPARE st33;
+SET @s34 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze')
+  OR EXISTS(SELECT 1 FROM information_schema.STATISTICS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze' AND INDEX_NAME = 'idx_einsaetze_kunde_datum')
+, 'DO 1', 'ALTER TABLE `einsaetze` ADD INDEX `idx_einsaetze_kunde_datum` (`kundenId`, `datum`)'));
+PREPARE st34 FROM @s34; EXECUTE st34; DEALLOCATE PREPARE st34;
+SET @s35 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze')
+  OR EXISTS(SELECT 1 FROM information_schema.STATISTICS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze' AND INDEX_NAME = 'idx_einsaetze_geloescht')
+, 'DO 1', 'ALTER TABLE `einsaetze` ADD INDEX `idx_einsaetze_geloescht` (`geloeschtAt`)'));
+PREPARE st35 FROM @s35; EXECUTE st35; DEALLOCATE PREPARE st35;
 
 -- ── 2. Löschstatus für weitere Stammdaten ─────────────────────────────────
 --  Überall, wo Daten angelegt werden, muss der Administrator löschen können.
 --  Gelöscht wird grundsätzlich per Soft-Delete (Nachvollziehbarkeit, DSGVO).
 
-CALL lw_add_column('leistungen',      'geloeschtAt',  'timestamp NULL');
-CALL lw_add_column('leistungen',      'geloeschtVon', 'int NULL');
-CALL lw_add_column('fahrten',         'geloeschtAt',  'timestamp NULL');
-CALL lw_add_column('fahrten',         'geloeschtVon', 'int NULL');
-CALL lw_add_column('fahrten',         'einsatzId',    'int NULL');
-CALL lw_add_column('urlaubsantraege', 'geloeschtAt',  'timestamp NULL');
-CALL lw_add_column('urlaubsantraege', 'geloeschtVon', 'int NULL');
-CALL lw_add_column('krankmeldungen',  'geloeschtAt',  'timestamp NULL');
-CALL lw_add_column('krankmeldungen',  'geloeschtVon', 'int NULL');
-CALL lw_add_column('touren',          'geloeschtAt',  'timestamp NULL');
-CALL lw_add_column('touren',          'geloeschtVon', 'int NULL');
-CALL lw_add_column('touren',          'reihenfolgeGeaendertVon', 'int NULL');
-CALL lw_add_column('touren',          'reihenfolgeGeaendertAt',  'timestamp NULL');
+SET @s13 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'leistungen')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'leistungen' AND COLUMN_NAME = 'geloeschtAt')
+, 'DO 1', 'ALTER TABLE `leistungen` ADD COLUMN `geloeschtAt` timestamp NULL'));
+PREPARE st13 FROM @s13; EXECUTE st13; DEALLOCATE PREPARE st13;
+SET @s14 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'leistungen')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'leistungen' AND COLUMN_NAME = 'geloeschtVon')
+, 'DO 1', 'ALTER TABLE `leistungen` ADD COLUMN `geloeschtVon` int NULL'));
+PREPARE st14 FROM @s14; EXECUTE st14; DEALLOCATE PREPARE st14;
+SET @s15 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'fahrten')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'fahrten' AND COLUMN_NAME = 'geloeschtAt')
+, 'DO 1', 'ALTER TABLE `fahrten` ADD COLUMN `geloeschtAt` timestamp NULL'));
+PREPARE st15 FROM @s15; EXECUTE st15; DEALLOCATE PREPARE st15;
+SET @s16 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'fahrten')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'fahrten' AND COLUMN_NAME = 'geloeschtVon')
+, 'DO 1', 'ALTER TABLE `fahrten` ADD COLUMN `geloeschtVon` int NULL'));
+PREPARE st16 FROM @s16; EXECUTE st16; DEALLOCATE PREPARE st16;
+SET @s17 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'fahrten')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'fahrten' AND COLUMN_NAME = 'einsatzId')
+, 'DO 1', 'ALTER TABLE `fahrten` ADD COLUMN `einsatzId` int NULL'));
+PREPARE st17 FROM @s17; EXECUTE st17; DEALLOCATE PREPARE st17;
+SET @s18 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'urlaubsantraege')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'urlaubsantraege' AND COLUMN_NAME = 'geloeschtAt')
+, 'DO 1', 'ALTER TABLE `urlaubsantraege` ADD COLUMN `geloeschtAt` timestamp NULL'));
+PREPARE st18 FROM @s18; EXECUTE st18; DEALLOCATE PREPARE st18;
+SET @s19 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'urlaubsantraege')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'urlaubsantraege' AND COLUMN_NAME = 'geloeschtVon')
+, 'DO 1', 'ALTER TABLE `urlaubsantraege` ADD COLUMN `geloeschtVon` int NULL'));
+PREPARE st19 FROM @s19; EXECUTE st19; DEALLOCATE PREPARE st19;
+SET @s20 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'krankmeldungen')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'krankmeldungen' AND COLUMN_NAME = 'geloeschtAt')
+, 'DO 1', 'ALTER TABLE `krankmeldungen` ADD COLUMN `geloeschtAt` timestamp NULL'));
+PREPARE st20 FROM @s20; EXECUTE st20; DEALLOCATE PREPARE st20;
+SET @s21 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'krankmeldungen')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'krankmeldungen' AND COLUMN_NAME = 'geloeschtVon')
+, 'DO 1', 'ALTER TABLE `krankmeldungen` ADD COLUMN `geloeschtVon` int NULL'));
+PREPARE st21 FROM @s21; EXECUTE st21; DEALLOCATE PREPARE st21;
+SET @s22 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'touren')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'touren' AND COLUMN_NAME = 'geloeschtAt')
+, 'DO 1', 'ALTER TABLE `touren` ADD COLUMN `geloeschtAt` timestamp NULL'));
+PREPARE st22 FROM @s22; EXECUTE st22; DEALLOCATE PREPARE st22;
+SET @s23 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'touren')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'touren' AND COLUMN_NAME = 'geloeschtVon')
+, 'DO 1', 'ALTER TABLE `touren` ADD COLUMN `geloeschtVon` int NULL'));
+PREPARE st23 FROM @s23; EXECUTE st23; DEALLOCATE PREPARE st23;
+SET @s24 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'touren')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'touren' AND COLUMN_NAME = 'reihenfolgeGeaendertVon')
+, 'DO 1', 'ALTER TABLE `touren` ADD COLUMN `reihenfolgeGeaendertVon` int NULL'));
+PREPARE st24 FROM @s24; EXECUTE st24; DEALLOCATE PREPARE st24;
+SET @s25 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'touren')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'touren' AND COLUMN_NAME = 'reihenfolgeGeaendertAt')
+, 'DO 1', 'ALTER TABLE `touren` ADD COLUMN `reihenfolgeGeaendertAt` timestamp NULL'));
+PREPARE st25 FROM @s25; EXECUTE st25; DEALLOCATE PREPARE st25;
 
-CALL lw_add_index('leistungen',      'idx_leistungen_geloescht', '`geloeschtAt`');
-CALL lw_add_index('fahrten',         'idx_fahrten_geloescht',    '`geloeschtAt`');
-CALL lw_add_index('urlaubsantraege', 'idx_urlaub_zeitraum',      '`mitarbeiterId`, `von`, `bis`');
-CALL lw_add_index('krankmeldungen',  'idx_krank_zeitraum',       '`mitarbeiterId`, `von`, `bis`');
-CALL lw_add_index('touren',          'idx_touren_ma_datum',      '`mitarbeiterId`, `datum`');
+SET @s36 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'leistungen')
+  OR EXISTS(SELECT 1 FROM information_schema.STATISTICS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'leistungen' AND INDEX_NAME = 'idx_leistungen_geloescht')
+, 'DO 1', 'ALTER TABLE `leistungen` ADD INDEX `idx_leistungen_geloescht` (`geloeschtAt`)'));
+PREPARE st36 FROM @s36; EXECUTE st36; DEALLOCATE PREPARE st36;
+SET @s37 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'fahrten')
+  OR EXISTS(SELECT 1 FROM information_schema.STATISTICS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'fahrten' AND INDEX_NAME = 'idx_fahrten_geloescht')
+, 'DO 1', 'ALTER TABLE `fahrten` ADD INDEX `idx_fahrten_geloescht` (`geloeschtAt`)'));
+PREPARE st37 FROM @s37; EXECUTE st37; DEALLOCATE PREPARE st37;
+SET @s38 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'urlaubsantraege')
+  OR EXISTS(SELECT 1 FROM information_schema.STATISTICS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'urlaubsantraege' AND INDEX_NAME = 'idx_urlaub_zeitraum')
+, 'DO 1', 'ALTER TABLE `urlaubsantraege` ADD INDEX `idx_urlaub_zeitraum` (`mitarbeiterId`, `von`, `bis`)'));
+PREPARE st38 FROM @s38; EXECUTE st38; DEALLOCATE PREPARE st38;
+SET @s39 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'krankmeldungen')
+  OR EXISTS(SELECT 1 FROM information_schema.STATISTICS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'krankmeldungen' AND INDEX_NAME = 'idx_krank_zeitraum')
+, 'DO 1', 'ALTER TABLE `krankmeldungen` ADD INDEX `idx_krank_zeitraum` (`mitarbeiterId`, `von`, `bis`)'));
+PREPARE st39 FROM @s39; EXECUTE st39; DEALLOCATE PREPARE st39;
+SET @s40 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'touren')
+  OR EXISTS(SELECT 1 FROM information_schema.STATISTICS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'touren' AND INDEX_NAME = 'idx_touren_ma_datum')
+, 'DO 1', 'ALTER TABLE `touren` ADD INDEX `idx_touren_ma_datum` (`mitarbeiterId`, `datum`)'));
+PREPARE st40 FROM @s40; EXECUTE st40; DEALLOCATE PREPARE st40;
 
 -- ── 3. Verrechnungssätze je Paragraph ─────────────────────────────────────
 --
@@ -238,12 +449,48 @@ CREATE TABLE IF NOT EXISTS `fuehrerschein_checks` (
 );
 
 -- Löschstatus auch für nachträglich angelegte Tabellen sicherstellen
-CALL lw_add_column('kassenanfragen',       'geloeschtAt',  'timestamp NULL');
-CALL lw_add_column('kassenanfragen',       'geloeschtVon', 'int NULL');
-CALL lw_add_column('neukundenaufnahmen',   'geloeschtAt',  'timestamp NULL');
-CALL lw_add_column('neukundenaufnahmen',   'geloeschtVon', 'int NULL');
-CALL lw_add_column('fuehrerschein_checks', 'geloeschtAt',  'timestamp NULL');
-CALL lw_add_column('fuehrerschein_checks', 'geloeschtVon', 'int NULL');
+SET @s26 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'kassenanfragen')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'kassenanfragen' AND COLUMN_NAME = 'geloeschtAt')
+, 'DO 1', 'ALTER TABLE `kassenanfragen` ADD COLUMN `geloeschtAt` timestamp NULL'));
+PREPARE st26 FROM @s26; EXECUTE st26; DEALLOCATE PREPARE st26;
+SET @s27 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'kassenanfragen')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'kassenanfragen' AND COLUMN_NAME = 'geloeschtVon')
+, 'DO 1', 'ALTER TABLE `kassenanfragen` ADD COLUMN `geloeschtVon` int NULL'));
+PREPARE st27 FROM @s27; EXECUTE st27; DEALLOCATE PREPARE st27;
+SET @s28 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'neukundenaufnahmen')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'neukundenaufnahmen' AND COLUMN_NAME = 'geloeschtAt')
+, 'DO 1', 'ALTER TABLE `neukundenaufnahmen` ADD COLUMN `geloeschtAt` timestamp NULL'));
+PREPARE st28 FROM @s28; EXECUTE st28; DEALLOCATE PREPARE st28;
+SET @s29 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'neukundenaufnahmen')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'neukundenaufnahmen' AND COLUMN_NAME = 'geloeschtVon')
+, 'DO 1', 'ALTER TABLE `neukundenaufnahmen` ADD COLUMN `geloeschtVon` int NULL'));
+PREPARE st29 FROM @s29; EXECUTE st29; DEALLOCATE PREPARE st29;
+SET @s30 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'fuehrerschein_checks')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'fuehrerschein_checks' AND COLUMN_NAME = 'geloeschtAt')
+, 'DO 1', 'ALTER TABLE `fuehrerschein_checks` ADD COLUMN `geloeschtAt` timestamp NULL'));
+PREPARE st30 FROM @s30; EXECUTE st30; DEALLOCATE PREPARE st30;
+SET @s31 := (SELECT IF(
+  NOT EXISTS(SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'fuehrerschein_checks')
+  OR EXISTS(SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'fuehrerschein_checks' AND COLUMN_NAME = 'geloeschtVon')
+, 'DO 1', 'ALTER TABLE `fuehrerschein_checks` ADD COLUMN `geloeschtVon` int NULL'));
+PREPARE st31 FROM @s31; EXECUTE st31; DEALLOCATE PREPARE st31;
 
 -- ── 6. Datenmigration: Bestandsdaten vervollständigen ─────────────────────
 --
@@ -289,7 +536,3 @@ UPDATE `einsaetze`
 SET `budgetGebucht` = false
 WHERE `budgetGebucht` IS NULL;
 
--- ── Aufräumen ─────────────────────────────────────────────────────────────
-
-DROP PROCEDURE IF EXISTS lw_add_column;
-DROP PROCEDURE IF EXISTS lw_add_index;
