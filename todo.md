@@ -549,3 +549,67 @@
 - [x] DsgvoErstDialog in PortalApp.tsx eingebunden
 - [x] Connector-Stubs: save/test Procedures im integrationenRouter
 - [x] TypeScript: 0 Fehler | Tests: 33/33 bestanden
+
+## Phase 31 – Einsatzplanung, Budgetstunden, Lohnkosten, Löschkonzept
+
+### Fachliche Grundlagen
+- [x] shared/planungsLogik.ts: zentrale Berechnungslogik für Frontend und Backend
+- [x] Verrechnungssatz (36 €/Std.) strikt getrennt vom Stundenlohn (16 €/Std.)
+- [x] Budgetstunden = Restbudget ÷ Verrechnungssatz (347 € ÷ 36 € = 9,64 Std.)
+- [x] Stunden werden automatisch aus Start-/Endzeit berechnet (09:00–11:30 = 2,5 Std.)
+- [x] Lohnkosten = Gesamtstunden × 16 € (2,5 Std. = 40 €)
+- [x] Anfahrtspauschale 6 € immer budgetwirksam eingerechnet
+- [x] Minijob-Grenze 603 €/Monat (nur für Beschäftigungsart „minijob")
+
+### Datenbank
+- [x] einsaetze: endzeit, paragraph2, stunden1/2, kosten1/2, lohnkosten, notizen, geplantVon
+- [x] einsaetze: Soft-Delete (geloeschtAt, geloeschtVon, loeschgrund)
+- [x] Neue Tabelle paragraphSaetze (historisierte Verrechnungssätze)
+- [x] Neue Tabelle planungsWarnungen (bestätigen + löschen)
+- [x] Soft-Delete für leistungen, fahrten, urlaubsantraege, krankmeldungen, touren
+- [x] Fehlende Tabellen nachgetragen: kassenanfragen, neukundenaufnahmen, fuehrerschein_checks
+- [x] Migration 0006_einsatzplanung.sql (additiv, idempotent, rückwärtskompatibel)
+- [x] Datenmigration: endzeit/stunden1/lohnkosten/kosten1 für Bestandsdaten
+- [x] Indizes für Planungsabfragen
+
+### Backend
+- [x] planungRouter: uebersicht (14 Tage / Woche / Monat)
+- [x] planungRouter: pruefe + pruefeBearbeitung (Live-Validierung ohne Speichern)
+- [x] planungRouter: erstelle, aktualisiere, setzeStatus, loesche
+- [x] planungRouter: budgetUebersicht, minijobStatus, minijobUebersicht
+- [x] planungRouter: dashboard (Sammelkennzahlen)
+- [x] planungRouter: mitarbeiterListe (Teamleitung ohne Admin-Rechte)
+- [x] planungRouter: warnungen.list/bestaetige/loesche/loescheBestaetigte
+- [x] planungRouter: touren.tagesTour, speichereReihenfolge, loesche
+- [x] planungRouter: loescheDatensatz (generisch, 10 Bereiche)
+- [x] Budgetbuchung transaktionssicher inkl. Budgethistorie
+- [x] Budgetrückbuchung bei Absage, Änderung und Löschung
+- [x] 12 Validierungsregeln (Doppelbuchung, Urlaub, Krank, Budget, Minijob, Arbeitszeit …)
+- [x] Audit-Log für alle Änderungen an Einsätzen, Budgets und Paragraphen
+- [x] Soft-Delete-Filter in allen bestehenden Listenabfragen
+
+### Frontend
+- [x] AuswahlFeld.tsx: durchsuchbare Combobox (Kunden, Mitarbeiter, Kostenträger)
+- [x] NavigationContext.tsx: seitenübergreifende Navigation
+- [x] Einsatzplanung.tsx: 14-Tage/Wochen/Monatsansicht, farblich nach Mitarbeiter
+- [x] Terminassistent mit Live-Budgetvorschau (vorher/nachher) und Minijob-Anzeige
+- [x] Zweiter Abrechnungsparagraph direkt im Terminformular
+- [x] MeineTour.tsx: manuelle Tourenreihenfolge per Drag-and-Drop und ▲▼
+- [x] Navigation zu Google Maps / Apple Karten je Tourenpunkt
+- [x] Kalender.tsx: Termine, Urlaub, Krank, Feiertage, Touren, freie Tage
+- [x] Dashboard: 13 zusätzliche Kennzahlen inkl. Budgetverbrauch je Paragraph
+- [x] Dashboard: Warnungsliste mit Bestätigen und Löschen
+- [x] Löschfunktionen ergänzt: Kassenanfragen, Textbausteine, Benachrichtigungen
+
+### Fehlerbehebungen
+- [x] Kundenauswahl in Kassenanfragen repariert (Suche, keine leeren Einträge)
+- [x] Schnellzugriffe im Ampel-Dashboard funktionsfähig gemacht
+- [x] Benachrichtigungs-Badge: Feld „gelesenAt" → „gelesen"
+- [x] Zeitzonensichere Datumsnormalisierung für DATE-Spalten
+- [x] Gelöschte Datensätze verschwinden aus allen Listen
+
+### Qualität
+- [x] 51 neue Vitest-Tests für Planungslogik (81 Tests gesamt bestanden)
+- [x] vitest.config.ts: shared/ in die Testausführung aufgenommen
+- [x] TypeScript: 0 Fehler
+- [x] docs/EINSATZPLANUNG.md: Datenbank, Validierungen, Rechte, Löschkonzept

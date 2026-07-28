@@ -31,7 +31,19 @@ export default function Benachrichtigungen() {
     onError: (e) => toast.error(e.message),
   });
 
-  const unread = (notifications as any[]).filter(n => !n.gelesenAt).length;
+  const deleteMut = trpc.notifications.delete.useMutation({
+    onSuccess: () => refetch(),
+    onError: (e) => toast.error(e.message),
+  });
+
+  const deleteGeleseneMut = trpc.notifications.deleteGelesene.useMutation({
+    onSuccess: () => { toast.success("Gelesene Benachrichtigungen entfernt"); refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  // Das Feld heisst in der Datenbank "gelesen" (boolean).
+  const unread = (notifications as any[]).filter(n => !n.gelesen).length;
+  const gelesenAnzahl = (notifications as any[]).filter(n => n.gelesen).length;
 
   return (
     <div className="p-4 pb-28 max-w-2xl mx-auto">
@@ -42,17 +54,31 @@ export default function Benachrichtigungen() {
             <Badge className="bg-red-500 text-white text-xs">{unread}</Badge>
           )}
         </div>
-        {unread > 0 && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => markAllMut.mutate()}
-            disabled={markAllMut.isPending}
-            className="text-xs"
-          >
-            Alle gelesen
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {unread > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => markAllMut.mutate()}
+              disabled={markAllMut.isPending}
+              className="text-xs"
+            >
+              Alle gelesen
+            </Button>
+          )}
+          {gelesenAnzahl > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => deleteGeleseneMut.mutate()}
+              disabled={deleteGeleseneMut.isPending}
+              className="text-xs text-red-600 border-red-300 hover:bg-red-50"
+              title="Bereits gelesene Meldungen entfernen, damit der Arbeitsbereich frei bleibt"
+            >
+              {gelesenAnzahl} gelesene löschen
+            </Button>
+          )}
+        </div>
       </div>
 
       {notifications.length === 0 ? (
@@ -65,7 +91,7 @@ export default function Benachrichtigungen() {
           {(notifications as any[]).map((n) => (
             <Card
               key={n.id}
-              className={`border transition-all ${typColor[n.typ] || "bg-gray-50 border-gray-200"} ${!n.gelesenAt ? "shadow-sm" : "opacity-70"}`}
+              className={`border transition-all ${typColor[n.typ] || "bg-gray-50 border-gray-200"} ${!n.gelesen ? "shadow-sm" : "opacity-70"}`}
             >
               <CardContent className="p-3">
                 <div className="flex items-start justify-between gap-2">
@@ -73,10 +99,10 @@ export default function Benachrichtigungen() {
                     <span className="text-lg flex-shrink-0">{typIcon[n.typ] || "📢"}</span>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className={`text-sm font-semibold ${!n.gelesenAt ? "text-gray-900" : "text-gray-600"}`}>
+                        <p className={`text-sm font-semibold ${!n.gelesen ? "text-gray-900" : "text-gray-600"}`}>
                           {n.titel}
                         </p>
-                        {!n.gelesenAt && (
+                        {!n.gelesen && (
                           <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
                         )}
                       </div>
@@ -89,17 +115,30 @@ export default function Benachrichtigungen() {
                       </p>
                     </div>
                   </div>
-                  {!n.gelesenAt && (
+                  <div className="flex gap-1 flex-shrink-0">
+                    {!n.gelesen && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-xs h-7 px-2"
+                        title="Als gelesen markieren"
+                        onClick={() => markReadMut.mutate({ id: n.id })}
+                        disabled={markReadMut.isPending}
+                      >
+                        ✓
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="text-xs flex-shrink-0 h-7 px-2"
-                      onClick={() => markReadMut.mutate({ id: n.id })}
-                      disabled={markReadMut.isPending}
+                      className="text-xs h-7 px-2 text-red-600 hover:bg-red-50"
+                      title="Benachrichtigung löschen"
+                      onClick={() => deleteMut.mutate({ id: n.id })}
+                      disabled={deleteMut.isPending}
                     >
-                      ✓
+                      ✕
                     </Button>
-                  )}
+                  </div>
                 </div>
               </CardContent>
             </Card>

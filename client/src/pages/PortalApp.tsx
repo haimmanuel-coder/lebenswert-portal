@@ -43,18 +43,16 @@ import OnboardingTour, { useOnboardingTour } from "@/components/OnboardingTour";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 import { useSSENotifications } from "@/hooks/useSSENotifications";
 import DsgvoErstDialog from "@/components/DsgvoErstDialog";
+import Einsatzplanung from "./Einsatzplanung";
+import MeineTour from "./MeineTour";
+import { NavigationProvider, type SeitenId } from "@/contexts/NavigationContext";
 
-type PageId =
-  | "home" | "einsaetze" | "zeit" | "lnw" | "fahrt"
-  | "admin" | "management" | "kunden" | "kostentraeger"
-  | "textbausteine" | "export" | "fuehrerschein"
-  | "neukundenaufnahme" | "kalender" | "kassenanfrage"
-  | "urlaub" | "krank" | "touren" | "benachrichtigungen"
-  | "profil" | "leistungsfreigabe" | "buchhaltung"
-  | "mitarbeiterakte" | "logbuch" | "vertretungen"
-  | "admindashboard" | "rollenverwaltung" | "kundenzuteilung" | "rbacverwaltung"
-  | "besuchsberichte" | "datenschutz" | "integrationen" | "arbeitszentrum"
-  | "zweifaktor" | "verfuegbarkeiten" | "analysen" | "backupstatus";
+/**
+ * Seitenkennungen werden zentral im NavigationContext gepflegt, damit
+ * Unterseiten (z. B. Schnellzugriffe im Ampel-Dashboard) dieselben Ziele
+ * ansteuern können.
+ */
+type PageId = SeitenId;
 
 interface NavItem {
   id: PageId;
@@ -80,8 +78,12 @@ export default function PortalApp() {
   const { data: warnungen = [] } = trpc.kunden.budgetWarnungen.useQuery();
   const { data: unreadNotifs = [] } = trpc.notifications.list.useQuery();
   const { data: neukundenPushOffen = [] } = (trpc as any).neukundenPush.meineOffenen.useQuery();
+  // Offene Planungswarnungen (Minijob, Budget) als Badge in der Navigation
+  const { data: planungsWarnungen = [] } = (trpc as any).planung.warnungen.list.useQuery({ nurOffene: true });
   const offenCount = leistungen.filter((l) => l.status === "offen").length;
-  const unreadCount = (unreadNotifs as any[]).filter((n: any) => !n.gelesenAt).length;
+  // Das Feld heisst in der Datenbank "gelesen" (boolean) – zuvor wurde ein
+  // nicht vorhandenes Feld geprueft, wodurch der Badge alle Meldungen zaehlte.
+  const unreadCount = (unreadNotifs as any[]).filter((n: any) => !n.gelesen).length;
   const neukundenPushCount = (neukundenPushOffen as any[]).length;
     const isAdmin = mitarbeiter?.rolle === "admin";
   const { isOnline, offlineCount } = useOfflineSync();
@@ -122,6 +124,7 @@ export default function PortalApp() {
       title: "Kunden & Einsätze",
       items: [
         { id: "kunden", icon: "👥", label: "Kundenliste", badge: warnungen.length > 0 ? warnungen.length : undefined },
+        { id: "planung", icon: "🗓️", label: "Einsatzplanung", badge: planungsWarnungen.length > 0 ? planungsWarnungen.length : undefined },
         { id: "einsaetze", icon: "📅", label: "Einsätze" },
         { id: "lnw", icon: "📋", label: "Leistungsnachweise", badge: offenCount > 0 ? offenCount : undefined },
         { id: "kassenanfrage", icon: "🏥", label: "Kassenanfragen" },
@@ -136,6 +139,7 @@ export default function PortalApp() {
         { id: "fahrt", icon: "🚗", label: "Fahrtenbuch" },
         { id: "urlaub", icon: "🌴", label: "Urlaubsverwaltung" },
         { id: "krank", icon: "🤒", label: "Krankmeldung" },
+        { id: "meinetour", icon: "🧭", label: "Meine Tour" },
         { id: "touren", icon: "🗺️", label: "Tourenplanung" },
         { id: "fuehrerschein", icon: "🪪", label: "Führerschein-Check" },
         { id: "profil", icon: "👤", label: "Mein Profil" },
@@ -177,6 +181,7 @@ export default function PortalApp() {
     }
     switch (activePage) {
       case "home": return <Dashboard />;
+      case "planung": return <Einsatzplanung />;
       case "einsaetze": return <Einsaetze />;
       case "zeit": return <Zeiterfassung />;
       case "lnw": return <Leistungsnachweise />;
@@ -193,6 +198,7 @@ export default function PortalApp() {
       case "kassenanfrage": return <Kassenanfrage />;
       case "urlaub": return <Urlaubsverwaltung />;
       case "krank": return <Krankmeldung />;
+      case "meinetour": return <MeineTour />;
       case "touren": return <Tourenplanung />;
       case "benachrichtigungen": return <Benachrichtigungen />;
       case "profil": return <MeinProfil />;
@@ -351,7 +357,16 @@ export default function PortalApp() {
     </aside>
   );
 
+  // Navigation für alle Unterseiten bereitstellen – dadurch funktionieren
+  // Schnellzugriffe und Verlinkungen aus Dashboards heraus.
+  const navigationWert = {
+    navigiere: navTo,
+    oeffneKunde: (id: number) => setKundenDetailId(id),
+    aktuelleSeite: activePage,
+  };
+
   return (
+    <NavigationProvider wert={navigationWert}>
     <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "#f4f6f3", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>
 
       {/* Desktop Sidebar */}
@@ -439,5 +454,6 @@ export default function PortalApp() {
         }}
       />
     </div>
+    </NavigationProvider>
   );
 }

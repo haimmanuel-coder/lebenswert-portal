@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { useNavigation, type SeitenId } from "@/contexts/NavigationContext";
 
 type AmpelStatus = "gruen" | "gelb" | "rot" | "grau";
 
@@ -96,6 +97,7 @@ function AuslastungsBar({ name, art, ist, soll, pct }: { name: string; art: stri
 export default function AdminDashboard() {
   const [budgetFilter, setBudgetFilter] = useState<"alle" | "rot" | "gelb" | "gruen">("alle");
   const { data, isLoading } = trpc.admin.dashboardStats.useQuery();
+  const { navigiere } = useNavigation();
 
   if (isLoading) {
     return (
@@ -308,15 +310,20 @@ export default function AdminDashboard() {
         </div>
         <div className="lw-card-body">
           <div className="lw-grid-3">
-            {[
-              { icon: "🏖️", label: "Urlaubsanträge prüfen", badge: kpis?.offeneUrlaube, color: "#f59e0b" },
-              { icon: "🤒", label: "Krankmeldungen", badge: kpis?.aktivKrank, color: "var(--lw-red)" },
-              { icon: "📋", label: "Leistungsnachweise freigeben", color: "#8b5cf6" },
-              { icon: "👥", label: "Mitarbeiter verwalten", color: "#0ea5e9" },
-              { icon: "📤", label: "DATEV / Lexware Export", color: "#10b981" },
-              { icon: "📜", label: "Audit-Logbuch", color: "var(--lw-gray-600)" },
-            ].map((item, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.875rem", background: "var(--lw-gray-50)", borderRadius: "var(--lw-r-md)", cursor: "pointer", border: "1px solid var(--lw-gray-200)", transition: "all 0.15s var(--ease-out)" }}
+            {([
+              { icon: "🗓️", label: "Einsatzplanung öffnen", ziel: "planung" as SeitenId, color: "#4a8c3f" },
+              { icon: "🏖️", label: "Urlaubsanträge prüfen", badge: kpis?.offeneUrlaube, ziel: "urlaub" as SeitenId, color: "#f59e0b" },
+              { icon: "🤒", label: "Krankmeldungen", badge: kpis?.aktivKrank, ziel: "krank" as SeitenId, color: "var(--lw-red)" },
+              { icon: "📋", label: "Leistungsnachweise freigeben", ziel: "leistungsfreigabe" as SeitenId, color: "#8b5cf6" },
+              { icon: "👥", label: "Mitarbeiter verwalten", ziel: "mitarbeiterakte" as SeitenId, color: "#0ea5e9" },
+              { icon: "📤", label: "DATEV / Lexware Export", ziel: "buchhaltung" as SeitenId, color: "#10b981" },
+              { icon: "📜", label: "Audit-Logbuch", ziel: "logbuch" as SeitenId, color: "var(--lw-gray-600)" },
+              { icon: "🗺️", label: "Tourenplanung", ziel: "touren" as SeitenId, color: "#6366f1" },
+              { icon: "🏥", label: "Kassenanfragen", ziel: "kassenanfrage" as SeitenId, color: "#14b8a6" },
+            ]).map((item, i) => (
+              <button key={i} type="button" onClick={() => navigiere(item.ziel)}
+                title={`${item.label} öffnen`}
+                style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.875rem", background: "var(--lw-gray-50)", borderRadius: "var(--lw-r-md)", cursor: "pointer", border: "1px solid var(--lw-gray-200)", transition: "all 0.15s var(--ease-out)", width: "100%", textAlign: "left", font: "inherit" }}
                 onMouseEnter={e => (e.currentTarget.style.background = "var(--lw-gray-100)")}
                 onMouseLeave={e => (e.currentTarget.style.background = "var(--lw-gray-50)")}
               >
@@ -329,7 +336,8 @@ export default function AdminDashboard() {
                 {item.badge ? (
                   <span className="lw-badge lw-badge-red">{item.badge}</span>
                 ) : null}
-              </div>
+                <span style={{ color: "var(--lw-gray-400)", fontSize: "0.875rem" }}>›</span>
+              </button>
             ))}
           </div>
         </div>

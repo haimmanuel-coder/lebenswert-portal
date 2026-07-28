@@ -6,6 +6,8 @@ import { useState, useRef } from "react";
 import BottomSheet from "@/components/BottomSheet";
 import SignatureCanvas from "@/components/SignatureCanvas";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { useNavigation, type SeitenId } from "@/contexts/NavigationContext";
+import { formatEuro, formatStunden } from "@shared/planungsLogik";
 
 function fmtDate(d: string | Date | null) {
   if (!d) return "–";
@@ -26,8 +28,106 @@ function getStatusBadge(status: string) {
   return { cls: "badge-yellow", label: "Geplant" };
 }
 
+/**
+ * Liste der offenen Planungswarnungen.
+ *
+ * Teamleitung und Administrator bestätigen eine Meldung und können sie
+ * anschließend vollständig löschen – bestätigte Meldungen sollen den
+ * Arbeitsbereich nicht dauerhaft blockieren.
+ */
+function WarnungsListe() {
+  const { mitarbeiter } = usePortalAuth();
+  const darfVerwalten = mitarbeiter?.rolle === "admin" || mitarbeiter?.rolle === "teamleitung";
+  const utils = trpc.useUtils();
+  const { data: warnungen = [] } = (trpc as any).planung.warnungen.list.useQuery({ nurOffene: false, limit: 25 });
+
+  const aktualisiere = () => {
+    (utils as any).planung.warnungen.list.invalidate();
+    (utils as any).planung.dashboard.invalidate();
+  };
+
+  const bestaetigen = (trpc as any).planung.warnungen.bestaetige.useMutation({
+    onSuccess: () => { toast.success("Meldung bestätigt"); aktualisiere(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const loeschen = (trpc as any).planung.warnungen.loesche.useMutation({
+    onSuccess: () => { toast.success("Meldung entfernt"); aktualisiere(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const alleAufraeumen = (trpc as any).planung.warnungen.loescheBestaetigte.useMutation({
+    onSuccess: (r: any) => { toast.success(`${r.anzahl} bestätigte Meldungen entfernt`); aktualisiere(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const liste = warnungen as any[];
+  if (liste.length === 0) return null;
+  const bestaetigteAnzahl = liste.filter((w) => w.bestaetigtAt).length;
+
+  return (
+    <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 10px rgba(0,0,0,.08)", padding: 16, marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <div style={{ fontSize: 14, fontWeight: 700 }}>⚠️ Meldungen ({liste.length})</div>
+        {darfVerwalten && bestaetigteAnzahl > 0 && (
+          <button
+            onClick={() => alleAufraeumen.mutate()}
+            style={{ fontSize: 11, fontWeight: 700, padding: "5px 10px", borderRadius: 6, border: "1px solid #e5e7eb", background: "#f9fafb", color: "#4b5563", cursor: "pointer" }}
+          >
+            {bestaetigteAnzahl} bestätigte aufräumen
+          </button>
+        )}
+      </div>
+      {liste.map((warnung) => (
+        <div
+          key={warnung.id}
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 10,
+            padding: "9px 0",
+            borderBottom: "1px solid #f3f4f6",
+            opacity: warnung.bestaetigtAt ? 0.6 : 1,
+          }}
+        >
+          <span style={{ fontSize: 15, flexShrink: 0 }}>
+            {warnung.schwere === "blockierend" ? "⛔" : warnung.schwere === "warnung" ? "⚠️" : "ℹ️"}
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700 }}>
+              {warnung.titel}
+              {warnung.bestaetigtAt && (
+                <span style={{ marginLeft: 6, fontSize: 10, color: "#059669", fontWeight: 700 }}>✓ bestätigt</span>
+              )}
+            </div>
+            <div style={{ fontSize: 11.5, color: "#6b7280", marginTop: 2 }}>{warnung.nachricht}</div>
+          </div>
+          {darfVerwalten && (
+            <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
+              {!warnung.bestaetigtAt && (
+                <button
+                  onClick={() => bestaetigen.mutate({ id: warnung.id })}
+                  style={{ fontSize: 10, fontWeight: 700, padding: "4px 9px", borderRadius: 6, border: "none", background: "#e8f5e4", color: "#2d6a27", cursor: "pointer" }}
+                >
+                  Bestätigen
+                </button>
+              )}
+              <button
+                onClick={() => loeschen.mutate({ id: warnung.id })}
+                title="Meldung aus dem Arbeitsbereich entfernen"
+                style={{ fontSize: 10, fontWeight: 700, padding: "4px 9px", borderRadius: 6, border: "none", background: "#fee2e2", color: "#b91c1c", cursor: "pointer" }}
+              >
+                Löschen
+              </button>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { mitarbeiter } = usePortalAuth();
+  const { navigiere } = useNavigation();
   const { timerDisplay, timerLabel, isRunning, isPaused, start, pause, stop } = useTimer();
   const [abschlussOpen, setAbschlussOpen] = useState(false);
   const [activeEinsatz, setActiveEinsatz] = useState<{ id: number; name: string; datum: string } | null>(null);
@@ -41,6 +141,9 @@ export default function Dashboard() {
   const getKundeName = (id: number) => { const k = kunden.find((c) => c.id === id); return k ? `${k.vorname} ${k.nachname}` : `Kunde #${id}`; };
   const utils = trpc.useUtils();
   const { data: budgetWarnungenRaw = [] } = trpc.kunden.budgetWarnungen.useQuery();
+  // Sammelkennzahlen: heutige Einsätze, Personalstand, offene Vorgänge,
+  // Budgetverbrauch, Minijob-Warnungen, Touren, Urlaube, Geburtstage, Dokumente
+  const { data: kennzahlen } = (trpc as any).planung.dashboard.useQuery();
   const push = usePushNotifications();
   const anzahlBudgetWarnungen = (budgetWarnungenRaw as { id: number }[]).length;
   const updateStatus = trpc.einsaetze.updateStatus.useMutation({
@@ -181,6 +284,254 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* ── Erweiterte Kennzahlen ──────────────────────────────────────── */}
+      {kennzahlen && (
+        <>
+          {/* Minijob-Warnungen */}
+          {(kennzahlen.minijobWarnungen?.length ?? 0) > 0 && (
+            <div
+              onClick={() => navigiere("planung")}
+              style={{
+                background: "linear-gradient(135deg,#ef4444,#dc2626)",
+                borderRadius: 12,
+                padding: "12px 16px",
+                marginBottom: 12,
+                color: "#fff",
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                cursor: "pointer",
+              }}
+            >
+              <div style={{ fontSize: 26 }}>🔴</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14.5, fontWeight: 900 }}>
+                  {kennzahlen.minijobWarnungen.filter((m: any) => m.status.ueberschritten).length} Mitarbeiter
+                  überschreitet die Minijob-Grenze
+                </div>
+                <div style={{ fontSize: 12, opacity: 0.92, marginTop: 2 }}>
+                  {kennzahlen.minijobWarnungen
+                    .slice(0, 3)
+                    .map((m: any) => `${m.name} (${formatEuro(m.lohnkosten)})`)
+                    .join(" · ")}
+                </div>
+              </div>
+              <span style={{ fontSize: 18 }}>›</span>
+            </div>
+          )}
+
+          {/* Kennzahlenkacheln */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+              gap: 10,
+              marginBottom: 12,
+            }}
+          >
+            {([
+              {
+                label: "Einsätze heute",
+                wert: String(kennzahlen.einsaetzeHeute?.gesamt ?? 0),
+                zusatz: `${formatStunden(kennzahlen.einsaetzeHeute?.stunden ?? 0)}`,
+                farbe: "#4a8c3f",
+                ziel: "planung" as SeitenId,
+              },
+              {
+                label: "Aktive Mitarbeiter",
+                wert: String(kennzahlen.mitarbeiter?.imEinsatz ?? 0),
+                zusatz: `von ${kennzahlen.mitarbeiter?.gesamt ?? 0} im Einsatz`,
+                farbe: "#0ea5e9",
+                ziel: "mitarbeiterakte" as SeitenId,
+              },
+              {
+                label: "Freie Mitarbeiter",
+                wert: String(kennzahlen.mitarbeiter?.frei ?? 0),
+                zusatz: `${kennzahlen.mitarbeiter?.abwesend ?? 0} abwesend`,
+                farbe: "#14b8a6",
+                ziel: "planung" as SeitenId,
+              },
+              {
+                label: "Offene Kassenanfragen",
+                wert: String(kennzahlen.offeneKassenanfragen ?? 0),
+                farbe: "#8b5cf6",
+                ziel: "kassenanfrage" as SeitenId,
+              },
+              {
+                label: "Offene Genehmigungen",
+                wert: String(kennzahlen.offeneGenehmigungen ?? 0),
+                zusatz: `${kennzahlen.offeneUrlaubsantraege ?? 0} Urlaub · ${kennzahlen.offeneLeistungsnachweise ?? 0} LNW`,
+                farbe: "#f59e0b",
+                ziel: "urlaub" as SeitenId,
+              },
+              {
+                label: "Touren heute",
+                wert: String(kennzahlen.tourenHeute?.length ?? 0),
+                farbe: "#6366f1",
+                ziel: "touren" as SeitenId,
+              },
+              {
+                label: "Kommende Urlaube",
+                wert: String(kennzahlen.kommendeUrlaube?.length ?? 0),
+                zusatz: "nächste 30 Tage",
+                farbe: "#eab308",
+                ziel: "urlaub" as SeitenId,
+              },
+              {
+                label: "Offene Dokumente",
+                wert: String(kennzahlen.ablaufendeDokumente?.length ?? 0),
+                zusatz: "laufen ab",
+                farbe: "#ef4444",
+                ziel: "mitarbeiterakte" as SeitenId,
+              },
+            ]).map((karte) => (
+              <button
+                key={karte.label}
+                type="button"
+                onClick={() => navigiere(karte.ziel)}
+                style={{
+                  background: "#fff",
+                  borderRadius: 12,
+                  padding: "11px 13px",
+                  boxShadow: "0 2px 8px rgba(0,0,0,.06)",
+                  borderLeft: `4px solid ${karte.farbe}`,
+                  border: "none",
+                  borderLeftWidth: 4,
+                  borderLeftStyle: "solid",
+                  borderLeftColor: karte.farbe,
+                  textAlign: "left",
+                  cursor: "pointer",
+                  font: "inherit",
+                }}
+              >
+                <div style={{ fontSize: 20, fontWeight: 800, color: "#111827" }}>{karte.wert}</div>
+                <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2, fontWeight: 600 }}>{karte.label}</div>
+                {karte.zusatz && (
+                  <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 1 }}>{karte.zusatz}</div>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Budgetverbrauch je Paragraph */}
+          {kennzahlen.budgetJeParagraph && (
+            <div
+              style={{
+                background: "#fff",
+                borderRadius: 12,
+                boxShadow: "0 2px 10px rgba(0,0,0,.08)",
+                padding: 16,
+                marginBottom: 12,
+              }}
+            >
+              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>Budgetverbrauch je Paragraph</div>
+              {(["45b", "45a", "39"] as const).map((paragraph) => {
+                const eintrag = kennzahlen.budgetJeParagraph[paragraph];
+                if (!eintrag) return null;
+                const prozent = eintrag.budget > 0 ? Math.round((eintrag.verbraucht / eintrag.budget) * 100) : 0;
+                return (
+                  <div key={paragraph} style={{ marginBottom: 10 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                      <span style={{ fontWeight: 700 }}>§{paragraph}</span>
+                      <span style={{ color: "#6b7280" }}>
+                        {formatEuro(eintrag.verbraucht)} von {formatEuro(eintrag.budget)} ·{" "}
+                        <strong style={{ color: "#166534" }}>{formatStunden(eintrag.stunden)} frei</strong>
+                      </span>
+                    </div>
+                    <div style={{ height: 8, background: "#f3f4f6", borderRadius: 4, overflow: "hidden" }}>
+                      <div
+                        style={{
+                          width: `${Math.min(100, prozent)}%`,
+                          height: "100%",
+                          background: prozent >= 90 ? "#dc2626" : prozent >= 70 ? "#f59e0b" : "#4a8c3f",
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Budgetverbrauch pro Kunde – kritische Kunden */}
+          {(kennzahlen.kritischeKunden?.length ?? 0) > 0 && (
+            <div
+              style={{
+                background: "#fff",
+                borderRadius: 12,
+                boxShadow: "0 2px 10px rgba(0,0,0,.08)",
+                padding: 16,
+                marginBottom: 12,
+              }}
+            >
+              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>
+                Kunden mit kritischem Budget ({kennzahlen.kritischeKunden.length})
+              </div>
+              {kennzahlen.kritischeKunden.slice(0, 6).map((kunde: any, index: number) => (
+                <div
+                  key={`${kunde.id}-${kunde.paragraph}-${index}`}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "6px 0",
+                    borderBottom: "1px solid #f3f4f6",
+                    fontSize: 12.5,
+                  }}
+                >
+                  <span style={{ fontWeight: 600 }}>{kunde.name}</span>
+                  <span style={{ color: "#6b7280" }}>
+                    §{kunde.paragraph}:{" "}
+                    <strong style={{ color: "#dc2626" }}>{formatEuro(kunde.rest)}</strong> ={" "}
+                    {formatStunden(kunde.stunden)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Geburtstage */}
+          {(kennzahlen.geburtstage?.length ?? 0) > 0 && (
+            <div
+              style={{
+                background: "#fff",
+                borderRadius: 12,
+                boxShadow: "0 2px 10px rgba(0,0,0,.08)",
+                padding: 16,
+                marginBottom: 12,
+              }}
+            >
+              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>🎂 Kommende Geburtstage</div>
+              {kennzahlen.geburtstage.slice(0, 5).map((geburtstag: any, index: number) => (
+                <div
+                  key={index}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    padding: "5px 0",
+                    fontSize: 12.5,
+                    borderBottom: "1px solid #f9fafb",
+                  }}
+                >
+                  <span style={{ fontWeight: 600 }}>
+                    {geburtstag.name}
+                    <span style={{ color: "#9ca3af", fontWeight: 400, marginLeft: 6, fontSize: 11 }}>
+                      {geburtstag.typ === "kunde" ? "Kunde" : "Mitarbeiter"}
+                    </span>
+                  </span>
+                  <span style={{ color: "#6b7280" }}>
+                    {geburtstag.tageBis === 0 ? "heute" : `in ${geburtstag.tageBis} Tagen`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Offene Warnungen mit Bestätigen/Löschen */}
+          {(kennzahlen.warnungen?.length ?? 0) > 0 && <WarnungsListe />}
+        </>
+      )}
 
       {/* Push-Benachrichtigungen Opt-In */}
       {push.isSupported && !push.isSubscribed && push.permission !== "denied" && (
