@@ -36,8 +36,12 @@
 --
 --  ANWENDUNG (neue Datenbank)
 --
---      mysql "$DATABASE_URL" < drizzle/baseline/0000_basisschema.sql
---      mysql "$DATABASE_URL" < drizzle/0007_einsatzplanung.sql
+--      mysql <datenbank> < drizzle/baseline/0000_basisschema.sql
+--      mysql <datenbank> < drizzle/0007_einsatzplanung.sql
+--
+--    Der MySQL-Client versteht keine mysql://-URL; Host, Benutzer und
+--    Passwort werden als eigene Parameter oder über ~/.my.cnf übergeben.
+--    Alternativ übernimmt das der Workflow datenbank-migration.yml.
 --
 --    Der zweite Schritt ergänzt die Spalten der Einsatzplanung sowie die
 --    drei Tabellen, die ausschließlich per SQL angesprochen werden

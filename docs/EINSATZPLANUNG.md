@@ -161,8 +161,24 @@ Neu angelegt für die Planungsabfragen: `idx_einsaetze_datum`,
 ### 2.7 Migration ausführen
 
 ```bash
-mysql "$DATABASE_URL" < drizzle/0007_einsatzplanung.sql
+mysql <datenbank> < drizzle/0007_einsatzplanung.sql
 ```
+
+> **Hinweis:** Der MySQL-Client akzeptiert keine `mysql://`-URL. Die
+> Verbindungsangabe muss in einzelne Parameter zerlegt werden:
+>
+> ```bash
+> mysql --protocol=TCP --host=<host> --port=3306 \
+>       --user=<benutzer> --password=<passwort> <datenbank> < <datei.sql>
+> ```
+>
+> Bequemer und ohne Passwort in der Prozessliste: einmalig `~/.my.cnf` anlegen
+> (`[client]` mit `protocol`, `host`, `port`, `user`, `password`), danach
+> genügt `mysql <datenbank> < <datei.sql>`.
+>
+> Alternativ übernimmt der Workflow
+> [`datenbank-migration.yml`](../.github/workflows/datenbank-migration.yml)
+> das Zerlegen automatisch – siehe Abschnitt 2.9.
 
 Die Migration wurde am 28.07.2026 gegen eine echte MySQL-kompatible Datenbank
 verprobt: leere Datenbank, alle vorherigen Migrationen eingespielt, danach
@@ -203,8 +219,8 @@ Lücke im Migrationsverzeichnis.
 **Neue Datenbank aufsetzen:**
 
 ```bash
-mysql "$DATABASE_URL" < drizzle/baseline/0000_basisschema.sql
-mysql "$DATABASE_URL" < drizzle/0007_einsatzplanung.sql
+mysql <datenbank> < drizzle/baseline/0000_basisschema.sql
+mysql <datenbank> < drizzle/0007_einsatzplanung.sql
 ```
 
 Der zweite Schritt ergänzt die Spalten der Einsatzplanung sowie die drei
@@ -227,6 +243,41 @@ Gegengeprüft am 28.07.2026:
 Die Basismigration ist **kein Ersatz** für die nummerierten Migrationen und
 wird nicht in deren Reihenfolge eingereiht – sie liegt deshalb im eigenen
 Verzeichnis `drizzle/baseline/`.
+
+### 2.9 Migration per GitHub-Actions einspielen
+
+Wer keinen direkten Datenbankzugang von der eigenen Maschine aus hat, kann die
+Migration über den Workflow
+[`.github/workflows/datenbank-migration.yml`](../.github/workflows/datenbank-migration.yml)
+einspielen lassen.
+
+**Einmalige Einrichtung**
+
+1. Repository-Secret anlegen (Settings → Secrets and variables → Actions):
+   `DATABASE_URL` = `mysql://benutzer:passwort@host:3306/datenbankname`
+2. Empfohlen: Environment `produktion` anlegen (Settings → Environments) und
+   dort *Required reviewers* aktivieren. Der Workflow wartet dann vor dem
+   Einspielen auf eine Freigabe durch eine zweite Person.
+
+**Ausführen** – Actions → „Datenbank-Migration" → *Run workflow*:
+
+| Eingabe | Bedeutung |
+|---|---|
+| `migration` | Welche Datei eingespielt wird |
+| `modus` | `pruefen` = nur Verbindung, Backup und Ist-Zustand · `ausfuehren` = tatsächlich einspielen |
+| `bestaetigung` | Im Modus `ausfuehren` muss exakt `EINSPIELEN` eingetippt werden |
+
+**Sicherheitsmerkmale**
+
+* Startet ausschließlich manuell – nie automatisch bei einem Merge.
+* Legt vor jeder Änderung ein Backup an und hängt es als Artefakt an den Lauf
+  (7 Tage Aufbewahrung, da personenbezogene Daten enthalten sind).
+* Der Prüfmodus zeigt den Ist-Zustand, ohne etwas zu verändern.
+* Das Passwort wird in eine Optionsdatei geschrieben und erscheint dadurch
+  nicht in der Prozessliste; nach dem Lauf wird sie wieder entfernt.
+* Nach dem Einspielen wird verifiziert, dass alle erwarteten Spalten
+  vorhanden sind – fehlt eine, schlägt der Lauf fehl.
+* `concurrency` verhindert zwei gleichzeitige Läufe auf derselben Datenbank.
 
 ---
 

@@ -1,0 +1,279 @@
+name: Datenbank-Migration
+
+# ══════════════════════════════════════════════════════════════════════════
+#  Spielt eine Migrationsdatei kontrolliert in die Datenbank ein.
+#
+#  Der Workflow startet ausschließlich MANUELL – nie automatisch bei einem
+#  Merge. Schemaänderungen an einer Produktionsdatenbank sollen bewusst
+#  ausgelöst werden, nicht als Nebenwirkung eines Merges passieren.
+#
+#  Ablauf:
+#    1. Verbindung prüfen (nur lesend)
+#    2. Backup des aktuellen Schemas und der Daten erstellen
+#    3. Migration einspielen  (entfällt im Modus "pruefen")
+#    4. Ergebnis verifizieren
+#
+#  ── EINMALIGE EINRICHTUNG ────────────────────────────────────────────────
+#
+#  1. Repository-Secret anlegen:
+#       Settings → Secrets and variables → Actions → New repository secret
+#       Name:  DATABASE_URL
+#       Wert:  mysql://benutzer:passwort@host:3306/datenbankname
+#
+#  2. Empfohlen – Freigabe durch eine zweite Person erzwingen:
+#       Settings → Environments → New environment → "produktion"
+#       Dort "Required reviewers" aktivieren.
+#       Der Workflow wartet dann vor dem Einspielen auf eine Freigabe.
+#
+#  Das Secret ist in Logs automatisch maskiert und für Pull Requests aus
+#  Forks nicht zugänglich.
+# ══════════════════════════════════════════════════════════════════════════
+
+on:
+  workflow_dispatch:
+    inputs:
+      migration:
+        description: "Welche Migrationsdatei einspielen?"
+        required: true
+        default: "drizzle/0007_einsatzplanung.sql"
+        type: choice
+        options:
+          - "drizzle/0007_einsatzplanung.sql"
+          - "drizzle/baseline/0000_basisschema.sql"
+      modus:
+        description: "pruefen = nur anzeigen, was passieren würde · ausfuehren = tatsächlich einspielen"
+        required: true
+        default: "pruefen"
+        type: choice
+        options:
+          - "pruefen"
+          - "ausfuehren"
+      bestaetigung:
+        description: "Zum Einspielen exakt 'EINSPIELEN' eingeben (im Modus 'pruefen' leer lassen)"
+        required: false
+        default: ""
+        type: string
+
+# Zwei gleichzeitige Migrationsläufe auf derselben Datenbank verhindern.
+concurrency:
+  group: datenbank-migration
+  cancel-in-progress: false
+
+jobs:
+  migration:
+    runs-on: ubuntu-latest
+    # Environment-Schutz: erlaubt Freigabe durch Reviewer vor dem Einspielen.
+    environment: produktion
+
+    steps:
+      - name: Quellcode auschecken
+        uses: actions/checkout@v4
+
+      - name: Eingaben prüfen
+        run: |
+          set -euo pipefail
+          DATEI="${{ inputs.migration }}"
+
+          if [ ! -f "$DATEI" ]; then
+            echo "::error::Migrationsdatei '$DATEI' existiert nicht."
+            exit 1
+          fi
+
+          # Im Ausführmodus ist die Tippbestätigung Pflicht – sie verhindert
+          # ein versehentliches Einspielen durch einen Fehlklick.
+          if [ "${{ inputs.modus }}" = "ausfuehren" ] && [ "${{ inputs.bestaetigung }}" != "EINSPIELEN" ]; then
+            echo "::error::Zum Einspielen muss im Feld 'bestaetigung' exakt EINSPIELEN stehen."
+            exit 1
+          fi
+
+          echo "Datei:  $DATEI"
+          echo "Modus:  ${{ inputs.modus }}"
+          echo "Größe:  $(wc -l < "$DATEI") Zeilen"
+
+      - name: MySQL-Client installieren
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq mysql-client
+
+      - name: Verbindungsdaten aufbereiten
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DATABASE_URL:-}" ]; then
+            echo "::error::Repository-Secret DATABASE_URL ist nicht gesetzt."
+            echo "Anlegen unter: Settings → Secrets and variables → Actions"
+            exit 1
+          fi
+
+          # Der MySQL-Client versteht keine mysql://-URLs – die Verbindungs-
+          # angabe muss in einzelne Parameter zerlegt werden.
+          ohne_schema="${DATABASE_URL#*://}"
+          zugang="${ohne_schema%%@*}"
+          rest="${ohne_schema#*@}"
+          benutzer="${zugang%%:*}"
+          passwort="${zugang#*:}"
+          hostport="${rest%%/*}"
+          host="${hostport%%:*}"
+          port="${hostport#*:}"
+          [ "$port" = "$host" ] && port=3306
+          pfad="${rest#*/}"
+          datenbank="${pfad%%\?*}"
+
+          if [ -z "$host" ] || [ -z "$datenbank" ]; then
+            echo "::error::DATABASE_URL konnte nicht zerlegt werden."
+            echo "Erwartetes Format: mysql://benutzer:passwort@host:3306/datenbankname"
+            exit 1
+          fi
+
+          # Passwort zusätzlich maskieren, falls es nicht als Ganzes im
+          # Secret-Wert erkannt wird (z. B. bei URL-kodierten Zeichen).
+          echo "::add-mask::$passwort"
+
+          # Zugangsdaten in eine Optionsdatei schreiben, damit das Passwort
+          # nicht in der Prozessliste des Runners auftaucht.
+          umask 077
+          cat > "$HOME/.my.cnf" <<EOF
+          [client]
+          protocol=TCP
+          host=$host
+          port=$port
+          user=$benutzer
+          password=$passwort
+          EOF
+
+          echo "DB_NAME=$datenbank" >> "$GITHUB_ENV"
+          echo "Ziel: $host:$port/$datenbank (Benutzer: $benutzer)"
+
+      - name: Verbindung prüfen
+        run: |
+          set -euo pipefail
+          mysql "$DB_NAME" -e "SELECT VERSION() AS server, DATABASE() AS datenbank, NOW() AS zeit;"
+
+      - name: Ausgangszustand erfassen
+        run: |
+          set -euo pipefail
+          echo "### Zustand vor der Migration" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          ANZAHL=$(mysql "$DB_NAME" -N -B -e \
+            "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE();")
+          echo "- Tabellen: **$ANZAHL**" >> "$GITHUB_STEP_SUMMARY"
+
+          # Spalten, welche die Einsatzplanung benötigt
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Spalte in \`einsaetze\` | vorhanden |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          for spalte in endzeit paragraph2 stunden1 kosten1 lohnkosten budgetGebucht; do
+            DA=$(mysql "$DB_NAME" -N -B -e \
+              "SELECT COUNT(*) FROM information_schema.COLUMNS
+               WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze' AND COLUMN_NAME = '$spalte';")
+            if [ "$DA" = "1" ]; then echo "| $spalte | ja |" >> "$GITHUB_STEP_SUMMARY";
+            else echo "| $spalte | **nein** |" >> "$GITHUB_STEP_SUMMARY"; fi
+          done
+
+      - name: Backup erstellen
+        run: |
+          set -euo pipefail
+          ZEIT=$(date +%Y%m%d_%H%M%S)
+          echo "BACKUP_DATEI=backup_${ZEIT}.sql" >> "$GITHUB_ENV"
+          # --single-transaction hält die Datenbank während des Backups
+          # schreibfähig (InnoDB) und liefert dennoch einen konsistenten Stand.
+          mysqldump "$DB_NAME" \
+            --single-transaction \
+            --routines \
+            --triggers \
+            --events \
+            --no-tablespaces \
+            > "backup_${ZEIT}.sql"
+          echo "Backup: $(du -h "backup_${ZEIT}.sql" | cut -f1)"
+
+      - name: Backup als Artefakt sichern
+        uses: actions/upload-artifact@v4
+        with:
+          name: datenbank-backup-${{ github.run_number }}
+          path: backup_*.sql
+          # Backups enthalten personenbezogene Daten (DSGVO): kurze
+          # Aufbewahrung, Download nur für Repository-Berechtigte.
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Prüflauf – Migration NICHT einspielen
+        if: inputs.modus == 'pruefen'
+        run: |
+          set -euo pipefail
+          {
+            echo ""
+            echo "### Prüflauf"
+            echo ""
+            echo "Die Migration wurde **nicht** eingespielt."
+            echo ""
+            echo "Verbindung, Backup und Ausgangszustand wurden geprüft."
+            echo "Zum tatsächlichen Einspielen den Workflow erneut starten mit:"
+            echo "- Modus: \`ausfuehren\`"
+            echo "- Bestätigung: \`EINSPIELEN\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Migration einspielen
+        if: inputs.modus == 'ausfuehren'
+        run: |
+          set -euo pipefail
+          DATEI="${{ inputs.migration }}"
+          echo "Spiele $DATEI ein …"
+          # Kein --force: bricht bei einem Fehler ab, statt weiterzulaufen.
+          mysql "$DB_NAME" < "$DATEI"
+          echo "Migration eingespielt."
+
+      - name: Ergebnis verifizieren
+        if: inputs.modus == 'ausfuehren'
+        run: |
+          set -euo pipefail
+          {
+            echo ""
+            echo "### Zustand nach der Migration"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          ANZAHL=$(mysql "$DB_NAME" -N -B -e \
+            "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE();")
+          echo "- Tabellen: **$ANZAHL**" >> "$GITHUB_STEP_SUMMARY"
+
+          FEHLT=0
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Spalte in \`einsaetze\` | vorhanden |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          for spalte in endzeit paragraph2 stunden1 stunden2 kosten1 kosten2 lohnkosten budgetGebucht notizen geloeschtAt; do
+            DA=$(mysql "$DB_NAME" -N -B -e \
+              "SELECT COUNT(*) FROM information_schema.COLUMNS
+               WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'einsaetze' AND COLUMN_NAME = '$spalte';")
+            if [ "$DA" = "1" ]; then
+              echo "| $spalte | ja |" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "| $spalte | **fehlt** |" >> "$GITHUB_STEP_SUMMARY"
+              FEHLT=1
+            fi
+          done
+
+          # Verrechnungssätze anzeigen – §45a/§45b 36 €, §39 46 €
+          if mysql "$DB_NAME" -N -B -e "SELECT 1 FROM paragraphSaetze LIMIT 1;" >/dev/null 2>&1; then
+            {
+              echo ""
+              echo "**Hinterlegte Verrechnungssätze**"
+              echo ""
+              echo "| Paragraph | € je Stunde |"
+              echo "|---|---|"
+            } >> "$GITHUB_STEP_SUMMARY"
+            mysql "$DB_NAME" -N -B -e \
+              "SELECT CONCAT('| §', paragraph, ' | ', FORMAT(satzProStunde, 2), ' |')
+               FROM paragraphSaetze WHERE aktiv = 1 ORDER BY paragraph;" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [ "$FEHLT" = "1" ]; then
+            echo "::error::Nach der Migration fehlen weiterhin Spalten – bitte Protokoll prüfen."
+            exit 1
+          fi
+          echo "Verifikation erfolgreich."
+
+      - name: Zugangsdaten entfernen
+        if: always()
+        run: rm -f "$HOME/.my.cnf"
