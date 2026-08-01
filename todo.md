@@ -659,3 +659,9 @@
 ## Bugfixes 2026-08-01
 - [x] Fix: datenschutzDokumente-Tabelle per SQL-Migration erstellen (Fehler 1)
 - [x] Fix: system.getMitteilungen Procedure im systemRouter implementieren (Fehler 2)
+
+## Empfehlungen 2026-08-01
+
+- [x] Empfehlung 1: Zentrales Migrations-Skript (ensureTables) beim Server-Start – alle Tabellen per CREATE TABLE IF NOT EXISTS absichern
+- [x] Empfehlung 2: Admin-Interface für DSGVO-Dokumente im AdminPanel (Bearbeiten, Versionieren, Neu anlegen)
+- [x] Empfehlung 3: Notifications-Tabelle in DB prüfen und per SQL absichern

@@ -158,4 +158,60 @@ export const datenschutzRouter = router({
       });
       return { success: true };
     }),
+
+  /** Alle Dokumente abrufen – Admin-Interface */
+  listAlleDokumente: portalProtected.query(async () => {
+    const db = await getDb();
+    if (!db) return [];
+    return db.select().from(datenschutzDokumente).orderBy(desc(datenschutzDokumente.createdAt));
+  }),
+
+  /** Einzelnes Dokument bearbeiten (Admin) */
+  updateDokument: portalProtected
+    .input(z.object({
+      id: z.number().int().positive(),
+      titel: z.string().min(1),
+      inhalt: z.string().min(1),
+      version: z.string().min(1),
+      aktiv: z.boolean().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(datenschutzDokumente)
+        .set({ titel: input.titel, inhalt: input.inhalt, version: input.version, aktiv: input.aktiv ?? true })
+        .where(eq(datenschutzDokumente.id, input.id));
+      return { success: true };
+    }),
+
+  /** Dokument als neue Version anlegen (versioniert, altes wird deaktiviert) */
+  neueVersion: portalProtected
+    .input(z.object({
+      id: z.number().int().positive(),
+      titel: z.string().min(1),
+      inhalt: z.string().min(1),
+      neueVersion: z.string().min(1),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const altRows = await db.select().from(datenschutzDokumente).where(eq(datenschutzDokumente.id, input.id)).limit(1);
+      if (altRows.length === 0) throw new TRPCError({ code: "NOT_FOUND" });
+      const alt = altRows[0];
+      await db.update(datenschutzDokumente).set({ aktiv: false }).where(eq(datenschutzDokumente.id, input.id));
+      await db.insert(datenschutzDokumente).values({
+        typ: alt.typ, titel: input.titel, inhalt: input.inhalt, version: input.neueVersion, aktiv: true,
+      });
+      return { success: true };
+    }),
+
+  /** Dokument deaktivieren (kein Hard-Delete, Audit-Trail bleibt erhalten) */
+  deaktiviereDokument: portalProtected
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(datenschutzDokumente).set({ aktiv: false }).where(eq(datenschutzDokumente.id, input.id));
+      return { success: true };
+    }),
 });

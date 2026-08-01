@@ -11,6 +11,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { neukundenEskalationHandler, vertretungBereinigungHandler } from "../scheduledHandlers";
 import { handleFahrtenVersandCron } from "../scheduled/fahrtenVersand";
+import { ensureTables } from "../ensureTables";
 import multer from "multer";
 import { storagePut } from "../storage";
 
@@ -34,6 +35,9 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  // Tabellen-Absicherung: alle Tabellen per CREATE TABLE IF NOT EXISTS erstellen
+  await ensureTables();
+
   const app = express();
   const server = createServer(app);
   // Trust reverse proxy (Manus gateway) so req.protocol is correctly 'https'

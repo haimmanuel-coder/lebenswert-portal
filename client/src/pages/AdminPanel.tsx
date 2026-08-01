@@ -1,11 +1,12 @@
 import { FormularVorlagenTab } from "./FormularVorlagenTab";
+import { DsgvoAdminTab } from "./DsgvoAdminTab";
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import BottomSheet from "@/components/BottomSheet";
 import MitarbeiterDetail from "./MitarbeiterDetail";
 
-type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen";
+type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo";
 type PortalRolle = "mitarbeiter" | "teamleitung" | "buchhaltung" | "admin";
 
 const ROLLEN_LABEL: Record<PortalRolle, string> = {
@@ -230,6 +231,7 @@ export default function AdminPanel() {
           { key: "zuordnung" as AdminTab, label: "🔗 Zuordnung" },
           { key: "abschluss" as AdminTab, label: "📊 Abschluss" },
           { key: "vorlagen" as AdminTab, label: "📋 Formularvorlagen" },
+          { key: "dsgvo" as AdminTab, label: "🔒 DSGVO-Dokumente" },
         ].map((t) => (
           <button key={t.key} style={tabStyle(t.key)} onClick={() => setTab(t.key)}>{t.label}</button>
         ))}
@@ -525,6 +527,9 @@ export default function AdminPanel() {
 
       {tab === "vorlagen" && (
         <FormularVorlagenTab />
+      )}
+      {tab === "dsgvo" && (
+        <DsgvoAdminTab />
       )}
 
       <BottomSheet open={budgetSheet} onClose={() => setBudgetSheet(false)} title={budgetKunde ? `Budget: ${budgetKunde.vorname} ${budgetKunde.nachname}` : "Budget bearbeiten"}>
