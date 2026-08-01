@@ -655,3 +655,7 @@
 - [x] Backend: Abrechnungs-Router (Zeitraum berechnen, Fahrten zusammenführen, PDF, Admin-Freigabe, E-Mail)
 - [x] Frontend: Fahrtennachweise-Freigabe-Seite im AdminPanel + Steuerbüro-E-Mail-Einstellung
 - [x] Heartbeat: Automatischer E-Mail-Versand am 18. jeden Monats
+
+## Bugfixes 2026-08-01
+- [x] Fix: datenschutzDokumente-Tabelle per SQL-Migration erstellen (Fehler 1)
+- [x] Fix: system.getMitteilungen Procedure im systemRouter implementieren (Fehler 2)
