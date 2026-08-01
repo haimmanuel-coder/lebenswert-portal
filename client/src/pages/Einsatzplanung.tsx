@@ -445,6 +445,82 @@ export default function Einsatzplanung() {
         ))}
       </div>
 
+      {/* ── Schnellansicht: Heutige eigene Einsätze (nur für normale MA) ─── */}
+      {!darfAlleSehen && (() => {
+        const heutigeTermine = (termineProTag.get(heute) ?? []).filter(
+          (t: any) => t.status !== "abgesagt"
+        );
+        if (heutigeTermine.length === 0) return null;
+        return (
+          <div style={{
+            background: "linear-gradient(135deg, #eff6ff, #dbeafe)",
+            border: "1.5px solid #93c5fd",
+            borderRadius: 14,
+            padding: "14px 16px",
+            marginBottom: 14,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <span style={{ fontSize: 18 }}>🗓️</span>
+              <span style={{ fontSize: 14, fontWeight: 800, color: "#1d4ed8" }}>
+                Deine Einsätze heute
+              </span>
+              <span style={{
+                background: "#6366f1", color: "#fff",
+                fontSize: 10, fontWeight: 800,
+                padding: "2px 8px", borderRadius: 20, marginLeft: "auto",
+              }}>
+                {heutigeTermine.length} Termin{heutigeTermine.length !== 1 ? "e" : ""}
+              </span>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {heutigeTermine.map((t: any) => {
+                const kunde = (kunden as any[]).find((k: any) => k.id === t.kundenId);
+                const kundeName = kunde
+                  ? `${kunde.vorname ?? ""} ${kunde.nachname ?? ""}`.trim()
+                  : `Kunde #${t.kundenId}`;
+                const sf = STATUS_FARBEN[t.status] ?? STATUS_FARBEN.geplant;
+                return (
+                  <div key={t.id} style={{
+                    background: "#fff",
+                    borderRadius: 10,
+                    padding: "10px 14px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
+                  }}>
+                    <div style={{
+                      width: 40, height: 40, borderRadius: "50%",
+                      background: "#eff6ff",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 18, flexShrink: 0,
+                    }}>👤</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontSize: 14, fontWeight: 700, color: "#111827",
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      }}>
+                        {kundeName}
+                      </div>
+                      <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                        {(t.startzeit ?? "").slice(0, 5)} – {(t.endzeit ?? "").slice(0, 5)} Uhr
+                        {t.stunden ? ` · ${t.stunden}h` : ""}
+                        {t.paragraph ? ` · §${t.paragraph}` : ""}
+                      </div>
+                    </div>
+                    <span style={{
+                      background: sf.hintergrund, color: sf.text,
+                      fontSize: 10, fontWeight: 700,
+                      padding: "3px 8px", borderRadius: 20, flexShrink: 0,
+                    }}>{sf.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── Steuerleiste ──────────────────────────────────────────────── */}
       <div
         style={{

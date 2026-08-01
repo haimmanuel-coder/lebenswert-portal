@@ -9,7 +9,6 @@
  *   • Krankmeldungen
  *   • Fortbildungen (aus den Mitarbeiterdokumenten)
  *   • gesetzliche Feiertage
- *   • geplante Touren
  *   • freie Zeiten (Tage ohne Termin und ohne Abwesenheit)
  *
  * Über die Mitarbeiterauswahl lässt sich der Kalender auf eine Person
@@ -103,9 +102,6 @@ export default function Kalender() {
   const abwesenheitenAmTag = (datum: string) =>
     ((planung?.abwesenheiten ?? []) as any[]).filter((a) => liegtImZeitraum(datum, a.von, a.bis));
 
-  const tourenAmTag = (datum: string) =>
-    ((planung?.touren ?? []) as any[]).filter((t) => t.datum === datum);
-
   const anzahlTage = tageImMonat(jahr, monat);
   const startSpalte = ersterWochentag(jahr, monat);
 
@@ -147,15 +143,13 @@ export default function Kalender() {
 
   const tagesTermine = gewaehlterTag ? (termineNachTag[gewaehlterTag] ?? []) : [];
   const tagesAbwesenheiten = gewaehlterTag ? abwesenheitenAmTag(gewaehlterTag) : [];
-  const tagesTouren = gewaehlterTag ? tourenAmTag(gewaehlterTag) : [];
-
   return (
     <div style={{ padding: "20px 16px", maxWidth: 860, margin: "0 auto" }}>
       {/* Kopfbereich */}
       <div style={{ marginBottom: 14 }}>
         <h1 style={{ fontSize: 21, fontWeight: 800, color: "#1a2e1a", margin: 0 }}>📆 Kalender</h1>
         <p style={{ fontSize: 12.5, color: "#6b7280", margin: "4px 0 0" }}>
-          Termine, Urlaube, Krankmeldungen, Feiertage und Touren im Überblick
+          Termine, Urlaube, Krankmeldungen und Feiertage im Überblick
         </p>
       </div>
 
@@ -506,23 +500,6 @@ export default function Kalender() {
               </div>
             </div>
           ))}
-
-          {tagesTouren.length > 0 && (
-            <div
-              style={{
-                background: "#eef2ff",
-                border: "1px solid #c7d2fe",
-                borderRadius: 8,
-                padding: "8px 11px",
-                fontSize: 12.5,
-                color: "#3730a3",
-                marginBottom: 8,
-              }}
-            >
-              🗺️ {tagesTouren.length} geplante Tour{tagesTouren.length > 1 ? "en" : ""}:{" "}
-              {tagesTouren.map((t: any) => `${t.mitarbeiterName} (${t.punkte?.length ?? 0} Stationen)`).join(", ")}
-            </div>
-          )}
 
           {tagesTermine.length === 0 ? (
             <div style={{ color: "#9ca3af", fontSize: 13 }}>

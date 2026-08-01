@@ -681,3 +681,8 @@
 - [x] "Termine planen" Button im MA-Dashboard einbauen
 - [x] Einsatzplanung für MA-Bereich vollständig verfügbar (darfPlanen-Logik bereits im Backend)
 - [x] Touren-Kachel im Dashboard auf Einsatzplanung umgeleitet
+
+## Empfehlungen 2026-08-01 (Batch 3)
+- [x] Badge-Farbe für MA-Einsätze auf Blau/Indigo umstellen
+- [x] Einsatzplanung-Schnellansicht heutige Einsätze für normale MA
+- [x] Kalender.tsx: Touren-Block und alle Touren-Referenzen entfernen

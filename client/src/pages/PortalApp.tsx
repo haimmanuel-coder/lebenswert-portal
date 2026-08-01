@@ -308,7 +308,10 @@ export default function PortalApp() {
                   }}>{item.label}</span>
                   {item.badge !== undefined && item.badge > 0 && (
                     <span style={{
-                      background: item.id === "kunden" ? "#f59e0b" : "#dc2626",
+                      background:
+                        item.id === "kunden" ? "#f59e0b"
+                        : item.id === "planung" && !(isAdmin || isTeamleitung) ? "#6366f1"
+                        : "#dc2626",
                       color: "#fff", fontSize: 9, fontWeight: 800,
                       minWidth: 16, height: 16, borderRadius: 8,
                       display: "flex", alignItems: "center", justifyContent: "center",
