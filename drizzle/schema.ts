@@ -958,3 +958,41 @@ export const planungsWarnungen = mysqlTable("planungsWarnungen", {
 });
 export type PlanungsWarnung = typeof planungsWarnungen.$inferSelect;
 export type InsertPlanungsWarnung = typeof planungsWarnungen.$inferInsert;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A21 – Jahresbudgetverwaltung (V2.2)
+// ─────────────────────────────────────────────────────────────────────────────
+export const jahresbudgets = mysqlTable("jahresbudgets", {
+  id: int("id").autoincrement().primaryKey(),
+  kundenId: int("kundenId").notNull(),
+  leistungsbereich: mysqlEnum("leistungsbereich", ["45b", "39", "45a", "privat", "sonstige"]).notNull(),
+  jahresbudgetCent: int("jahresbudgetCent").notNull().default(0),
+  verbrauchtCent: int("verbrauchtCent").notNull().default(0),
+  gueltigAb: date("gueltigAb").notNull(),
+  gueltigBis: date("gueltigBis").notNull(),
+  stundensatzCent: int("stundensatzCent").notNull().default(3500),
+  notizen: text("notizen"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type Jahresbudget = typeof jahresbudgets.$inferSelect;
+export type InsertJahresbudget = typeof jahresbudgets.$inferInsert;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A27 – Controlling-Snapshots (V2.2)
+// ─────────────────────────────────────────────────────────────────────────────
+export const controllingSnapshots = mysqlTable("controllingSnapshots", {
+  id: int("id").autoincrement().primaryKey(),
+  monat: varchar("monat", { length: 7 }).notNull(),
+  kundenId: int("kundenId").notNull(),
+  mitarbeiterId: int("mitarbeiterId"),
+  leistungsbereich: varchar("leistungsbereich", { length: 10 }).notNull(),
+  jahresbudgetCent: int("jahresbudgetCent").notNull().default(0),
+  monatsbudgetCent: int("monatsbudgetCent").notNull().default(0),
+  geplanteMinuten: int("geplanteMinuten").notNull().default(0),
+  tatsaechlicheMinuten: int("tatsaechlicheMinuten").notNull().default(0),
+  verbrauchtCent: int("verbrauchtCent").notNull().default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ControllingSnapshot = typeof controllingSnapshots.$inferSelect;
+export type InsertControllingSnapshot = typeof controllingSnapshots.$inferInsert;

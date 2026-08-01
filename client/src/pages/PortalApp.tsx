@@ -47,6 +47,8 @@ import DsgvoErstDialog from "@/components/DsgvoErstDialog";
 import Einsatzplanung from "./Einsatzplanung";
 import MeineTour from "./MeineTour";
 import ImportAssistent from "./ImportAssistent";
+import BudgetVerwaltung from "./BudgetVerwaltung";
+import ControllingDashboard from "./ControllingDashboard";
 import Privatrechnung from "./Privatrechnung";
 import { NavigationProvider, type SeitenId } from "@/contexts/NavigationContext";
 
@@ -181,6 +183,8 @@ export default function PortalApp() {
           { id: "backupstatus" as PageId, icon: "💾", label: "Backup-Status", adminOnly: true },
           { id: "import" as PageId, icon: "📥", label: "Import-Assistent", adminOnly: true },
           { id: "privatrechnung" as PageId, icon: "🧾", label: "Privatrechnung", adminOnly: true },
+          { id: "budget" as PageId, icon: "💰", label: "Budgetverwaltung", adminOnly: false },
+          { id: "controlling" as PageId, icon: "📊", label: "Controlling", adminOnly: true },
         ] : [
           { id: "export" as PageId, icon: "📮", label: "Export & Briefe" },
         ]),
@@ -234,6 +238,8 @@ export default function PortalApp() {
       case "analysen": return <AnalyseDashboard />;
       case "backupstatus": return <BackupStatus />;
       case "import": return <ImportAssistent />;
+      case "budget": return <BudgetVerwaltung />;
+      case "controlling": return <ControllingDashboard />;
       case "privatrechnung": return <Privatrechnung />;
       default: return <Dashboard />;
     }

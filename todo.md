@@ -616,26 +616,36 @@
 
 ## Lastenheft V2.0 – 11 Aufgaben (Aug 2026)
 
-- [ ] A1: Mehrfach-Paragraphenauswahl im Kundenprofil (§39, §45b, §37, Privat als JSON-Array)
-- [ ] A2: Kostenträger-Dropdown mit 16 Einträgen (AOK, Barmer, DAK, IKK, TK, KKH, Knappschaft, BKK, Debeka, LVM, Signal Iduna, HUK, Private PV, Beihilfe, Selbstzahler, Sonstige)
-- [ ] A3: Beihilfe-Integration (Ja/Nein Toggle, Pflegekasse-%, Beihilfe-%, Versicherung, Bemerkungen)
-- [ ] A4: Automatische Leistungsnachweise pro Paragraph nach Einsatzabschluss (je Paragraph ein LNW)
-- [ ] A5: Mitarbeiter-Einsatzplanung (Button im Dashboard, 2-Wochen-Vorausplanung, nur eigene Kunden)
-- [ ] A6: Dashboard modernisieren (Tourenplanung/Meine Tour/Manuelle Zeiterfassung entfernen, neue Icons)
-- [ ] A7: Mitarbeiter-Workflow (Mitteilungen, Hinweise, Krankmeldungen, Urlaubsanfragen, Vertretungsanfragen, Neue Kunden, Dokumente – alle anklickbar/bearbeitbar)
-- [ ] A8: Vertretungsmanagement (Freigabe bei Krank/Urlaub/Fortbildung, Push-Benachrichtigung, "Kunde übernehmen"-Button, Farbkennzeichnung Grün=eigener Kunde/Orange=Vertretung)
-- [ ] A9: Dokumentation nach Einsatz (Beginn/Ende, Leistung, Bemerkungen, Unterschrift Kunde+Mitarbeiter, Fotos optional)
-- [ ] A10: Leistungsnachweise pro Paragraph automatisch generieren (monatlich, je Paragraph separat)
-- [ ] A11: OptaData-Vorbereitung (Kostenträger, Leistungsart, vollständige Felder, eLNW-Struktur)
+- [x] A1: Mehrfach-Paragraphenauswahl im Kundenprofil (§39, §45b, §37, Privat als JSON-Array)
+- [x] A2: Kostenträger-Dropdown mit 16 Einträgen (AOK, Barmer, DAK, IKK, TK, KKH, Knappschaft, BKK, Debeka, LVM, Signal Iduna, HUK, Private PV, Beihilfe, Selbstzahler, Sonstige)
+- [x] A3: Beihilfe-Integration (Ja/Nein Toggle, Pflegekasse-%, Beihilfe-%, Versicherung, Bemerkungen)
+- [x] A4: Automatische Leistungsnachweise pro Paragraph nach Einsatzabschluss (je Paragraph ein LNW)
+- [x] A5: Mitarbeiter-Einsatzplanung (Button im Dashboard, 2-Wochen-Vorausplanung, nur eigene Kunden)
+- [x] A6: Dashboard modernisieren (Tourenplanung/Meine Tour/Manuelle Zeiterfassung entfernen, neue Icons)
+- [x] A7: Mitarbeiter-Workflow (Mitteilungen, Hinweise, Krankmeldungen, Urlaubsanfragen, Vertretungsanfragen, Neue Kunden, Dokumente – alle anklickbar/bearbeitbar)
+- [x] A8: Vertretungsmanagement (Freigabe bei Krank/Urlaub/Fortbildung, Push-Benachrichtigung, "Kunde übernehmen"-Button, Farbkennzeichnung Grün=eigener Kunde/Orange=Vertretung)
+- [x] A9: Dokumentation nach Einsatz (Beginn/Ende, Leistung, Bemerkungen, Unterschrift Kunde+Mitarbeiter, Fotos optional)
+- [x] A10: Leistungsnachweise pro Paragraph automatisch generieren (monatlich, je Paragraph separat)
+- [x] A11: OptaData-Vorbereitung (Kostenträger, Leistungsart, vollständige Felder, eLNW-Struktur)
 
 ## Lastenheft V2.1 – Aufgaben 12–20 (Aug 2026)
 
-- [ ] A12: §45a Umwidmung – Kundenprofil-Felder, Budget-Warnungen (80/90/100%), Sperrlogik bei 100%
-- [ ] A13: Automatisches Fahrtenbuch – nach Einsatzabschluss automatisch befüllen, Filter, PDF/Excel-Export
-- [ ] A14: Sonderfahrten – Mitarbeiter markiert Einsatz, km × 0,35 €, erscheint auf Monatsrechnung
-- [ ] A15: Erweiterbare Rechnungspositionen – Einkauf, Begleitservice, Auslagen etc. mit Menge/Preis
-- [ ] A16: Automatische Privatrechnung – Monatsendeabrechnung, PDF, optionaler E-Mail-Versand
-- [ ] A17: DSGVO/IT-Sicherheit – Sitzungs-Timeout, RBAC-Härtung, Audit-Log vollständig
-- [ ] A18: Import-Assistent – Excel/CSV-Upload für Kunden, Pflegegrad, Kostenträger, Budgets
-- [ ] A19: Intelligenter Datenabgleich – Änderungsprotokoll mit Datum/Uhrzeit/Benutzer/Feld/Alt/Neu
-- [ ] A20: Plausibilitätsprüfung – Pflichtfelder, Doppelte Kunden/Einsätze, Budgetüberschreitung, Terminüberschneidung
+- [x] A12: §45a Umwidmung – Kundenprofil-Felder, Budget-Warnungen (80/90/100%), Sperrlogik bei 100%
+- [x] A13: Automatisches Fahrtenbuch – nach Einsatzabschluss automatisch befüllen, Filter, PDF/Excel-Export
+- [x] A14: Sonderfahrten – Mitarbeiter markiert Einsatz, km × 0,35 €, erscheint auf Monatsrechnung
+- [x] A15: Erweiterbare Rechnungspositionen – Einkauf, Begleitservice, Auslagen etc. mit Menge/Preis
+- [x] A16: Automatische Privatrechnung – Monatsendeabrechnung, PDF, optionaler E-Mail-Versand
+- [x] A17: DSGVO/IT-Sicherheit – Sitzungs-Timeout, RBAC-Härtung, Audit-Log vollständig
+- [x] A18: Import-Assistent – Excel/CSV-Upload für Kunden, Pflegegrad, Kostenträger, Budgets
+- [x] A19: Intelligenter Datenabgleich – Änderungsprotokoll mit Datum/Uhrzeit/Benutzer/Feld/Alt/Neu
+- [x] A20: Plausibilitätsprüfung – Pflichtfelder, Doppelte Kunden/Einsätze, Budgetüberschreitung, Terminüberschneidung
+
+## Lastenheft V2.2 – Intelligentes Budgetmanagement (A21–A27)
+
+- [x] A21: Jahresbudgetverwaltung – Jahresbudget je Leistungsbereich (§45b, §39, §45a, Privat), Gültigkeitszeitraum, Verbrauch, Restbudget, automatische Monatsbudgetberechnung
+- [x] A22: Budgetanzeige für Mitarbeiter – Monatsbudget, geplant, verbraucht, Rest (€/h/%); keine Jahresbudget-Sichtbarkeit
+- [x] A23: KI-Planungsempfehlung – LLM-basierte unverbindliche Empfehlung zur optimalen Budgetausnutzung
+- [x] A24: Budgetampel – Grün/Gelb/Rot/Grau in Kundenliste, Einsatzplanung, Dashboard, Kundenprofil
+- [x] A25: Jahresprognose – Verbrauch, Durchschnitt, voraussichtlicher Jahresverbrauch, Restbudget, Unter-/Überauslastung
+- [x] A26: Optimierungsvorschläge – Fahrtzeit-Kombination, gleichmäßige Verteilung, Budgetverfall-Vermeidung, kombinierbare Leistungsansprüche
+- [x] A27: Controlling-Dashboard (Admin) – Kennzahlen, Filter (Zeitraum, MA, Leistungsbereich, Pflegegrad, Kostenträger), Excel+PDF-Export
