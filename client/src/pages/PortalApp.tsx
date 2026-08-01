@@ -15,6 +15,7 @@ import Kostentraeger from "./Kostentraeger";
 import Textbausteine from "./Textbausteine";
 import ExportCenter from "./ExportCenter";
 import Fuehrerschein from "./Fuehrerschein";
+import Sicherheitsunterweisungen from "./Sicherheitsunterweisungen";
 import NeukundenAufnahme from "./NeukundenAufnahme";
 import Kalender from "./Kalender";
 import Kassenanfrage from "./Kassenanfrage";
@@ -102,6 +103,9 @@ export default function PortalApp() {
   const planungsBadge = (isAdmin || isTeamleitung)
     ? (planungsWarnungen.length > 0 ? planungsWarnungen.length : undefined)
     : (heutigeEinsaetze.length > 0 ? heutigeEinsaetze.length : undefined);
+  // Offene Pflicht-Sicherheitsunterweisungen für Badge
+  const { data: sicherheitOffen } = (trpc as any).sicherheitsunterweisung.countOffen.useQuery();
+  const sicherheitBadge = (sicherheitOffen as any)?.count > 0 ? (sicherheitOffen as any).count : undefined;
   const { isOnline, offlineCount } = useOfflineSync();
   const { show: showTour, startTour, closeTour } = useOnboardingTour();
   useSSENotifications(mitarbeiter?.id);
@@ -159,6 +163,7 @@ export default function PortalApp() {
         { id: "urlaub", icon: "🌴", label: "Urlaubsverwaltung" },
         { id: "krank", icon: "🤒", label: "Krankmeldung" },
         { id: "fuehrerschein", icon: "🪪", label: "Führerschein-Check" },
+        { id: "sicherheitsunterweisung", icon: "🛡️", label: "Sicherheitsunterweisungen", badge: sicherheitBadge > 0 ? sicherheitBadge : undefined },
         { id: "profil", icon: "👤", label: "Mein Profil" },
       ],
     },
@@ -221,6 +226,7 @@ export default function PortalApp() {
       case "textbausteine": return <Textbausteine />;
       case "export": return <ExportCenter />;
       case "fuehrerschein": return <Fuehrerschein />;
+      case "sicherheitsunterweisung": return <Sicherheitsunterweisungen />;
       case "neukundenaufnahme": return <NeukundenAufnahme />;
       case "kalender": return <Kalender />;
       case "kassenanfrage": return <Kassenanfrage />;

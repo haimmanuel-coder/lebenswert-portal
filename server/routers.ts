@@ -118,6 +118,7 @@ import { rbacRouter } from "./routers/rbacRouter";
 import { umwidmungRouter, sonderfahrtRouter, rechnungspositionRouter, privatrechnungRouter, importRouter } from "./routers/privatrechnungRouter";
 import { budgetRouter } from "./routers/budgetRouter";
 import { fahrtenAbrechnungRouter } from "./routers/fahrtenAbrechnungRouter";
+import { sicherheitsunterweisungRouter } from "./routers/sicherheitsunterweisungRouter";
 import {
   savePushSubscription,
   deletePushSubscription,
@@ -1281,6 +1282,54 @@ export const appRouter = router({
               }
             }
           } catch (lnErr) { console.warn('[A4] Leistungsnachweis-Erstellung fehlgeschlagen:', lnErr); }
+
+          // ── BUDGET-AUTOMATIK: Stunden vom Kundenbudget abziehen ──────────
+          // Wenn ein Einsatz abgeschlossen wird, werden die geleisteten Stunden
+          // automatisch vom jeweiligen Paragraph-Budget des Kunden abgezogen.
+          // Dies entspricht dem Leistungskonzept: "alle erfassten Stunden müssen
+          // automatisch vom zugeteilten Budget abgezogen werden."
+          try {
+            const dbBudget = await getDb();
+            if (dbBudget) {
+              const einsatzBudgetRows = await dbBudget.select().from(einsaetzeTable).where(eq(einsaetzeTable.id, input.id)).limit(1);
+              if (einsatzBudgetRows.length > 0) {
+                const eb = einsatzBudgetRows[0];
+                const kundeAktuell = await getKundeById(eb.kundenId);
+                if (kundeAktuell) {
+                  const budgetUpdate: Record<string, string> = {};
+                  const stunden1 = parseFloat(String(eb.dauerStunden ?? 0));
+                  const stunden2 = parseFloat(String((eb as any).stunden2 ?? 0));
+                  // Paragraph 1
+                  if (eb.paragraph === '45b' && stunden1 > 0) {
+                    const neu = Math.max(0, parseFloat(String((kundeAktuell as any).verbraucht45b ?? 0)) + stunden1);
+                    budgetUpdate.verbraucht45b = String(neu);
+                  } else if (eb.paragraph === '45a' && stunden1 > 0) {
+                    const neu = Math.max(0, parseFloat(String((kundeAktuell as any).verbraucht45a ?? 0)) + stunden1);
+                    budgetUpdate.verbraucht45a = String(neu);
+                  } else if (eb.paragraph === '39' && stunden1 > 0) {
+                    const neu = Math.max(0, parseFloat(String((kundeAktuell as any).verbraucht39 ?? 0)) + stunden1);
+                    budgetUpdate.verbraucht39 = String(neu);
+                  }
+                  // Paragraph 2 (falls vorhanden)
+                  if ((eb as any).paragraph2 === '45b' && stunden2 > 0) {
+                    const basis = budgetUpdate.verbraucht45b ? parseFloat(budgetUpdate.verbraucht45b) : parseFloat(String((kundeAktuell as any).verbraucht45b ?? 0));
+                    budgetUpdate.verbraucht45b = String(Math.max(0, basis + stunden2));
+                  } else if ((eb as any).paragraph2 === '45a' && stunden2 > 0) {
+                    const basis = budgetUpdate.verbraucht45a ? parseFloat(budgetUpdate.verbraucht45a) : parseFloat(String((kundeAktuell as any).verbraucht45a ?? 0));
+                    budgetUpdate.verbraucht45a = String(Math.max(0, basis + stunden2));
+                  } else if ((eb as any).paragraph2 === '39' && stunden2 > 0) {
+                    const basis = budgetUpdate.verbraucht39 ? parseFloat(budgetUpdate.verbraucht39) : parseFloat(String((kundeAktuell as any).verbraucht39 ?? 0));
+                    budgetUpdate.verbraucht39 = String(Math.max(0, basis + stunden2));
+                  }
+                  if (Object.keys(budgetUpdate).length > 0) {
+                    await updateKundeBudget(eb.kundenId, budgetUpdate);
+                    console.log(`[Budget-Automatik] Kunde ${eb.kundenId}: ${JSON.stringify(budgetUpdate)} abgezogen`);
+                  }
+                }
+              }
+            }
+          } catch (budgetErr) { console.warn('[Budget-Automatik] Budgetabzug fehlgeschlagen:', budgetErr); }
+
           try {
             const warnungen = await getKundenMitBudgetWarnung();
             if (warnungen.length > 0) {
@@ -2508,6 +2557,7 @@ export const appRouter = router({
   fahrtenAbrechnung: fahrtenAbrechnungRouter,
   budget: budgetRouter,
   import: importRouter,
+  sicherheitsunterweisung: sicherheitsunterweisungRouter,
 });
 
 export type AppRouter = typeof appRouter;

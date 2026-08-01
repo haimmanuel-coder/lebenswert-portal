@@ -686,3 +686,12 @@
 - [x] Badge-Farbe für MA-Einsätze auf Blau/Indigo umstellen
 - [x] Einsatzplanung-Schnellansicht heutige Einsätze für normale MA
 - [x] Kalender.tsx: Touren-Block und alle Touren-Referenzen entfernen
+
+## Compliance-Features 2026-08-02
+
+- [x] Führerschein-Check: automatischer 6-Monats-Erinnerungs-Workflow (Heartbeat-Job täglich 08:00)
+- [x] ensureHeartbeatJobs: alle 5 Cron-Jobs beim Server-Start registrieren
+- [x] Sicherheitsunterweisungen: Pflichtlektüre mit digitaler Bestätigung und Timestamp
+- [x] Sicherheitsunterweisungen: MA-Seite mit Fortschrittsanzeige und Bestätigungs-Button
+- [x] Sicherheitsunterweisungen: Badge in Navigation (offene Pflichtunterweisungen)
+- [x] Budget-Automatik: LNW-Abschluss zieht Stunden automatisch vom Kundenbudget ab

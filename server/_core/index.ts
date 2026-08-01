@@ -11,7 +11,9 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { neukundenEskalationHandler, vertretungBereinigungHandler } from "../scheduledHandlers";
 import { handleFahrtenVersandCron } from "../scheduled/fahrtenVersand";
+import { fuehrerscheinErinnerungHandler } from "../scheduled/fuehrerscheinErinnerung";
 import { ensureTables } from "../ensureTables";
+import { ensureHeartbeatJobs } from "../ensureHeartbeatJobs";
 import multer from "multer";
 import { storagePut } from "../storage";
 
@@ -37,6 +39,8 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   // Tabellen-Absicherung: alle Tabellen per CREATE TABLE IF NOT EXISTS erstellen
   await ensureTables();
+  // Heartbeat-Jobs registrieren (idempotent)
+  ensureHeartbeatJobs().catch((e) => console.warn("[HeartbeatJobs] Hintergrund-Init fehlgeschlagen:", e));
 
   const app = express();
   const server = createServer(app);
@@ -68,6 +72,7 @@ async function startServer() {
   });
   // ⏱ Heartbeat-Handler (Cron-only, vor tRPC registrieren)
   app.post("/api/scheduled/neukunden-eskalation", neukundenEskalationHandler);
+  app.post("/api/scheduled/fuehrerschein-erinnerung", fuehrerscheinErinnerungHandler);
   app.post("/api/scheduled/vertretung-bereinigung", vertretungBereinigungHandler);
   // Fahrtennachweise: automatischer Versand am 18. jeden Monats
   app.post("/api/scheduled/fahrtennachweise-versand", async (_req: any, res: any) => {
