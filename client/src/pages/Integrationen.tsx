@@ -150,7 +150,7 @@ export default function Integrationen() {
               { label: "Ø Einsatzdauer (h)", wert: analysen?.durchschnittlicheEinsatzdauer ? `${analysen.durchschnittlicheEinsatzdauer}h` : "—", icon: "⏱️", farbe: "#f59e0b" },
               { label: "Offene Budgets", wert: analysen?.offeneBudgets ?? "—", icon: "💰", farbe: "#ef4444" },
               { label: "Mitarbeiter aktiv", wert: analysen?.aktiveMitarbeiter ?? "—", icon: "👤", farbe: "#8b5cf6" },
-              { label: "Touren geplant", wert: analysen?.tourenGeplant ?? "—", icon: "🗺️", farbe: "#0d9488" },
+              { label: "Einsätze geplant", wert: analysen?.tourenGeplant ?? "—", icon: "🗓️", farbe: "#0d9488" },
             ].map(kpi => (
               <div key={kpi.label} style={{ background: "#fff", borderRadius: 16, border: "1px solid #e5e7eb", padding: "20px 18px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>

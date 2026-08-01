@@ -82,15 +82,26 @@ export default function PortalApp() {
   const { data: warnungen = [] } = trpc.kunden.budgetWarnungen.useQuery();
   const { data: unreadNotifs = [] } = trpc.notifications.list.useQuery();
   const { data: neukundenPushOffen = [] } = (trpc as any).neukundenPush.meineOffenen.useQuery();
-  // Offene Planungswarnungen (Minijob, Budget) als Badge in der Navigation
+  // Offene Planungswarnungen (Minijob, Budget) als Badge in der Navigation (nur Admin/Teamleitung)
   const { data: planungsWarnungen = [] } = (trpc as any).planung.warnungen.list.useQuery({ nurOffene: true });
+  // Heutige eigene Einsätze für MA-Badge in der Einsatzplanung-Navigation
+  const { data: meineEinsaetze = [] } = trpc.einsaetze.list.useQuery();
   const offenCount = leistungen.filter((l) => l.status === "offen").length;
   // Das Feld heisst in der Datenbank "gelesen" (boolean) – zuvor wurde ein
   // nicht vorhandenes Feld geprueft, wodurch der Badge alle Meldungen zaehlte.
   const unreadCount = (unreadNotifs as any[]).filter((n: any) => !n.gelesen).length;
   const neukundenPushCount = (neukundenPushOffen as any[]).length;
-    const isAdmin = mitarbeiter?.rolle === "admin";
+  const isAdmin = mitarbeiter?.rolle === "admin";
   const isTeamleitung = mitarbeiter?.rolle === "teamleitung";
+  // Badge-Logik: Admin/Teamleitung sehen Warnungsanzahl, normale MA sehen heutige Einsätze
+  const today = new Date().toISOString().split("T")[0];
+  const heutigeEinsaetze = (meineEinsaetze as any[]).filter((e: any) => {
+    const datum = typeof e.datum === "string" ? e.datum : (e.datum as Date).toISOString().split("T")[0];
+    return datum === today && e.status !== "abgeschlossen";
+  });
+  const planungsBadge = (isAdmin || isTeamleitung)
+    ? (planungsWarnungen.length > 0 ? planungsWarnungen.length : undefined)
+    : (heutigeEinsaetze.length > 0 ? heutigeEinsaetze.length : undefined);
   const { isOnline, offlineCount } = useOfflineSync();
   const { show: showTour, startTour, closeTour } = useOnboardingTour();
   useSSENotifications(mitarbeiter?.id);
@@ -126,7 +137,7 @@ export default function PortalApp() {
       title: "Arbeitsablauf",
       items: [
         { id: "home", icon: "🏠", label: "Dashboard" },
-        { id: "planung", icon: "🗓️", label: "Einsatzplanung", badge: planungsWarnungen.length > 0 ? planungsWarnungen.length : undefined },
+        { id: "planung", icon: "🗓️", label: "Einsatzplanung", badge: planungsBadge },
         { id: "einsaetze", icon: "📅", label: "Einsätze" },
         { id: "zeit", icon: "⏱", label: "Zeiterfassung" },
         { id: "lnw", icon: "📋", label: "Leistungsnachweise", badge: offenCount > 0 ? offenCount : undefined },

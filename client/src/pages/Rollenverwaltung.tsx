@@ -13,7 +13,7 @@ type Mitarbeiter = {
 
 const ROLLEN = [
   { value: "admin", label: "Administrator", icon: "🔑", color: "#dc2626", bg: "#fee2e2", desc: "Vollzugriff auf alle Bereiche, Benutzerverwaltung, Exporte, Logbuch" },
-  { value: "teamleitung", label: "Teamleitung", icon: "👥", color: "#7c3aed", bg: "#f5f3ff", desc: "Tourenplanung, Einsatzplanung, Mitarbeiterübersicht, Besuchsberichte freigeben" },
+  { value: "teamleitung", label: "Teamleitung", icon: "👥", color: "#7c3aed", bg: "#f5f3ff", desc: "Einsatzplanung, Termine planen, Mitarbeiterübersicht, Besuchsberichte freigeben" },
   { value: "buchhaltung", label: "Buchhaltung", icon: "💼", color: "#b45309", bg: "#fffbeb", desc: "Kundenliste (lesend), Finanzen, DATEV-Export, Leistungsnachweise" },
   { value: "mitarbeiter", label: "Mitarbeiter", icon: "👤", color: "#4a8c3f", bg: "#f0fdf4", desc: "Zeiterfassung, eigene Einsätze, Kundenliste (lesend), Leistungsnachweise" },
 ];
@@ -194,7 +194,7 @@ export default function Rollenverwaltung() {
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#92400e", marginBottom: 3 }}>Wichtiger Hinweis</div>
             <p style={{ fontSize: 12, color: "#78350f", margin: 0, lineHeight: 1.6 }}>
-              Rollenänderungen wirken sofort. Teamleitung darf Touren planen und Besuchsberichte freigeben. Buchhaltung hat Zugriff auf Finanzdaten und DATEV-Export. Wenn du einem Mitarbeiter die Admin-Rolle gibst, hat er vollen Zugriff auf alle Daten. Es muss immer mindestens ein Administrator im System verbleiben.
+              Rollenänderungen wirken sofort. Teamleitung darf Termine planen und Besuchsberichte freigeben. Buchhaltung hat Zugriff auf Finanzdaten und DATEV-Export. Wenn du einem Mitarbeiter die Admin-Rolle gibst, hat er vollen Zugriff auf alle Daten. Es muss immer mindestens ein Administrator im System verbleiben.
             </p>
           </div>
         </div>

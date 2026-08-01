@@ -61,7 +61,7 @@ export default function Verfuegbarkeiten() {
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: "#1f2937", margin: 0 }}>📅 Meine Verfügbarkeiten</h1>
           <p style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>
-            Gib an, wann du für Einsätze verfügbar bist. Die Tourenplanung berücksichtigt deine Angaben.
+            Gib an, wann du für Einsätze verfügbar bist. Die Einsatzplanung berücksichtigt deine Angaben.
           </p>
         </div>
         <button
