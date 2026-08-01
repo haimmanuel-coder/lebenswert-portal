@@ -1027,14 +1027,26 @@ function TerminAssistent({
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 12, marginBottom: 14 }}>
           <div>
             <label style={feldLabelStil}>Mitarbeiter *</label>
-            <AuswahlFeld
-              optionen={mitarbeiterOptionen}
-              wert={formular.mitarbeiterId}
-              onChange={(id) => aendere("mitarbeiterId", id)}
-              platzhalter="Mitarbeiter auswählen …"
-              suchPlatzhalter="Name suchen …"
-              pflicht
-            />
+            {istAdmin ? (
+              // Admin und Teamleitung können beliebigen Mitarbeiter auswählen
+              <AuswahlFeld
+                optionen={mitarbeiterOptionen}
+                wert={formular.mitarbeiterId}
+                onChange={(id) => aendere("mitarbeiterId", id)}
+                platzhalter="Mitarbeiter auswählen …"
+                suchPlatzhalter="Name suchen …"
+                pflicht
+              />
+            ) : (
+              // Normale MA sehen nur ihren eigenen Namen (nicht änderbar)
+              <div style={{ ...eingabeStil, background: "#f3f4f6", color: "#374151", display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 14 }}>&#128100;</span>
+                <span style={{ fontSize: 13.5, fontWeight: 600 }}>
+                  {mitarbeiterOptionen.find((o: any) => o.id === formular.mitarbeiterId)?.label ?? "Mein Profil"}
+                </span>
+                <span style={{ marginLeft: "auto", fontSize: 11, color: "#9ca3af", background: "#e5e7eb", padding: "2px 7px", borderRadius: 6 }}>Ich</span>
+              </div>
+            )}
           </div>
           <div>
             <label style={feldLabelStil}>Kunde *</label>

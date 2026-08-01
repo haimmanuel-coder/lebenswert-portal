@@ -534,7 +534,9 @@ export const planungRouter = router({
         auslastung,
         konfiguration: { ...konfiguration, minijobGrenze: MINIJOB_GRENZE },
         rechte: {
-          darfPlanen: rolle === "admin" || rolle === "teamleitung",
+          // Alle Mitarbeiter dürfen Termine planen (eigene Einsätze).
+          // Nur Admin und Teamleitung dürfen Termine für andere MA planen.
+          darfPlanen: true,
           darfLoeschen: rolle === "admin" || rolle === "teamleitung",
           darfAlleSehen: alleSehen,
         },
