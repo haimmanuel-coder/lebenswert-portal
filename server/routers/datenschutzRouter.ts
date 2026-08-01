@@ -5,6 +5,34 @@ import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
 import { datenschutzDokumente, datenschutzZustimmungen, mitarbeiter as mitarbeiterTable } from "../../drizzle/schema";
 import { eq, desc, and } from "drizzle-orm";
+import { sendEmail } from "../emailService";
+
+/** HTML-Template für DSGVO-Benachrichtigungs-E-Mail */
+function buildDsgvoUpdateEmail(data: { vorname: string; nachname: string; titel: string; version: string }): string {
+  return `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+      <div style="background:#1a5c38;color:#fff;padding:20px;border-radius:8px 8px 0 0">
+        <h2 style="margin:0">Lebenswert Betreuung</h2>
+        <p style="margin:4px 0 0">Wichtige Datenschutz-Information</p>
+      </div>
+      <div style="background:#f9f9f9;padding:20px;border:1px solid #e0e0e0">
+        <p>Hallo <strong>${data.vorname} ${data.nachname}</strong>,</p>
+        <p>wir haben unsere Datenschutzunterlagen aktualisiert:</p>
+        <div style="background:#e8f5e9;border-left:4px solid #4a8c3f;padding:12px 16px;margin:16px 0;border-radius:4px">
+          <strong>${data.titel}</strong> &ndash; Version ${data.version}
+        </div>
+        <p>Bitte melden Sie sich im <strong>Mitarbeiter-Portal</strong> an und bestätigen Sie die neue Version, um weiterhin Zugang zu allen Funktionen zu haben.</p>
+        <div style="text-align:center;margin:24px 0">
+          <a href="https://portal.lebenswert-betreuung.de" style="background:#4a8c3f;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">Zum Portal &rarr;</a>
+        </div>
+        <p style="color:#666;font-size:12px">Falls Sie Fragen haben, wenden Sie sich bitte an Ihre Teamleitung.</p>
+        <p style="margin-top:24px">Mit freundlichen Grüßen<br><strong>Lebenswert Betreuung GmbH</strong></p>
+      </div>
+      <div style="background:#e8f5e9;padding:10px;font-size:11px;color:#555;border-radius:0 0 8px 8px">
+        Diese E-Mail wurde automatisch generiert. | DSGVO-konform verarbeitet.
+      </div>
+    </div>`;
+}
 
 
 export const datenschutzRouter = router({
@@ -202,6 +230,31 @@ export const datenschutzRouter = router({
       await db.insert(datenschutzDokumente).values({
         typ: alt.typ, titel: input.titel, inhalt: input.inhalt, version: input.neueVersion, aktiv: true,
       });
+
+      // ── E-Mail-Benachrichtigung an alle aktiven Mitarbeiter ──────────────
+      try {
+        const alleMa = await db
+          .select({ id: mitarbeiterTable.id, vorname: mitarbeiterTable.vorname, nachname: mitarbeiterTable.nachname, email: mitarbeiterTable.email })
+          .from(mitarbeiterTable)
+          .where(eq(mitarbeiterTable.aktiv, 1));
+
+        let gesendet = 0;
+        let fehler = 0;
+        for (const ma of alleMa) {
+          if (!ma.email) continue;
+          const result = await sendEmail({
+            to: ma.email,
+            subject: `⚠️ Neue DSGVO-Version: ${input.titel} (v${input.neueVersion}) – Zustimmung erforderlich`,
+            html: buildDsgvoUpdateEmail({ vorname: ma.vorname, nachname: ma.nachname, titel: input.titel, version: input.neueVersion }),
+          });
+          if (result.success) gesendet++; else fehler++;
+        }
+        console.log(`[DSGVO] Neue Version ${input.neueVersion}: ${gesendet} E-Mails gesendet, ${fehler} Fehler`);
+      } catch (emailErr: any) {
+        // E-Mail-Fehler darf die Versionierung nicht blockieren
+        console.error("[DSGVO] E-Mail-Versand fehlgeschlagen:", emailErr.message);
+      }
+
       return { success: true };
     }),
 
@@ -213,5 +266,38 @@ export const datenschutzRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       await db.update(datenschutzDokumente).set({ aktiv: false }).where(eq(datenschutzDokumente.id, input.id));
       return { success: true };
+    }),
+
+  /**
+   * Zustimmungs-Übersicht für ein Dokument (Admin):
+   * Gibt alle aktiven Mitarbeiter mit ihrem Zustimmungsstatus zurück.
+   */
+  getZustimmungsUebersicht: portalProtected
+    .input(z.object({ dokumentId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const alle = await db
+        .select({ id: mitarbeiterTable.id, vorname: mitarbeiterTable.vorname, nachname: mitarbeiterTable.nachname, rolle: mitarbeiterTable.rolle })
+        .from(mitarbeiterTable)
+        .where(eq(mitarbeiterTable.aktiv, 1));
+      const zustimmungen = await db
+        .select()
+        .from(datenschutzZustimmungen)
+        .where(eq(datenschutzZustimmungen.dokumentId, input.dokumentId));
+      const zustMap = new Map<number, typeof zustimmungen[0]>();
+      for (const z of zustimmungen) zustMap.set(z.mitarbeiterId, z);
+      return alle.map((ma) => {
+        const zust = zustMap.get(ma.id);
+        return {
+          mitarbeiterId: ma.id,
+          vorname: ma.vorname,
+          nachname: ma.nachname,
+          rolle: ma.rolle,
+          zugestimmt: !!zust,
+          zugestimmtAt: zust?.zugestimmtAt ?? null,
+          dokumentVersion: zust?.dokumentVersion ?? null,
+        };
+      });
     }),
 });

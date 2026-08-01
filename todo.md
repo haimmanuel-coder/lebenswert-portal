@@ -665,3 +665,9 @@
 - [x] Empfehlung 1: Zentrales Migrations-Skript (ensureTables) beim Server-Start – alle Tabellen per CREATE TABLE IF NOT EXISTS absichern
 - [x] Empfehlung 2: Admin-Interface für DSGVO-Dokumente im AdminPanel (Bearbeiten, Versionieren, Neu anlegen)
 - [x] Empfehlung 3: Notifications-Tabelle in DB prüfen und per SQL absichern
+
+## Nächste 3 Optionen 2026-08-01
+
+- [x] Option 1: ensureTables auf alle 53 Schema-Tabellen erweitern
+- [x] Option 2: DSGVO-Zustimmungs-Übersicht im DsgvoAdminTab (welcher MA hat zugestimmt)
+- [x] Option 3: E-Mail-Benachrichtigung an alle Mitarbeiter bei neuer DSGVO-Version
