@@ -220,14 +220,26 @@ export default function Vertretungen() {
                 </thead>
                 <tbody>
                   {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                  {(vertretungen as any[]).map((v: any) => (
-                    <tr key={v.id}>
+                  {(vertretungen as any[]).map((v: any) => {
+                    // A6: Farbkennzeichnung nach Status
+                    const heute = new Date().toISOString().split('T')[0];
+                    const vonStr = typeof v.von === 'string' ? v.von.split('T')[0] : (v.von as Date)?.toISOString?.()?.split('T')[0] ?? '';
+                    const bisStr = typeof v.bis === 'string' ? v.bis.split('T')[0] : (v.bis as Date)?.toISOString?.()?.split('T')[0] ?? '';
+                    const laeuftHeute = v.aktiv && vonStr <= heute && bisStr >= heute;
+                    const baldAblaufend = v.aktiv && bisStr >= heute && bisStr <= new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0];
+                    const zeilenFarbe = laeuftHeute ? '#f0fdf4' : baldAblaufend ? '#fefce8' : v.aktiv ? '#fff' : '#f9fafb';
+                    return (
+                    <tr key={v.id} style={{ background: zeilenFarbe }}>
                       <td style={{ fontWeight: 600 }}>{getMaName(v.vertreterId)}</td>
                       <td>{getMaName(v.vertretenId)}</td>
                       <td style={{ whiteSpace: "nowrap" }}>{fmtDate(v.von)} – {fmtDate(v.bis)}</td>
                       <td style={{ fontSize: "0.8125rem" }}>{v.grund ?? "–"}</td>
                       <td>
-                        {v.aktiv ? (
+                        {laeuftHeute ? (
+                          <span className="lw-badge lw-badge-green">🟢 Läuft heute</span>
+                        ) : baldAblaufend ? (
+                          <span className="lw-badge lw-badge-yellow">⚠️ Läuft ab</span>
+                        ) : v.aktiv ? (
                           <span className="lw-badge lw-badge-green">✓ Aktiv</span>
                         ) : (
                           <span className="lw-badge lw-badge-gray">Beendet</span>
@@ -245,7 +257,8 @@ export default function Vertretungen() {
                         )}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

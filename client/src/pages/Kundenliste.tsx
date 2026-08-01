@@ -486,6 +486,16 @@ function KundeFormSheet({
     email: initialData?.email ?? "",
     pflegegrad: String(initialData?.pflegegrad ?? "2"),
     paragraph: initialData?.paragraph ?? "45b",
+    // A1: Mehrfach-Paragraphen
+    paragraphen: (() => { try { return JSON.parse((initialData as any)?.paragraphen ?? '[]'); } catch { return [(initialData?.paragraph ?? '45b')]; } })() as string[],
+    // A3: Beihilfe
+    beihilfe: !!(initialData as any)?.beihilfe,
+    beihilfeProzent: String((initialData as any)?.beihilfeProzent ?? '50'),
+    pflegekasseProzent: String((initialData as any)?.pflegekasseProzent ?? '50'),
+    beihilfeVersicherung: (initialData as any)?.beihilfeVersicherung ?? '',
+    beihilfeBemerkungen: (initialData as any)?.beihilfeBemerkungen ?? '',
+    // A2: Kostenträger-Name (statische Liste)
+    kostentraegerName: (initialData as any)?.kostentraegerName ?? (initialData as any)?.kostentraeger ?? '',
     kostentraegerId: String(initialData?.kostentraegerId ?? ""),
     versicherungsnummer: initialData?.versicherungsnummer ?? "",
     wunschtag1: (initialData as any)?.wunschtag1 ?? "",
@@ -512,7 +522,14 @@ function KundeFormSheet({
       mobil: form.mobil || undefined,
       email: form.email || undefined,
       pflegegrad: parseInt(form.pflegegrad) || 2,
-      paragraph: form.paragraph as "45b" | "45a" | "39" | "privat",
+      paragraph: (form.paragraphen[0] ?? 'privat') as "45b" | "45a" | "39" | "privat",
+      paragraphen: JSON.stringify(form.paragraphen),
+      beihilfe: form.beihilfe,
+      beihilfeProzent: form.beihilfe ? parseInt(form.beihilfeProzent) || 50 : undefined,
+      pflegekasseProzent: form.beihilfe ? parseInt(form.pflegekasseProzent) || 50 : undefined,
+      beihilfeVersicherung: form.beihilfe ? form.beihilfeVersicherung || undefined : undefined,
+      beihilfeBemerkungen: form.beihilfe ? form.beihilfeBemerkungen || undefined : undefined,
+      kostentraegerName: form.kostentraegerName || undefined,
       kostentraegerId: form.kostentraegerId ? parseInt(form.kostentraegerId) : null,
       versicherungsnummer: form.versicherungsnummer || undefined,
       wunschtag1: (form as any).wunschtag1 || undefined,
@@ -594,13 +611,19 @@ function KundeFormSheet({
             </select>
           </div>
           <div>
-            <label style={lbl}>Paragraph SGB XI</label>
-            <select style={{ ...inp, cursor: "pointer" }} value={form.paragraph} onChange={e => set("paragraph", e.target.value)}>
-              <option value="45b">§45b – Entlastungsleistungen</option>
-              <option value="45a">§45a – Angebote zur Unterstützung</option>
-              <option value="39">§39 – Häusliche Krankenpflege</option>
-              <option value="privat">Privat</option>
-            </select>
+            <label style={lbl}>Paragraphen SGB XI (Mehrfachauswahl)</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+              {([['45b', '§45b – Entlastungsleistungen'], ['45a', '§45a – Angebote zur Unterstützung'], ['39', '§39 – Häusliche Krankenpflege'], ['37', '§37 – Verhinderungspflege'], ['privat', 'Privat (Selbstzahler)']] as [string, string][]).map(([val, label]) => (
+                <label key={val} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={(form as any).paragraphen?.includes(val) ?? false}
+                    onChange={e => {
+                      const next = e.target.checked ? [...((form as any).paragraphen ?? []), val] : ((form as any).paragraphen ?? []).filter((x: string) => x !== val);
+                      setForm(f => ({ ...f, paragraphen: next.length ? next : [val] }));
+                    }} />
+                  {label}
+                </label>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -608,11 +631,31 @@ function KundeFormSheet({
         <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 10, marginTop: 16 }}>Kostenträger & Versicherung</div>
         <div style={{ marginBottom: 10 }}>
           <label style={lbl}>Kostenträger (Krankenkasse)</label>
-          <select style={{ ...inp, cursor: "pointer" }} value={form.kostentraegerId} onChange={e => set("kostentraegerId", e.target.value)}>
+          <select style={{ ...inp, cursor: 'pointer' }} value={(form as any).kostentraegerName ?? ''} onChange={e => setForm(f => ({ ...f, kostentraegerName: e.target.value }))}>
             <option value="">– Bitte wählen –</option>
-            {kostentraegerListe.map(kt => <option key={kt.id} value={String(kt.id)}>{kt.name}{kt.ikNummer ? ` (${kt.ikNummer})` : ""}</option>)}
+            {['AOK', 'Barmer', 'DAK-Gesundheit', 'IKK classic', 'Techniker Krankenkasse (TK)', 'KKH', 'Knappschaft', 'BKK', 'Debeka', 'LVM Krankenversicherung', 'Signal Iduna', 'HUK-COBURG', 'Private Pflegeversicherung', 'Beihilfe (Beamte)', 'Selbstzahler', 'Sonstige'].map(name => (
+              <option key={name} value={name}>{name}</option>
+            ))}
           </select>
         </div>
+        {/* A3: Beihilfe-Integration */}
+        <div style={{ marginBottom: 10 }}>
+          <label style={{ ...lbl, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 0 }}>
+            <input type="checkbox" checked={(form as any).beihilfe ?? false} onChange={e => setForm(f => ({ ...f, beihilfe: e.target.checked }))} />
+            Beihilfeberechtigt (Beamte)
+          </label>
+        </div>
+        {(form as any).beihilfe && (
+          <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 10, padding: 12, marginBottom: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#0369a1', marginBottom: 8 }}>Beihilfe-Details</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+              <div><label style={lbl}>Pflegekasse %</label><input type="number" min={0} max={100} style={inp} value={(form as any).pflegekasseProzent ?? '50'} onChange={e => setForm(f => ({ ...f, pflegekasseProzent: e.target.value }))} placeholder="50" /></div>
+              <div><label style={lbl}>Beihilfe %</label><input type="number" min={0} max={100} style={inp} value={(form as any).beihilfeProzent ?? '50'} onChange={e => setForm(f => ({ ...f, beihilfeProzent: e.target.value }))} placeholder="50" /></div>
+            </div>
+            <div style={{ marginBottom: 8 }}><label style={lbl}>Beihilfe-Versicherung</label><input style={inp} value={(form as any).beihilfeVersicherung ?? ''} onChange={e => setForm(f => ({ ...f, beihilfeVersicherung: e.target.value }))} placeholder="z.B. Bundesbeihilfestelle" /></div>
+            <div><label style={lbl}>Bemerkungen</label><input style={inp} value={(form as any).beihilfeBemerkungen ?? ''} onChange={e => setForm(f => ({ ...f, beihilfeBemerkungen: e.target.value }))} placeholder="z.B. Beihilfe-Nr. 12345" /></div>
+          </div>
+        )}
         <div style={{ marginBottom: 10 }}>
           <label style={lbl}>Versicherungsnummer</label>
           <input style={inp} value={form.versicherungsnummer} onChange={e => set("versicherungsnummer", e.target.value)} placeholder="A123456789" />

@@ -3,6 +3,35 @@ import { useTimer } from "@/contexts/TimerContext";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useState, useRef } from "react";
+
+/** A5: Prioritäts-Mitteilungen-Bereich */
+function MitteilungenBereich() {
+  const utils = trpc.useUtils();
+  const { data: mitteilungen = [] } = (trpc as any).system.getMitteilungen?.useQuery?.() ?? { data: [] };
+  const { data: notifData } = (trpc as any).notifications?.list?.useQuery?.() ?? {};
+  const notifs: any[] = notifData ?? [];
+  const ungelesen = notifs.filter((n: any) => !n.gelesenAt);
+  const markRead = (trpc as any).notifications?.markRead?.useMutation?.({ onSuccess: () => (utils as any).notifications?.list?.invalidate?.() });
+  if (ungelesen.length === 0) return null;
+  return (
+    <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 10px rgba(0,0,0,.08)", padding: 16, marginBottom: 12 }}>
+      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span>🔔 Mitteilungen <span style={{ background: "#ef4444", color: "#fff", borderRadius: 20, padding: "2px 7px", fontSize: 11, fontWeight: 800, marginLeft: 6 }}>{ungelesen.length}</span></span>
+        <button onClick={() => (trpc as any).notifications?.markAllRead?.useMutation?.({ onSuccess: () => (utils as any).notifications?.list?.invalidate?.() })} style={{ fontSize: 11, color: "#6b7280", background: "none", border: "none", cursor: "pointer" }}>Alle gelesen</button>
+      </div>
+      {ungelesen.slice(0, 5).map((n: any) => (
+        <div key={n.id} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 0", borderBottom: "1px solid #f3f4f6" }}>
+          <span style={{ fontSize: 16, flexShrink: 0 }}>{n.typ === "warnung" ? "⚠️" : n.typ === "fehler" ? "❌" : "📋"}</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: n.typ === "warnung" ? "#b45309" : n.typ === "fehler" ? "#dc2626" : "#111827" }}>{n.titel}</div>
+            <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{n.nachricht}</div>
+          </div>
+          {markRead && <button onClick={() => markRead.mutate({ id: n.id })} style={{ fontSize: 10, color: "#4a8c3f", background: "none", border: "none", cursor: "pointer", flexShrink: 0 }}>✓</button>}
+        </div>
+      ))}
+    </div>
+  );
+}
 import BottomSheet from "@/components/BottomSheet";
 import SignatureCanvas from "@/components/SignatureCanvas";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
@@ -134,6 +163,7 @@ export default function Dashboard() {
   const [bericht, setBericht] = useState("");
   const [gesundheit, setGesundheit] = useState<"gut" | "stabil" | "auffaellig" | "kritisch">("gut");
   const [bemerkung, setBemerkung] = useState("");
+  const [fotoFiles, setFotoFiles] = useState<File[]>([]); // A7: Foto-Upload
   const sigRef = useRef<import("@/components/SignatureCanvas").SignatureCanvasRef>(null);
 
   const { data: einsaetze = [], refetch } = trpc.einsaetze.list.useQuery();
@@ -533,6 +563,9 @@ export default function Dashboard() {
         </>
       )}
 
+      {/* A5: Prioritäts-Mitteilungen-Bereich */}
+      <MitteilungenBereich />
+
       {/* Push-Benachrichtigungen Opt-In */}
       {push.isSupported && !push.isSubscribed && push.permission !== "denied" && (
         <div style={{ background: "linear-gradient(135deg, #4a8c3f, #2d6a27)", borderRadius: 12, padding: "14px 16px", marginBottom: 12, display: "flex", alignItems: "center", gap: 12, color: "#fff" }}>
@@ -663,6 +696,23 @@ export default function Dashboard() {
         <div style={{ marginBottom: 14 }}>
           <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>Bemerkungen</label>
           <textarea value={bemerkung} onChange={(e) => setBemerkung(e.target.value)} placeholder="Optional..." style={{ width: "100%", padding: "12px 13px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 15, outline: "none", resize: "none", minHeight: 60, fontFamily: "inherit", boxSizing: "border-box" }} />
+        </div>
+        {/* A7: Foto-Upload */}
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>Fotos (optional)</label>
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            capture="environment"
+            onChange={(ev) => setFotoFiles(Array.from(ev.target.files ?? []))}
+            style={{ display: "block", fontSize: 13, color: "#374151" }}
+          />
+          {fotoFiles.length > 0 && (
+            <div style={{ marginTop: 6, fontSize: 12, color: "#4a8c3f", fontWeight: 600 }}>
+              {fotoFiles.length} Foto{fotoFiles.length > 1 ? "s" : ""} ausgewählt
+            </div>
+          )}
         </div>
         <div style={{ marginBottom: 14 }}>
           <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>Unterschrift Mitarbeiter</label>

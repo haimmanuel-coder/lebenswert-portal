@@ -288,6 +288,40 @@ export default function ExportCenter() {
         </CardContent>
       </Card>
 
+      {/* A9/A11: OptaData-Vorbereitung – Abschlussprüfung */}
+      <Card className="mb-4 border-2 border-blue-200">
+        <CardHeader className="pb-2 pt-4 px-4">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <span className="text-lg">🔗</span> OptaData-Vorbereitung
+          </CardTitle>
+          <p className="text-xs text-gray-500">Abschlussprüfung vor dem Übertrag an OptaData</p>
+        </CardHeader>
+        <CardContent className="px-4 pb-4 space-y-3">
+          <div className="bg-blue-50 rounded-lg p-3 text-xs text-blue-700 space-y-1">
+            <div className="font-bold mb-1">📋 Checkliste vor dem OptaData-Export:</div>
+            <div>✅ Alle Einsatznachweise des Monats abgeschlossen?</div>
+            <div>✅ Unterschriften (Mitarbeiter + Kunde) vorhanden?</div>
+            <div>✅ Leistungstyp (§45b / §45a / §39) korrekt zugeordnet?</div>
+            <div>✅ Kostenträger bei jedem Kunden hinterlegt?</div>
+            <div>✅ Beihilfe-Anteil korrekt erfasst (falls zutreffend)?</div>
+          </div>
+          <div className="bg-yellow-50 rounded-lg p-3 text-xs text-yellow-700">
+            <Info className="w-3 h-3 inline mr-1" />
+            <strong>Hinweis:</strong> Der CSV-Export (oben) enthält alle Pflichtfelder für den OptaData-Import. Bitte prüfen Sie die Datei vor dem Hochladen in OptaData auf Vollständigkeit.
+          </div>
+          <Button
+            variant="outline"
+            className="w-full gap-2 border-blue-300 text-blue-700 hover:bg-blue-50"
+            onClick={() => {
+              toast.info("🔗 OptaData-Direktanbindung in Vorbereitung. CSV-Export ist bereits OptaData-kompatibel.");
+            }}
+          >
+            <Download className="w-4 h-4" />
+            OptaData-kompatiblen CSV exportieren
+          </Button>
+        </CardContent>
+      </Card>
+
       {/* E-Brief Sheet */}
       {showEBrief && (
         <div className="fixed inset-0 z-50 flex items-end">

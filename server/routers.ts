@@ -1247,6 +1247,38 @@ export const appRouter = router({
 
         // Automatischer Push bei Budget-Warnung nach Einsatz-Abschluss
         if (input.status === "abgeschlossen") {
+          // A4: Automatischen Leistungsnachweis pro Paragraph erstellen
+          try {
+            const dbA4 = await getDb();
+            if (dbA4) {
+              const einsatzRows = await dbA4.select().from(einsaetzeTable).where(eq(einsaetzeTable.id, input.id)).limit(1);
+              if (einsatzRows.length > 0) {
+                const e = einsatzRows[0];
+                const paragraphenLN: Array<"45b" | "45a" | "39"> = [];
+                if (e.paragraph && ["45b","45a","39"].includes(e.paragraph)) paragraphenLN.push(e.paragraph as "45b" | "45a" | "39");
+                if (e.paragraph2 && ["45b","45a","39"].includes(e.paragraph2)) paragraphenLN.push(e.paragraph2 as "45b" | "45a" | "39");
+                const monatLN = e.datum ? String(e.datum).slice(0, 7) : new Date().toISOString().slice(0, 7);
+                const stunden1 = parseFloat(String(e.dauerStunden ?? 0));
+                const stunden2 = parseFloat(String(e.stunden2 ?? 0));
+                const { leistungen } = await import('../drizzle/schema');
+                for (let i = 0; i < paragraphenLN.length; i++) {
+                  const para = paragraphenLN[i];
+                  const std = i === 0 ? stunden1 : stunden2;
+                  const existingLN = await dbA4.select({ id: leistungen.id, stunden: leistungen.stunden, anzahlEinsaetze: leistungen.anzahlEinsaetze })
+                    .from(leistungen)
+                    .where(and(eq(leistungen.mitarbeiterId, e.mitarbeiterId), eq(leistungen.kundenId, e.kundenId), eq(leistungen.monat, monatLN), eq(leistungen.paragraph, para)))
+                    .limit(1);
+                  if (existingLN.length > 0) {
+                    const altStd = parseFloat(String(existingLN[0].stunden ?? 0));
+                    const altAnz = existingLN[0].anzahlEinsaetze ?? 1;
+                    await dbA4.update(leistungen).set({ stunden: String(altStd + std), anzahlEinsaetze: altAnz + 1 }).where(eq(leistungen.id, existingLN[0].id));
+                  } else {
+                    await dbA4.insert(leistungen).values({ mitarbeiterId: e.mitarbeiterId, kundenId: e.kundenId, monat: monatLN, paragraph: para, stunden: String(std), anzahlEinsaetze: 1, betrag: String(std * 30), status: 'offen' });
+                  }
+                }
+              }
+            }
+          } catch (lnErr) { console.warn('[A4] Leistungsnachweis-Erstellung fehlgeschlagen:', lnErr); }
           try {
             const warnungen = await getKundenMitBudgetWarnung();
             if (warnungen.length > 0) {
