@@ -30,7 +30,8 @@ export type SeitenId =
   | "mitarbeiterakte" | "logbuch" | "vertretungen"
   | "admindashboard" | "rollenverwaltung" | "kundenzuteilung" | "rbacverwaltung"
   | "besuchsberichte" | "datenschutz" | "integrationen" | "arbeitszentrum"
-  | "zweifaktor" | "verfuegbarkeiten" | "analysen" | "backupstatus";
+  | "zweifaktor" | "verfuegbarkeiten" | "analysen" | "backupstatus"
+  | "import" | "privatrechnung";
 
 type NavigationWert = {
   /** Wechselt zur angegebenen Seite. */

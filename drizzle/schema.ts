@@ -113,6 +113,20 @@ export const kunden = mysqlTable("kunden", {
   // Pflegegrad & Paragraph (Modul 2)
   pflegegrad: int("pflegegrad").default(2),
   paragraph: mysqlEnum("paragraph", ["45b", "45a", "39", "privat"]).default("45b"),
+  // A1: Mehrfach-Paragraphen (JSON-Array, z.B. ["45b","39","privat"])
+  paragraphen: text("paragraphen"),
+  // A2: Kostenträger-Typ (standardisierte Liste)
+  kostentraegerTyp: varchar("kostentraegerTyp", { length: 100 }),
+  // A3: Beihilfe
+  beihilfeVorhanden: boolean("beihilfeVorhanden").default(false),
+  beihilfePflegekasseProzent: decimal("beihilfePflegekasseProzent", { precision: 5, scale: 2 }),
+  beihilfeProzent: decimal("beihilfeProzent", { precision: 5, scale: 2 }),
+  beihilfeVersicherung: varchar("beihilfeVersicherung", { length: 200 }),
+  beihilfeBemerkungen: text("beihilfeBemerkungen"),
+  // Budget §37 SGB V (Verhinderungspflege)
+  budget37: decimal("budget37", { precision: 10, scale: 2 }).default("0"),
+  verbraucht37: decimal("verbraucht37", { precision: 10, scale: 2 }).default("0"),
+  letzteAbrechnung37: varchar("letzteAbrechnung37", { length: 10 }),
   // Budget §45b SGB XI
   budget45b: decimal("budget45b", { precision: 10, scale: 2 }).default("0"),
   verbraucht45b: decimal("verbraucht45b", { precision: 10, scale: 2 }).default("0"),

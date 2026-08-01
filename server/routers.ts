@@ -115,6 +115,7 @@ import { verfuegbarkeitenRouter } from "./routers/verfuegbarkeitenRouter";
 import { besuchsberichteRouter } from "./routers/besuchsberichteRouter";
 import { integrationenRouter, analysenRouter } from "./routers/integrationenRouter";
 import { rbacRouter } from "./routers/rbacRouter";
+import { umwidmungRouter, sonderfahrtRouter, rechnungspositionRouter, privatrechnungRouter, importRouter } from "./routers/privatrechnungRouter";
 import {
   savePushSubscription,
   deletePushSubscription,
@@ -2459,14 +2460,18 @@ export const appRouter = router({
       }),
   }),
 
-  twoFactor: twoFactorRouter,
+    twoFactor: twoFactorRouter,
   datenschutz: datenschutzRouter,
   verfuegbarkeiten: verfuegbarkeitenRouter,
   besuchsberichte: besuchsberichteRouter,
   integrationen: integrationenRouter,
   analysen: analysenRouter,
   rbac: rbacRouter,
-
+  umwidmung: umwidmungRouter,
+  sonderfahrt: sonderfahrtRouter,
+  rechnungsposition: rechnungspositionRouter,
+  privatrechnung: privatrechnungRouter,
+  import: importRouter,
 });
 
 export type AppRouter = typeof appRouter;

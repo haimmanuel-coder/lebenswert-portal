@@ -42,9 +42,12 @@ import BackupStatus from "./BackupStatus";
 import OnboardingTour, { useOnboardingTour } from "@/components/OnboardingTour";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 import { useSSENotifications } from "@/hooks/useSSENotifications";
+import { useSessionTimeout } from "@/hooks/useSessionTimeout";
 import DsgvoErstDialog from "@/components/DsgvoErstDialog";
 import Einsatzplanung from "./Einsatzplanung";
 import MeineTour from "./MeineTour";
+import ImportAssistent from "./ImportAssistent";
+import Privatrechnung from "./Privatrechnung";
 import { NavigationProvider, type SeitenId } from "@/contexts/NavigationContext";
 
 /**
@@ -90,6 +93,8 @@ export default function PortalApp() {
   const { isOnline, offlineCount } = useOfflineSync();
   const { show: showTour, startTour, closeTour } = useOnboardingTour();
   useSSENotifications(mitarbeiter?.id);
+  // Aufgabe 17: Automatischer Sitzungs-Timeout nach 30 Minuten Inaktivität
+  useSessionTimeout(logout, !!mitarbeiter);
   // DSGVO-Erstanmeldungs-Dialog
   const { data: dsgvoCheck } = (trpc.datenschutz as any).checkZustimmung.useQuery(
     undefined, { enabled: !!mitarbeiter }
@@ -174,6 +179,8 @@ export default function PortalApp() {
           { id: "datenschutz" as PageId, icon: "🔐", label: "Datenschutz" },
           { id: "analysen" as PageId, icon: "📊", label: "Analysen", adminOnly: true },
           { id: "backupstatus" as PageId, icon: "💾", label: "Backup-Status", adminOnly: true },
+          { id: "import" as PageId, icon: "📥", label: "Import-Assistent", adminOnly: true },
+          { id: "privatrechnung" as PageId, icon: "🧾", label: "Privatrechnung", adminOnly: true },
         ] : [
           { id: "export" as PageId, icon: "📮", label: "Export & Briefe" },
         ]),
@@ -226,6 +233,8 @@ export default function PortalApp() {
       case "verfuegbarkeiten": return <Verfuegbarkeiten />;
       case "analysen": return <AnalyseDashboard />;
       case "backupstatus": return <BackupStatus />;
+      case "import": return <ImportAssistent />;
+      case "privatrechnung": return <Privatrechnung />;
       default: return <Dashboard />;
     }
   };
