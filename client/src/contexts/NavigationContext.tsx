@@ -31,7 +31,7 @@ export type SeitenId =
   | "admindashboard" | "rollenverwaltung" | "kundenzuteilung" | "rbacverwaltung"
   | "besuchsberichte" | "datenschutz" | "integrationen" | "arbeitszentrum"
   | "zweifaktor" | "verfuegbarkeiten" | "analysen" | "backupstatus"
-  | "import" | "privatrechnung" | "budget" | "controlling";
+  | "import" | "privatrechnung" | "budget" | "controlling" | "fahrtenabrechnung";
 
 type NavigationWert = {
   /** Wechselt zur angegebenen Seite. */

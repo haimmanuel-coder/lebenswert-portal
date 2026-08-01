@@ -117,6 +117,7 @@ import { integrationenRouter, analysenRouter } from "./routers/integrationenRout
 import { rbacRouter } from "./routers/rbacRouter";
 import { umwidmungRouter, sonderfahrtRouter, rechnungspositionRouter, privatrechnungRouter, importRouter } from "./routers/privatrechnungRouter";
 import { budgetRouter } from "./routers/budgetRouter";
+import { fahrtenAbrechnungRouter } from "./routers/fahrtenAbrechnungRouter";
 import {
   savePushSubscription,
   deletePushSubscription,
@@ -2504,6 +2505,7 @@ export const appRouter = router({
   sonderfahrt: sonderfahrtRouter,
   rechnungsposition: rechnungspositionRouter,
   privatrechnung: privatrechnungRouter,
+  fahrtenAbrechnung: fahrtenAbrechnungRouter,
   budget: budgetRouter,
   import: importRouter,
 });

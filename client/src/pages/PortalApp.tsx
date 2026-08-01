@@ -49,6 +49,7 @@ import MeineTour from "./MeineTour";
 import ImportAssistent from "./ImportAssistent";
 import BudgetVerwaltung from "./BudgetVerwaltung";
 import ControllingDashboard from "./ControllingDashboard";
+import FahrtenAbrechnung from "./FahrtenAbrechnung";
 import Privatrechnung from "./Privatrechnung";
 import { NavigationProvider, type SeitenId } from "@/contexts/NavigationContext";
 
@@ -185,6 +186,7 @@ export default function PortalApp() {
           { id: "privatrechnung" as PageId, icon: "🧾", label: "Privatrechnung", adminOnly: true },
           { id: "budget" as PageId, icon: "💰", label: "Budgetverwaltung", adminOnly: false },
           { id: "controlling" as PageId, icon: "📊", label: "Controlling", adminOnly: true },
+          { id: "fahrtenabrechnung" as PageId, icon: "🚗", label: "Fahrtabrechnung", adminOnly: true },
         ] : [
           { id: "export" as PageId, icon: "📮", label: "Export & Briefe" },
         ]),
@@ -240,6 +242,7 @@ export default function PortalApp() {
       case "import": return <ImportAssistent />;
       case "budget": return <BudgetVerwaltung />;
       case "controlling": return <ControllingDashboard />;
+      case "fahrtenabrechnung": return <FahrtenAbrechnung />;
       case "privatrechnung": return <Privatrechnung />;
       default: return <Dashboard />;
     }

@@ -10,6 +10,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { neukundenEskalationHandler, vertretungBereinigungHandler } from "../scheduledHandlers";
+import { handleFahrtenVersandCron } from "../scheduled/fahrtenVersand";
 import multer from "multer";
 import { storagePut } from "../storage";
 
@@ -64,6 +65,17 @@ async function startServer() {
   // ⏱ Heartbeat-Handler (Cron-only, vor tRPC registrieren)
   app.post("/api/scheduled/neukunden-eskalation", neukundenEskalationHandler);
   app.post("/api/scheduled/vertretung-bereinigung", vertretungBereinigungHandler);
+  // Fahrtennachweise: automatischer Versand am 18. jeden Monats
+  app.post("/api/scheduled/fahrtennachweise-versand", async (_req: any, res: any) => {
+    try {
+      const result = await handleFahrtenVersandCron();
+      res.json({ ok: true, ...result });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[Scheduled/FahrtenVersand]", err);
+      res.status(500).json({ ok: false, error: msg });
+    }
+  });
 
   // 📡 SSE-Kanal für Echtzeit-Benachrichtigungen
   const sseClients = new Map<number, Set<any>>();

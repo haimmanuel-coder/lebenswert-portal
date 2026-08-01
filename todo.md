@@ -649,3 +649,9 @@
 - [x] A25: Jahresprognose – Verbrauch, Durchschnitt, voraussichtlicher Jahresverbrauch, Restbudget, Unter-/Überauslastung
 - [x] A26: Optimierungsvorschläge – Fahrtzeit-Kombination, gleichmäßige Verteilung, Budgetverfall-Vermeidung, kombinierbare Leistungsansprüche
 - [x] A27: Controlling-Dashboard (Admin) – Kennzahlen, Filter (Zeitraum, MA, Leistungsbereich, Pflegegrad, Kostenträger), Excel+PDF-Export
+
+## Fahrtennachweise-Abrechnung (16.–15. Zyklus)
+- [ ] Schema: fahrtenAbrechnungen-Tabelle (Zeitraum, Status, Freigabe, E-Mail-Log)
+- [ ] Backend: Abrechnungs-Router (Zeitraum berechnen, Fahrten zusammenführen, PDF, Admin-Freigabe, E-Mail)
+- [ ] Frontend: Fahrtennachweise-Freigabe-Seite im AdminPanel + Steuerbüro-E-Mail-Einstellung
+- [ ] Heartbeat: Automatischer E-Mail-Versand am 18. jeden Monats
