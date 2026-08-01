@@ -651,7 +651,7 @@
 - [x] A27: Controlling-Dashboard (Admin) – Kennzahlen, Filter (Zeitraum, MA, Leistungsbereich, Pflegegrad, Kostenträger), Excel+PDF-Export
 
 ## Fahrtennachweise-Abrechnung (16.–15. Zyklus)
-- [ ] Schema: fahrtenAbrechnungen-Tabelle (Zeitraum, Status, Freigabe, E-Mail-Log)
-- [ ] Backend: Abrechnungs-Router (Zeitraum berechnen, Fahrten zusammenführen, PDF, Admin-Freigabe, E-Mail)
-- [ ] Frontend: Fahrtennachweise-Freigabe-Seite im AdminPanel + Steuerbüro-E-Mail-Einstellung
-- [ ] Heartbeat: Automatischer E-Mail-Versand am 18. jeden Monats
+- [x] Schema: fahrtenAbrechnungen-Tabelle (Zeitraum, Status, Freigabe, E-Mail-Log)
+- [x] Backend: Abrechnungs-Router (Zeitraum berechnen, Fahrten zusammenführen, PDF, Admin-Freigabe, E-Mail)
+- [x] Frontend: Fahrtennachweise-Freigabe-Seite im AdminPanel + Steuerbüro-E-Mail-Einstellung
+- [x] Heartbeat: Automatischer E-Mail-Versand am 18. jeden Monats
