@@ -312,13 +312,13 @@ export default function AdminDashboard() {
           <div className="lw-grid-3">
             {([
               { icon: "🗓️", label: "Einsatzplanung öffnen", ziel: "planung" as SeitenId, color: "#4a8c3f" },
+              { icon: "📅", label: "Termine planen", ziel: "planung" as SeitenId, color: "#0ea5e9" },
               { icon: "🏖️", label: "Urlaubsanträge prüfen", badge: kpis?.offeneUrlaube, ziel: "urlaub" as SeitenId, color: "#f59e0b" },
               { icon: "🤒", label: "Krankmeldungen", badge: kpis?.aktivKrank, ziel: "krank" as SeitenId, color: "var(--lw-red)" },
               { icon: "📋", label: "Leistungsnachweise freigeben", ziel: "leistungsfreigabe" as SeitenId, color: "#8b5cf6" },
               { icon: "👥", label: "Mitarbeiter verwalten", ziel: "mitarbeiterakte" as SeitenId, color: "#0ea5e9" },
               { icon: "📤", label: "DATEV / Lexware Export", ziel: "buchhaltung" as SeitenId, color: "#10b981" },
               { icon: "📜", label: "Audit-Logbuch", ziel: "logbuch" as SeitenId, color: "var(--lw-gray-600)" },
-              { icon: "🗺️", label: "Tourenplanung", ziel: "touren" as SeitenId, color: "#6366f1" },
               { icon: "🏥", label: "Kassenanfragen", ziel: "kassenanfrage" as SeitenId, color: "#14b8a6" },
             ]).map((item, i) => (
               <button key={i} type="button" onClick={() => navigiere(item.ziel)}

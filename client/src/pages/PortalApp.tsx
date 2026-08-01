@@ -20,7 +20,6 @@ import Kalender from "./Kalender";
 import Kassenanfrage from "./Kassenanfrage";
 import Urlaubsverwaltung from "./Urlaubsverwaltung";
 import Krankmeldung from "./Krankmeldung";
-import Tourenplanung from "./Tourenplanung";
 import Benachrichtigungen from "./Benachrichtigungen";
 import MeinProfil from "./MeinProfil";
 import LeistungsFreigabe from "./LeistungsFreigabe";
@@ -45,7 +44,6 @@ import { useSSENotifications } from "@/hooks/useSSENotifications";
 import { useSessionTimeout } from "@/hooks/useSessionTimeout";
 import DsgvoErstDialog from "@/components/DsgvoErstDialog";
 import Einsatzplanung from "./Einsatzplanung";
-import MeineTour from "./MeineTour";
 import ImportAssistent from "./ImportAssistent";
 import BudgetVerwaltung from "./BudgetVerwaltung";
 import ControllingDashboard from "./ControllingDashboard";
@@ -129,8 +127,6 @@ export default function PortalApp() {
       items: [
         { id: "home", icon: "🏠", label: "Dashboard" },
         { id: "planung", icon: "🗓️", label: "Einsatzplanung", badge: planungsWarnungen.length > 0 ? planungsWarnungen.length : undefined },
-        { id: "touren", icon: "🗺️", label: "Tourenplanung" },
-        { id: "meinetour", icon: "🧭", label: "Meine Tour" },
         { id: "einsaetze", icon: "📅", label: "Einsätze" },
         { id: "zeit", icon: "⏱", label: "Zeiterfassung" },
         { id: "lnw", icon: "📋", label: "Leistungsnachweise", badge: offenCount > 0 ? offenCount : undefined },
@@ -219,8 +215,6 @@ export default function PortalApp() {
       case "kassenanfrage": return <Kassenanfrage />;
       case "urlaub": return <Urlaubsverwaltung />;
       case "krank": return <Krankmeldung />;
-      case "meinetour": return <MeineTour />;
-      case "touren": return <Tourenplanung />;
       case "benachrichtigungen": return <Benachrichtigungen />;
       case "profil": return <MeinProfil />;
       case "leistungsfreigabe": return <LeistungsFreigabe />;

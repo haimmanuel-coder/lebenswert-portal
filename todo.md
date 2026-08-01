@@ -671,3 +671,13 @@
 - [x] Option 1: ensureTables auf alle 53 Schema-Tabellen erweitern
 - [x] Option 2: DSGVO-Zustimmungs-Übersicht im DsgvoAdminTab (welcher MA hat zugestimmt)
 - [x] Option 3: E-Mail-Benachrichtigung an alle Mitarbeiter bei neuer DSGVO-Version
+
+## Umbau Einsatzplanung / Tourenplanung 2026-08-01
+
+- [x] Tourenplanung aus Navigation und Routing entfernen
+- [x] Meine Tour aus Navigation und Routing entfernen
+- [x] touren/meinetour aus SeitenId-Typ entfernen
+- [x] Tourenplanung aus AdminDashboard Schnellzugriff entfernen
+- [x] "Termine planen" Button im MA-Dashboard einbauen
+- [x] Einsatzplanung für MA-Bereich vollständig verfügbar (darfPlanen-Logik bereits im Backend)
+- [x] Touren-Kachel im Dashboard auf Einsatzplanung umgeleitet

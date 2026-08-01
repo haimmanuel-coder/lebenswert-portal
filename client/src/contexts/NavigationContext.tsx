@@ -25,7 +25,7 @@ export type SeitenId =
   | "admin" | "management" | "kunden" | "kostentraeger"
   | "textbausteine" | "export" | "fuehrerschein"
   | "neukundenaufnahme" | "kalender" | "kassenanfrage"
-  | "urlaub" | "krank" | "touren" | "meinetour" | "benachrichtigungen"
+  | "urlaub" | "krank" | "benachrichtigungen"
   | "profil" | "leistungsfreigabe" | "buchhaltung"
   | "mitarbeiterakte" | "logbuch" | "vertretungen"
   | "admindashboard" | "rollenverwaltung" | "kundenzuteilung" | "rbacverwaltung"

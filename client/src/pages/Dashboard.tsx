@@ -396,10 +396,10 @@ export default function Dashboard() {
                 ziel: "urlaub" as SeitenId,
               },
               {
-                label: "Touren heute",
+                label: "Einsätze geplant",
                 wert: String(kennzahlen.tourenHeute?.length ?? 0),
                 farbe: "#6366f1",
-                ziel: "touren" as SeitenId,
+                ziel: "planung" as SeitenId,
               },
               {
                 label: "Kommende Urlaube",
@@ -590,6 +590,38 @@ export default function Dashboard() {
           <button onClick={push.unsubscribe} style={{ background: "none", border: "none", fontSize: 12, color: "#6b7280", cursor: "pointer" }}>Deaktivieren</button>
         </div>
       )}
+
+      {/* Termine planen – Schnellzugriff-Button */}
+      <div style={{ marginBottom: 12 }}>
+        <button
+          onClick={() => navigiere("planung")}
+          style={{
+            width: "100%",
+            padding: "14px 20px",
+            background: "linear-gradient(135deg, #4a8c3f, #2d6a27)",
+            color: "#fff",
+            border: "none",
+            borderRadius: 12,
+            fontWeight: 800,
+            fontSize: 15,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 10,
+            boxShadow: "0 4px 14px rgba(74,140,63,.35)",
+            transition: "transform 0.15s cubic-bezier(0.23,1,0.32,1), box-shadow 0.15s",
+          }}
+          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 6px 20px rgba(74,140,63,.45)"; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 14px rgba(74,140,63,.35)"; }}
+          onMouseDown={e => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(0.97)")}
+          onMouseUp={e => ((e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)")}
+        >
+          <span style={{ fontSize: 20 }}>📅</span>
+          <span>Termine planen</span>
+          <span style={{ marginLeft: "auto", opacity: 0.8, fontSize: 18 }}>›</span>
+        </button>
+      </div>
 
       {/* Heute */}
       <div className="card" style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 10px rgba(0,0,0,.08)", padding: 16, marginBottom: 12 }}>
