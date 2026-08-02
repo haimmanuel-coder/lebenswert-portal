@@ -1833,6 +1833,112 @@ export const appRouter = router({
       .input(z.object({ mitarbeiterId: z.number().int().positive() }))
       .query(async ({ input }) => getZuordnungenForMitarbeiter(input.mitarbeiterId)),
 
+    /** Mitarbeiter deaktivieren (Soft-Delete: aktiv=0) */
+    mitarbeiterDeaktivieren: adminProcedure
+      .input(z.object({
+        id: z.number().int().positive(),
+        grund: z.string().min(3),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await updateMitarbeiter(input.id, { aktiv: 0, notizen: `Deaktiviert: ${input.grund}` } as any);
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'ADMIN', ressource: 'mitarbeiter', details: `deaktiviert id=${input.id} grund=${input.grund}`, status: 'success' });
+        return { success: true };
+      }),
+
+    /** Mitarbeiter-Berechtigungen lesen */
+    getBerechtigungen: adminProcedure
+      .input(z.object({ mitarbeiterId: z.number().int().positive() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        const { mitarbeiterBerechtigungen: mbTable } = await import('../drizzle/schema.js');
+        return db.select().from(mbTable).where(eq(mbTable.mitarbeiterId, input.mitarbeiterId));
+      }),
+
+    /** Mitarbeiter-Berechtigungen setzen (upsert) */
+    setBerechtigungen: adminProcedure
+      .input(z.object({
+        mitarbeiterId: z.number().int().positive(),
+        berechtigungen: z.array(z.object({
+          modul: z.string().min(1),
+          zugriff: z.enum(['erlaubt', 'verweigert']),
+        })),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        const { mitarbeiterBerechtigungen: mbTable } = await import('../drizzle/schema.js');
+        // Alle bisherigen Berechtigungen dieses MA löschen und neu setzen
+        await db.delete(mbTable).where(eq(mbTable.mitarbeiterId, input.mitarbeiterId));
+        if (input.berechtigungen.length > 0) {
+          await db.insert(mbTable).values(
+            input.berechtigungen.map((b) => ({
+              mitarbeiterId: input.mitarbeiterId,
+              modul: b.modul,
+              zugriff: b.zugriff,
+              gesetztVonId: ctx.adminId,
+            }))
+          );
+        }
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'ADMIN', ressource: 'berechtigungen', details: `ma=${input.mitarbeiterId} module=${input.berechtigungen.map(b => b.modul).join(',')}`, status: 'success' });
+        return { success: true };
+      }),
+
+    /** Dokument für beliebigen Mitarbeiter hochladen (Admin) */
+    addDokumentAdmin: adminProcedure
+      .input(z.object({
+        mitarbeiterId: z.number().int().positive(),
+        typ: z.enum(['zertifikat', 'arbeitsvertrag', 'krankmeldung', 'fuehrerschein', 'erstehilfe', 'sonstiges']),
+        bezeichnung: z.string().min(1).max(255),
+        dateiUrl: z.string().optional(),
+        dateiname: z.string().optional(),
+        ausstellungsdatum: z.string().optional(),
+        ablaufdatum: z.string().optional(),
+        notizen: z.string().optional(),
+        base64: z.string().optional(),
+        mimeType: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        let dateiUrl = input.dateiUrl;
+        let dateiname = input.dateiname;
+        if (input.base64 && input.mimeType) {
+          const { storagePut } = await import('./storage.js');
+          const ext = input.mimeType.split('/')[1] ?? 'pdf';
+          const fname = input.dateiname ?? `dokument-${Date.now()}.${ext}`;
+          const key = `mitarbeiter-dokumente/ma-${input.mitarbeiterId}/${Date.now()}-${fname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+          const buf = Buffer.from(input.base64, 'base64');
+          const res = await storagePut(key, buf, input.mimeType);
+          dateiUrl = res.url;
+          dateiname = fname;
+        }
+        await db.insert(mitarbeiterDokumente).values({
+          mitarbeiterId: input.mitarbeiterId,
+          typ: input.typ,
+          bezeichnung: input.bezeichnung,
+          dateiUrl,
+          dateiname,
+          ausstellungsdatum: input.ausstellungsdatum ? new Date(input.ausstellungsdatum) : undefined,
+          ablaufdatum: input.ablaufdatum ? new Date(input.ablaufdatum) : undefined,
+          notizen: input.notizen,
+          hochgeladenVon: ctx.adminId,
+        });
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'ADMIN', ressource: 'dokument', details: `ma=${input.mitarbeiterId} typ=${input.typ}`, status: 'success' });
+        return { success: true };
+      }),
+
+    /** Dokument löschen (Admin) */
+    deleteDokumentAdmin: adminProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(async ({ input, ctx }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        await db.delete(mitarbeiterDokumente).where(eq(mitarbeiterDokumente.id, input.id));
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'ADMIN', ressource: 'dokument', details: `delete id=${input.id}`, status: 'success' });
+        return { success: true };
+      }),
+
     setZuordnung: adminProcedure
       .input(z.object({
         mitarbeiterId: z.number().int().positive(),

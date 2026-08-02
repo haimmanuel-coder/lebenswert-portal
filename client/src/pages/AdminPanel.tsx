@@ -44,6 +44,10 @@ export default function AdminPanel() {
   const [maRolle, setMaRolle] = useState<PortalRolle>("mitarbeiter");
   const [maTelefon, setMaTelefon] = useState("");
   const [maBeschaeftigung, setMaBeschaeftigung] = useState<"minijob" | "teilzeit" | "vollzeit">("minijob");
+  // MA-Filter
+  const [maSearch, setMaSearch] = useState("");
+  const [maBeschFilter, setMaBeschFilter] = useState<"alle" | "minijob" | "teilzeit" | "vollzeit">("alle");
+  const [maZeigeInaktiv, setMaZeigeInaktiv] = useState(false);
 
   const { data: maList = [], refetch: refetchMa } = trpc.admin.mitarbeiterList.useQuery();
   const createMa = trpc.admin.mitarbeiterCreate.useMutation({
@@ -254,11 +258,46 @@ export default function AdminPanel() {
       {/* ── MITARBEITER ── */}
       {tab === "mitarbeiter" && (
         <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <span style={{ fontSize: 14, fontWeight: 600 }}>{maList.length} Mitarbeiter</span>
-            <button onClick={() => { resetMaForm(); setMaSheet(true); }} style={{ padding: "8px 14px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>+ Neu</button>
+          {/* Header */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <span style={{ fontSize: 14, fontWeight: 600 }}>
+              {maList.filter(m => maZeigeInaktiv || m.aktiv).length} Mitarbeiter
+            </span>
+            <button onClick={() => { resetMaForm(); setMaSheet(true); }} style={{ padding: "8px 14px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>+ Neu anlegen</button>
           </div>
-          {maList.map((ma) => {
+          {/* Suchfeld */}
+          <input
+            value={maSearch}
+            onChange={e => setMaSearch(e.target.value)}
+            placeholder="🔍 Name oder E-Mail suchen..."
+            style={{ width: "100%", padding: "9px 12px", border: "2px solid #e5e7eb", borderRadius: 8, fontSize: 13, outline: "none", marginBottom: 8, boxSizing: "border-box" }}
+          />
+          {/* Beschäftigungsart-Filter + Inaktive */}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+            {(["alle", "minijob", "teilzeit", "vollzeit"] as const).map(f => (
+              <button key={f} onClick={() => setMaBeschFilter(f)}
+                style={{ padding: "5px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer",
+                  background: maBeschFilter === f ? "#4a8c3f" : "#f3f4f6",
+                  color: maBeschFilter === f ? "#fff" : "#4b5563" }}>
+                {f === "alle" ? "Alle" : f === "minijob" ? "Minijob" : f === "teilzeit" ? "Teilzeit" : "Vollzeit"}
+              </button>
+            ))}
+            <button onClick={() => setMaZeigeInaktiv(v => !v)}
+              style={{ padding: "5px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer", marginLeft: "auto",
+                background: maZeigeInaktiv ? "#fee2e2" : "#f3f4f6",
+                color: maZeigeInaktiv ? "#991b1b" : "#4b5563" }}>
+              {maZeigeInaktiv ? "⛔ Inaktive ausblenden" : "Inaktive anzeigen"}
+            </button>
+          </div>
+          {maList
+            .filter(ma => maZeigeInaktiv || ma.aktiv)
+            .filter(ma => maBeschFilter === "alle" || (ma as any).beschaeftigungsart === maBeschFilter)
+            .filter(ma => {
+              if (!maSearch.trim()) return true;
+              const q = maSearch.toLowerCase();
+              return `${ma.vorname} ${ma.nachname}`.toLowerCase().includes(q) || ma.email.toLowerCase().includes(q);
+            })
+            .map((ma) => {
             const zert = (ma as any).zertifikatStatus as string ?? "nicht_angemeldet";
             const beschaeft = (ma as any).beschaeftigungsart as string ?? "minijob";
             const zertBadge = ZERT_BADGE[zert] ?? ZERT_BADGE.nicht_angemeldet;
@@ -298,10 +337,10 @@ export default function AdminPanel() {
                 </div>
               </div>
             </div>
-          );})}
+                    );})
+          }
         </div>
       )}
-
       {/* ── KUNDEN ── */}
       {tab === "kunden" && (
         <div>

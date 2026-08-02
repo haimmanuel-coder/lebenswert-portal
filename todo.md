@@ -733,3 +733,13 @@
 - [x] Kundenzuteilung: Bug behoben (useState in Render-Phase → useEffect)
 - [x] Zeiterfassung-Kachel aus MA-Dashboard entfernt (bleibt im Menü)
 - [x] Budget-Warnungen: nur zuständige MA sehen kritische Meldungen ihrer Kunden
+
+## Mitarbeiterakte vollständige Überarbeitung (02.08.2026)
+- [x] MitarbeiterDetail.tsx: 5-Tab-Menü (Stammdaten / Dokumente / Zertifikate / Vertrag / Rechte)
+- [x] Tab Stammdaten: Beschäftigungsart-Toggle, Kontakt, Adresse, Beschäftigung, Dienstwagen, Deaktivieren-Bereich
+- [x] Tab Dokumente: Alle Dokumente nach Typ gruppiert (Zertifikat/Arbeitsvertrag/Krankmeldung/Führerschein/Erste-Hilfe/Sonstiges), Ablauf-Ampel, Datei-Upload, Löschen
+- [x] Tab Zertifikate: Status-Auswahl, Datum, Ablauf, Bemerkung
+- [x] Tab Anstellungsverhältnis/Vertrag: Anstellungsdaten-Übersicht (4 Kacheln), Vertrag-Upload, Download
+- [x] Tab Rollenrechte: Systemrolle ändern (4 Rollen), 12 Modul-Berechtigungen (Standard/Erlaubt/Gesperrt), Legende
+- [x] Backend: mitarbeiterDeaktivieren (Soft-Delete mit Grund), getBerechtigungen, setBerechtigungen
+- [x] AdminPanel MA-Tab: Suchfeld (Name/E-Mail), Beschäftigungsart-Filter (Alle/Minijob/Teilzeit/Vollzeit), Inaktive anzeigen/ausblenden, Neu-anlegen-Button
