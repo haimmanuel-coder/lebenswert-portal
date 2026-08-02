@@ -454,7 +454,52 @@ export default function Leistungsnachweise() {
           Geschätzter Betrag: {betragPreview} € ({stunden}h × {rate} € + {anzahl} × 6 € Pauschale)
         </div>
 
-        <div style={{ display: "flex", gap: 10, marginTop: 20, paddingTop: 16, borderTop: "1px solid #e5e7eb" }}>
+        {/* Vorschau vor Einreichen */}
+        {kundenId && monat && passendeEinsaetze.length > 0 && (
+          <button
+            onClick={() => {
+              const kunde = kunden.find((k) => String(k.id) === kundenId);
+              if (!kunde) { toast.error("Kundendaten nicht gefunden"); return; }
+              const lnwEinsaetze = passendeEinsaetze.map((e: any) => ({
+                datum: e.datum,
+                startzeit: e.startzeit ?? null,
+                dauerStunden: e.dauerStunden ?? null,
+                anfahrtPauschale: e.anfahrtPauschale ?? 6,
+                km: null,
+              }));
+              const url = previewLeistungsnachweisPdf({
+                kundeVorname: kunde.vorname,
+                kundeNachname: kunde.nachname,
+                kundeGeburtsdatum: (kunde as any).geburtsdatum,
+                kundeStrasse: kunde.strasse,
+                kundePlz: kunde.plz,
+                kundeOrt: kunde.ort,
+                kundeVersicherungsnummer: (kunde as any).versicherungsnummer,
+                kundeKostentraeger: (kunde as any).kostentraeger,
+                kundePflegegrad: kunde.pflegegrad,
+                kundePflegegradSeit: (kunde as any).pflegegradSeit ?? null,
+                monat,
+                paragraph: para,
+                stunden: parseFloat(stunden) || 0,
+                anzahlEinsaetze: parseInt(anzahl) || 1,
+                betrag: parseFloat(betragPreview),
+                status: "offen",
+                createdAt: new Date(),
+                einsaetze: lnwEinsaetze,
+                unterschriftMitarbeiter: signaturMitarbeiter ?? undefined,
+                unterschriftKunde: signaturKunde ?? undefined,
+                mitarbeiterName: mitarbeiter ? `${mitarbeiter.vorname} ${mitarbeiter.nachname}` : "Mitarbeiter",
+                mitarbeiterPosition: (mitarbeiter as any)?.position,
+              });
+              setVorschauUrl(url);
+              setVorschauLnw(null); // kein gespeicherter LNW, nur Vorschau
+            }}
+            style={{ width: "100%", padding: "11px 13px", background: "#eff6ff", color: "#1d4ed8", border: "2px solid #1d4ed8", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+          >
+            👁️ PDF-Vorschau vor Einreichen
+          </button>
+        )}
+        <div style={{ display: "flex", gap: 10, marginTop: 4, paddingTop: 16, borderTop: "1px solid #e5e7eb" }}>
           <button onClick={() => setSheetOpen(false)} style={{ flex: 1, padding: 13, background: "#f4f6f3", color: "#6b7280", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>Abbrechen</button>
           <button onClick={saveLnw} disabled={createLeistung.isPending} style={{ flex: 1, padding: 13, background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
             {createLeistung.isPending ? "Einreichen…" : "Einreichen"}
@@ -462,8 +507,8 @@ export default function Leistungsnachweise() {
         </div>
       </BottomSheet>
 
-      {/* Feature 2: PDF-Vorschau-Modal */}
-      {vorschauUrl && vorschauLnw && (
+      {/* Feature 2: PDF-Vorschau-Modal (auch für Einreich-Formular ohne gespeicherten LNW) */}
+      {vorschauUrl && (
         <div
           style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 9999, display: "flex", flexDirection: "column" }}
           onClick={(e) => { if (e.target === e.currentTarget) { setVorschauUrl(null); setVorschauLnw(null); } }}
@@ -471,15 +516,18 @@ export default function Leistungsnachweise() {
           {/* Header */}
           <div style={{ background: "#1e293b", color: "#fff", padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
             <div style={{ fontWeight: 700, fontSize: 15 }}>
-              👁️ Vorschau: LNW {fmtMonat(vorschauLnw.monat)} – {getKundeName(vorschauLnw.kundenId)}
+              👁️ Vorschau: LNW
+              {vorschauLnw ? ` ${fmtMonat(vorschauLnw.monat)} – ${getKundeName(vorschauLnw.kundenId)}` : ` ${fmtMonat(monat)} – ${kunden.find((k) => String(k.id) === kundenId)?.vorname ?? ""} ${kunden.find((k) => String(k.id) === kundenId)?.nachname ?? ""}`}
             </div>
             <div style={{ display: "flex", gap: 10 }}>
+              {vorschauLnw && (
               <button
                 onClick={() => handlePdfDownload(vorschauLnw)}
                 style={{ padding: "7px 16px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}
               >
                 📄 Herunterladen
               </button>
+              )}
               <button
                 onClick={() => { setVorschauUrl(null); setVorschauLnw(null); }}
                 style={{ padding: "7px 14px", background: "#dc2626", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}
