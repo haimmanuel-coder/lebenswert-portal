@@ -753,3 +753,15 @@
 - [x] Feature 3: KPI-Karten (Rot/Gelb/Grün), Filter, aufklappbare Probleme pro MA
 - [x] Feature 3: Ablaufende-Dokumente-Liste mit Zeitfenster-Auswahl + Erinnerungs-Button
 - [x] AdminPanel: neuer Tab '🚦 Compliance-Ampel' eingebunden
+
+## LNW Unterschriften-Autovorschau + PDF-Vorschau (02.08.2026)
+- [x] Feature 1: Unterschriften aus Einsätzen automatisch im LNW-Formular vorausfüllen
+  - [x] useEffect: passende Einsätze (Kunde/Monat/Para) nach unterschriftMitarbeiter/Kunde durchsuchen
+  - [x] Hinweis '✅ Automatisch aus Einsatz übernommen' im Formular anzeigen
+  - [x] Nur vorausfüllen wenn Nutzer noch nichts manuell eingetragen hat
+- [x] Feature 2: PDF-Vorschau-Modal vor dem Download
+  - [x] pdfGenerator.ts: _buildPdf() refactored, previewLeistungsnachweisPdf() gibt blob-URL zurück
+  - [x] handlePdfVorschau() öffnet Vollbild-Modal mit iframe
+  - [x] '👁️ Vorschau'-Button in LNW-Karte (vor PDF-Download-Button)
+  - [x] Modal-Header: Titel + Herunterladen-Button + Schließen-Button
+  - [x] buildPdfData() als gemeinsame Hilfsfunktion für Vorschau und Download

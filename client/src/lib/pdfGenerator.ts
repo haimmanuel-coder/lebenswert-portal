@@ -66,7 +66,18 @@ function fmtDauer(h: number | string | null | undefined): string {
   return min > 0 ? `${std}:${min.toString().padStart(2, "0")} Std.` : `${std}:00 Std.`;
 }
 
+/** Gibt eine Blob-URL zurück für die Browser-Vorschau (kein Download). */
+export function previewLeistungsnachweisPdf(data: LeistungsnachweisPdfData): string {
+  return _buildPdf(data).output("bloburl") as unknown as string;
+}
+
 export function generateLeistungsnachweisPdf(data: LeistungsnachweisPdfData): void {
+  const doc = _buildPdf(data);
+  doc.save(`Leistungsnachweis_${data.kundeNachname}_${data.monat}.pdf`);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function _buildPdf(data: LeistungsnachweisPdfData): any {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const W = 210;
   const margin = 15;
@@ -373,6 +384,5 @@ export function generateLeistungsnachweisPdf(data: LeistungsnachweisPdfData): vo
   doc.text(`Seite 1 von 1`, W - margin, footerY + 5, { align: "right" });
   doc.text(new Date().toLocaleString("de-DE"), W - margin, footerY + 10, { align: "right" });
 
-  // ── SPEICHERN ─────────────────────────────────────────────────────────────
-  doc.save(`Leistungsnachweis_${data.kundeNachname}_${data.monat}.pdf`);
+  return doc;
 }

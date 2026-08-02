@@ -4,7 +4,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import BottomSheet from "@/components/BottomSheet";
 import SignatureCanvas from "@/components/SignatureCanvas";
-import { generateLeistungsnachweisPdf } from "@/lib/pdfGenerator";
+import { generateLeistungsnachweisPdf, previewLeistungsnachweisPdf } from "@/lib/pdfGenerator";
 import { STUNDENSATZ, ANFAHRT_PAUSCHALE } from "@shared/leistungssaetze";
 
 function fmtMonat(m: string) {
@@ -36,6 +36,12 @@ export default function Leistungsnachweise() {
   const [previewKunde, setPreviewKunde] = useState<string | null>(null);
   const [signaturMitarbeiter, setSignaturMitarbeiter] = useState<string | null>(null);
   const [signaturKunde, setSignaturKunde] = useState<string | null>(null);
+  // Feature 1: Auto-Unterschrift aus Einstätzen
+  const [autoUnterschriftMitarbeiter, setAutoUnterschriftMitarbeiter] = useState<string | null>(null);
+  const [autoUnterschriftKunde, setAutoUnterschriftKunde] = useState<string | null>(null);
+  // Feature 2: PDF-Vorschau-Modal
+  const [vorschauUrl, setVorschauUrl] = useState<string | null>(null);
+  const [vorschauLnw, setVorschauLnw] = useState<(typeof leistungen)[0] | null>(null);
 
   const { data: kunden = [] } = trpc.kunden.list.useQuery();
   const getKundeName = (id: number) => { const k = kunden.find((c) => c.id === id); return k ? `${k.vorname} ${k.nachname}` : `Kunde #${id}`; };
@@ -66,6 +72,38 @@ export default function Leistungsnachweise() {
     setAnzahl(String(anzahlAuto));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kundenId, monat, para, alleEinsaetze.length]);
+
+  // Feature 1: Unterschriften aus den passenden Einstätzen vorausfüllen
+  useEffect(() => {
+    if (!kundenId || !monat || !para) {
+      setAutoUnterschriftMitarbeiter(null);
+      setAutoUnterschriftKunde(null);
+      return;
+    }
+    const einsaetze = (alleEinsaetze as any[]).filter(
+      (e) =>
+        String(e.kundenId) === kundenId &&
+        e.status === "abgeschlossen" &&
+        typeof e.datum === "string" &&
+        e.datum.slice(0, 7) === monat &&
+        e.paragraph === para
+    );
+    // Neueste Unterschrift des Mitarbeiters aus den Einstätzen nehmen
+    const mitSig = einsaetze.find((e) => e.unterschriftMitarbeiter)?.unterschriftMitarbeiter ?? null;
+    const kdSig = einsaetze.find((e) => e.unterschriftKunde)?.unterschriftKunde ?? null;
+    setAutoUnterschriftMitarbeiter(mitSig);
+    setAutoUnterschriftKunde(kdSig);
+    // Nur vorausfüllen wenn der Nutzer noch nichts manuell eingetragen hat
+    if (mitSig && !signaturMitarbeiter) {
+      setSignaturMitarbeiter(mitSig);
+      setPreviewMitarbeiter(mitSig);
+    }
+    if (kdSig && !signaturKunde) {
+      setSignaturKunde(kdSig);
+      setPreviewKunde(kdSig);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kundenId, monat, para, alleEinsaetze.length]);
   const deleteLeistung = trpc.leistungen.delete.useMutation({
     onSuccess: () => { refetch(); toast.success("🗑️ Leistungsnachweis gelöscht"); },
     onError: (e) => toast.error("❌ " + e.message),
@@ -82,6 +120,8 @@ export default function Leistungsnachweise() {
       setPreviewKunde(null);
       setSignaturMitarbeiter(null);
       setSignaturKunde(null);
+      setAutoUnterschriftMitarbeiter(null);
+      setAutoUnterschriftKunde(null);
     },
     onError: (e) => toast.error("❌ " + e.message),
   });
@@ -125,10 +165,9 @@ export default function Leistungsnachweise() {
 
   const { mitarbeiter } = usePortalAuth();
 
-  const handlePdfDownload = (l: typeof leistungen[0]) => {
+  const buildPdfData = (l: typeof leistungen[0]) => {
     const kunde = kunden.find((k) => k.id === l.kundenId);
-    if (!kunde) { toast.error("Kundendaten nicht gefunden"); return; }
-    // Einsätze für diesen LNW (gleicher Kunde, Monat, Paragraph)
+    if (!kunde) return null;
     const lnwEinsaetze = (alleEinsaetze as any[]).filter(
       (e) =>
         e.kundenId === l.kundenId &&
@@ -142,7 +181,7 @@ export default function Leistungsnachweise() {
       anfahrtPauschale: e.anfahrtPauschale ?? 6,
       km: null,
     }));
-    generateLeistungsnachweisPdf({
+    return {
       kundeVorname: kunde.vorname,
       kundeNachname: kunde.nachname,
       kundeGeburtsdatum: (kunde as any).geburtsdatum,
@@ -165,7 +204,21 @@ export default function Leistungsnachweise() {
       unterschriftKunde: (l as any).unterschriftKunde,
       mitarbeiterName: mitarbeiter ? `${mitarbeiter.vorname} ${mitarbeiter.nachname}` : "Mitarbeiter",
       mitarbeiterPosition: (mitarbeiter as any)?.position,
-    });
+    };
+  };
+
+  const handlePdfVorschau = (l: typeof leistungen[0]) => {
+    const pdfData = buildPdfData(l);
+    if (!pdfData) { toast.error("Kundendaten nicht gefunden"); return; }
+    const url = previewLeistungsnachweisPdf(pdfData);
+    setVorschauUrl(url);
+    setVorschauLnw(l);
+  };
+
+  const handlePdfDownload = (l: typeof leistungen[0]) => {
+    const pdfData = buildPdfData(l);
+    if (!pdfData) { toast.error("Kundendaten nicht gefunden"); return; }
+    generateLeistungsnachweisPdf(pdfData);
     toast.success("📄 PDF wird heruntergeladen...");
   };
 
@@ -209,9 +262,16 @@ export default function Leistungsnachweise() {
                     {l.status}
                   </span>
                   <button
+                    onClick={() => handlePdfVorschau(l)}
+                    title="PDF-Vorschau im Browser"
+                    style={{ display: "block", marginTop: 6, padding: "4px 10px", background: "#eff6ff", color: "#1d4ed8", border: "1.5px solid #1d4ed8", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer" }}
+                  >
+                    👁️ Vorschau
+                  </button>
+                  <button
                     onClick={() => handlePdfDownload(l)}
                     title="PDF herunterladen"
-                    style={{ display: "block", marginTop: 6, padding: "4px 10px", background: "#e8f5e4", color: "#4a8c3f", border: "1.5px solid #4a8c3f", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer" }}
+                    style={{ display: "block", marginTop: 4, padding: "4px 10px", background: "#e8f5e4", color: "#4a8c3f", border: "1.5px solid #4a8c3f", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer" }}
                   >
                     📄 PDF
                   </button>
@@ -319,6 +379,11 @@ export default function Leistungsnachweise() {
 
         <div style={{ marginBottom: 14 }}>
           <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>Unterschrift Mitarbeiter</label>
+          {autoUnterschriftMitarbeiter && (
+            <div style={{ background: "#f0fdf4", border: "1.5px solid #86efac", borderRadius: 8, padding: "5px 10px", marginBottom: 6, fontSize: 11, color: "#166534", fontWeight: 600 }}>
+              ✅ Automatisch aus Einsatz übernommen
+            </div>
+          )}
           <SignatureCanvas
             ref={sigRef}
             height={120}
@@ -396,6 +461,41 @@ export default function Leistungsnachweise() {
           </button>
         </div>
       </BottomSheet>
+
+      {/* Feature 2: PDF-Vorschau-Modal */}
+      {vorschauUrl && vorschauLnw && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 9999, display: "flex", flexDirection: "column" }}
+          onClick={(e) => { if (e.target === e.currentTarget) { setVorschauUrl(null); setVorschauLnw(null); } }}
+        >
+          {/* Header */}
+          <div style={{ background: "#1e293b", color: "#fff", padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>
+              👁️ Vorschau: LNW {fmtMonat(vorschauLnw.monat)} – {getKundeName(vorschauLnw.kundenId)}
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={() => handlePdfDownload(vorschauLnw)}
+                style={{ padding: "7px 16px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+              >
+                📄 Herunterladen
+              </button>
+              <button
+                onClick={() => { setVorschauUrl(null); setVorschauLnw(null); }}
+                style={{ padding: "7px 14px", background: "#dc2626", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+              >
+                ✕ Schließen
+              </button>
+            </div>
+          </div>
+          {/* iframe */}
+          <iframe
+            src={vorschauUrl}
+            style={{ flex: 1, border: "none", background: "#fff" }}
+            title="Leistungsnachweis Vorschau"
+          />
+        </div>
+      )}
     </div>
   );
 }
