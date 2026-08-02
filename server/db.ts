@@ -959,6 +959,36 @@ export async function updateFuehrerscheinStatus(id: number, status: 'gueltig' | 
   await db.execute(sql`UPDATE fuehrerschein_checks SET status = ${status} WHERE id = ${id}`);
 }
 
+/** Neue Tabelle (camelCase-Spalten) */
+export async function getFuehrerscheinChecksNeu(mitarbeiterId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  if (mitarbeiterId) {
+    const r = await db.execute(sql`SELECT * FROM fuehrerschein_checks WHERE mitarbeiterId = ${mitarbeiterId} ORDER BY pruefDatum DESC`);
+    return (r as any)[0] as any[];
+  }
+  const r = await db.execute(sql`SELECT * FROM fuehrerschein_checks ORDER BY naechstePruefung ASC`);
+  return (r as any)[0] as any[];
+}
+
+export async function createFuehrerscheinCheckNeu(data: {
+  mitarbeiterId: number;
+  pruefDatum: string;
+  naechstePruefung: string;
+  status: 'ausstehend' | 'bestanden' | 'abgelaufen';
+  fotoUrl?: string;
+  fotoKey?: string;
+  bemerkung?: string;
+  geprueftVonId?: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error('DB not available');
+  await db.execute(sql`
+    INSERT INTO fuehrerschein_checks (mitarbeiterId, pruefDatum, naechstePruefung, status, fotoUrl, fotoKey, bemerkung, geprueftVonId)
+    VALUES (${data.mitarbeiterId}, ${data.pruefDatum}, ${data.naechstePruefung}, ${data.status}, ${data.fotoUrl ?? null}, ${data.fotoKey ?? null}, ${data.bemerkung ?? null}, ${data.geprueftVonId ?? null})
+  `);
+}
+
 // ── NEUKUNDENAUFNAHMEN ────────────────────────────────
 export async function getAllNeukundenaufnahmen() {
   const db = await getDb();

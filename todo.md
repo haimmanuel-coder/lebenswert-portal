@@ -169,6 +169,19 @@
 - [x] openEditMa liest beschaeftigungsart aus DB und befüllt Dropdown
 - [x] resetMaForm setzt Dropdown zurück auf 'minijob'
 
+## Drei weitere Features (02.08.2026)
+- [x] Feature 1: Beschäftigungsverhältnis in Mitarbeiterakte (MitarbeiterDetail.tsx) bereits vollständig angezeigt + editierbar (3-Button-Toggle: Minijob/Teilzeit/Vollzeit)
+- [x] Feature 2: pflegegradSeit-Datumsfeld im Kunden-Formular (AdminPanel) editierbar + Router-Procedure erweitert
+- [x] Feature 3: Führerschein-Check-Modul (FuehrerscheinCheckTab.tsx)
+  - [x] Neue DB-Tabelle fuehrerschein_checks (camelCase-Spalten)
+  - [x] DB-Helpers: getFuehrerscheinChecksNeu, createFuehrerscheinCheckNeu
+  - [x] Router-Procedures: listMitStatus, alleChecks, adminCreate, uploadFoto
+  - [x] KPI-Karten: Gültig, Überfällig, Kein Check
+  - [x] Mitarbeiter-Liste mit Ampel-System (grün/gelb/rot)
+  - [x] Check erfassen: Status, Datum, Auto-+6-Monate, Foto-Upload (Kamera), Bemerkung
+  - [x] Verlauf-Ansicht pro Mitarbeiter
+  - [x] AdminPanel: neuer Tab '🪖 Führerschein-Checks' eingebunden
+
 ### Feature 3: Offline-Modus mit Service Worker (PWA)
 - [x] Service Worker: sw.js mit Cache-First für Assets, Network-First für API
 - [x] Service Worker: IndexedDB Queue für Offline-Einsätze

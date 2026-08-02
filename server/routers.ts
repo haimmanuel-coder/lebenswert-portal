@@ -89,6 +89,8 @@ import {
   getFuehrerscheinChecks,
   createFuehrerscheinCheck,
   updateFuehrerscheinStatus,
+  getFuehrerscheinChecksNeu,
+  createFuehrerscheinCheckNeu,
   getAllNeukundenaufnahmen,
   createNeukundenaufnahme,
   updateNeukundenaufnahmeStatus,
@@ -926,6 +928,7 @@ export const appRouter = router({
         adresse: z.string().optional(),
         telefon: z.string().optional(),
         pflegegrad: z.number().int().min(1).max(5).optional(),
+        pflegegradSeit: z.string().nullable().optional(),
         paragraph: z.enum(["45b", "45a", "39", "privat"]).optional(),
         aktiv: z.number().int().optional(),
         kostentraegerId: z.number().int().positive().optional().nullable(),
@@ -2329,6 +2332,62 @@ export const appRouter = router({
       }),
 
     vapidKey: portalProcedure.query(() => ({ key: VAPID_PUBLIC })),
+
+    /** Admin: alle Mitarbeiter mit ihrem letzten Check-Status */
+    listMitStatus: adminProcedure.query(async () => {
+      const alle = await getAllMitarbeiter();
+      const checks = await getFuehrerscheinChecksNeu();
+      return alle.map((ma: any) => {
+        const maChecks = checks.filter((c: any) => c.mitarbeiterId === ma.id);
+        const letzter = maChecks.sort((a: any, b: any) => b.pruefDatum.localeCompare(a.pruefDatum))[0] ?? null;
+        return {
+          id: ma.id as number,
+          vorname: ma.vorname as string,
+          nachname: ma.nachname as string,
+          beschaeftigungsart: (ma.beschaeftigungsart ?? 'minijob') as string,
+          letzterCheck: letzter,
+          naechstePruefung: letzter?.naechstePruefung ?? null,
+          status: letzter ? (letzter.status as string) : 'kein_check',
+        };
+      });
+    }),
+
+    /** Admin: alle Checks aller Mitarbeiter */
+    alleChecks: adminProcedure.query(async () => {
+      return getFuehrerscheinChecksNeu();
+    }),
+
+    /** Admin: Check für beliebigen Mitarbeiter anlegen */
+    adminCreate: adminProcedure
+      .input(z.object({
+        mitarbeiterId: z.number().int().positive(),
+        pruefDatum: z.string(),
+        naechstePruefung: z.string(),
+        status: z.enum(['ausstehend', 'bestanden', 'abgelaufen']),
+        fotoUrl: z.string().optional(),
+        fotoKey: z.string().optional(),
+        bemerkung: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await createFuehrerscheinCheckNeu(input);
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'ADMIN', ressource: 'fuehrerschein', details: `ma=${input.mitarbeiterId} datum=${input.pruefDatum}`, status: 'success' });
+        return { success: true };
+      }),
+
+    /** Foto als Base64 hochladen und URL zurückgeben */
+    uploadFoto: adminProcedure
+      .input(z.object({
+        base64: z.string(),
+        mimeType: z.string(),
+        fileName: z.string(),
+      }))
+      .mutation(async ({ input }) => {
+        const { storagePut } = await import('./storage.js');
+        const buf = Buffer.from(input.base64, 'base64');
+        const key = `fuehrerschein/${Date.now()}-${input.fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+        const { url } = await storagePut(key, buf, input.mimeType);
+        return { url, key };
+      }),
   }),
 
   // ── NEUKUNDENAUFNAHMEN ───────────────────────────────

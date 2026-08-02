@@ -2,13 +2,14 @@ import { FormularVorlagenTab } from "./FormularVorlagenTab";
 import { DsgvoAdminTab } from "./DsgvoAdminTab";
 import { VerrechnungssaetzeTab } from "./VerrechnungssaetzeTab";
 import { SicherheitsunterweisungenAdminTab } from "./SicherheitsunterweisungenAdminTab";
+import { FuehrerscheinCheckTab } from "./FuehrerscheinCheckTab";
 import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import BottomSheet from "@/components/BottomSheet";
 import MitarbeiterDetail from "./MitarbeiterDetail";
 
-type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo" | "preise" | "sicherheit";
+type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo" | "preise" | "sicherheit" | "fuehrerschein";
 type PortalRolle = "mitarbeiter" | "teamleitung" | "buchhaltung" | "admin";
 
 const ROLLEN_LABEL: Record<PortalRolle, string> = {
@@ -80,6 +81,7 @@ export default function AdminPanel() {
   const [kdAdresse, setKdAdresse] = useState("");
   const [kdTelefon, setKdTelefon] = useState("");
   const [kdPflegegrad, setKdPflegegrad] = useState("2");
+  const [kdPflegegradSeit, setKdPflegegradSeit] = useState("");
   const [kdParagraph, setKdParagraph] = useState<"45b" | "45a" | "39" | "privat">("45b");
 
   const { data: kundenList = [], refetch: refetchKd } = trpc.kunden.list.useQuery();
@@ -128,17 +130,18 @@ export default function AdminPanel() {
     });
   };
 
-  const resetKdForm = () => { setEditKd(null); setKdVorname(""); setKdNachname(""); setKdAdresse(""); setKdTelefon(""); setKdPflegegrad("2"); setKdParagraph("45b"); };
+  const resetKdForm = () => { setEditKd(null); setKdVorname(""); setKdNachname(""); setKdAdresse(""); setKdTelefon(""); setKdPflegegrad("2"); setKdPflegegradSeit(""); setKdParagraph("45b"); };
   const openEditKd = (k: typeof kundenList[0]) => {
     setEditKd(k);
     setKdVorname(k.vorname); setKdNachname(k.nachname); setKdAdresse(k.strasse || "");
     setKdTelefon(k.telefon || ""); setKdPflegegrad(String(k.pflegegrad || 2));
+    setKdPflegegradSeit((k as any).pflegegradSeit ? String((k as any).pflegegradSeit).split("T")[0] : "");
     setKdParagraph((k.paragraph as "45b" | "45a" | "39" | "privat") || "45b");
     setKdSheet(true);
   };
   const saveKd = () => {
     if (!kdVorname || !kdNachname) { toast.error("Pflichtfelder ausfüllen!"); return; }
-    const data = { vorname: kdVorname, nachname: kdNachname, strasse: kdAdresse, telefon: kdTelefon, pflegegrad: parseInt(kdPflegegrad), paragraph: kdParagraph };
+    const data = { vorname: kdVorname, nachname: kdNachname, strasse: kdAdresse, telefon: kdTelefon, pflegegrad: parseInt(kdPflegegrad), pflegegradSeit: kdPflegegradSeit || null, paragraph: kdParagraph };
     if (editKd) updateKd.mutate({ id: editKd.id, ...data });
     else createKd.mutate(data);
   };
@@ -242,6 +245,7 @@ export default function AdminPanel() {
           { key: "dsgvo" as AdminTab, label: "🔒 DSGVO-Dokumente" },
           { key: "preise" as AdminTab, label: "💶 Leistungskosten" },
           { key: "sicherheit" as AdminTab, label: "🦺 Sicherheitsunterweisungen" },
+          { key: "fuehrerschein" as AdminTab, label: "🪖 Führerschein-Checks" },
         ].map((t) => (
           <button key={t.key} style={tabStyle(t.key)} onClick={() => setTab(t.key)}>{t.label}</button>
         ))}
@@ -527,6 +531,10 @@ export default function AdminPanel() {
             </select>
           </div>
         </div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelStyle}>Pflegegrad anerkannt seit</label>
+          <input type="date" value={kdPflegegradSeit} onChange={(e) => setKdPflegegradSeit(e.target.value)} style={inputStyle} />
+        </div>
         <div style={{ marginBottom: 14 }}>
           <label style={labelStyle}>Paragraph</label>
           <select value={kdParagraph} onChange={(e) => setKdParagraph(e.target.value as "45b" | "45a" | "39" | "privat")} style={inputStyle}>
@@ -554,6 +562,9 @@ export default function AdminPanel() {
       )}
       {tab === "sicherheit" && (
         <SicherheitsunterweisungenAdminTab />
+      )}
+      {tab === "fuehrerschein" && (
+        <FuehrerscheinCheckTab />
       )}
 
       <BottomSheet open={budgetSheet} onClose={() => setBudgetSheet(false)} title={budgetKunde ? `Budget: ${budgetKunde.vorname} ${budgetKunde.nachname}` : "Budget bearbeiten"}>
