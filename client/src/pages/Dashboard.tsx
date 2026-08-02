@@ -1,5 +1,4 @@
 import { usePortalAuth } from "@/contexts/PortalAuthContext";
-import { useTimer } from "@/contexts/TimerContext";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useState, useRef } from "react";
@@ -157,7 +156,6 @@ function WarnungsListe() {
 export default function Dashboard() {
   const { mitarbeiter } = usePortalAuth();
   const { navigiere } = useNavigation();
-  const { timerDisplay, timerLabel, isRunning, isPaused, start, pause, stop } = useTimer();
   const [abschlussOpen, setAbschlussOpen] = useState(false);
   const [activeEinsatz, setActiveEinsatz] = useState<{ id: number; name: string; datum: string } | null>(null);
   const [bericht, setBericht] = useState("");
@@ -252,38 +250,6 @@ export default function Dashboard() {
           {greet}, {mitarbeiter?.vorname}! 👋
         </div>
         <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>{todayStr}</div>
-      </div>
-
-      {/* Timer */}
-      <div className="timer-card">
-        <div style={{ fontSize: 13, opacity: 0.85 }}>{timerLabel}</div>
-        <div className="timer-display">{timerDisplay}</div>
-        <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-          <button
-            onClick={isRunning ? pause : start}
-            style={{
-              flex: 1, padding: 12, border: "none", borderRadius: 10,
-              fontSize: 14, fontWeight: 700, cursor: "pointer",
-              background: "#fff", color: "#4a8c3f", transition: "transform 0.15s",
-            }}
-            onMouseDown={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(0.96)")}
-            onMouseUp={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(1)")}
-          >
-            {isRunning ? "⏸ Pausieren" : isPaused ? "▶ Weiter" : "▶ Starten"}
-          </button>
-          {(isRunning || isPaused) && (
-            <button
-              onClick={() => { stop(); toast.success("Timer beendet"); }}
-              style={{
-                flex: 1, padding: 12, border: "2px solid rgba(255,255,255,0.4)",
-                borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer",
-                background: "rgba(255,255,255,0.2)", color: "#fff",
-              }}
-            >
-              ■ Beenden
-            </button>
-          )}
-        </div>
       </div>
 
       {/* KPI */}

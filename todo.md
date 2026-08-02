@@ -695,3 +695,10 @@
 - [x] Sicherheitsunterweisungen: MA-Seite mit Fortschrittsanzeige und Bestätigungs-Button
 - [x] Sicherheitsunterweisungen: Badge in Navigation (offene Pflichtunterweisungen)
 - [x] Budget-Automatik: LNW-Abschluss zieht Stunden automatisch vom Kundenbudget ab
+
+## Features 2026-08-02 (Batch 4)
+
+- [x] Leistungskosten §39/§45b/§45a: Admin-Interface im AdminPanel (VerrechnungssaetzeTab)
+- [x] Kundenzuteilung: Bug behoben (useState in Render-Phase → useEffect)
+- [x] Zeiterfassung-Kachel aus MA-Dashboard entfernt (bleibt im Menü)
+- [x] Budget-Warnungen: nur zuständige MA sehen kritische Meldungen ihrer Kunden

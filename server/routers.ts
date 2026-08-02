@@ -960,8 +960,16 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    budgetWarnungen: portalProtected.query(async () => {
-      const warnungen = await getKundenMitBudgetWarnung();
+    budgetWarnungen: portalProtected.query(async ({ ctx }) => {
+      const ma = await getMitarbeiterById(ctx.mitarbeiterId);
+      const alleWarnungen = await getKundenMitBudgetWarnung();
+      // Normale Mitarbeiter sehen nur Warnungen ihrer zugewiesenen Kunden
+      let warnungen = alleWarnungen;
+      if (ma?.rolle === 'mitarbeiter') {
+        const zuordnungen = await getZuordnungenForMitarbeiter(ctx.mitarbeiterId);
+        const zugewieseneIds = new Set(zuordnungen.map((z: any) => z.kundenId));
+        warnungen = alleWarnungen.filter((k: any) => zugewieseneIds.has(k.id));
+      }
       return warnungen.map(k => ({
         id: k.id,
         vorname: k.vorname,

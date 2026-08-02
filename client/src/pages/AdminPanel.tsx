@@ -1,12 +1,13 @@
 import { FormularVorlagenTab } from "./FormularVorlagenTab";
 import { DsgvoAdminTab } from "./DsgvoAdminTab";
-import { useState } from "react";
+import { VerrechnungssaetzeTab } from "./VerrechnungssaetzeTab";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import BottomSheet from "@/components/BottomSheet";
 import MitarbeiterDetail from "./MitarbeiterDetail";
 
-type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo";
+type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo" | "preise";
 type PortalRolle = "mitarbeiter" | "teamleitung" | "buchhaltung" | "admin";
 
 const ROLLEN_LABEL: Record<PortalRolle, string> = {
@@ -155,15 +156,19 @@ export default function AdminPanel() {
 
   const openKundeZuordnung = (kundeId: number) => {
     setZuordKundeId(kundeId);
-    // Bestehende Zuordnungen laden (nach kurzer Verzögerung für Query)
-    setZuordRows([]);
+    setZuordRows([]); // Reset – useEffect befüllt sobald Daten geladen
   };
 
-  // Wenn Zuordnungsdaten geladen werden, in lokalen State übernehmen
-  const prevZuordKundeId = useState<number | null>(null);
-  if (zuordKundeId && zuordDaten.length > 0 && zuordRows.length === 0) {
-    setZuordRows(zuordDaten.map(z => ({ mitarbeiterId: z.mitarbeiterId, prioritaet: z.prioritaet, rolle: z.rolle as 'hauptbetreuer' | 'vertretung' })));
-  }
+  // Wenn Zuordnungsdaten geladen werden, in lokalen State übernehmen (korrekt via useEffect)
+  useEffect(() => {
+    if (zuordKundeId && zuordDaten.length > 0) {
+      setZuordRows(zuordDaten.map(z => ({
+        mitarbeiterId: z.mitarbeiterId,
+        prioritaet: z.prioritaet,
+        rolle: z.rolle as 'hauptbetreuer' | 'vertretung',
+      })));
+    }
+  }, [zuordKundeId, zuordDaten]);
 
   const addZuordRow = () => {
     if (zuordRows.length >= 3) { toast.error("Maximal 3 Mitarbeiter pro Kunde erlaubt."); return; }
@@ -232,6 +237,7 @@ export default function AdminPanel() {
           { key: "abschluss" as AdminTab, label: "📊 Abschluss" },
           { key: "vorlagen" as AdminTab, label: "📋 Formularvorlagen" },
           { key: "dsgvo" as AdminTab, label: "🔒 DSGVO-Dokumente" },
+          { key: "preise" as AdminTab, label: "💶 Leistungskosten" },
         ].map((t) => (
           <button key={t.key} style={tabStyle(t.key)} onClick={() => setTab(t.key)}>{t.label}</button>
         ))}
@@ -530,6 +536,9 @@ export default function AdminPanel() {
       )}
       {tab === "dsgvo" && (
         <DsgvoAdminTab />
+      )}
+      {tab === "preise" && (
+        <VerrechnungssaetzeTab />
       )}
 
       <BottomSheet open={budgetSheet} onClose={() => setBudgetSheet(false)} title={budgetKunde ? `Budget: ${budgetKunde.vorname} ${budgetKunde.nachname}` : "Budget bearbeiten"}>
