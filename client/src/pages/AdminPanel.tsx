@@ -1,13 +1,14 @@
 import { FormularVorlagenTab } from "./FormularVorlagenTab";
 import { DsgvoAdminTab } from "./DsgvoAdminTab";
 import { VerrechnungssaetzeTab } from "./VerrechnungssaetzeTab";
+import { SicherheitsunterweisungenAdminTab } from "./SicherheitsunterweisungenAdminTab";
 import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import BottomSheet from "@/components/BottomSheet";
 import MitarbeiterDetail from "./MitarbeiterDetail";
 
-type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo" | "preise";
+type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo" | "preise" | "sicherheit";
 type PortalRolle = "mitarbeiter" | "teamleitung" | "buchhaltung" | "admin";
 
 const ROLLEN_LABEL: Record<PortalRolle, string> = {
@@ -238,6 +239,7 @@ export default function AdminPanel() {
           { key: "vorlagen" as AdminTab, label: "📋 Formularvorlagen" },
           { key: "dsgvo" as AdminTab, label: "🔒 DSGVO-Dokumente" },
           { key: "preise" as AdminTab, label: "💶 Leistungskosten" },
+          { key: "sicherheit" as AdminTab, label: "🦺 Sicherheitsunterweisungen" },
         ].map((t) => (
           <button key={t.key} style={tabStyle(t.key)} onClick={() => setTab(t.key)}>{t.label}</button>
         ))}
@@ -539,6 +541,9 @@ export default function AdminPanel() {
       )}
       {tab === "preise" && (
         <VerrechnungssaetzeTab />
+      )}
+      {tab === "sicherheit" && (
+        <SicherheitsunterweisungenAdminTab />
       )}
 
       <BottomSheet open={budgetSheet} onClose={() => setBudgetSheet(false)} title={budgetKunde ? `Budget: ${budgetKunde.vorname} ${budgetKunde.nachname}` : "Budget bearbeiten"}>

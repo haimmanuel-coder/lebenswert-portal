@@ -153,6 +153,16 @@
 - [x] PDF: Neue Vorlage mit Optadata-Abtretungshinweis, Einsatz-Tabelle (Datum/Uhrzeit/Dauer/Pauschale/km), Pflegegrad+seit-Feld, zwei Unterschriftszeilen (MA+Stempel, Kunde), IK-Nr. 460 547 168 in Header/Footer
 - [x] Leistungsnachweise.tsx: kundePflegegradSeit + einsaetze[] an PDF-Generator übergeben
 
+## Admin-Interface Sicherheitsunterweisungen
+- [x] SicherheitsunterweisungenAdminTab.tsx: Vollständige Verwaltungsoberfläche
+- [x] KPI-Karten: Aktive Unterweisungen, Pflicht-Unterweisungen, Offene Bestätigungen
+- [x] Unterweisungs-Karten mit Fortschrittsbalken (X/Y Mitarbeiter bestätigt)
+- [x] Detail-Ansicht: Wer hat bestätigt (grün) / wer noch nicht (rot) mit Timestamp
+- [x] Neue Unterweisung anlegen (Titel, Inhalt, Kategorie, Pflicht, Version, Gültig-bis)
+- [x] Bestehende Unterweisung bearbeiten inkl. Versions-Hinweis
+- [x] Unterweisung deaktivieren mit Bestätigungsdialog
+- [x] AdminPanel: neuer Tab '🦺 Sicherheitsunterweisungen' eingebunden
+
 ### Feature 3: Offline-Modus mit Service Worker (PWA)
 - [x] Service Worker: sw.js mit Cache-First für Assets, Network-First für API
 - [x] Service Worker: IndexedDB Queue für Offline-Einsätze
