@@ -743,3 +743,13 @@
 - [x] Tab Rollenrechte: Systemrolle ändern (4 Rollen), 12 Modul-Berechtigungen (Standard/Erlaubt/Gesperrt), Legende
 - [x] Backend: mitarbeiterDeaktivieren (Soft-Delete mit Grund), getBerechtigungen, setBerechtigungen
 - [x] AdminPanel MA-Tab: Suchfeld (Name/E-Mail), Beschäftigungsart-Filter (Alle/Minijob/Teilzeit/Vollzeit), Inaktive anzeigen/ausblenden, Neu-anlegen-Button
+
+## Drei Compliance-Features (02.08.2026)
+- [x] Feature 1: Backend compliance-Router (ablaufendeDokumente, uebersicht, erinnerungSenden, meineBerechtigungen)
+- [x] Feature 1: Dokument-Ablauf-Erinnerungen – Admin-Push bei ablaufenden Dokumenten (≤30 Tage), Zeitfenster wählbar (14/30/60/90 Tage)
+- [x] Feature 2: Modul-Berechtigungen im Portal durchgesetzt – gesperrte Module aus Navigation ausgeblendet
+- [x] Feature 2: darfModulNutzen-Funktion in PortalApp + useBerechtigungen-Hook
+- [x] Feature 3: ComplianceAmpelTab.tsx – Ampel-Übersicht aller aktiven MA (🔴/🟡/🟢)
+- [x] Feature 3: KPI-Karten (Rot/Gelb/Grün), Filter, aufklappbare Probleme pro MA
+- [x] Feature 3: Ablaufende-Dokumente-Liste mit Zeitfenster-Auswahl + Erinnerungs-Button
+- [x] AdminPanel: neuer Tab '🚦 Compliance-Ampel' eingebunden

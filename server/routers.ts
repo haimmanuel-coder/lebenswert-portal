@@ -18,7 +18,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
-import { sql, eq, desc, and } from "drizzle-orm";
+import { sql, eq, desc, and, isNotNull, lte } from "drizzle-orm";
 import { getDb } from "./db";
 import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, einsatzAenderungen, kunden as kundenTable, notifications as notificationsTable } from "../drizzle/schema";
 import {
@@ -121,6 +121,7 @@ import { umwidmungRouter, sonderfahrtRouter, rechnungspositionRouter, privatrech
 import { budgetRouter } from "./routers/budgetRouter";
 import { fahrtenAbrechnungRouter } from "./routers/fahrtenAbrechnungRouter";
 import { sicherheitsunterweisungRouter } from "./routers/sicherheitsunterweisungRouter";
+import { notifyOwner } from "./_core/notification";
 import {
   savePushSubscription,
   deletePushSubscription,
@@ -2719,6 +2720,104 @@ export const appRouter = router({
   }),
 
     twoFactor: twoFactorRouter,
+  // ── COMPLIANCE & DOKUMENT-ABLAUF-ERINNERUNGEN ────────────────────────────────
+  compliance: router({
+    /** Alle ablaufenden Dokumente (innerhalb der nächsten `tage` Tage) */
+    ablaufendeDokumente: adminProcedure
+      .input(z.object({ tage: z.number().int().min(1).max(365).default(30) }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        const { mitarbeiterDokumente: dokTable, mitarbeiter: maTable } = await import('../drizzle/schema.js');
+        const jetzt = new Date();
+        const grenze = new Date(jetzt.getTime() + input.tage * 24 * 60 * 60 * 1000);
+        const rows = await db
+          .select({
+            id: dokTable.id,
+            mitarbeiterId: dokTable.mitarbeiterId,
+            typ: dokTable.typ,
+            bezeichnung: dokTable.bezeichnung,
+            ablaufdatum: dokTable.ablaufdatum,
+            vorname: maTable.vorname,
+            nachname: maTable.nachname,
+          })
+          .from(dokTable)
+          .leftJoin(maTable, eq(dokTable.mitarbeiterId, maTable.id))
+          .where(and(
+            isNotNull(dokTable.ablaufdatum),
+            lte(dokTable.ablaufdatum, grenze),
+          ));
+        return rows.map(r => ({
+          ...r,
+          bereitsAbgelaufen: r.ablaufdatum ? new Date(r.ablaufdatum) < jetzt : false,
+          tageBisAblauf: r.ablaufdatum
+            ? Math.ceil((new Date(r.ablaufdatum).getTime() - jetzt.getTime()) / (1000 * 60 * 60 * 24))
+            : null,
+        }));
+      }),
+    /** Compliance-Übersicht: Alle aktiven MA mit Ampel-Status */
+    uebersicht: adminProcedure.query(async () => {
+      const db = await getDb();
+      if (!db) return [];
+      const { mitarbeiterDokumente: dokTable, mitarbeiter: maTable } = await import('../drizzle/schema.js');
+      const jetzt = new Date();
+      const in30 = new Date(jetzt.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const maListe = await db.select().from(maTable).where(eq(maTable.aktiv, 1));
+      const alleDoks = await db.select().from(dokTable);
+      return maListe.map(ma => {
+        const maDoks = alleDoks.filter(d => d.mitarbeiterId === ma.id);
+        const abgelaufen = maDoks.filter(d => d.ablaufdatum && new Date(d.ablaufdatum) < jetzt);
+        const baldAblaufend = maDoks.filter(d => d.ablaufdatum && new Date(d.ablaufdatum) >= jetzt && new Date(d.ablaufdatum) <= in30);
+        const hatVertrag = maDoks.some(d => d.typ === 'arbeitsvertrag');
+        const hatErsteHilfe = maDoks.some(d => d.typ === 'erstehilfe');
+        const zertStatus = (ma as any).zertifikatStatus ?? 'nicht_angemeldet';
+        let ampel: 'gruen' | 'gelb' | 'rot' = 'gruen';
+        if (abgelaufen.length > 0 || !hatVertrag || zertStatus === 'nicht_angemeldet') ampel = 'rot';
+        else if (baldAblaufend.length > 0 || !hatErsteHilfe || zertStatus === 'angemeldet') ampel = 'gelb';
+        return {
+          id: ma.id, vorname: ma.vorname, nachname: ma.nachname, rolle: ma.rolle,
+          beschaeftigungsart: (ma as any).beschaeftigungsart ?? 'minijob',
+          ampel, abgelaufenAnzahl: abgelaufen.length, baldAblaufendAnzahl: baldAblaufend.length,
+          hatVertrag, hatErsteHilfe, zertStatus,
+          probleme: [
+            ...abgelaufen.map(d => `❌ ${d.bezeichnung} abgelaufen`),
+            ...baldAblaufend.map(d => `⚠️ ${d.bezeichnung} läuft bald ab`),
+            ...(!hatVertrag ? ['❌ Kein Arbeitsvertrag hinterlegt'] : []),
+            ...(!hatErsteHilfe ? ['⚠️ Kein Erste-Hilfe-Kurs hinterlegt'] : []),
+            ...(zertStatus === 'nicht_angemeldet' ? ['❌ Kein Zertifikat / nicht angemeldet'] : []),
+            ...(zertStatus === 'angemeldet' ? ['⚠️ Zertifikat: Schulung noch nicht abgeschlossen'] : []),
+          ],
+        };
+      });
+    }),
+    /** Erinnerungs-Push an Admin senden für ablaufende Dokumente */
+    erinnerungSenden: adminProcedure
+      .input(z.object({ tage: z.number().int().min(1).max(365).default(30) }))
+      .mutation(async ({ ctx }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        const { mitarbeiterDokumente: dokTable, mitarbeiter: maTable } = await import('../drizzle/schema.js');
+        const jetzt = new Date();
+        const in30 = new Date(jetzt.getTime() + 30 * 24 * 60 * 60 * 1000);
+        const rows = await db
+          .select({ bezeichnung: dokTable.bezeichnung, ablaufdatum: dokTable.ablaufdatum, vorname: maTable.vorname, nachname: maTable.nachname })
+          .from(dokTable)
+          .leftJoin(maTable, eq(dokTable.mitarbeiterId, maTable.id))
+          .where(and(isNotNull(dokTable.ablaufdatum), lte(dokTable.ablaufdatum, in30)));
+        if (rows.length === 0) return { gesendet: false, anzahl: 0 };
+        const liste = rows.map(r => `\u2022 ${r.vorname} ${r.nachname}: ${r.bezeichnung} (${r.ablaufdatum ? new Date(r.ablaufdatum).toLocaleDateString('de-DE') : '?'})`).join('\n');
+        await notifyOwner({ title: `\u26a0\ufe0f ${rows.length} Dokument(e) laufen bald ab`, content: `Folgende Dokumente laufen in den n\u00e4chsten 30 Tagen ab:\n\n${liste}` });
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'ADMIN', ressource: 'compliance_erinnerung', details: `anzahl=${rows.length}`, status: 'success' });
+        return { gesendet: true, anzahl: rows.length };
+      }),
+    /** Berechtigungen eines eingeloggten Mitarbeiters lesen (für Portal-Durchsetzung) */
+    meineBerechtigungen: portalProtected.query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const { mitarbeiterBerechtigungen: mbTable } = await import('../drizzle/schema.js');
+      return db.select().from(mbTable).where(eq(mbTable.mitarbeiterId, ctx.mitarbeiterId));
+    }),
+  }),
   datenschutz: datenschutzRouter,
   verfuegbarkeiten: verfuegbarkeitenRouter,
   besuchsberichte: besuchsberichteRouter,

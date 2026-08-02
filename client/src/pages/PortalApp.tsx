@@ -94,6 +94,16 @@ export default function PortalApp() {
   const neukundenPushCount = (neukundenPushOffen as any[]).length;
   const isAdmin = mitarbeiter?.rolle === "admin";
   const isTeamleitung = mitarbeiter?.rolle === "teamleitung";
+  // ── Modul-Berechtigungen: Gesperrte Module aus Navigation ausblenden ──
+  const { data: meineBerechtigungen = [] } = (trpc as any).compliance.meineBerechtigungen.useQuery(
+    undefined, { enabled: !!mitarbeiter && !isAdmin, staleTime: 60_000 }
+  );
+  const darfModulNutzen = (modul: string): boolean => {
+    if (isAdmin) return true;
+    const eintrag = (meineBerechtigungen as Array<{ modul: string; zugriff: string }>).find(b => b.modul === modul);
+    if (!eintrag) return true; // kein Eintrag = Standard = erlaubt
+    return eintrag.zugriff === "erlaubt";
+  };
   // Badge-Logik: Admin/Teamleitung sehen Warnungsanzahl, normale MA sehen heutige Einsätze
   const today = new Date().toISOString().split("T")[0];
   const heutigeEinsaetze = (meineEinsaetze as any[]).filter((e: any) => {
@@ -296,7 +306,7 @@ export default function PortalApp() {
               textTransform: "uppercase", letterSpacing: 1.2,
               padding: "10px 16px 4px",
             }}>{section.title}</div>
-            {section.items.map((item) => {
+            {section.items.filter(item => darfModulNutzen(item.id)).map((item) => {
               const isActive = activePage === item.id && kundenDetailId === null;
               return (
                 <button

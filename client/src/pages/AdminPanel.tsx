@@ -3,13 +3,14 @@ import { DsgvoAdminTab } from "./DsgvoAdminTab";
 import { VerrechnungssaetzeTab } from "./VerrechnungssaetzeTab";
 import { SicherheitsunterweisungenAdminTab } from "./SicherheitsunterweisungenAdminTab";
 import { FuehrerscheinCheckTab } from "./FuehrerscheinCheckTab";
+import ComplianceAmpelTab from "./ComplianceAmpelTab";
 import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import BottomSheet from "@/components/BottomSheet";
 import MitarbeiterDetail from "./MitarbeiterDetail";
 
-type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo" | "preise" | "sicherheit" | "fuehrerschein";
+type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo" | "preise" | "sicherheit" | "fuehrerschein" | "compliance";
 type PortalRolle = "mitarbeiter" | "teamleitung" | "buchhaltung" | "admin";
 
 const ROLLEN_LABEL: Record<PortalRolle, string> = {
@@ -250,6 +251,7 @@ export default function AdminPanel() {
           { key: "preise" as AdminTab, label: "💶 Leistungskosten" },
           { key: "sicherheit" as AdminTab, label: "🦺 Sicherheitsunterweisungen" },
           { key: "fuehrerschein" as AdminTab, label: "🪖 Führerschein-Checks" },
+          { key: "compliance" as AdminTab, label: "🚦 Compliance-Ampel" },
         ].map((t) => (
           <button key={t.key} style={tabStyle(t.key)} onClick={() => setTab(t.key)}>{t.label}</button>
         ))}
@@ -604,6 +606,9 @@ export default function AdminPanel() {
       )}
       {tab === "fuehrerschein" && (
         <FuehrerscheinCheckTab />
+      )}
+      {tab === "compliance" && (
+        <ComplianceAmpelTab />
       )}
 
       <BottomSheet open={budgetSheet} onClose={() => setBudgetSheet(false)} title={budgetKunde ? `Budget: ${budgetKunde.vorname} ${budgetKunde.nachname}` : "Budget bearbeiten"}>
