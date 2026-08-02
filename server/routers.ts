@@ -1796,6 +1796,7 @@ export const appRouter = router({
         passwort: z.string().min(6),
         rolle: z.enum(["mitarbeiter", "teamleitung", "buchhaltung", "admin"]).default("mitarbeiter"),
         telefon: z.string().optional(),
+        beschaeftigungsart: z.enum(["minijob", "teilzeit", "vollzeit"]).default("minijob"),
       }))
       .mutation(async ({ input, ctx }) => {
         const hash = await bcrypt.hash(input.passwort, 10);
@@ -1814,6 +1815,7 @@ export const appRouter = router({
         aktiv: z.number().int().optional(),
         telefon: z.string().optional(),
         neuesPasswort: z.string().min(6).optional(),
+        beschaeftigungsart: z.enum(["minijob", "teilzeit", "vollzeit"]).optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         const { id, neuesPasswort, ...data } = input;

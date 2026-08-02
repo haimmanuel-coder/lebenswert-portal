@@ -163,6 +163,12 @@
 - [x] Unterweisung deaktivieren mit Bestätigungsdialog
 - [x] AdminPanel: neuer Tab '🦺 Sicherheitsunterweisungen' eingebunden
 
+## Beschäftigungsverhältnis-Auswahl beim Mitarbeiter
+- [x] Backend: mitarbeiterCreate + mitarbeiterUpdate um beschaeftigungsart (minijob/teilzeit/vollzeit) erweitert
+- [x] Frontend: Dropdown '🟣 Minijob / 🔵 Teilzeit / 🟢 Vollzeit' im MA-BottomSheet
+- [x] openEditMa liest beschaeftigungsart aus DB und befüllt Dropdown
+- [x] resetMaForm setzt Dropdown zurück auf 'minijob'
+
 ### Feature 3: Offline-Modus mit Service Worker (PWA)
 - [x] Service Worker: sw.js mit Cache-First für Assets, Network-First für API
 - [x] Service Worker: IndexedDB Queue für Offline-Einsätze

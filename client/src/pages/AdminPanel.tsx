@@ -42,6 +42,7 @@ export default function AdminPanel() {
   const [maPasswort, setMaPasswort] = useState("");
   const [maRolle, setMaRolle] = useState<PortalRolle>("mitarbeiter");
   const [maTelefon, setMaTelefon] = useState("");
+  const [maBeschaeftigung, setMaBeschaeftigung] = useState<"minijob" | "teilzeit" | "vollzeit">("minijob");
 
   const { data: maList = [], refetch: refetchMa } = trpc.admin.mitarbeiterList.useQuery();
   const createMa = trpc.admin.mitarbeiterCreate.useMutation({
@@ -53,20 +54,21 @@ export default function AdminPanel() {
     onError: (e) => toast.error("❌ " + e.message),
   });
 
-  const resetMaForm = () => { setEditMa(null); setMaVorname(""); setMaNachname(""); setMaEmail(""); setMaPasswort(""); setMaRolle("mitarbeiter"); setMaTelefon(""); };
+  const resetMaForm = () => { setEditMa(null); setMaVorname(""); setMaNachname(""); setMaEmail(""); setMaPasswort(""); setMaRolle("mitarbeiter"); setMaTelefon(""); setMaBeschaeftigung("minijob"); };
   const openEditMa = (ma: typeof maList[0]) => {
     setEditMa(ma);
     setMaVorname(ma.vorname); setMaNachname(ma.nachname); setMaEmail(ma.email);
     setMaRolle(ma.rolle); setMaTelefon(ma.telefon || "");
+    setMaBeschaeftigung(((ma as any).beschaeftigungsart as "minijob" | "teilzeit" | "vollzeit") || "minijob");
     setMaPasswort(""); setMaSheet(true);
   };
   const saveMa = () => {
     if (!maVorname || !maNachname || !maEmail) { toast.error("Pflichtfelder ausfüllen!"); return; }
     if (editMa) {
-      updateMa.mutate({ id: editMa.id, vorname: maVorname, nachname: maNachname, email: maEmail, rolle: maRolle, telefon: maTelefon, ...(maPasswort ? { neuesPasswort: maPasswort } : {}) });
+      updateMa.mutate({ id: editMa.id, vorname: maVorname, nachname: maNachname, email: maEmail, rolle: maRolle, telefon: maTelefon, beschaeftigungsart: maBeschaeftigung, ...(maPasswort ? { neuesPasswort: maPasswort } : {}) });
     } else {
       if (!maPasswort) { toast.error("Passwort eingeben!"); return; }
-      createMa.mutate({ vorname: maVorname, nachname: maNachname, email: maEmail, passwort: maPasswort, rolle: maRolle, telefon: maTelefon });
+      createMa.mutate({ vorname: maVorname, nachname: maNachname, email: maEmail, passwort: maPasswort, rolle: maRolle, telefon: maTelefon, beschaeftigungsart: maBeschaeftigung });
     }
   };
 
@@ -483,6 +485,14 @@ export default function AdminPanel() {
               <option value="admin">Admin</option>
             </select>
           </div>
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelStyle}>Beschäftigungsverhältnis</label>
+          <select value={maBeschaeftigung} onChange={(e) => setMaBeschaeftigung(e.target.value as "minijob" | "teilzeit" | "vollzeit")} style={inputStyle}>
+            <option value="minijob">🟣 Minijob</option>
+            <option value="teilzeit">🔵 Teilzeit</option>
+            <option value="vollzeit">🟢 Vollzeit</option>
+          </select>
         </div>
         <button onClick={saveMa} disabled={createMa.isPending || updateMa.isPending} style={btnGreen}>
           {createMa.isPending || updateMa.isPending ? "Speichern…" : editMa ? "Änderungen speichern" : "Mitarbeiter anlegen"}
