@@ -143,67 +143,72 @@ export default function PortalApp() {
         { id: "home", icon: "🏠", label: "Dashboard" },
         { id: "planung", icon: "🗓️", label: "Einsatzplanung", badge: planungsBadge },
         { id: "einsaetze", icon: "📅", label: "Einsätze" },
-        { id: "zeit", icon: "⏱", label: "Zeiterfassung" },
         { id: "lnw", icon: "📋", label: "Leistungsnachweise", badge: offenCount > 0 ? offenCount : undefined },
         { id: "fahrt", icon: "🚗", label: "Fahrtenbuch" },
+        { id: "zeit", icon: "⏱", label: "Zeiterfassung" },
       ],
     },
-    // ── Entscheidung 7: Nebenfunktionen als separater, visuell abgesetzter
-    // Block – bewusst getrennt von der workflow-geordneten Hauptsequenz,
-    // damit deren Reihenfolge nicht verwässert wird.
+    // ── GRUPPE 2: KUNDEN & COMPLIANCE ──────────────────────────────────────
+    // Kundenbezogenes + Pflichtmodule (Urlaub, Krank, Compliance, Profil).
     {
-      title: "Kunden & Verwaltung",
+      title: "Kunden & Compliance",
       items: [
+        { id: "kunden", icon: "👥", label: "Kundenliste", badge: warnungen.length > 0 ? warnungen.length : undefined },
         { id: "benachrichtigungen", icon: "🔔", label: "Benachrichtigungen", badge: unreadCount },
         { id: "kalender", icon: "📆", label: "Kalender" },
-        { id: "kunden", icon: "👥", label: "Kundenliste", badge: warnungen.length > 0 ? warnungen.length : undefined },
-        { id: "kassenanfrage", icon: "🏥", label: "Kassenanfragen" },
-        { id: "neukundenaufnahme", icon: "➕", label: "Neukundenaufnahme", badge: neukundenPushCount > 0 ? neukundenPushCount : undefined },
-        { id: "kostentraeger", icon: "🏦", label: "Kostenträger" },
         { id: "urlaub", icon: "🌴", label: "Urlaubsverwaltung" },
         { id: "krank", icon: "🤒", label: "Krankmeldung" },
         { id: "fuehrerschein", icon: "🪪", label: "Führerschein-Check" },
         { id: "sicherheitsunterweisung", icon: "🛡️", label: "Sicherheitsunterweisungen", badge: sicherheitBadge > 0 ? sicherheitBadge : undefined },
+        { id: "verfuegbarkeiten" as PageId, icon: "📅", label: "Verfügbarkeiten" },
         { id: "profil", icon: "👤", label: "Mein Profil" },
+        { id: "zweifaktor" as PageId, icon: "🔒", label: "2FA-Sicherheit" },
       ],
     },
+    // ── GRUPPE 3: ADMINISTRATION ────────────────────────────────────────────
+    // Nur für Admin/Teamleitung: Verwaltung, Export, Systemeinstellungen.
     {
       title: "Administration",
       items: [
-        // Entscheidung 4: Teamleitung erhält Freigaberecht für Leistungsnachweise
-        // und benötigt daher sichtbaren Zugriff auf diesen Menüpunkt, auch ohne
-        // volle Admin-Rechte.
         ...(isTeamleitung && !isAdmin ? [
           { id: "leistungsfreigabe" as PageId, icon: "✅", label: "LNW-Freigabe" },
+          { id: "besuchsberichte" as PageId, icon: "📋", label: "Besuchsberichte" },
+          { id: "datenschutz" as PageId, icon: "🔐", label: "Datenschutz" },
+          { id: "export" as PageId, icon: "📮", label: "Export & Briefe" },
         ] : []),
         ...(isAdmin ? [
+          // Übersicht & Steuerung
           { id: "admindashboard" as PageId, icon: "📊", label: "Ampel-Dashboard", adminOnly: true },
           { id: "management" as PageId, icon: "📈", label: "Management", adminOnly: true },
+          { id: "analysen" as PageId, icon: "📊", label: "Analysen", adminOnly: true },
+          { id: "controlling" as PageId, icon: "📊", label: "Controlling", adminOnly: true },
+          // Mitarbeiter & Kunden
           { id: "leistungsfreigabe" as PageId, icon: "✅", label: "LNW-Freigabe", adminOnly: true },
           { id: "mitarbeiterakte" as PageId, icon: "📂", label: "Mitarbeiterakte", adminOnly: true },
+          { id: "kundenzuteilung" as PageId, icon: "📌", label: "Kundenzuteilung", adminOnly: true },
+          { id: "neukundenaufnahme" as PageId, icon: "➕", label: "Neukundenaufnahme", badge: neukundenPushCount > 0 ? neukundenPushCount : undefined },
+          { id: "kassenanfrage" as PageId, icon: "🏥", label: "Kassenanfragen" },
+          { id: "kostentraeger" as PageId, icon: "🏦", label: "Kostenträger" },
+          { id: "budget" as PageId, icon: "💰", label: "Budgetverwaltung", adminOnly: false },
+          { id: "besuchsberichte" as PageId, icon: "📋", label: "Besuchsberichte" },
+          // Export & Buchhaltung
+          { id: "buchhaltung" as PageId, icon: "💼", label: "Buchhaltungs-Export", adminOnly: true },
+          { id: "fahrtenabrechnung" as PageId, icon: "🚗", label: "Fahrtabrechnung", adminOnly: true },
+          { id: "privatrechnung" as PageId, icon: "🧾", label: "Privatrechnung", adminOnly: true },
+          { id: "export" as PageId, icon: "📮", label: "Export & Briefe", adminOnly: true },
+          // Einstellungen & System
           { id: "rollenverwaltung" as PageId, icon: "🔑", label: "Rollenverwaltung", adminOnly: true },
           { id: "rbacverwaltung" as PageId, icon: "🛡️", label: "Rollen & Rechte", adminOnly: true },
           { id: "vertretungen" as PageId, icon: "🔄", label: "Vertretungen", adminOnly: true },
-          { id: "buchhaltung" as PageId, icon: "💼", label: "Buchhaltungs-Export", adminOnly: true },
-          { id: "export" as PageId, icon: "📮", label: "Export & Briefe", adminOnly: true },
           { id: "textbausteine" as PageId, icon: "📝", label: "Textbausteine", adminOnly: true },
-          { id: "logbuch" as PageId, icon: "🗒️", label: "Logbuch", adminOnly: true },
-          { id: "kundenzuteilung" as PageId, icon: "📌", label: "Kundenzuteilung", adminOnly: true },
-          { id: "besuchsberichte" as PageId, icon: "📋", label: "Besuchsberichte" },
-          { id: "integrationen" as PageId, icon: "🔌", label: "Integrationen", adminOnly: true },
           { id: "datenschutz" as PageId, icon: "🔐", label: "Datenschutz" },
-          { id: "analysen" as PageId, icon: "📊", label: "Analysen", adminOnly: true },
-          { id: "backupstatus" as PageId, icon: "💾", label: "Backup-Status", adminOnly: true },
+          { id: "integrationen" as PageId, icon: "🔌", label: "Integrationen", adminOnly: true },
           { id: "import" as PageId, icon: "📥", label: "Import-Assistent", adminOnly: true },
-          { id: "privatrechnung" as PageId, icon: "🧾", label: "Privatrechnung", adminOnly: true },
-          { id: "budget" as PageId, icon: "💰", label: "Budgetverwaltung", adminOnly: false },
-          { id: "controlling" as PageId, icon: "📊", label: "Controlling", adminOnly: true },
-          { id: "fahrtenabrechnung" as PageId, icon: "🚗", label: "Fahrtabrechnung", adminOnly: true },
-        ] : [
+          { id: "logbuch" as PageId, icon: "🗒️", label: "Logbuch", adminOnly: true },
+          { id: "backupstatus" as PageId, icon: "💾", label: "Backup-Status", adminOnly: true },
+        ] : !isTeamleitung ? [
           { id: "export" as PageId, icon: "📮", label: "Export & Briefe" },
-        ]),
-        { id: "zweifaktor" as PageId, icon: "🔒", label: "2FA-Sicherheit" },
-        { id: "verfuegbarkeiten" as PageId, icon: "📅", label: "Verfügbarkeiten" },
+        ] : []),
       ],
     },
   ];

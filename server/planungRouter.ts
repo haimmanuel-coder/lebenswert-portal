@@ -1342,6 +1342,38 @@ export const planungRouter = router({
       });
       return { success: true };
     }),
+  /** Gibt den vollständigen Änderungsverlauf der Verrechnungssätze zurück (Admin). */
+  satzVerlauf: roleProcedure(["admin"]).query(async () => {
+    const { getDb: getDbConn } = await import("./db");
+    const verbindung = await getDbConn();
+    if (!verbindung) return [];
+    const { paragraphSaetze } = await import("../drizzle/schema");
+    const { desc } = await import("drizzle-orm");
+    const zeilen = await verbindung
+      .select()
+      .from(paragraphSaetze)
+      .orderBy(desc(paragraphSaetze.createdAt))
+      .limit(100);
+    // Namen der ändernden Admins nachladen
+    const rawIds = zeilen.map((z: any) => z.geaendertVon).filter(Boolean);
+    const ids = Array.from(new Set(rawIds)) as number[];
+    const namen: Record<number, string> = {};
+    for (const id of ids) {
+      const ma = await getMitarbeiterById(id as number);
+      if (ma) namen[id as number] = `${ma.vorname} ${ma.nachname}`;
+    }
+    return zeilen.map((z: any) => ({
+      id: z.id,
+      paragraph: z.paragraph,
+      satzProStunde: parseFloat(z.satzProStunde),
+      lohnProStunde: parseFloat(z.lohnProStunde),
+      anfahrtPauschale: parseFloat(z.anfahrtPauschale),
+      gueltigAb: z.gueltigAb,
+      aktiv: z.aktiv,
+      geaendertVon: z.geaendertVon,
+      geaendertVonName: z.geaendertVon ? (namen[z.geaendertVon] ?? `MA #${z.geaendertVon}`) : "System",
+      createdAt: z.createdAt,
+    }));
+  }),
 });
-
 export type PlanungsEinsatzTyp = PlanungsEinsatz;

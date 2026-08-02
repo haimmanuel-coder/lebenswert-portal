@@ -220,6 +220,69 @@ export function VerrechnungssaetzeTab() {
         Bereits abgeschlossene Einsätze und Leistungsnachweise behalten ihre ursprünglichen Kosten.
         Die Anfahrtspauschale gilt für alle drei Paragraphen gemeinsam.
       </div>
+
+      {/* Änderungsverlauf */}
+      <VerlaufBereich />
+    </div>
+  );
+}
+
+function VerlaufBereich() {
+  const { data: verlauf, isLoading } = (trpc as any).planung.satzVerlauf.useQuery();
+  const [offen, setOffen] = useState(false);
+
+  if (isLoading || !verlauf?.length) return null;
+
+  const PARA_FARBEN: Record<string, string> = { "45b": "#4a8c3f", "45a": "#2563eb", "39": "#7c3aed" };
+
+  return (
+    <div style={{ marginTop: 28 }}>
+      <button
+        onClick={() => setOffen((v) => !v)}
+        style={{
+          display: "flex", alignItems: "center", gap: 8, background: "none",
+          border: "none", cursor: "pointer", padding: 0, marginBottom: 12,
+          fontSize: 14, fontWeight: 700, color: "#374151",
+        }}
+      >
+        <span style={{ fontSize: 16 }}>{offen ? "🔽" : "▶️"}</span>
+        Änderungsverlauf ({verlauf.length} Einträge)
+      </button>
+      {offen && (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: "#f9fafb" }}>
+                {["Datum", "Paragraph", "Satz €/Std.", "Lohn €/Std.", "Anfahrt €", "Gültig ab", "Status", "Geändert von"].map((h) => (
+                  <th key={h} style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: "#6b7280", fontSize: 11, textTransform: "uppercase", borderBottom: "1.5px solid #e5e7eb" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {verlauf.map((z: any) => (
+                <tr key={z.id} style={{ borderBottom: "1px solid #f3f4f6", opacity: z.aktiv ? 1 : 0.5 }}>
+                  <td style={{ padding: "8px 12px", color: "#374151" }}>
+                    {z.createdAt ? new Date(z.createdAt).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "–"}
+                  </td>
+                  <td style={{ padding: "8px 12px" }}>
+                    <span style={{ background: PARA_FARBEN[z.paragraph] + "22", color: PARA_FARBEN[z.paragraph], fontWeight: 700, borderRadius: 6, padding: "2px 8px", fontSize: 12 }}>§ {z.paragraph}</span>
+                  </td>
+                  <td style={{ padding: "8px 12px", fontWeight: 700, color: "#111827" }}>{z.satzProStunde.toFixed(2)} €</td>
+                  <td style={{ padding: "8px 12px", color: "#374151" }}>{z.lohnProStunde.toFixed(2)} €</td>
+                  <td style={{ padding: "8px 12px", color: "#374151" }}>{z.anfahrtPauschale.toFixed(2)} €</td>
+                  <td style={{ padding: "8px 12px", color: "#374151" }}>{z.gueltigAb ?? "–"}</td>
+                  <td style={{ padding: "8px 12px" }}>
+                    <span style={{ background: z.aktiv ? "#dcfce7" : "#f3f4f6", color: z.aktiv ? "#16a34a" : "#9ca3af", borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 700 }}>
+                      {z.aktiv ? "✓ Aktiv" : "Archiv"}
+                    </span>
+                  </td>
+                  <td style={{ padding: "8px 12px", color: "#6b7280" }}>{z.geaendertVonName}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
