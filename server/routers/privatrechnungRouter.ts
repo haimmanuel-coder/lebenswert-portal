@@ -278,7 +278,7 @@ export const importRouter = router({
     const db = await getDb();
     if (!db) return [];
     const rows = await db.execute(
-      sql`SELECT ip.*, m.vorname, m.nachname FROM importprotokolle ip LEFT JOIN mitarbeiter m ON ip.importiertVon = m.id ORDER BY ip.createdAt DESC LIMIT 50`
+      sql`SELECT ip.id AS id, ip.dateiname, ip.importiertVon, ip.anzahlNeu, ip.anzahlAktualisiert, ip.anzahlFehler, ip.fehlerDetails, ip.createdAt, m.vorname, m.nachname FROM importprotokolle ip LEFT JOIN mitarbeiter m ON ip.importiertVon = m.id ORDER BY ip.createdAt DESC LIMIT 50`
     );
     return (rows as any).rows ?? (rows as any[]);
   }),
@@ -293,7 +293,7 @@ export const importRouter = router({
       const db = await getDb();
       if (!db) return [];
       const rows = await db.execute(
-        sql`SELECT ap.*, m.vorname, m.nachname FROM aenderungsprotokoll ap LEFT JOIN mitarbeiter m ON ap.geaendertVon = m.id ORDER BY ap.createdAt DESC LIMIT ${input.limit}`
+        sql`SELECT ap.id AS id, ap.tabelle, ap.datensatzId, ap.feld, ap.alterWert, ap.neuerWert, ap.geaendertVon, ap.importquelle, ap.createdAt, m.vorname, m.nachname FROM aenderungsprotokoll ap LEFT JOIN mitarbeiter m ON ap.geaendertVon = m.id ORDER BY ap.createdAt DESC LIMIT ${input.limit}`
       );
       let list = (rows as any).rows ?? (rows as any[]);
       if (input.tabelle) list = list.filter((r: any) => r.tabelle === input.tabelle);
