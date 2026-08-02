@@ -166,11 +166,11 @@ export function generateLeistungsnachweisPdf(data: LeistungsnachweisPdfData): vo
   doc.setFont("helvetica", "normal");
   doc.text(fmtDate(data.kundePflegegradSeit), margin + 55, y + 8.5);
 
-  // Paragraph-Optionen
+  // Paragraph-Optionen – gleichmäßig verteilt, Pauschale rechts daneben
   const paraOpts = [
-    { id: "45a", label: "§ 45a", x: margin + 92 },
-    { id: "45b", label: "§ 45b", x: margin + 116 },
-    { id: "39",  label: "§ 39",  x: margin + 140 },
+    { id: "45a", label: "§ 45a", x: margin + 80 },
+    { id: "45b", label: "§ 45b", x: margin + 108 },
+    { id: "39",  label: "§ 39 Insatzpauschale: 6,– €",  x: margin + 136 },
   ];
   paraOpts.forEach(({ id, label, x }) => {
     const checked = data.paragraph === id;
@@ -183,14 +183,9 @@ export function generateLeistungsnachweisPdf(data: LeistungsnachweisPdfData): vo
     }
     doc.setFont("helvetica", checked ? "bold" : "normal");
     doc.setTextColor(checked ? GREEN : DARK);
-    doc.setFontSize(8.5);
+    doc.setFontSize(8);
     doc.text(label, x + 3.5, y + 8.5);
   });
-
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(DARK);
-  doc.setFontSize(8);
-  doc.text("Einsatzpauschale: 6,– €", W - margin - 3, y + 8.5, { align: "right" });
 
   y += 19;
 
@@ -294,10 +289,25 @@ export function generateLeistungsnachweisPdf(data: LeistungsnachweisPdfData): vo
   doc.line(margin + sigW + 4 + 36, y, margin + tableW, y);
   y += 4;
 
+  // Hilfsfunktion: Bildtyp aus Data-URL ermitteln
+  const getImgType = (dataUrl: string): string => {
+    const m = dataUrl.match(/^data:image\/(\w+);/);
+    const t = m ? m[1].toUpperCase() : "PNG";
+    // jsPDF unterstützt: JPEG, PNG, WEBP, BMP, GIF
+    return t === "JPG" ? "JPEG" : t;
+  };
+
   doc.setDrawColor(200, 200, 200);
   doc.rect(margin, y, sigW, sigH, "S");
-  if (data.unterschriftMitarbeiter?.startsWith("data:image")) {
-    try { doc.addImage(data.unterschriftMitarbeiter, "PNG", margin + 2, y + 2, sigW - 4, sigH - 4); } catch {}
+  if (data.unterschriftMitarbeiter && data.unterschriftMitarbeiter.startsWith("data:image")) {
+    try {
+      const imgType = getImgType(data.unterschriftMitarbeiter);
+      doc.addImage(data.unterschriftMitarbeiter, imgType, margin + 2, y + 2, sigW - 4, sigH - 4);
+    } catch (e) {
+      doc.setTextColor(200, 200, 200);
+      doc.setFontSize(7);
+      doc.text("Unterschrift Mitarbeiter", margin + sigW / 2, y + sigH / 2, { align: "center" });
+    }
   } else {
     doc.setTextColor(200, 200, 200);
     doc.setFontSize(7);
@@ -323,8 +333,15 @@ export function generateLeistungsnachweisPdf(data: LeistungsnachweisPdfData): vo
 
   doc.setDrawColor(200, 200, 200);
   doc.rect(margin, y, tableW, sigH, "S");
-  if (data.unterschriftKunde?.startsWith("data:image")) {
-    try { doc.addImage(data.unterschriftKunde, "PNG", margin + 2, y + 2, tableW - 4, sigH - 4); } catch {}
+  if (data.unterschriftKunde && data.unterschriftKunde.startsWith("data:image")) {
+    try {
+      const imgType = getImgType(data.unterschriftKunde);
+      doc.addImage(data.unterschriftKunde, imgType, margin + 2, y + 2, tableW - 4, sigH - 4);
+    } catch (e) {
+      doc.setTextColor(200, 200, 200);
+      doc.setFontSize(7);
+      doc.text("Unterschrift Kunde", margin + tableW / 2, y + sigH / 2, { align: "center" });
+    }
   } else {
     doc.setTextColor(200, 200, 200);
     doc.setFontSize(7);
