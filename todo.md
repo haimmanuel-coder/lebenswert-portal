@@ -150,6 +150,8 @@
 - [x] Frontend: pdfGenerator.ts mit jsPDF (kein Backend nötig)
 - [x] Frontend: PDF-Download-Button in jedem Leistungsnachweis
 - [x] PDF enthält: Kunden-Stammdaten, Paragraph, Stunden, Datum, Unterschrift-Bild, Lebenswert-Stempel
+- [x] PDF: Neue Vorlage mit Optadata-Abtretungshinweis, Einsatz-Tabelle (Datum/Uhrzeit/Dauer/Pauschale/km), Pflegegrad+seit-Feld, zwei Unterschriftszeilen (MA+Stempel, Kunde), IK-Nr. 460 547 168 in Header/Footer
+- [x] Leistungsnachweise.tsx: kundePflegegradSeit + einsaetze[] an PDF-Generator übergeben
 
 ### Feature 3: Offline-Modus mit Service Worker (PWA)
 - [x] Service Worker: sw.js mit Cache-First für Assets, Network-First für API

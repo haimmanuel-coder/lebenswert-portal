@@ -112,6 +112,7 @@ export const kunden = mysqlTable("kunden", {
   versicherungsnummer: varchar("versicherungsnummer", { length: 50 }),
   // Pflegegrad & Paragraph (Modul 2)
   pflegegrad: int("pflegegrad").default(2),
+  pflegegradSeit: date("pflegegradSeit"),
   paragraph: mysqlEnum("paragraph", ["45b", "45a", "39", "privat"]).default("45b"),
   // A1: Mehrfach-Paragraphen (JSON-Array, z.B. ["45b","39","privat"])
   paragraphen: text("paragraphen"),

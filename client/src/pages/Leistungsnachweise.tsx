@@ -128,6 +128,20 @@ export default function Leistungsnachweise() {
   const handlePdfDownload = (l: typeof leistungen[0]) => {
     const kunde = kunden.find((k) => k.id === l.kundenId);
     if (!kunde) { toast.error("Kundendaten nicht gefunden"); return; }
+    // Einsätze für diesen LNW (gleicher Kunde, Monat, Paragraph)
+    const lnwEinsaetze = (alleEinsaetze as any[]).filter(
+      (e) =>
+        e.kundenId === l.kundenId &&
+        typeof e.datum === "string" &&
+        e.datum.slice(0, 7) === l.monat &&
+        e.paragraph === l.paragraph
+    ).map((e) => ({
+      datum: e.datum,
+      startzeit: e.startzeit ?? null,
+      dauerStunden: e.dauerStunden ?? null,
+      anfahrtPauschale: e.anfahrtPauschale ?? 6,
+      km: null,
+    }));
     generateLeistungsnachweisPdf({
       kundeVorname: kunde.vorname,
       kundeNachname: kunde.nachname,
@@ -138,6 +152,7 @@ export default function Leistungsnachweise() {
       kundeVersicherungsnummer: (kunde as any).versicherungsnummer,
       kundeKostentraeger: (kunde as any).kostentraeger,
       kundePflegegrad: kunde.pflegegrad,
+      kundePflegegradSeit: (kunde as any).pflegegradSeit ?? null,
       monat: l.monat,
       paragraph: l.paragraph,
       stunden: parseFloat(String(l.stunden || 0)),
@@ -145,6 +160,7 @@ export default function Leistungsnachweise() {
       betrag: parseFloat(String(l.betrag || 0)),
       status: l.status,
       createdAt: l.createdAt,
+      einsaetze: lnwEinsaetze,
       unterschriftMitarbeiter: (l as any).unterschriftLeister,
       unterschriftKunde: (l as any).unterschriftKunde,
       mitarbeiterName: mitarbeiter ? `${mitarbeiter.vorname} ${mitarbeiter.nachname}` : "Mitarbeiter",
