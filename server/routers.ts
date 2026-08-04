@@ -18,7 +18,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
-import { sql, eq, desc, and, isNotNull, lte } from "drizzle-orm";
+import { sql, eq, desc, and, isNotNull, lte, isNull } from "drizzle-orm";
 import { getDb } from "./db";
 import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, einsatzAenderungen, kunden as kundenTable, notifications as notificationsTable } from "../drizzle/schema";
 import {
@@ -2717,8 +2717,109 @@ export const appRouter = router({
         await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'ADMIN', ressource: 'dienstwagen', details: `ma=${input.mitarbeiterId} dienstwagen=${input.dienstwagen}`, status: 'success' });
         return { success: true };
       }),
+    }),
+  // ── ADMIN: URLAUB & KRANKMELDUNG DIREKT VERWALTEN ────────────────────────────
+  urlaubAdmin: router({
+    /** Alle Urlaubsanträge eines bestimmten Mitarbeiters (Admin-Sicht) */
+    listByMitarbeiter: adminProcedure
+      .input(z.object({ mitarbeiterId: z.number().int().positive() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        const { urlaubsantraege } = await import('../drizzle/schema.js');
+        return db.select().from(urlaubsantraege)
+          .where(eq(urlaubsantraege.mitarbeiterId, input.mitarbeiterId))
+          .orderBy(desc(urlaubsantraege.createdAt));
+      }),
+    /** Admin legt Urlaubsantrag für Mitarbeiter an */
+    create: adminProcedure
+      .input(z.object({
+        mitarbeiterId: z.number().int().positive(),
+        von: z.string().min(1),
+        bis: z.string().min(1),
+        tage: z.number().int().min(1),
+        notizen: z.string().optional(),
+        status: z.enum(['beantragt', 'genehmigt', 'abgelehnt']).default('genehmigt'),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        const { urlaubsantraege } = await import('../drizzle/schema.js');
+        await db.insert(urlaubsantraege).values({
+          mitarbeiterId: input.mitarbeiterId,
+          von: input.von as any,
+          bis: input.bis as any,
+          tage: input.tage,
+          notizen: input.notizen ?? null,
+          status: input.status,
+        } as any);
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'ADMIN', ressource: 'urlaub', details: `admin-create ma=${input.mitarbeiterId}`, status: 'success' });
+        return { success: true };
+      }),
+    /** Admin aktualisiert Status eines Urlaubsantrags */
+    updateStatus: adminProcedure
+      .input(z.object({
+        id: z.number().int().positive(),
+        status: z.enum(['beantragt', 'genehmigt', 'abgelehnt']),
+        adminNotiz: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await updateUrlaubsantragStatus(input.id, input.status, input.adminNotiz);
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'ADMIN', ressource: 'urlaub', details: `status=${input.status} id=${input.id}`, status: 'success' });
+        return { success: true };
+      }),
+    /** Admin löscht Urlaubsantrag */
+    delete: adminProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(async ({ input, ctx }) => {
+        await deleteUrlaubsantrag(input.id);
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'ADMIN', ressource: 'urlaub', details: `delete id=${input.id}`, status: 'success' });
+        return { success: true };
+      }),
   }),
-
+  krankAdmin: router({
+    /** Alle Krankmeldungen eines bestimmten Mitarbeiters (Admin-Sicht) */
+    listByMitarbeiter: adminProcedure
+      .input(z.object({ mitarbeiterId: z.number().int().positive() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        const { krankmeldungen } = await import('../drizzle/schema.js');
+        return db.select().from(krankmeldungen)
+          .where(and(eq(krankmeldungen.mitarbeiterId, input.mitarbeiterId), isNull(krankmeldungen.geloeschtAt)))
+          .orderBy(desc(krankmeldungen.createdAt));
+      }),
+    /** Admin legt Krankmeldung für Mitarbeiter an */
+    create: adminProcedure
+      .input(z.object({
+        mitarbeiterId: z.number().int().positive(),
+        von: z.string().min(1),
+        bis: z.string().optional(),
+        tage: z.number().int().min(1).optional(),
+        notizen: z.string().optional(),
+        auAttest: z.boolean().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await createKrankmeldung({
+          mitarbeiterId: input.mitarbeiterId,
+          von: new Date(input.von),
+          bis: input.bis ? new Date(input.bis) : undefined,
+          tage: input.tage,
+          notizen: input.notizen,
+          auAttest: input.auAttest,
+        });
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'ADMIN', ressource: 'krankmeldung', details: `admin-create ma=${input.mitarbeiterId}`, status: 'success' });
+        return { success: true };
+      }),
+    /** Admin löscht Krankmeldung (Soft-Delete) */
+    delete: adminProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(async ({ input, ctx }) => {
+        await deleteKrankmeldung(input.id);
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'ADMIN', ressource: 'krankmeldung', details: `delete id=${input.id}`, status: 'success' });
+        return { success: true };
+      }),
+  }),
     twoFactor: twoFactorRouter,
   // ── COMPLIANCE & DOKUMENT-ABLAUF-ERINNERUNGEN ────────────────────────────────
   compliance: router({

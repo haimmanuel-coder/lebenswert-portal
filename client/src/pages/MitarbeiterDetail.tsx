@@ -16,7 +16,7 @@ import { Switch } from "@/components/ui/switch";
 // ─── Typen ────────────────────────────────────────────────────────────────────
 type ZertifikatStatus = "erhalten" | "angemeldet" | "nicht_angemeldet";
 type Beschaeftigungsart = "minijob" | "teilzeit" | "vollzeit";
-type AkteTab = "stamm" | "dokumente" | "zertifikat" | "vertrag" | "rechte";
+type AkteTab = "stamm" | "dokumente" | "zertifikat" | "vertrag" | "rechte" | "urlaubkrank";
 type DokTyp = "zertifikat" | "arbeitsvertrag" | "krankmeldung" | "fuehrerschein" | "erstehilfe" | "sonstiges";
 
 // ─── Konfigurationen ──────────────────────────────────────────────────────────
@@ -157,9 +157,23 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
   const [showDeaktDialog, setShowDeaktDialog] = useState(false);
   const [deaktGrund, setDeaktGrund] = useState("");
 
+  // Urlaub/Krank Admin-States
+  const [showUrlaubForm, setShowUrlaubForm] = useState(false);
+  const [urlaubForm, setUrlaubForm] = useState({ von: "", bis: "", tage: 1, notizen: "", status: "genehmigt" as "beantragt" | "genehmigt" | "abgelehnt" });
+  const [showKrankForm, setShowKrankForm] = useState(false);
+  const [krankForm, setKrankForm] = useState({ von: "", bis: "", tage: 1, notizen: "", auAttest: false });
+
   // ─── Queries ───────────────────────────────────────────────────────────────
   const utils = trpc.useUtils();
   const { data: ma, isLoading } = trpc.admin.mitarbeiterDetail.useQuery({ id: mitarbeiterId });
+  const { data: urlaubListe = [] } = (trpc as any).urlaubAdmin.listByMitarbeiter.useQuery(
+    { mitarbeiterId },
+    { enabled: activeTab === "urlaubkrank" }
+  );
+  const { data: krankListe = [] } = (trpc as any).krankAdmin.listByMitarbeiter.useQuery(
+    { mitarbeiterId },
+    { enabled: activeTab === "urlaubkrank" }
+  );
   const { data: mitarbeiterDoks = [] } = (trpc.mitarbeiterakte as any).listDokumente.useQuery({ mitarbeiterId });
   const { data: berechtigungenData = [] } = (trpc.admin as any).getBerechtigungen.useQuery(
     { mitarbeiterId },
@@ -239,6 +253,46 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
       toast.success("Mitarbeiter deaktiviert");
       utils.admin.mitarbeiterList.invalidate();
       onBack();
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const urlaubCreate = (trpc as any).urlaubAdmin.create.useMutation({
+    onSuccess: () => {
+      toast.success("Urlaubsantrag gespeichert");
+      (trpc as any).urlaubAdmin.listByMitarbeiter.invalidate({ mitarbeiterId });
+      setShowUrlaubForm(false);
+      setUrlaubForm({ von: "", bis: "", tage: 1, notizen: "", status: "genehmigt" });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const urlaubUpdateStatus = (trpc as any).urlaubAdmin.updateStatus.useMutation({
+    onSuccess: () => {
+      toast.success("Status aktualisiert");
+      (trpc as any).urlaubAdmin.listByMitarbeiter.invalidate({ mitarbeiterId });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const urlaubDelete = (trpc as any).urlaubAdmin.delete.useMutation({
+    onSuccess: () => {
+      toast.success("Urlaubsantrag gelöscht");
+      (trpc as any).urlaubAdmin.listByMitarbeiter.invalidate({ mitarbeiterId });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const krankCreate = (trpc as any).krankAdmin.create.useMutation({
+    onSuccess: () => {
+      toast.success("Krankmeldung gespeichert");
+      (trpc as any).krankAdmin.listByMitarbeiter.invalidate({ mitarbeiterId });
+      setShowKrankForm(false);
+      setKrankForm({ von: "", bis: "", tage: 1, notizen: "", auAttest: false });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const krankDelete = (trpc as any).krankAdmin.delete.useMutation({
+    onSuccess: () => {
+      toast.success("Krankmeldung gelöscht");
+      (trpc as any).krankAdmin.listByMitarbeiter.invalidate({ mitarbeiterId });
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -369,6 +423,7 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
     { id: "zertifikat",label: "Zertifikate", icon: Award },
     { id: "vertrag",   label: "Vertrag",     icon: FileText },
     { id: "rechte",    label: "Rechte",      icon: Shield },
+    { id: "urlaubkrank", label: "Urlaub/Krank", icon: Calendar },
   ];
 
   return (
@@ -1014,6 +1069,182 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
               <p className="text-xs text-blue-700">🔘 <strong>Standard</strong> – Zugriff gemäß Systemrolle</p>
               <p className="text-xs text-blue-700">✅ <strong>Erlaubt</strong> – Zugriff immer gewährt (überschreibt Rolle)</p>
               <p className="text-xs text-blue-700">🚫 <strong>Gesperrt</strong> – Zugriff immer verweigert (überschreibt Rolle)</p>
+            </div>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════════
+            TAB 6: URLAUB & KRANKMELDUNGEN (ADMIN)
+        ═══════════════════════════════════════════════════════════════════ */}
+        {activeTab === "urlaubkrank" && (
+          <div className="space-y-6">
+
+            {/* ── URLAUB ── */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold text-foreground flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-primary" /> Urlaubsanträge
+                </h2>
+                {isAdmin && (
+                  <Button size="sm" onClick={() => setShowUrlaubForm(v => !v)}>
+                    <Plus className="w-4 h-4 mr-1" /> Neu
+                  </Button>
+                )}
+              </div>
+
+              {/* Urlaub-Formular */}
+              {showUrlaubForm && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
+                  <p className="text-sm font-semibold text-blue-800">Neuen Urlaubsantrag anlegen</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div><label className="text-xs text-muted-foreground">Von *</label>
+                      <Input type="date" value={urlaubForm.von} onChange={e => setUrlaubForm(f => ({ ...f, von: e.target.value }))} className="mt-1" /></div>
+                    <div><label className="text-xs text-muted-foreground">Bis *</label>
+                      <Input type="date" value={urlaubForm.bis} onChange={e => setUrlaubForm(f => ({ ...f, bis: e.target.value }))} className="mt-1" /></div>
+                  </div>
+                  <div><label className="text-xs text-muted-foreground">Anzahl Tage</label>
+                    <Input type="number" min={1} value={urlaubForm.tage} onChange={e => setUrlaubForm(f => ({ ...f, tage: Number(e.target.value) }))} className="mt-1" /></div>
+                  <div><label className="text-xs text-muted-foreground">Status</label>
+                    <select value={urlaubForm.status} onChange={e => setUrlaubForm(f => ({ ...f, status: e.target.value as any }))}
+                      className="w-full mt-1 px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary">
+                      <option value="genehmigt">✅ Genehmigt</option>
+                      <option value="beantragt">🟡 Beantragt</option>
+                      <option value="abgelehnt">❌ Abgelehnt</option>
+                    </select>
+                  </div>
+                  <div><label className="text-xs text-muted-foreground">Notizen</label>
+                    <textarea value={urlaubForm.notizen} onChange={e => setUrlaubForm(f => ({ ...f, notizen: e.target.value }))}
+                      className="w-full mt-1 p-2 border rounded-lg text-sm resize-none h-16 focus:outline-none focus:ring-2 focus:ring-primary" /></div>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={() => urlaubCreate.mutate({ mitarbeiterId, ...urlaubForm })} disabled={!urlaubForm.von || !urlaubForm.bis || urlaubCreate.isPending}>
+                      <Save className="w-4 h-4 mr-1" /> Speichern
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setShowUrlaubForm(false)}>Abbrechen</Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Urlaub-Liste */}
+              {(urlaubListe as any[]).length === 0 && !showUrlaubForm ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Calendar className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">Keine Urlaubsanträge vorhanden</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {(urlaubListe as any[]).map((u: any) => (
+                    <div key={u.id} className="bg-card rounded-xl border p-3 flex items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium">
+                            {u.von ? new Date(u.von).toLocaleDateString("de-DE") : ""} – {u.bis ? new Date(u.bis).toLocaleDateString("de-DE") : ""}
+                          </span>
+                          <span className="text-xs text-muted-foreground">({u.tage} Tage)</span>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                            u.status === "genehmigt" ? "bg-green-100 text-green-700" :
+                            u.status === "abgelehnt" ? "bg-red-100 text-red-700" :
+                            "bg-yellow-100 text-yellow-700"
+                          }`}>
+                            {u.status === "genehmigt" ? "✅ Genehmigt" : u.status === "abgelehnt" ? "❌ Abgelehnt" : "🟡 Beantragt"}
+                          </span>
+                        </div>
+                        {u.notizen && <p className="text-xs text-muted-foreground mt-1 italic">{u.notizen}</p>}
+                        {isAdmin && u.status === "beantragt" && (
+                          <div className="flex gap-1 mt-2">
+                            <button onClick={() => urlaubUpdateStatus.mutate({ id: u.id, status: "genehmigt" })}
+                              className="text-xs bg-green-600 text-white px-2 py-1 rounded-lg hover:bg-green-700 transition-colors">✅ Genehmigen</button>
+                            <button onClick={() => urlaubUpdateStatus.mutate({ id: u.id, status: "abgelehnt" })}
+                              className="text-xs bg-red-600 text-white px-2 py-1 rounded-lg hover:bg-red-700 transition-colors">❌ Ablehnen</button>
+                          </div>
+                        )}
+                      </div>
+                      {isAdmin && (
+                        <button onClick={() => { if (confirm("Urlaubsantrag wirklich löschen?")) urlaubDelete.mutate({ id: u.id }); }}
+                          className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-600 transition-colors shrink-0">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Trennlinie */}
+            <div className="border-t" />
+
+            {/* ── KRANKMELDUNGEN ── */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold text-foreground flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-orange-500" /> Krankmeldungen
+                </h2>
+                {isAdmin && (
+                  <Button size="sm" variant="outline" onClick={() => setShowKrankForm(v => !v)}>
+                    <Plus className="w-4 h-4 mr-1" /> Neu
+                  </Button>
+                )}
+              </div>
+
+              {/* Krank-Formular */}
+              {showKrankForm && (
+                <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 space-y-3">
+                  <p className="text-sm font-semibold text-orange-800">Neue Krankmeldung anlegen</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div><label className="text-xs text-muted-foreground">Von *</label>
+                      <Input type="date" value={krankForm.von} onChange={e => setKrankForm(f => ({ ...f, von: e.target.value }))} className="mt-1" /></div>
+                    <div><label className="text-xs text-muted-foreground">Bis (optional)</label>
+                      <Input type="date" value={krankForm.bis} onChange={e => setKrankForm(f => ({ ...f, bis: e.target.value }))} className="mt-1" /></div>
+                  </div>
+                  <div><label className="text-xs text-muted-foreground">Anzahl Tage</label>
+                    <Input type="number" min={1} value={krankForm.tage} onChange={e => setKrankForm(f => ({ ...f, tage: Number(e.target.value) }))} className="mt-1" /></div>
+                  <div className="flex items-center gap-3">
+                    <Switch checked={krankForm.auAttest} onCheckedChange={v => setKrankForm(f => ({ ...f, auAttest: v }))} />
+                    <label className="text-sm text-foreground">AU-Attest vorhanden</label>
+                  </div>
+                  <div><label className="text-xs text-muted-foreground">Notizen</label>
+                    <textarea value={krankForm.notizen} onChange={e => setKrankForm(f => ({ ...f, notizen: e.target.value }))}
+                      className="w-full mt-1 p-2 border rounded-lg text-sm resize-none h-16 focus:outline-none focus:ring-2 focus:ring-primary" /></div>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={() => krankCreate.mutate({ mitarbeiterId, ...krankForm, bis: krankForm.bis || undefined, tage: krankForm.tage || undefined })} disabled={!krankForm.von || krankCreate.isPending}>
+                      <Save className="w-4 h-4 mr-1" /> Speichern
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setShowKrankForm(false)}>Abbrechen</Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Krank-Liste */}
+              {(krankListe as any[]).length === 0 && !showKrankForm ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <AlertTriangle className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">Keine Krankmeldungen vorhanden</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {(krankListe as any[]).map((k: any) => (
+                    <div key={k.id} className="bg-card rounded-xl border p-3 flex items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium">
+                            Ab {k.von ? new Date(k.von).toLocaleDateString("de-DE") : ""}
+                            {k.bis ? ` bis ${new Date(k.bis).toLocaleDateString("de-DE")}` : ""}
+                          </span>
+                          {k.tage && <span className="text-xs text-muted-foreground">({k.tage} Tage)</span>}
+                          {k.auAttest && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">📄 AU-Attest</span>}
+                        </div>
+                        {k.notizen && <p className="text-xs text-muted-foreground mt-1 italic">{k.notizen}</p>}
+                      </div>
+                      {isAdmin && (
+                        <button onClick={() => { if (confirm("Krankmeldung wirklich löschen?")) krankDelete.mutate({ id: k.id }); }}
+                          className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-600 transition-colors shrink-0">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

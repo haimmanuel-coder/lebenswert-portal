@@ -765,3 +765,13 @@
   - [x] '👁️ Vorschau'-Button in LNW-Karte (vor PDF-Download-Button)
   - [x] Modal-Header: Titel + Herunterladen-Button + Schließen-Button
   - [x] buildPdfData() als gemeinsame Hilfsfunktion für Vorschau und Download
+
+## Mitarbeiterakte – Tab 6 Urlaub/Krank (04.08.2026)
+- [x] MitarbeiterDetail: neuer Tab '📅 Urlaub/Krank' (6. Tab)
+- [x] Backend: urlaubAdmin.listByMitarbeiter, create, updateStatus, delete
+- [x] Backend: krankAdmin.listByMitarbeiter, create, delete
+- [x] Frontend: Urlaubsanträge anlegen (Von/Bis, Tage, Status, Notizen)
+- [x] Frontend: Status-Buttons Genehmigen/Ablehnen für offene Anträge
+- [x] Frontend: Krankmeldungen anlegen (Von, Bis optional, Tage, AU-Attest-Toggle, Notizen)
+- [x] Frontend: Löschen für Urlaub und Krankmeldungen
+- [x] TypeScript: 0 Fehler
