@@ -18,6 +18,30 @@ function fmtEuro(n: number) {
   return n.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 }
 
+function exportCSV(monat: string, positionen: Array<{ vorname: string; nachname: string; beschaeftigungsart: string; geleisteteStunden: number; monatslohn: number; stundenlohn: number; lohnkosten: number }>, summe: number) {
+  const header = ["Monat", "Vorname", "Nachname", "Beschäftigungsart", "Std. geleistet", "Monatslohn (€)", "Stundenlohn (€)", "Lohnkosten (€)"];
+  const rows = positionen.map((p) => [
+    monat,
+    p.vorname,
+    p.nachname,
+    p.beschaeftigungsart,
+    String(p.geleisteteStunden).replace(".", ","),
+    String(p.monatslohn).replace(".", ","),
+    String(p.stundenlohn).replace(".", ","),
+    String(p.lohnkosten).replace(".", ","),
+  ]);
+  rows.push(["", "", "", "GESAMT", "", "", "", String(summe).replace(".", ",")]);
+  const csv = [header, ...rows].map((r) => r.map((v) => `"${v}"`).join(";")).join("\n");
+  const bom = "\uFEFF"; // UTF-8 BOM für Excel
+  const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `lohnkosten_${monat}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function LohnkostenTab() {
   const today = new Date().toISOString().slice(0, 7);
   const [monat, setMonat] = useState(today);
@@ -44,12 +68,21 @@ export default function LohnkostenTab() {
           <div style={{ fontSize: 16, fontWeight: 800 }}>💰 Lohnkosten-Übersicht</div>
           <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>Monatliche Personalkosten aller aktiven Mitarbeiter</div>
         </div>
-        <input
-          type="month"
-          value={monat}
-          onChange={(e) => setMonat(e.target.value)}
-          style={{ padding: "8px 12px", border: "2px solid #e5e7eb", borderRadius: 8, fontSize: 14, outline: "none", background: "#fff" }}
-        />
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <input
+            type="month"
+            value={monat}
+            onChange={(e) => setMonat(e.target.value)}
+            style={{ padding: "8px 12px", border: "2px solid #e5e7eb", borderRadius: 8, fontSize: 14, outline: "none", background: "#fff" }}
+          />
+          <button
+            onClick={() => exportCSV(monat, positionen, summe)}
+            disabled={positionen.length === 0}
+            style={{ padding: "8px 14px", background: positionen.length > 0 ? "#4a8c3f" : "#d1d5db", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: positionen.length > 0 ? "pointer" : "not-allowed", whiteSpace: "nowrap" }}
+          >
+            ⬇ CSV
+          </button>
+        </div>
       </div>
 
       {/* Summen-KPI */}

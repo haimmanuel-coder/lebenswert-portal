@@ -1904,11 +1904,14 @@ export const appRouter = router({
           ...restInput,
           passwortHash: hash,
           aktiv: 1,
+          // Urlaubskonto automatisch initialisieren
+          urlaubstageJahr: restInput.urlaubstageJahr ?? 24,
+          urlaubstageVerbraucht: 0,
           ...(wochenstunden !== undefined ? { wochenstunden: String(wochenstunden) } : {}),
           ...(monatslohn !== undefined ? { monatslohn: String(monatslohn) } : {}),
           ...(stundenlohn !== undefined ? { stundenlohn: String(stundenlohn) } : {}),
         } as any);
-        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "ADMIN", ressource: "mitarbeiter", details: `create ${input.email}`, status: "success" });
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "ADMIN", ressource: "mitarbeiter", details: `create ${input.email} urlaubstage=${restInput.urlaubstageJahr ?? 24}`, status: "success" });
         return { success: true };
       }),
 
@@ -3216,6 +3219,48 @@ export const appRouter = router({
         const summe = positionen.reduce((s: number, p: any) => s + p.lohnkosten, 0);
         return { monat, positionen, summe: Math.round(summe * 100) / 100 };
       }),
+    /** Lohnkosten-Trend: Gesamtlohnkosten der letzten 6 Monate */
+    lohnkostenTrend: adminProcedure.query(async () => {
+      const db = await getDb();
+      if (!db) return [];
+      const { mitarbeiter: maTable, einsaetze: einsaetzeSchema } = await import('../drizzle/schema.js');
+      const { gte } = await import('drizzle-orm');
+      const maListe = await db.select().from(maTable).where(eq(maTable.aktiv, 1));
+      const result = [];
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(1);
+        d.setMonth(d.getMonth() - i);
+        const monatStr = d.toISOString().slice(0, 7);
+        const [jahr, monatNr] = monatStr.split('-').map(Number);
+        const monatsStart = new Date(jahr, monatNr - 1, 1);
+        const monatsEnde = new Date(jahr, monatNr, 0, 23, 59, 59);
+        const alleEinsaetze = await db.select().from(einsaetzeSchema)
+          .where(and(
+            gte(einsaetzeSchema.datum, monatsStart),
+            lte(einsaetzeSchema.datum, monatsEnde),
+            eq(einsaetzeSchema.status, 'abgeschlossen'),
+          ));
+        let summe = 0;
+        for (const ma of maListe) {
+          const maEinsaetze = alleEinsaetze.filter((e: any) => e.mitarbeiterId === (ma as any).id);
+          const geleisteteStunden = maEinsaetze.reduce((s: number, e: any) => {
+            if (!e.startzeit || !e.endzeit) return s;
+            return s + Math.max(0, (new Date(e.endzeit).getTime() - new Date(e.startzeit).getTime()) / (1000 * 60 * 60));
+          }, 0);
+          const monatslohn = parseFloat(String((ma as any).monatslohn ?? 0));
+          const stundenlohn = parseFloat(String((ma as any).stundenlohn ?? 0));
+          if (monatslohn > 0) summe += monatslohn;
+          else if (stundenlohn > 0) summe += geleisteteStunden * stundenlohn;
+        }
+        result.push({
+          monat: monatStr,
+          label: d.toLocaleDateString('de-DE', { month: 'short', year: '2-digit' }),
+          summe: Math.round(summe * 100) / 100,
+        });
+      }
+      return result;
+    }),
     /** Berechtigungen eines eingeloggten Mitarbeiters lesen (für Portal-Durchsetzung) */
     meineBerechtigungen: portalProtected.query(async ({ ctx }) => {
       const db = await getDb();

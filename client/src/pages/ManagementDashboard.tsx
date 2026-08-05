@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, ReferenceLine } from "recharts";
 
 const COLORS = ["#4a8c3f", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51"];
 
@@ -33,6 +33,7 @@ export default function ManagementDashboard() {
 
   const { data: statistik } = trpc.admin.statistik.useQuery({ monat }, { enabled: !!monat });
   const { data: complianceScore } = trpc.compliance.gesamtScore.useQuery();
+  const { data: lohnkostenTrend = [] } = trpc.compliance.lohnkostenTrend.useQuery();
   const { data: auditLogs = [] } = trpc.admin.auditLogs.useQuery({ limit: auditLimit });
   const { data: maList = [] } = trpc.admin.mitarbeiterList.useQuery();
   const { data: kundenList = [] } = trpc.kunden.list.useQuery();
@@ -177,6 +178,38 @@ export default function ManagementDashboard() {
             <Line type="monotone" dataKey="stunden" stroke="#2a9d8f" strokeWidth={2} dot={{ fill: "#2a9d8f", r: 4 }} />
           </LineChart>
         </ResponsiveContainer>
+      </div>
+
+      {/* Lohnkosten-Trend */}
+      <div style={{ background: "#fff", borderRadius: 14, boxShadow: "0 2px 12px rgba(0,0,0,.08)", padding: 16, marginBottom: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <div style={{ fontSize: 14, fontWeight: 700 }}>💰 Lohnkosten-Trend – letzte 6 Monate</div>
+          {lohnkostenTrend.length > 0 && (
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#4a8c3f" }}>
+              Gesamt: {lohnkostenTrend.reduce((s, m) => s + m.summe, 0).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
+            </div>
+          )}
+        </div>
+        {lohnkostenTrend.length === 0 ? (
+          <div style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: "20px 0" }}>Noch keine Lohnkostendaten vorhanden.</div>
+        ) : (
+          <ResponsiveContainer width="100%" height={180}>
+            <LineChart data={lohnkostenTrend} margin={{ top: 4, right: 10, left: 10, bottom: 0 }}>
+              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${v} €`} width={70} />
+              <Tooltip formatter={(v: number) => [`${v.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €`, "Lohnkosten"]} />
+              <ReferenceLine y={0} stroke="#e5e7eb" />
+              <Line
+                type="monotone"
+                dataKey="summe"
+                stroke="#7c3aed"
+                strokeWidth={2.5}
+                dot={{ fill: "#7c3aed", r: 5, strokeWidth: 2, stroke: "#fff" }}
+                activeDot={{ r: 7, fill: "#7c3aed" }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
       </div>
 
       {/* Paragraph-Verteilung */}

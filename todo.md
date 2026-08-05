@@ -938,3 +938,11 @@
 - [x] Feature 3: Backend: mitarbeiter.lohnkostenMonat – Monatslöhne + Stundenlöhne × geleistete Stunden
 - [x] Feature 3: Admin-Panel – neuer Tab "💰 Lohnkosten" mit Tabelle + Balkendiagramm
 - [x] TypeScript: 0 Fehler
+
+## 3 Features: CSV-Export + Urlaubskonto-Automatik + Lohnkosten-Trend (05.08.2026)
+- [x] Feature 1: LohnkostenTab – CSV-Export-Button (Monatstabelle als DATEV-kompatible CSV)
+- [x] Feature 2: Urlaubskonto-Automatik – beim MA-Anlegen wird urlaubsKonto automatisch mit urlaubstageJahr initialisiert
+- [x] Feature 2: Backend: mitarbeiterCreate initialisiert urlaubsVerbraucht=0, urlaubsJahr=aktuelles Jahr
+- [x] Feature 3: Management-Dashboard – Lohnkosten-Trend Liniendiagramm (letzte 6 Monate)
+- [x] Feature 3: Backend: compliance.lohnkostenTrend – Summe je Monat für letzte 6 Monate
+- [x] TypeScript: 0 Fehler
