@@ -6,6 +6,7 @@ import { getDb } from "../db";
 import { datenschutzDokumente, datenschutzZustimmungen, mitarbeiter as mitarbeiterTable } from "../../drizzle/schema";
 import { eq, desc, and } from "drizzle-orm";
 import { sendEmail } from "../emailService";
+import { notifyOwner } from "../_core/notification";
 
 /** HTML-Template für DSGVO-Benachrichtigungs-E-Mail */
 function buildDsgvoUpdateEmail(data: { vorname: string; nachname: string; titel: string; version: string }): string {
@@ -266,6 +267,110 @@ export const datenschutzRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       await db.update(datenschutzDokumente).set({ aktiv: false }).where(eq(datenschutzDokumente.id, input.id));
       return { success: true };
+    }),
+
+  /** Vorlagen auflisten – Alias für listAlleDokumente (Frontend-kompatibel) */
+  listVorlagen: portalProtected.query(async () => {
+    const db = await getDb();
+    if (!db) return [];
+    return db.select().from(datenschutzDokumente).orderBy(desc(datenschutzDokumente.createdAt));
+  }),
+
+  /** Neue Vorlage erstellen (Admin) – Alias für createDokument mit pflicht-Flag */
+  createVorlage: portalProtected
+    .input(z.object({
+      titel: z.string().min(1),
+      inhalt: z.string().min(1),
+      version: z.string().default("1.0"),
+      pflicht: z.boolean().default(true),
+      typ: z.enum(["datenschutzerklaerung", "avv", "einwilligung", "loeschkonzept", "verarbeitungsverzeichnis"]).default("datenschutzerklaerung"),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.insert(datenschutzDokumente).values({
+        typ: input.typ,
+        titel: input.titel,
+        inhalt: input.inhalt,
+        version: input.version,
+        aktiv: true,
+      });
+      return { success: true };
+    }),
+
+  /** Vorlage deaktivieren (soft-delete) */
+  deleteVorlage: portalProtected
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(datenschutzDokumente).set({ aktiv: false }).where(eq(datenschutzDokumente.id, input.id));
+      return { success: true };
+    }),
+
+  /** CSV-Export aller Zustimmungen (Admin) */
+  csvExport: portalProtected.query(async () => {
+    const db = await getDb();
+    if (!db) return "";
+    const alleZ = await db
+      .select({
+        mitarbeiterId: datenschutzZustimmungen.mitarbeiterId,
+        vorname: mitarbeiterTable.vorname,
+        nachname: mitarbeiterTable.nachname,
+        email: mitarbeiterTable.email,
+        dokumentId: datenschutzZustimmungen.dokumentId,
+        dokumentVersion: datenschutzZustimmungen.dokumentVersion,
+        zugestimmtAt: datenschutzZustimmungen.zugestimmtAt,
+      })
+      .from(datenschutzZustimmungen)
+      .leftJoin(mitarbeiterTable, eq(datenschutzZustimmungen.mitarbeiterId, mitarbeiterTable.id))
+      .orderBy(desc(datenschutzZustimmungen.zugestimmtAt));
+    const dokumente = await db.select().from(datenschutzDokumente);
+    const dokMap = new Map(dokumente.map(d => [d.id, d]));
+    const header = "Mitarbeiter-ID;Vorname;Nachname;E-Mail;Dokument-ID;Dokument-Titel;Version;Zugestimmt am\n";
+    const rows = alleZ.map(r => {
+      const dok = dokMap.get(r.dokumentId);
+      const datum = r.zugestimmtAt ? new Date(r.zugestimmtAt).toLocaleString("de-DE") : "";
+      return [
+        r.mitarbeiterId, r.vorname ?? "", r.nachname ?? "", r.email ?? "",
+        r.dokumentId, dok?.titel ?? "", r.dokumentVersion ?? "", datum,
+      ].join(";");
+    }).join("\n");
+    return header + rows;
+  }),
+
+  /** Erinnerungs-Push an alle MA ohne Zustimmung für ein Dokument (Admin) */
+  zustimmungsErinnerung: portalProtected
+    .input(z.object({ dokumentId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const dok = await db.select().from(datenschutzDokumente).where(eq(datenschutzDokumente.id, input.dokumentId)).limit(1);
+      if (dok.length === 0) throw new TRPCError({ code: "NOT_FOUND" });
+      const alleMa = await db
+        .select({ id: mitarbeiterTable.id, vorname: mitarbeiterTable.vorname, nachname: mitarbeiterTable.nachname, email: mitarbeiterTable.email })
+        .from(mitarbeiterTable)
+        .where(eq(mitarbeiterTable.aktiv, 1));
+      const alleZ = await db.select({ mitarbeiterId: datenschutzZustimmungen.mitarbeiterId })
+        .from(datenschutzZustimmungen)
+        .where(eq(datenschutzZustimmungen.dokumentId, input.dokumentId));
+      const zugestimmteIds = new Set(alleZ.map(z => z.mitarbeiterId));
+      const ohneZustimmung = alleMa.filter(ma => !zugestimmteIds.has(ma.id));
+      let gesendet = 0;
+      for (const ma of ohneZustimmung) {
+        if (!ma.email) continue;
+        await sendEmail({
+          to: ma.email,
+          subject: `⚠️ Erinnerung: Zustimmung zu "${dok[0].titel}" noch ausstehend`,
+          html: buildDsgvoUpdateEmail({ vorname: ma.vorname, nachname: ma.nachname, titel: dok[0].titel, version: dok[0].version }),
+        });
+        gesendet++;
+      }
+      await notifyOwner({
+        title: "DSGVO-Erinnerung versendet",
+        content: `${gesendet} Mitarbeiter haben eine Erinnerung zu "${dok[0].titel}" erhalten.`,
+      });
+      return { success: true, gesendet, total: ohneZustimmung.length };
     }),
 
   /**

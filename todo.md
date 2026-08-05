@@ -867,3 +867,16 @@
 - [x] Frontend: ZIP-Download-Button im UnterschriftenArchivTab mit Lade-Spinner und Hinweis-Banner
 - [x] ZIP-Logik: JSZip + jsPDF, Dateiname DATUM_Kunde_MA_ID.pdf, DEFLATE-Kompression
 - [x] TypeScript: 0 Fehler
+
+## Datenschutz-Features Erweiterung (05.08.2026)
+- [x] Backend: datenschutzRouter.listVorlagen (alle Dokumente inkl. inaktive)
+- [x] Backend: datenschutzRouter.createVorlage (Admin, Titel/Inhalt/Version/Pflicht/Typ)
+- [x] Backend: datenschutzRouter.deleteVorlage (soft-delete via aktiv=false)
+- [x] Backend: datenschutzRouter.zustimmungsErinnerung (E-Mail an alle MA ohne Zustimmung + notifyOwner)
+- [x] Backend: datenschutzRouter.csvExport (CSV mit JOIN auf mitarbeiter + dokumente)
+- [x] Frontend: Vorlagen-Tab vollständig verdrahtet (listVorlagen + createVorlage + deleteVorlage + Erinnern-Button je Vorlage)
+- [x] Frontend: CSV-Download-Button im "Alle Mitarbeiter"-Tab (Blob-Download)
+- [x] Frontend: Erinnerungs-Button im "Alle Mitarbeiter"-Tab (erstes aktives Dokument)
+- [x] Frontend: Zustimmungs-Tabelle zeigt zugestimmt/ausstehend als Zähler-Badges
+- [x] Frontend: Meine Einwilligungen nutzt korrekte Feldnamen (z.titel, z.id, z.zugestimmtAt)
+- [x] TypeScript: 0 Fehler
