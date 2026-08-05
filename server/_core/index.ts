@@ -12,6 +12,8 @@ import { serveStatic, setupVite } from "./vite";
 import { neukundenEskalationHandler, vertretungBereinigungHandler } from "../scheduledHandlers";
 import { handleFahrtenVersandCron } from "../scheduled/fahrtenVersand";
 import { fuehrerscheinErinnerungHandler } from "../scheduled/fuehrerscheinErinnerung";
+import { datenschutzErinnerungHandler } from "../scheduled/datenschutzErinnerung";
+import { unterweisungenFaelligkeitHandler } from "../scheduled/unterweisungenFaelligkeit";
 import { ensureTables } from "../ensureTables";
 import { ensureHeartbeatJobs } from "../ensureHeartbeatJobs";
 import multer from "multer";
@@ -74,6 +76,8 @@ async function startServer() {
   app.post("/api/scheduled/neukunden-eskalation", neukundenEskalationHandler);
   app.post("/api/scheduled/fuehrerschein-erinnerung", fuehrerscheinErinnerungHandler);
   app.post("/api/scheduled/vertretung-bereinigung", vertretungBereinigungHandler);
+  app.post("/api/scheduled/datenschutz-erinnerung", datenschutzErinnerungHandler);
+  app.post("/api/scheduled/unterweisungen-faelligkeit", unterweisungenFaelligkeitHandler);
   // Fahrtennachweise: automatischer Versand am 18. jeden Monats
   app.post("/api/scheduled/fahrtennachweise-versand", async (_req: any, res: any) => {
     try {

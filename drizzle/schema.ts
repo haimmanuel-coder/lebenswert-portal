@@ -1185,3 +1185,16 @@ export const unterweisungsNachweise = mysqlTable("as_unterweisung_nachweise", {
 });
 export type UnterweisungsNachweis = typeof unterweisungsNachweise.$inferSelect;
 export type InsertUnterweisungsNachweis = typeof unterweisungsNachweise.$inferInsert;
+
+// ── Datenschutz Audit-Log ─────────────────────────────────────────────────────
+export const datenschutzAuditLog = mysqlTable("datenschutz_audit_log", {
+  id: int("id").autoincrement().primaryKey(),
+  aktion: varchar("aktion", { length: 80 }).notNull(),
+  dokumentId: int("dokumentId"),
+  dokumentTitel: varchar("dokumentTitel", { length: 255 }),
+  adminId: int("adminId"),
+  adminName: varchar("adminName", { length: 255 }),
+  details: text("details"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type DatenschutzAuditLog = typeof datenschutzAuditLog.$inferSelect;

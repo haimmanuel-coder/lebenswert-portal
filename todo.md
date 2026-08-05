@@ -880,3 +880,15 @@
 - [x] Frontend: Zustimmungs-Tabelle zeigt zugestimmt/ausstehend als Zähler-Badges
 - [x] Frontend: Meine Einwilligungen nutzt korrekte Feldnamen (z.titel, z.id, z.zugestimmtAt)
 - [x] TypeScript: 0 Fehler
+
+## Heartbeat + Login-Pflicht + Audit-Log (05.08.2026)
+- [x] DB: datenschutz_audit_log (id, aktion, dokumentId, dokumentTitel, adminId, adminName, details, createdAt)
+- [x] Backend: datenschutzRouter.getAuditLog (Admin, limit 100, 30s Refresh)
+- [x] Backend: Audit-Log-Einträge bei createVorlage/deleteVorlage/zustimmungsErinnerung
+- [x] Backend: Heartbeat-Job 'datenschutz-erinnerung' (jeden Montag 08:00) – MA ohne Pflicht-Zustimmung an Admin melden
+- [x] Backend: Heartbeat-Job 'unterweisungen-faelligkeit' (täglich 07:00) – ≤30 Tage fällige Unterweisungen an Admin melden
+- [x] Backend: datenschutzRouter.checkPflichtZustimmungen – Procedure für Login-Pflichtprüfung
+- [x] Frontend: DsgvoPflichtModal.tsx – Modal bei Login wenn offene Pflicht-Dokumente vorhanden
+- [x] Frontend: PortalApp.tsx – DsgvoPflichtModal nach Login einblenden
+- [x] Frontend: Datenschutz.tsx – neuer Tab "🕵️ Audit-Log" (Admin, Farb-Badges je Aktion)
+- [x] TypeScript: 0 Fehler

@@ -45,6 +45,7 @@ import { useOfflineSync } from "@/hooks/useOfflineSync";
 import { useSSENotifications } from "@/hooks/useSSENotifications";
 import { useSessionTimeout } from "@/hooks/useSessionTimeout";
 import DsgvoErstDialog from "@/components/DsgvoErstDialog";
+import { DsgvoPflichtModal } from "@/components/DsgvoPflichtModal";
 import Einsatzplanung from "./Einsatzplanung";
 import ImportAssistent from "./ImportAssistent";
 import BudgetVerwaltung from "./BudgetVerwaltung";
@@ -128,6 +129,13 @@ export default function PortalApp() {
   );
   const [dsgvoDialogGeschlossen, setDsgvoDialogGeschlossen] = useState(false);
   const showDsgvoDialog = !!mitarbeiter && !!dsgvoCheck && dsgvoCheck.required && !dsgvoCheck.zugestimmt && !dsgvoDialogGeschlossen;
+  // Pflichtprüfung beim Login: alle aktiven Dokumente ohne Zustimmung
+  const { data: offenePflichtDokumente } = (trpc.datenschutz as any).checkPflichtZustimmungen.useQuery(
+    undefined, { enabled: !!mitarbeiter && !showDsgvoDialog }
+  );
+  const [pflichtModalGeschlossen, setPflichtModalGeschlossen] = useState(false);
+  const showPflichtModal = !!mitarbeiter && !showDsgvoDialog && !pflichtModalGeschlossen
+    && Array.isArray(offenePflichtDokumente) && (offenePflichtDokumente as any[]).length > 0;
   const initials = mitarbeiter
     ? `${mitarbeiter.vorname?.[0] ?? ""}${mitarbeiter.nachname?.[0] ?? ""}`.toUpperCase()
     : "MA";
@@ -503,6 +511,12 @@ export default function PortalApp() {
 
       <OnboardingTour forceShow={showTour} onClose={closeTour} />
       {showDsgvoDialog && <DsgvoErstDialog onClose={() => setDsgvoDialogGeschlossen(true)} />}
+      {showPflichtModal && (
+        <DsgvoPflichtModal
+          offeneDokumente={(offenePflichtDokumente as any[]) ?? []}
+          onAlleBestaetigt={() => setPflichtModalGeschlossen(true)}
+        />
+      )}
       <Toaster
         position="top-right"
         richColors

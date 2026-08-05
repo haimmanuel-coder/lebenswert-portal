@@ -6,7 +6,7 @@ import { toast } from "sonner";
 export default function Datenschutz() {
   const { mitarbeiter } = usePortalAuth() as any;
   const isAdmin = mitarbeiter?.rolle === "admin";
-  const [tab, setTab] = useState<"meine" | "alle" | "vorlagen">(isAdmin ? "alle" : "meine");
+  const [tab, setTab] = useState<"meine" | "alle" | "vorlagen" | "auditlog">(isAdmin ? "alle" : "meine");
   const [erinnerungId, setErinnerungId] = useState<number | null>(null);
 
   const { data: meineZustimmungen = [], refetch: refetchMeine } = (trpc.datenschutz as any).getMeineZustimmungen.useQuery(
@@ -20,6 +20,10 @@ export default function Datenschutz() {
   const { data: vorlagen = [], refetch: refetchVorlagen } = (trpc.datenschutz as any).listVorlagen.useQuery(
     undefined,
     { enabled: tab === "vorlagen" && isAdmin }
+  );
+  const { data: auditLog = [] } = (trpc.datenschutz as any).getAuditLog.useQuery(
+    { limit: 100 },
+    { enabled: tab === "auditlog" && isAdmin, refetchInterval: 30_000 }
   );
   const { data: csvDaten } = (trpc.datenschutz as any).csvExport.useQuery(
     undefined,
@@ -71,6 +75,7 @@ export default function Datenschutz() {
           ...(isAdmin ? [
             { id: "alle", label: "👥 Alle Mitarbeiter" },
             { id: "vorlagen", label: "📝 Vorlagen verwalten" },
+            { id: "auditlog", label: "🕵️ Audit-Log" },
           ] : []),
         ].map(t => (
           <button
@@ -317,6 +322,74 @@ export default function Datenschutz() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+      {/* Audit-Log (Admin) */}
+      {tab === "auditlog" && isAdmin && (
+        <div>
+          <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #e5e7eb", overflow: "hidden" }}>
+            <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 15, color: "#111827" }}>🕵️ Datenschutz-Audit-Log</div>
+                <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>Alle Änderungen an Vorlagen und Zustimmungen – DSGVO-konform protokolliert</div>
+              </div>
+              <span style={{ background: "#f0fdf4", color: "#166534", border: "1px solid #bbf7d0", borderRadius: 8, padding: "3px 10px", fontSize: 11, fontWeight: 700 }}>
+                {(auditLog as any[]).length} Einträge
+              </span>
+            </div>
+            {(auditLog as any[]).length === 0 ? (
+              <div style={{ padding: "40px 20px", textAlign: "center", color: "#9ca3af" }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
+                <div style={{ fontWeight: 700 }}>Keine Audit-Einträge vorhanden</div>
+                <div style={{ fontSize: 12, marginTop: 4 }}>Änderungen an Vorlagen werden hier automatisch protokolliert.</div>
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ background: "#f9fafb" }}>
+                      {["Zeitpunkt", "Aktion", "Dokument", "Admin", "Details"].map(h => (
+                        <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#6b7280", borderBottom: "1px solid #e5e7eb", whiteSpace: "nowrap" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(auditLog as any[]).map((entry: any, i: number) => {
+                      const aktionFarbe: Record<string, string> = {
+                        vorlage_erstellt: "#dcfce7", vorlage_bearbeitet: "#fef9c3", vorlage_deaktiviert: "#fee2e2",
+                        neue_version: "#dbeafe", erinnerung_gesendet: "#fef3c7", zustimmung_gespeichert: "#f0fdf4",
+                      };
+                      const aktionLabel: Record<string, string> = {
+                        vorlage_erstellt: "✅ Erstellt", vorlage_bearbeitet: "✏️ Bearbeitet", vorlage_deaktiviert: "🗑️ Deaktiviert",
+                        neue_version: "🔄 Neue Version", erinnerung_gesendet: "📧 Erinnerung", zustimmung_gespeichert: "✍️ Zustimmung",
+                      };
+                      return (
+                        <tr key={entry.id ?? i} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                          <td style={{ padding: "10px 14px", fontSize: 12, color: "#374151", whiteSpace: "nowrap" }}>
+                            {entry.createdAt ? new Date(entry.createdAt).toLocaleString("de-DE") : "–"}
+                          </td>
+                          <td style={{ padding: "10px 14px" }}>
+                            <span style={{ background: aktionFarbe[entry.aktion] ?? "#f3f4f6", color: "#374151", borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>
+                              {aktionLabel[entry.aktion] ?? entry.aktion}
+                            </span>
+                          </td>
+                          <td style={{ padding: "10px 14px", fontSize: 12, color: "#374151" }}>
+                            {entry.dokumentTitel ?? (entry.dokumentId ? `ID ${entry.dokumentId}` : "–")}
+                          </td>
+                          <td style={{ padding: "10px 14px", fontSize: 12, color: "#374151" }}>
+                            {entry.adminName ?? (entry.adminId ? `ID ${entry.adminId}` : "–")}
+                          </td>
+                          <td style={{ padding: "10px 14px", fontSize: 11, color: "#6b7280", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {entry.details ? (() => { try { const d = JSON.parse(entry.details); return Object.entries(d).map(([k,v]) => `${k}: ${v}`).join(" · "); } catch { return entry.details; } })() : "–"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
