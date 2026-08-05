@@ -790,3 +790,40 @@
 - [x] Feature 4: updateStatus-Procedure prüft keineVertretung-Flag vor Vertretungs-Push
 - [x] Bugfix: longtext-ReferenceError (nur historisch in Logs, schema.ts verwendet text())
 - [x] TypeScript: 0 Fehler | Tests: 86/86 bestanden
+
+## Arbeitssicherheits-Modul (§5 ArbSchG, DGUV V2, BioStoffV, ArbMedVV, §12 ArbSchG)
+
+### Datenbank
+- [x] DB: arbeitssicherheit_gefaehrdungen (id, titel, bereich, risikobeschreibung, massnahmen, verantwortlich, risikoStufe, status, naechstePruefung, erstelltVon, createdAt)
+- [x] DB: arbeitssicherheit_psa (id, mitarbeiterId, psaTyp, groesse, menge, ausgabeDatum, rueckgabeDatum, zustand, notizen, createdAt)
+- [x] DB: arbeitssicherheit_vorsorge (id, mitarbeiterId, vorsorgeart, anlass, faelligkeit, durchgefuehrtAm, arzt, ergebnis, naechsteFaelligkeit, createdAt)
+- [x] DB: arbeitssicherheit_alleinarbeit (id, mitarbeiterId, checkInZeit, checkOutZeit, checkInStatus, notfallKontakt, bemerkung, createdAt)
+- [x] DB: arbeitssicherheit_unterweisungen (id, mitarbeiterId, thema, unterweisungsDatum, inhalt, bestaetigt, bestaetigtAm, naechsteFaelligkeit, createdAt)
+- [x] SQL-Migration ausgeführt
+
+### Backend
+- [x] Router arbeitssicherheit: gefaehrdung.list, gefaehrdung.create, gefaehrdung.update, gefaehrdung.delete
+- [x] Router arbeitssicherheit: psa.listAll, psa.meinePsa, psa.create, psa.rueckgabe, psa.delete
+- [x] Router arbeitssicherheit: vorsorge.listAll, vorsorge.meineVorsorgen, vorsorge.create, vorsorge.abschliessen, vorsorge.delete
+- [x] Router arbeitssicherheit: alleinarbeit.checkIn, alleinarbeit.checkOut, alleinarbeit.listOffen, alleinarbeit.meinStatus, alleinarbeit.meinVerlauf, alleinarbeit.notfallMelden
+- [x] Router arbeitssicherheit: unterweisung.listAll, unterweisung.meineUnterweisungen, unterweisung.bestaetigen, unterweisung.adminCreate, unterweisung.delete
+- [x] Router arbeitssicherheit: dashboard (KPIs: offene Gefährdungen, PSA-Ausgaben gesamt, überfällige Vorsorgen, offene Alleinarbeit, offene Unterweisungen)
+
+### Frontend Admin
+- [x] ArbeitssicherheitAdminTab.tsx: 6 Sub-Tabs (Übersicht / Gefährdungsbeurteilung / PSA / Vorsorge / Unterweisungen / Alleinarbeit-Monitor)
+- [x] Gefährdungsbeurteilung: Karten mit Risiko-Ampel (🔴/🟡/🟢), Anlegen/Status-Update/Löschen, Status-Filter
+- [x] PSA-Verwaltung: Tabelle aller Ausgaben, Ausgabe erfassen (Typ/Größe/Menge/Datum), Rückgabe markieren
+- [x] Arbeitsmed. Vorsorge: Übersicht aller MA mit Fälligkeits-Ampel, Vorsorge erfassen, Abschluss-Dialog
+- [x] Unterweisungen (Arbeitssicherheit): Übersicht mit Bestätigungs-Ampel, Neue Unterweisung anlegen, Themen-Filter
+- [x] Alleinarbeit-Monitor: Live-Übersicht offener Check-ins (60s Refresh), Zeitüberschreitungs-Warnung (>4h), Notfall-Button
+- [x] AdminPanel: neuer Tab '⛑️ Arbeitssicherheit' eingebunden
+
+### Frontend Mitarbeiter
+- [x] Mitarbeiter-Seite MeineArbeitssicherheit.tsx: eigene PSA, Vorsorge-Termine, offene Unterweisungen bestätigen
+- [x] Alleinarbeit Check-in/Check-out mit Notfallkontakt-Eingabe
+- [x] Alleinarbeit-Verlauf (letzte 30 Einträge)
+- [x] Navigation: Menüpunkt '⛑️ Arbeitssicherheit' in Kunden & Compliance
+
+### Qualität
+- [x] TypeScript: 0 Fehler
+- [x] Tests: 86/86 bestanden

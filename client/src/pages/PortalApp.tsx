@@ -16,6 +16,7 @@ import Textbausteine from "./Textbausteine";
 import ExportCenter from "./ExportCenter";
 import Fuehrerschein from "./Fuehrerschein";
 import Sicherheitsunterweisungen from "./Sicherheitsunterweisungen";
+import MeineArbeitssicherheit from "./MeineArbeitssicherheit";
 import NeukundenAufnahme from "./NeukundenAufnahme";
 import Kalender from "./Kalender";
 import Kassenanfrage from "./Kassenanfrage";
@@ -170,6 +171,7 @@ export default function PortalApp() {
         { id: "krank", icon: "🤒", label: "Krankmeldung" },
         { id: "fuehrerschein", icon: "🪪", label: "Führerschein-Check" },
         { id: "sicherheitsunterweisung", icon: "🛡️", label: "Sicherheitsunterweisungen", badge: sicherheitBadge > 0 ? sicherheitBadge : undefined },
+        { id: "meinearbeitssicherheit" as PageId, icon: "⛑️", label: "Arbeitssicherheit" },
         { id: "verfuegbarkeiten" as PageId, icon: "📅", label: "Verfügbarkeiten" },
         { id: "profil", icon: "👤", label: "Mein Profil" },
         { id: "zweifaktor" as PageId, icon: "🔒", label: "2FA-Sicherheit" },
@@ -242,6 +244,7 @@ export default function PortalApp() {
       case "export": return <ExportCenter />;
       case "fuehrerschein": return <Fuehrerschein />;
       case "sicherheitsunterweisung": return <Sicherheitsunterweisungen />;
+      case "meinearbeitssicherheit": return <MeineArbeitssicherheit />;
       case "neukundenaufnahme": return <NeukundenAufnahme />;
       case "kalender": return <Kalender />;
       case "kassenanfrage": return <Kassenanfrage />;

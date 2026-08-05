@@ -4,13 +4,14 @@ import { VerrechnungssaetzeTab } from "./VerrechnungssaetzeTab";
 import { SicherheitsunterweisungenAdminTab } from "./SicherheitsunterweisungenAdminTab";
 import { FuehrerscheinCheckTab } from "./FuehrerscheinCheckTab";
 import ComplianceAmpelTab from "./ComplianceAmpelTab";
+import { ArbeitssicherheitAdminTab } from "./ArbeitssicherheitAdminTab";
 import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import BottomSheet from "@/components/BottomSheet";
 import MitarbeiterDetail from "./MitarbeiterDetail";
 
-type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo" | "preise" | "sicherheit" | "fuehrerschein" | "compliance";
+type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo" | "preise" | "sicherheit" | "fuehrerschein" | "compliance" | "arbeitssicherheit";
 type PortalRolle = "mitarbeiter" | "teamleitung" | "buchhaltung" | "admin";
 
 const ROLLEN_LABEL: Record<PortalRolle, string> = {
@@ -252,6 +253,7 @@ export default function AdminPanel() {
           { key: "sicherheit" as AdminTab, label: "🦺 Sicherheitsunterweisungen" },
           { key: "fuehrerschein" as AdminTab, label: "🪖 Führerschein-Checks" },
           { key: "compliance" as AdminTab, label: "🚦 Compliance-Ampel" },
+          { key: "arbeitssicherheit" as AdminTab, label: "⛑️ Arbeitssicherheit" },
         ].map((t) => (
           <button key={t.key} style={tabStyle(t.key)} onClick={() => setTab(t.key)}>{t.label}</button>
         ))}
@@ -607,10 +609,12 @@ export default function AdminPanel() {
       {tab === "fuehrerschein" && (
         <FuehrerscheinCheckTab />
       )}
-      {tab === "compliance" && (
+            {tab === "compliance" && (
         <ComplianceAmpelTab />
       )}
-
+      {tab === "arbeitssicherheit" && (
+        <ArbeitssicherheitAdminTab />
+      )}
       <BottomSheet open={budgetSheet} onClose={() => setBudgetSheet(false)} title={budgetKunde ? `Budget: ${budgetKunde.vorname} ${budgetKunde.nachname}` : "Budget bearbeiten"}>
         {/* §45b */}
         <div style={{ background: "#f0fdf4", borderRadius: 10, padding: 12, marginBottom: 10 }}>

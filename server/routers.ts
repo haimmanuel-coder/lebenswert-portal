@@ -121,6 +121,7 @@ import { umwidmungRouter, sonderfahrtRouter, rechnungspositionRouter, privatrech
 import { budgetRouter } from "./routers/budgetRouter";
 import { fahrtenAbrechnungRouter } from "./routers/fahrtenAbrechnungRouter";
 import { sicherheitsunterweisungRouter } from "./routers/sicherheitsunterweisungRouter";
+import { arbeitssicherheitRouter } from "./routers/arbeitssicherheitRouter";
 import { notifyOwner } from "./_core/notification";
 import {
   savePushSubscription,
@@ -3050,6 +3051,7 @@ export const appRouter = router({
   budget: budgetRouter,
   import: importRouter,
   sicherheitsunterweisung: sicherheitsunterweisungRouter,
+  arbeitssicherheit: arbeitssicherheitRouter,
 });
 
 export type AppRouter = typeof appRouter;

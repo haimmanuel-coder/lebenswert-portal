@@ -1020,3 +1020,116 @@ export const controllingSnapshots = mysqlTable("controllingSnapshots", {
 });
 export type ControllingSnapshot = typeof controllingSnapshots.$inferSelect;
 export type InsertControllingSnapshot = typeof controllingSnapshots.$inferInsert;
+
+
+// ── MODUL ARBEITSSICHERHEIT ──────────────────────────────────────────────────
+
+/** Gefährdungsbeurteilung (§5 ArbSchG) */
+export const gefaehrdungsbeurteilungen = mysqlTable("gefaehrdungsbeurteilungen", {
+  id: int("id").autoincrement().primaryKey(),
+  titel: varchar("titel", { length: 255 }).notNull(),
+  bereich: mysqlEnum("bereich", [
+    "haushalt_senior",
+    "wegeunfall",
+    "ergonomie_physisch",
+    "psychisch",
+    "hygiene_infektion",
+    "sonstiges",
+  ]).notNull(),
+  risikobeschreibung: text("risikobeschreibung").notNull(),
+  massnahmen: text("massnahmen"),
+  verantwortlich: varchar("verantwortlich", { length: 255 }),
+  status: mysqlEnum("status", ["offen", "in_bearbeitung", "erledigt"]).default("offen").notNull(),
+  risikoStufe: mysqlEnum("risikoStufe", ["niedrig", "mittel", "hoch"]).default("mittel").notNull(),
+  naechstePruefung: date("naechstePruefung"),
+  erstelltVon: int("erstelltVon"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type Gefaehrdungsbeurteilung = typeof gefaehrdungsbeurteilungen.$inferSelect;
+export type InsertGefaehrdungsbeurteilung = typeof gefaehrdungsbeurteilungen.$inferInsert;
+
+/** PSA-Ausgaben (Persönliche Schutzausrüstung) */
+export const psaAusgaben = mysqlTable("psa_ausgaben", {
+  id: int("id").autoincrement().primaryKey(),
+  mitarbeiterId: int("mitarbeiterId").notNull(),
+  psaTyp: mysqlEnum("psaTyp", [
+    "einmalhandschuhe",
+    "ffp2_maske",
+    "mund_nasen_schutz",
+    "schutzkittel",
+    "schutzbrille",
+    "desinfektionsmittel",
+    "sonstiges",
+  ]).notNull(),
+  groesse: varchar("groesse", { length: 20 }),
+  menge: int("menge").default(1).notNull(),
+  ausgabeDatum: date("ausgabeDatum").notNull(),
+  rueckgabeDatum: date("rueckgabeDatum"),
+  zustand: mysqlEnum("zustand", ["neu", "gut", "beschaedigt", "zurueckgegeben"]).default("neu").notNull(),
+  notizen: text("notizen"),
+  ausgegebenVon: int("ausgegebenVon"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type PsaAusgabe = typeof psaAusgaben.$inferSelect;
+export type InsertPsaAusgabe = typeof psaAusgaben.$inferInsert;
+
+/** Arbeitsmedizinische Vorsorge (ArbMedVV) */
+export const arbeitsmedVorsorgen = mysqlTable("arbeitsmed_vorsorgen", {
+  id: int("id").autoincrement().primaryKey(),
+  mitarbeiterId: int("mitarbeiterId").notNull(),
+  vorsorgeart: mysqlEnum("vorsorgeart", ["pflicht", "angebot", "wunsch"]).notNull(),
+  anlass: varchar("anlass", { length: 255 }).notNull(),
+  faelligkeit: date("faelligkeit").notNull(),
+  durchgefuehrtAm: date("durchgefuehrtAm"),
+  arzt: varchar("arzt", { length: 255 }),
+  ergebnis: mysqlEnum("ergebnis", ["geeignet", "bedingt_geeignet", "nicht_geeignet", "ausstehend"]).default("ausstehend").notNull(),
+  naechsteFaelligkeit: date("naechsteFaelligkeit"),
+  notizen: text("notizen"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type ArbeitsmedVorsorge = typeof arbeitsmedVorsorgen.$inferSelect;
+export type InsertArbeitsmedVorsorge = typeof arbeitsmedVorsorgen.$inferInsert;
+
+/** Alleinarbeits-Protokolle (§6 ArbSchG – Schutz bei Alleinarbeit) */
+export const alleinarbeitsProtokolle = mysqlTable("alleinarbeits_protokolle", {
+  id: int("id").autoincrement().primaryKey(),
+  mitarbeiterId: int("mitarbeiterId").notNull(),
+  kundenId: int("kundenId"),
+  einsatzId: int("einsatzId"),
+  checkInZeit: timestamp("checkInZeit"),
+  checkOutZeit: timestamp("checkOutZeit"),
+  checkInStatus: mysqlEnum("checkInStatus", ["eingecheckt", "ausgecheckt", "ueberfaellig", "notfall"]).default("eingecheckt").notNull(),
+  notfallKontakt: varchar("notfallKontakt", { length: 255 }),
+  bemerkung: text("bemerkung"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type AlleinarbeitsProtokoll = typeof alleinarbeitsProtokolle.$inferSelect;
+export type InsertAlleinarbeitsProtokoll = typeof alleinarbeitsProtokolle.$inferInsert;
+
+/** Arbeitssicherheits-Unterweisungen (§12 ArbSchG) – themenspezifisch */
+export const arbeitssicherheitUnterweisungen = mysqlTable("arbeitssicherheit_unterweisungen", {
+  id: int("id").autoincrement().primaryKey(),
+  mitarbeiterId: int("mitarbeiterId").notNull(),
+  thema: mysqlEnum("thema", [
+    "notfall_erste_hilfe",
+    "hygiene_desinfektion",
+    "ergonomie_heben_tragen",
+    "deeskalation_demenz",
+    "verkehrssicherheit",
+    "psa_verwendung",
+    "alleinarbeit_schutz",
+    "biostoff_infektionsschutz",
+    "sonstiges",
+  ]).notNull(),
+  unterweisungsDatum: date("unterweisungsDatum").notNull(),
+  naechsteFaelligkeit: date("naechsteFaelligkeit"),
+  bestaetigt: boolean("bestaetigt").default(false).notNull(),
+  bestaetigtAm: timestamp("bestaetigtAm"),
+  durchgefuehrtVon: int("durchgefuehrtVon"),
+  inhalt: text("inhalt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ArbeitssicherheitUnterweisung = typeof arbeitssicherheitUnterweisungen.$inferSelect;
+export type InsertArbeitssicherheitUnterweisung = typeof arbeitssicherheitUnterweisungen.$inferInsert;
