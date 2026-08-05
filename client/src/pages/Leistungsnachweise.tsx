@@ -151,6 +151,16 @@ export default function Leistungsnachweise() {
       toast.error("Mindestens ein Einsatz wartet noch auf die Teamleitung-Freigabe der Ersatzunterschrift. Bitte zunächst freigeben lassen.");
       return;
     }
+    // ⚠️ Unterschrift-Pflichtprüfung (nicht blockierend – deutliche Warnung)
+    const effektivMaSig = signaturMitarbeiter ?? autoUnterschriftMitarbeiter;
+    const effektivKdSig = signaturKunde ?? autoUnterschriftKunde;
+    const hatErsatz = passendeEinsaetze.some((e: any) => e.unterschriftErsatzTyp && e.unterschriftErsatzTyp !== "keine");
+    if (!effektivMaSig) {
+      toast.warning("⚠️ Hinweis: Keine Mitarbeiter-Unterschrift vorhanden. Nachweis wird trotzdem eingereicht.", { duration: 5000 });
+    }
+    if (!effektivKdSig && !hatErsatz) {
+      toast.warning("⚠️ Hinweis: Keine Kunden-Unterschrift vorhanden. Bitte nachträglich einholen oder Ersatz-Typ angeben.", { duration: 5000 });
+    }
     createLeistung.mutate({
       kundenId: parseInt(kundenId),
       monat,

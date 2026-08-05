@@ -4,6 +4,8 @@ import { toast } from "sonner";
 import BottomSheet from "@/components/BottomSheet";
 import SignatureCanvas from "@/components/SignatureCanvas";
 import { saveOfflineEinsatz } from "@/hooks/useOfflineSync";
+import { usePortalAuth } from "@/contexts/PortalAuthContext";
+import { previewLeistungsnachweisPdf } from "@/lib/pdfGenerator";
 
 function fmtDate(d: string | Date | null) {
   if (!d) return "–";
@@ -39,12 +41,53 @@ export default function Einsaetze() {
   const [previewKunde, setPreviewKunde] = useState<string | null>(null);
   const [signaturMitarbeiter, setSignaturMitarbeiter] = useState<string | null>(null);
   const [signaturKunde, setSignaturKunde] = useState<string | null>(null);
+  // Feature 3: PDF-Vorschau nach Abschluss
+  const [pdfVorschauUrl, setPdfVorschauUrl] = useState<string | null>(null);
+  const { mitarbeiter } = usePortalAuth();
 
   const { data: einsaetze = [], refetch } = trpc.einsaetze.listWithKunden.useQuery();
   const { data: kunden = [] } = trpc.kunden.list.useQuery();
   const getKundeName = (id: number) => { const k = kunden.find((c) => c.id === id); return k ? `${k.vorname} ${k.nachname}` : `Kunde #${id}`; };
   const updateStatus = trpc.einsaetze.updateStatus.useMutation({
-    onSuccess: () => { refetch(); toast.success("✅ Einsatz abgeschlossen"); setAbschlussOpen(false); },
+    onSuccess: () => {
+      refetch();
+      toast.success("✅ Einsatz abgeschlossen");
+      setAbschlussOpen(false);
+      // Feature 3: PDF-Vorschau nach Abschluss
+      if (activeEinsatz) {
+        const kunde = (kunden as any[]).find((k: any) => k.id === activeEinsatz.kundenId);
+        if (kunde) {
+          const einsatzRow = (einsaetze as any[]).find((e: any) => e.id === activeEinsatz.id);
+          const pdfData = {
+            kundeVorname: kunde.vorname,
+            kundeNachname: kunde.nachname,
+            kundeGeburtsdatum: kunde.geburtsdatum ?? null,
+            kundeStrasse: kunde.strasse ?? null,
+            kundePlz: kunde.plz ?? null,
+            kundeOrt: kunde.ort ?? null,
+            kundeVersicherungsnummer: kunde.versicherungsnummer ?? null,
+            kundeKostentraeger: kunde.kostentraeger ?? null,
+            kundePflegegrad: kunde.pflegegrad ?? null,
+            kundePflegegradSeit: kunde.pflegegradSeit ?? null,
+            monat: activeEinsatz.datum.slice(0, 7),
+            paragraph: einsatzRow?.paragraph ?? "45b",
+            stunden: activeEinsatz.dauerStunden ?? 0,
+            anzahlEinsaetze: 1,
+            status: "abgeschlossen",
+            einsaetze: [{ datum: activeEinsatz.datum, startzeit: einsatzRow?.startzeit ?? null, dauerStunden: activeEinsatz.dauerStunden ?? null, anfahrtPauschale: einsatzRow?.anfahrtPauschale ?? 6, km: null }],
+            unterschriftMitarbeiter: signaturMitarbeiter ?? null,
+            unterschriftKunde: signaturKunde ?? null,
+            mitarbeiterName: mitarbeiter ? `${mitarbeiter.vorname} ${mitarbeiter.nachname}` : "Mitarbeiter",
+          };
+          try {
+            const url = previewLeistungsnachweisPdf(pdfData);
+            setPdfVorschauUrl(url);
+          } catch {
+            // PDF-Vorschau optional – Fehler ignorieren
+          }
+        }
+      }
+    },
     onError: async (e) => {
       // Bei Netzwerkfehler: Offline-Queue nutzen
       if (!navigator.onLine && activeEinsatz) {
@@ -376,6 +419,41 @@ export default function Einsaetze() {
           </button>
         </div>
       </BottomSheet>
+
+      {/* Feature 3: PDF-Vorschau-Modal nach Abschluss */}
+      {pdfVorschauUrl && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ background: "#fff", borderRadius: 14, width: "100%", maxWidth: 640, maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 8px 40px rgba(0,0,0,0.3)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: "1px solid #e5e7eb" }}>
+              <div style={{ fontWeight: 700, fontSize: 15, color: "#1e3a2f" }}>📄 Einsatz-Nachweis Vorschau</div>
+              <button
+                onClick={() => setPdfVorschauUrl(null)}
+                style={{ padding: "5px 12px", background: "#f3f4f6", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", color: "#4b5563" }}
+              >
+                ✕ Schließen
+              </button>
+            </div>
+            <div style={{ flex: 1, overflow: "hidden" }}>
+              <iframe src={pdfVorschauUrl} style={{ width: "100%", height: "100%", minHeight: 500, border: "none" }} title="Einsatz-Nachweis Vorschau" />
+            </div>
+            <div style={{ display: "flex", gap: 10, padding: "12px 18px", borderTop: "1px solid #e5e7eb" }}>
+              <a
+                href={pdfVorschauUrl}
+                download={`einsatz-nachweis.pdf`}
+                style={{ flex: 1, padding: "10px 16px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer", textAlign: "center", textDecoration: "none", display: "block" }}
+              >
+                📅 PDF herunterladen
+              </a>
+              <button
+                onClick={() => setPdfVorschauUrl(null)}
+                style={{ flex: 1, padding: "10px 16px", background: "#f3f4f6", color: "#4b5563", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+              >
+                Später
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

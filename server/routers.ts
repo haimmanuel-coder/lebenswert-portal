@@ -1411,6 +1411,42 @@ export const appRouter = router({
         });
         return { success: true };
       }),
+    /** Admin: Unterschriften-Archiv – alle abgeschlossenen Einsätze mit Unterschrift-Status */
+    unterschriftenArchiv: adminProcedure
+      .input(z.object({
+        monat: z.string().regex(/^\d{4}-\d{2}$/).optional(),
+        mitarbeiterId: z.number().int().positive().optional(),
+      }).optional())
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        const rows = await db.execute(sql`
+          SELECT
+            e.id,
+            e.datum,
+            e.paragraph,
+            e.status,
+            e.dauerStunden,
+            CASE WHEN e.unterschriftMitarbeiter IS NOT NULL AND e.unterschriftMitarbeiter != '' THEN 1 ELSE 0 END as hatUnterschriftMA,
+            CASE WHEN e.unterschriftKunde IS NOT NULL AND e.unterschriftKunde != '' THEN 1 ELSE 0 END as hatUnterschriftKunde,
+            e.unterschriftErsatzTyp,
+            e.unterschriftFreigabeStatus,
+            k.vorname as kundeVorname,
+            k.nachname as kundeNachname,
+            m.vorname as maVorname,
+            m.nachname as maNachname
+          FROM einsaetze e
+          LEFT JOIN kunden k ON e.kundenId = k.id
+          LEFT JOIN mitarbeiter m ON e.mitarbeiterId = m.id
+          WHERE e.status = 'abgeschlossen'
+            AND (e.geloeschtAt IS NULL)
+            ${input?.monat ? sql`AND DATE_FORMAT(e.datum, '%Y-%m') = ${input.monat}` : sql``}
+            ${input?.mitarbeiterId ? sql`AND e.mitarbeiterId = ${input.mitarbeiterId}` : sql``}
+          ORDER BY e.datum DESC
+          LIMIT 500
+        `);
+        return (rows as any)[0] as any[];
+      }),
   }),
   // ── LEISTUNGEN ───────────────────────────────────────
   leistungen: router({

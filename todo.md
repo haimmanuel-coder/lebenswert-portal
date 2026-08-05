@@ -851,3 +851,13 @@
 - [x] Neukundenaufnahme-PDF: SELECT * → alle Felder korrekt (kein Fix nötig)
 - [x] Leistungsnachweise-PDF: getAllLeistungen() db.select() → alle Felder korrekt (kein Fix nötig)
 - [x] TypeScript: 0 Fehler
+- [x] Checkpoint be706af6 gespeichert und live
+
+## Drei Unterschriften-Features (05.08.2026)
+- [x] Feature 1: Unterschriften-Archiv im Admin-Panel – Tab "📋 Unterschriften-Archiv" mit Filter nach Monat/Mitarbeiter, Vollständigkeits-Ampel
+- [x] Feature 1: Backend: einsaetze.unterschriftenArchiv (Admin-Procedure: alle Einsätze mit Unterschrift-Status)
+- [x] Feature 2: Unterschrift-Pflichtprüfung beim LNW-Einreichen – Warnung wenn MA-Unterschrift fehlt (nicht blockierend)
+- [x] Feature 2: Warnung wenn Kunden-Unterschrift fehlt (nicht blockierend, aber deutlich sichtbar)
+- [x] Feature 3: PDF-Vorschau-Modal direkt nach Einsatz-Abschluss (automatisch geöffnet)
+- [x] Feature 3: Vorschau-Modal zeigt generierten LNW-Entwurf mit Unterschrift sofort nach Abschluss + Download-Button
+- [x] TypeScript: 0 Fehler
