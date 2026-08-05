@@ -863,6 +863,186 @@ const TABLE_DEFINITIONS: string[] = [
     \`createdAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (\`id\`)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  // ── fuehrerschein_checks ──────────────────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS \`fuehrerschein_checks\` (
+    \`id\` int NOT NULL AUTO_INCREMENT,
+    \`mitarbeiterId\` int NOT NULL,
+    \`pruefDatum\` date NOT NULL,
+    \`naechstePruefung\` date,
+    \`status\` enum('gueltig','abgelaufen','ausstehend') NOT NULL DEFAULT 'ausstehend',
+    \`fotoUrl\` text,
+    \`fotoKey\` varchar(500),
+    \`bemerkung\` text,
+    \`geprueftVonId\` int,
+    \`mitarbeiter_id\` int,
+    \`foto_key\` varchar(500),
+    \`foto_url\` text,
+    \`pruef_datum\` date,
+    \`naechstes_pruef_datum\` date,
+    \`createdAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    \`updatedAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  // ── erste_hilfe_kurse ─────────────────────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS \`erste_hilfe_kurse\` (
+    \`id\` int NOT NULL AUTO_INCREMENT,
+    \`mitarbeiterId\` int NOT NULL,
+    \`kursName\` varchar(255) NOT NULL DEFAULT 'Erste-Hilfe-Kurs',
+    \`kursAnbieter\` varchar(255),
+    \`kursDatum\` date NOT NULL,
+    \`ablaufDatum\` date,
+    \`status\` enum('bestanden','angemeldet','abgelaufen') NOT NULL DEFAULT 'bestanden',
+    \`fotoBase64\` text,
+    \`fotoMimeType\` varchar(100),
+    \`bemerkung\` text,
+    \`createdAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    \`updatedAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  // ── gefaehrdungsbeurteilungen ─────────────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS \`gefaehrdungsbeurteilungen\` (
+    \`id\` int NOT NULL AUTO_INCREMENT,
+    \`titel\` varchar(255) NOT NULL,
+    \`bereich\` enum('haushalt_senior','wegeunfall','ergonomie_physisch','psychisch','hygiene_infektion','sonstiges') NOT NULL,
+    \`risikobeschreibung\` text NOT NULL,
+    \`massnahmen\` text,
+    \`verantwortlich\` varchar(255),
+    \`status\` enum('offen','in_bearbeitung','erledigt') NOT NULL DEFAULT 'offen',
+    \`risikoStufe\` enum('niedrig','mittel','hoch') NOT NULL DEFAULT 'mittel',
+    \`naechstePruefung\` date,
+    \`erstelltVon\` int,
+    \`createdAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    \`updatedAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  // ── psa_ausgaben ──────────────────────────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS \`psa_ausgaben\` (
+    \`id\` int NOT NULL AUTO_INCREMENT,
+    \`mitarbeiterId\` int NOT NULL,
+    \`psaTyp\` enum('einmalhandschuhe','ffp2_maske','mund_nasen_schutz','schutzkittel','schutzbrille','desinfektionsmittel','sonstiges') NOT NULL,
+    \`groesse\` varchar(20),
+    \`menge\` int NOT NULL DEFAULT 1,
+    \`ausgabeDatum\` date NOT NULL,
+    \`rueckgabeDatum\` date,
+    \`zustand\` enum('neu','gut','beschaedigt','zurueckgegeben') NOT NULL DEFAULT 'neu',
+    \`notizen\` text,
+    \`ausgegebenVon\` int,
+    \`createdAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  // ── arbeitsmed_vorsorgen ──────────────────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS \`arbeitsmed_vorsorgen\` (
+    \`id\` int NOT NULL AUTO_INCREMENT,
+    \`mitarbeiterId\` int NOT NULL,
+    \`vorsorgeart\` enum('pflicht','angebot','wunsch') NOT NULL,
+    \`anlass\` varchar(255) NOT NULL,
+    \`faelligkeit\` date NOT NULL,
+    \`durchgefuehrtAm\` date,
+    \`arzt\` varchar(255),
+    \`ergebnis\` enum('geeignet','bedingt_geeignet','nicht_geeignet','ausstehend') NOT NULL DEFAULT 'ausstehend',
+    \`naechsteFaelligkeit\` date,
+    \`notizen\` text,
+    \`createdAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    \`updatedAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  // ── alleinarbeits_protokolle ──────────────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS \`alleinarbeits_protokolle\` (
+    \`id\` int NOT NULL AUTO_INCREMENT,
+    \`mitarbeiterId\` int NOT NULL,
+    \`kundenId\` int,
+    \`einsatzId\` int,
+    \`checkInZeit\` timestamp NULL,
+    \`checkOutZeit\` timestamp NULL,
+    \`checkInStatus\` enum('eingecheckt','ausgecheckt','ueberfaellig','notfall') NOT NULL DEFAULT 'eingecheckt',
+    \`notfallKontakt\` varchar(255),
+    \`bemerkung\` text,
+    \`createdAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  // ── arbeitssicherheit_unterweisungen ──────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS \`arbeitssicherheit_unterweisungen\` (
+    \`id\` int NOT NULL AUTO_INCREMENT,
+    \`mitarbeiterId\` int NOT NULL,
+    \`thema\` enum('notfall_erste_hilfe','hygiene_desinfektion','ergonomie_heben_tragen','deeskalation_demenz','verkehrssicherheit','psa_verwendung','alleinarbeit_schutz','biostoff_infektionsschutz','sonstiges') NOT NULL,
+    \`unterweisungsDatum\` date NOT NULL,
+    \`naechsteFaelligkeit\` date,
+    \`bestaetigt\` tinyint(1) NOT NULL DEFAULT 0,
+    \`bestaetigtAm\` timestamp NULL,
+    \`durchgefuehrtVon\` int,
+    \`inhalt\` text,
+    \`createdAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  // ── as_unterweisung_vorlagen ──────────────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS \`as_unterweisung_vorlagen\` (
+    \`id\` int NOT NULL AUTO_INCREMENT,
+    \`titel\` varchar(255) NOT NULL,
+    \`thema\` enum('notfall_erste_hilfe','hygiene_desinfektion','ergonomie_heben_tragen','deeskalation_demenz','verkehrssicherheit','psa_verwendung','alleinarbeit_schutz','biostoff_infektionsschutz','sonstiges') NOT NULL,
+    \`inhalt\` text NOT NULL,
+    \`version\` varchar(20) NOT NULL DEFAULT '1.0',
+    \`pflicht\` tinyint(1) NOT NULL DEFAULT 1,
+    \`gueltigBis\` date,
+    \`aktiv\` tinyint(1) NOT NULL DEFAULT 1,
+    \`erstelltVon\` int,
+    \`createdAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    \`updatedAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  // ── as_unterweisung_nachweise ─────────────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS \`as_unterweisung_nachweise\` (
+    \`id\` int NOT NULL AUTO_INCREMENT,
+    \`unterweisungId\` int NOT NULL,
+    \`mitarbeiterId\` int NOT NULL,
+    \`vorlagenId\` int,
+    \`unterschriftKey\` varchar(500),
+    \`unterschriftUrl\` varchar(500),
+    \`pdfKey\` varchar(500),
+    \`pdfUrl\` varchar(500),
+    \`ipAdresse\` varchar(100),
+    \`browserInfo\` varchar(500),
+    \`bestaetigtAm\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    \`inhaltSnapshot\` text,
+    \`titelSnapshot\` varchar(255),
+    \`versionSnapshot\` varchar(20),
+    \`createdAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  // ── datenschutz_audit_log ─────────────────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS \`datenschutz_audit_log\` (
+    \`id\` int NOT NULL AUTO_INCREMENT,
+    \`aktion\` varchar(80) NOT NULL,
+    \`dokumentId\` int,
+    \`dokumentTitel\` varchar(255),
+    \`adminId\` int,
+    \`adminName\` varchar(255),
+    \`details\` text,
+    \`createdAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  // ── arbeitssicherheit_audit_log ───────────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS \`arbeitssicherheit_audit_log\` (
+    \`id\` int NOT NULL AUTO_INCREMENT,
+    \`aktion\` varchar(100) NOT NULL,
+    \`bereich\` enum('gefaehrdung','psa','vorsorge','alleinarbeit','unterweisung','allgemein') NOT NULL DEFAULT 'allgemein',
+    \`referenzId\` int,
+    \`adminId\` int,
+    \`adminName\` varchar(200),
+    \`details\` text,
+    \`createdAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ];
 
 let ensureTablesRan = false;
