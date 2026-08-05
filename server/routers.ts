@@ -1892,10 +1892,22 @@ export const appRouter = router({
         rolle: z.enum(["mitarbeiter", "teamleitung", "buchhaltung", "admin"]).default("mitarbeiter"),
         telefon: z.string().optional(),
         beschaeftigungsart: z.enum(["minijob", "teilzeit", "vollzeit"]).default("minijob"),
+        urlaubstageJahr: z.number().int().min(0).max(365).optional(),
+        wochenstunden: z.number().min(0).max(168).optional(),
+        monatslohn: z.number().min(0).optional(),
+        stundenlohn: z.number().min(0).optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         const hash = await bcrypt.hash(input.passwort, 10);
-        await createMitarbeiter({ ...input, passwortHash: hash, aktiv: 1 });
+        const { wochenstunden, monatslohn, stundenlohn, ...restInput } = input;
+        await createMitarbeiter({
+          ...restInput,
+          passwortHash: hash,
+          aktiv: 1,
+          ...(wochenstunden !== undefined ? { wochenstunden: String(wochenstunden) } : {}),
+          ...(monatslohn !== undefined ? { monatslohn: String(monatslohn) } : {}),
+          ...(stundenlohn !== undefined ? { stundenlohn: String(stundenlohn) } : {}),
+        } as any);
         await createAuditLog({ mitarbeiterId: ctx.adminId, action: "ADMIN", ressource: "mitarbeiter", details: `create ${input.email}`, status: "success" });
         return { success: true };
       }),
@@ -1911,6 +1923,10 @@ export const appRouter = router({
         telefon: z.string().optional(),
         neuesPasswort: z.string().min(6).optional(),
         beschaeftigungsart: z.enum(["minijob", "teilzeit", "vollzeit"]).optional(),
+        urlaubstageJahr: z.number().int().min(0).max(365).optional(),
+        wochenstunden: z.number().min(0).max(168).optional(),
+        monatslohn: z.number().min(0).optional(),
+        stundenlohn: z.number().min(0).optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         const { id, neuesPasswort, ...data } = input;
@@ -3133,6 +3149,72 @@ export const appRouter = router({
         await notifyOwner({ title: `\u26a0\ufe0f ${rows.length} Dokument(e) laufen bald ab`, content: `Folgende Dokumente laufen in den n\u00e4chsten 30 Tagen ab:\n\n${liste}` });
         await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'ADMIN', ressource: 'compliance_erinnerung', details: `anzahl=${rows.length}`, status: 'success' });
         return { gesendet: true, anzahl: rows.length };
+      }),
+    /** Compliance-Gesamt-Quote: X von Y Mitarbeitern vollständig compliant */
+    gesamtScore: adminProcedure.query(async () => {
+      const db = await getDb();
+      if (!db) return { gesamt: 0, compliant: 0, quote: 0, ampelRot: 0, ampelGelb: 0, ampelGruen: 0 };
+      const { mitarbeiter: maTable, mitarbeiterDokumente: dokTable } = await import('../drizzle/schema.js');
+      const jetzt = new Date();
+      const in30 = new Date(jetzt.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const maListe = await db.select().from(maTable).where(eq(maTable.aktiv, 1));
+      const alleDoks = await db.select().from(dokTable);
+      let rot = 0, gelb = 0, gruen = 0;
+      for (const ma of maListe) {
+        const maDoks = alleDoks.filter((d: any) => d.mitarbeiterId === ma.id);
+        const abgelaufen = maDoks.filter((d: any) => d.ablaufdatum && new Date(d.ablaufdatum) < jetzt);
+        const baldAblaufend = maDoks.filter((d: any) => d.ablaufdatum && new Date(d.ablaufdatum) >= jetzt && new Date(d.ablaufdatum) <= in30);
+        const hatVertrag = maDoks.some((d: any) => d.typ === 'arbeitsvertrag');
+        const zertStatus = (ma as any).zertifikatStatus ?? 'nicht_angemeldet';
+        if (abgelaufen.length > 0 || !hatVertrag || zertStatus === 'nicht_angemeldet') rot++;
+        else if (baldAblaufend.length > 0 || zertStatus === 'angemeldet') gelb++;
+        else gruen++;
+      }
+      const gesamt = maListe.length;
+      return { gesamt, compliant: gruen, quote: gesamt > 0 ? Math.round((gruen / gesamt) * 100) : 0, ampelRot: rot, ampelGelb: gelb, ampelGruen: gruen };
+    }),
+    /** Monatliche Lohnkosten-Übersicht */
+    lohnkostenMonat: adminProcedure
+      .input(z.object({ monat: z.string().regex(/^\d{4}-\d{2}$/).optional() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return { monat: '', positionen: [], summe: 0 };
+        const { mitarbeiter: maTable, einsaetze: einsaetzeSchema } = await import('../drizzle/schema.js');
+        const monat = input.monat ?? new Date().toISOString().slice(0, 7);
+        const [jahr, monatNr] = monat.split('-').map(Number);
+        const maListe = await db.select().from(maTable).where(eq(maTable.aktiv, 1));
+        const monatsStart = new Date(jahr, monatNr - 1, 1);
+        const monatsEnde = new Date(jahr, monatNr, 0, 23, 59, 59);
+        const { gte } = await import('drizzle-orm');
+        const alleEinsaetze = await db.select().from(einsaetzeSchema)
+          .where(and(
+            gte(einsaetzeSchema.datum, monatsStart),
+            lte(einsaetzeSchema.datum, monatsEnde),
+            eq(einsaetzeSchema.status, 'abgeschlossen'),
+          ));
+        const positionen = maListe.map((ma: any) => {
+          const maEinsaetze = alleEinsaetze.filter((e: any) => e.mitarbeiterId === ma.id);
+          const geleisteteStunden = maEinsaetze.reduce((sum: number, e: any) => {
+            if (!e.startzeit || !e.endzeit) return sum;
+            const diff = (new Date(e.endzeit).getTime() - new Date(e.startzeit).getTime()) / (1000 * 60 * 60);
+            return sum + Math.max(0, diff);
+          }, 0);
+          const monatslohn = ma.monatslohn ?? 0;
+          const stundenlohn = ma.stundenlohn ?? 0;
+          const zuschlaege = ma.zuschlaege ?? 0;
+          const beschaeftigungsart = ma.beschaeftigungsart ?? 'minijob';
+          let lohnkosten = 0;
+          if (monatslohn > 0) lohnkosten = monatslohn + zuschlaege;
+          else if (stundenlohn > 0) lohnkosten = geleisteteStunden * stundenlohn + zuschlaege;
+          return {
+            id: ma.id, vorname: ma.vorname, nachname: ma.nachname,
+            beschaeftigungsart, monatslohn, stundenlohn, zuschlaege,
+            geleisteteStunden: Math.round(geleisteteStunden * 10) / 10,
+            lohnkosten: Math.round(lohnkosten * 100) / 100,
+          };
+        });
+        const summe = positionen.reduce((s: number, p: any) => s + p.lohnkosten, 0);
+        return { monat, positionen, summe: Math.round(summe * 100) / 100 };
       }),
     /** Berechtigungen eines eingeloggten Mitarbeiters lesen (für Portal-Durchsetzung) */
     meineBerechtigungen: portalProtected.query(async ({ ctx }) => {

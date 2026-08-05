@@ -7,13 +7,14 @@ import ComplianceAmpelTab from "./ComplianceAmpelTab";
 import ComplianceGesamtuebersicht from "./ComplianceGesamtuebersicht";
 import { ArbeitssicherheitAdminTab } from "./ArbeitssicherheitAdminTab";
 import { UnterschriftenArchivTab } from "./UnterschriftenArchivTab";
+import LohnkostenTab from "./LohnkostenTab";
 import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import BottomSheet from "@/components/BottomSheet";
 import MitarbeiterDetail from "./MitarbeiterDetail";
 
-type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo" | "preise" | "sicherheit" | "fuehrerschein" | "compliance" | "compliance-gesamt" | "arbeitssicherheit" | "unterschriften-archiv";
+type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo" | "preise" | "sicherheit" | "fuehrerschein" | "compliance" | "compliance-gesamt" | "arbeitssicherheit" | "unterschriften-archiv" | "lohnkosten";
 type PortalRolle = "mitarbeiter" | "teamleitung" | "buchhaltung" | "admin";
 
 const ROLLEN_LABEL: Record<PortalRolle, string> = {
@@ -48,6 +49,10 @@ export default function AdminPanel() {
   const [maRolle, setMaRolle] = useState<PortalRolle>("mitarbeiter");
   const [maTelefon, setMaTelefon] = useState("");
   const [maBeschaeftigung, setMaBeschaeftigung] = useState<"minijob" | "teilzeit" | "vollzeit">("minijob");
+  const [maUrlaubstage, setMaUrlaubstage] = useState<number>(24);
+  const [maWochenstunden, setMaWochenstunden] = useState<number>(0);
+  const [maMonatslohn, setMaMonatslohn] = useState<number>(0);
+  const [maStundenlohn, setMaStundenlohn] = useState<number>(0);
   // MA-Filter
   const [maSearch, setMaSearch] = useState("");
   const [maBeschFilter, setMaBeschFilter] = useState<"alle" | "minijob" | "teilzeit" | "vollzeit">("alle");
@@ -63,21 +68,25 @@ export default function AdminPanel() {
     onError: (e) => toast.error("❌ " + e.message),
   });
 
-  const resetMaForm = () => { setEditMa(null); setMaVorname(""); setMaNachname(""); setMaEmail(""); setMaPasswort(""); setMaRolle("mitarbeiter"); setMaTelefon(""); setMaBeschaeftigung("minijob"); };
+  const resetMaForm = () => { setEditMa(null); setMaVorname(""); setMaNachname(""); setMaEmail(""); setMaPasswort(""); setMaRolle("mitarbeiter"); setMaTelefon(""); setMaBeschaeftigung("minijob"); setMaUrlaubstage(24); setMaWochenstunden(0); setMaMonatslohn(0); setMaStundenlohn(0); };
   const openEditMa = (ma: typeof maList[0]) => {
     setEditMa(ma);
     setMaVorname(ma.vorname); setMaNachname(ma.nachname); setMaEmail(ma.email);
     setMaRolle(ma.rolle); setMaTelefon(ma.telefon || "");
     setMaBeschaeftigung(((ma as any).beschaeftigungsart as "minijob" | "teilzeit" | "vollzeit") || "minijob");
+    setMaUrlaubstage((ma as any).urlaubstageJahr ?? 24);
+    setMaWochenstunden((ma as any).wochenstunden ?? 0);
+    setMaMonatslohn((ma as any).monatslohn ?? 0);
+    setMaStundenlohn((ma as any).stundenlohn ?? 0);
     setMaPasswort(""); setMaSheet(true);
   };
   const saveMa = () => {
     if (!maVorname || !maNachname || !maEmail) { toast.error("Pflichtfelder ausfüllen!"); return; }
     if (editMa) {
-      updateMa.mutate({ id: editMa.id, vorname: maVorname, nachname: maNachname, email: maEmail, rolle: maRolle, telefon: maTelefon, beschaeftigungsart: maBeschaeftigung, ...(maPasswort ? { neuesPasswort: maPasswort } : {}) });
+      updateMa.mutate({ id: editMa.id, vorname: maVorname, nachname: maNachname, email: maEmail, rolle: maRolle, telefon: maTelefon, beschaeftigungsart: maBeschaeftigung, urlaubstageJahr: maUrlaubstage, wochenstunden: maWochenstunden, monatslohn: maMonatslohn, stundenlohn: maStundenlohn, ...(maPasswort ? { neuesPasswort: maPasswort } : {}) });
     } else {
       if (!maPasswort) { toast.error("Passwort eingeben!"); return; }
-      createMa.mutate({ vorname: maVorname, nachname: maNachname, email: maEmail, passwort: maPasswort, rolle: maRolle, telefon: maTelefon, beschaeftigungsart: maBeschaeftigung });
+      createMa.mutate({ vorname: maVorname, nachname: maNachname, email: maEmail, passwort: maPasswort, rolle: maRolle, telefon: maTelefon, beschaeftigungsart: maBeschaeftigung, urlaubstageJahr: maUrlaubstage, wochenstunden: maWochenstunden, monatslohn: maMonatslohn, stundenlohn: maStundenlohn });
     }
   };
 
@@ -258,6 +267,7 @@ export default function AdminPanel() {
           { key: "compliance-gesamt" as AdminTab, label: "📊 Compliance-Gesamt" },
           { key: "arbeitssicherheit" as AdminTab, label: "⛑️ Arbeitssicherheit" },
           { key: "unterschriften-archiv" as AdminTab, label: "📋 Unterschriften-Archiv" },
+          { key: "lohnkosten" as AdminTab, label: "💰 Lohnkosten" },
         ].map((t) => (
           <button key={t.key} style={tabStyle(t.key)} onClick={() => setTab(t.key)}>{t.label}</button>
         ))}
@@ -537,13 +547,33 @@ export default function AdminPanel() {
             </select>
           </div>
         </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+          <div>
+            <label style={labelStyle}>Beschäftigungsart *</label>
+            <select value={maBeschaeftigung} onChange={(e) => setMaBeschaeftigung(e.target.value as "minijob" | "teilzeit" | "vollzeit")} style={inputStyle}>
+              <option value="minijob">🟣 Minijob</option>
+              <option value="teilzeit">🔵 Teilzeit</option>
+              <option value="vollzeit">🟢 Vollzeit</option>
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>Urlaubstage/Jahr *</label>
+            <input type="number" min={0} max={40} value={maUrlaubstage} onChange={(e) => setMaUrlaubstage(Number(e.target.value))} style={inputStyle} placeholder="24" />
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+          <div>
+            <label style={labelStyle}>Wochenstunden</label>
+            <input type="number" min={0} max={48} step={0.5} value={maWochenstunden} onChange={(e) => setMaWochenstunden(Number(e.target.value))} style={inputStyle} placeholder="20" />
+          </div>
+          <div>
+            <label style={labelStyle}>Monatslohn (€)</label>
+            <input type="number" min={0} step={0.01} value={maMonatslohn} onChange={(e) => setMaMonatslohn(Number(e.target.value))} style={inputStyle} placeholder="0.00" />
+          </div>
+        </div>
         <div style={{ marginBottom: 12 }}>
-          <label style={labelStyle}>Beschäftigungsverhältnis</label>
-          <select value={maBeschaeftigung} onChange={(e) => setMaBeschaeftigung(e.target.value as "minijob" | "teilzeit" | "vollzeit")} style={inputStyle}>
-            <option value="minijob">🟣 Minijob</option>
-            <option value="teilzeit">🔵 Teilzeit</option>
-            <option value="vollzeit">🟢 Vollzeit</option>
-          </select>
+          <label style={labelStyle}>Stundenlohn (€) – nur wenn kein Monatslohn</label>
+          <input type="number" min={0} step={0.01} value={maStundenlohn} onChange={(e) => setMaStundenlohn(Number(e.target.value))} style={inputStyle} placeholder="0.00" />
         </div>
         <button onClick={saveMa} disabled={createMa.isPending || updateMa.isPending} style={btnGreen}>
           {createMa.isPending || updateMa.isPending ? "Speichern…" : editMa ? "Änderungen speichern" : "Mitarbeiter anlegen"}
@@ -624,6 +654,9 @@ export default function AdminPanel() {
       )}
       {tab === "unterschriften-archiv" && (
         <UnterschriftenArchivTab />
+      )}
+      {tab === "lohnkosten" && (
+        <LohnkostenTab />
       )}
       <BottomSheet open={budgetSheet} onClose={() => setBudgetSheet(false)} title={budgetKunde ? `Budget: ${budgetKunde.vorname} ${budgetKunde.nachname}` : "Budget bearbeiten"}>
         {/* §45b */}

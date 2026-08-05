@@ -32,6 +32,7 @@ export default function ManagementDashboard() {
   const [auditLimit, setAuditLimit] = useState(50);
 
   const { data: statistik } = trpc.admin.statistik.useQuery({ monat }, { enabled: !!monat });
+  const { data: complianceScore } = trpc.compliance.gesamtScore.useQuery();
   const { data: auditLogs = [] } = trpc.admin.auditLogs.useQuery({ limit: auditLimit });
   const { data: maList = [] } = trpc.admin.mitarbeiterList.useQuery();
   const { data: kundenList = [] } = trpc.kunden.list.useQuery();
@@ -114,6 +115,42 @@ export default function ManagementDashboard() {
         {kpiCard("⏱", "Stunden", statistik ? parseFloat(String(statistik.stunden)).toFixed(1) : "–", monat, "#e9c46a")}
         {kpiCard("🚗", "km", statistik ? parseFloat(String(statistik.km)).toFixed(0) : "–", monat, "#f4a261")}
         {kpiCard("💶", "Vergütung", statistik ? `${parseFloat(String(statistik.verguetung)).toFixed(2)} €` : "–", monat, "#4a8c3f")}
+      </div>
+
+      {/* Compliance-KPI-Karte */}
+      <div style={{ background: "#fff", borderRadius: 14, boxShadow: "0 2px 12px rgba(0,0,0,.08)", padding: 16, marginBottom: 16 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>🚦 Compliance-Gesamt-Quote</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+          <div style={{ background: "#f0fdf4", borderRadius: 10, padding: "12px 14px", textAlign: "center" }}>
+            <div style={{ fontSize: 28, fontWeight: 900, color: "#16a34a" }}>{complianceScore?.quote ?? 0}%</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#374151" }}>Compliance-Quote</div>
+            <div style={{ fontSize: 11, color: "#6b7280" }}>{complianceScore?.compliant ?? 0} von {complianceScore?.gesamt ?? 0} MA</div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ background: "#fee2e2", borderRadius: 8, padding: "8px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#991b1b" }}>🔴 Kritisch</span>
+              <span style={{ fontSize: 16, fontWeight: 800, color: "#dc2626" }}>{complianceScore?.ampelRot ?? 0}</span>
+            </div>
+            <div style={{ background: "#fef9c3", borderRadius: 8, padding: "8px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#92400e" }}>🟡 Warnung</span>
+              <span style={{ fontSize: 16, fontWeight: 800, color: "#d97706" }}>{complianceScore?.ampelGelb ?? 0}</span>
+            </div>
+            <div style={{ background: "#f0fdf4", borderRadius: 8, padding: "8px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#166534" }}>🟢 Compliant</span>
+              <span style={{ fontSize: 16, fontWeight: 800, color: "#16a34a" }}>{complianceScore?.ampelGruen ?? 0}</span>
+            </div>
+          </div>
+        </div>
+        {/* Fortschrittsbalken */}
+        {complianceScore && complianceScore.gesamt > 0 && (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ height: 10, borderRadius: 5, background: "#f3f4f6", overflow: "hidden", display: "flex" }}>
+              <div style={{ width: `${(complianceScore.ampelGruen / complianceScore.gesamt) * 100}%`, background: "#16a34a", transition: "width .4s" }} />
+              <div style={{ width: `${(complianceScore.ampelGelb / complianceScore.gesamt) * 100}%`, background: "#f59e0b", transition: "width .4s" }} />
+              <div style={{ width: `${(complianceScore.ampelRot / complianceScore.gesamt) * 100}%`, background: "#dc2626", transition: "width .4s" }} />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Trend-Chart: Einsätze letzte 6 Monate */}

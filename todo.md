@@ -929,3 +929,12 @@
 - [x] Frontend Admin: Urlaub-Tab in Mitarbeiterakte zeigt vollständigen Verlauf + Konto-Anpassung
 
 - [x] TypeScript: 0 Fehler
+
+## 3 Features: MA-Formular + Compliance-KPI + Lohnkosten (05.08.2026)
+- [x] Feature 1: MA-Anlegen-Formular – Beschäftigungsart, Urlaubstage/Jahr, Wochenstunden als Pflichtfelder
+- [x] Feature 1: MA-Anlegen-Formular – Abschnitt "Vergütung" (Monatslohn/Stundenlohn, Zuschläge)
+- [x] Feature 2: Backend: mitarbeiter.complianceScore – Gesamt-Quote (X/9 compliant)
+- [x] Feature 2: Management-Dashboard – KPI-Karte "Compliance-Quote" mit Fortschrittsbalken
+- [x] Feature 3: Backend: mitarbeiter.lohnkostenMonat – Monatslöhne + Stundenlöhne × geleistete Stunden
+- [x] Feature 3: Admin-Panel – neuer Tab "💰 Lohnkosten" mit Tabelle + Balkendiagramm
+- [x] TypeScript: 0 Fehler
