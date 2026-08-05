@@ -27,6 +27,7 @@ import {
   getAllMitarbeiter,
   createMitarbeiter,
   updateMitarbeiter,
+  deleteMitarbeiter,
   getAllKunden,
   getKundeById,
   createKunde,
@@ -1956,6 +1957,23 @@ export const appRouter = router({
         return { success: true };
       }),
 
+    /** Mitarbeiter endgültig löschen (Hard-Delete) */
+    mitarbeiterDelete: adminProcedure
+      .input(z.object({
+        id: z.number().int().positive(),
+        bestaetigung: z.string().min(1), // Muss dem Namen des Mitarbeiters entsprechen
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const ma = await getMitarbeiterById(input.id);
+        if (!ma) throw new TRPCError({ code: 'NOT_FOUND', message: 'Mitarbeiter nicht gefunden.' });
+        const erwartet = `${ma.vorname} ${ma.nachname}`.toLowerCase().trim();
+        if (input.bestaetigung.toLowerCase().trim() !== erwartet) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Bestätigung stimmt nicht mit dem Namen überein.' });
+        }
+        await deleteMitarbeiter(input.id);
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'ADMIN', ressource: 'mitarbeiter', details: `HARD-DELETE id=${input.id} name=${ma.vorname} ${ma.nachname}`, status: 'success' });
+        return { success: true };
+      }),
     /** Mitarbeiter-Berechtigungen lesen */
     getBerechtigungen: adminProcedure
       .input(z.object({ mitarbeiterId: z.number().int().positive() }))

@@ -946,3 +946,10 @@
 - [x] Feature 3: Management-Dashboard – Lohnkosten-Trend Liniendiagramm (letzte 6 Monate)
 - [x] Feature 3: Backend: compliance.lohnkostenTrend – Summe je Monat für letzte 6 Monate
 - [x] TypeScript: 0 Fehler
+
+## MA-Anlegen + Löschen (05.08.2026)
+- [x] Backend: mitarbeiterDelete Procedure (Hard-Delete mit Audit-Log)
+- [x] AdminPanel: "Neu anlegen"-Button öffnet vollständiges BottomSheet (alle Felder sichtbar)
+- [x] AdminPanel: Lösch-Button pro Mitarbeiter mit Bestätigungsdialog (Name eintippen)
+- [x] AdminPanel: Nach Anlegen/Löschen Liste automatisch aktualisieren
+- [x] TypeScript: 0 Fehler

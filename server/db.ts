@@ -135,6 +135,15 @@ export async function updateMitarbeiter(id: number, data: Partial<InsertMitarbei
   if (!db) throw new Error("DB not available");
   await db.update(mitarbeiter).set(data).where(eq(mitarbeiter.id, id));
 }
+export async function deleteMitarbeiter(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  // Kundenzuüdnungen zuerst löschen (FK-Constraint)
+  const { kundenZuordnung } = await import('../drizzle/schema.js');
+  await db.delete(kundenZuordnung).where(eq(kundenZuordnung.mitarbeiterId, id));
+  // Dann Mitarbeiter löschen
+  await db.delete(mitarbeiter).where(eq(mitarbeiter.id, id));
+}
 
 // ── KUNDEN ───────────────────────────────────────────
 export async function getAllKunden() {

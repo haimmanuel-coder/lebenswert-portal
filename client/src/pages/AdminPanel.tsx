@@ -69,6 +69,13 @@ export default function AdminPanel() {
   });
 
   const resetMaForm = () => { setEditMa(null); setMaVorname(""); setMaNachname(""); setMaEmail(""); setMaPasswort(""); setMaRolle("mitarbeiter"); setMaTelefon(""); setMaBeschaeftigung("minijob"); setMaUrlaubstage(24); setMaWochenstunden(0); setMaMonatslohn(0); setMaStundenlohn(0); };
+  // ── Löschen ──────────────────────────────────────────
+  const [deleteDialogMa, setDeleteDialogMa] = useState<{ id: number; vorname: string; nachname: string } | null>(null);
+  const [deleteBestaetigung, setDeleteBestaetigung] = useState("");
+  const deleteMa = trpc.admin.mitarbeiterDelete.useMutation({
+    onSuccess: () => { refetchMa(); toast.success("🗑️ Mitarbeiter gelöscht"); setDeleteDialogMa(null); setDeleteBestaetigung(""); },
+    onError: (e) => toast.error("❌ " + e.message),
+  });
   const openEditMa = (ma: typeof maList[0]) => {
     setEditMa(ma);
     setMaVorname(ma.vorname); setMaNachname(ma.nachname); setMaEmail(ma.email);
@@ -352,6 +359,9 @@ export default function AdminPanel() {
                   <button onClick={() => { updateMa.mutate({ id: ma.id, aktiv: ma.aktiv ? 0 : 1 }); }} style={{ padding: "4px 10px", background: ma.aktiv ? "#fee2e2" : "#e8f5e4", color: ma.aktiv ? "#991b1b" : "#4a8c3f", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                     {ma.aktiv ? "Deaktivieren" : "Aktivieren"}
                   </button>
+                  <button onClick={() => { setDeleteDialogMa({ id: ma.id, vorname: ma.vorname, nachname: ma.nachname }); setDeleteBestaetigung(""); }} style={{ padding: "4px 10px", background: "#7f1d1d", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                    🗑️ Löschen
+                  </button>
                 </div>
               </div>
             </div>
@@ -579,6 +589,44 @@ export default function AdminPanel() {
           {createMa.isPending || updateMa.isPending ? "Speichern…" : editMa ? "Änderungen speichern" : "Mitarbeiter anlegen"}
         </button>
       </BottomSheet>
+
+      {/* ── Lösch-Bestätigungsdialog ── */}
+      {deleteDialogMa && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: 24, maxWidth: 420, width: "100%", boxShadow: "0 8px 40px rgba(0,0,0,.25)" }}>
+            <div style={{ fontSize: 22, marginBottom: 8 }}>⚠️ Mitarbeiter endgültig löschen</div>
+            <p style={{ fontSize: 14, color: "#374151", marginBottom: 16, lineHeight: 1.6 }}>
+              Du bist dabei, <strong>{deleteDialogMa.vorname} {deleteDialogMa.nachname}</strong> dauerhaft zu löschen.<br />
+              Diese Aktion kann <strong>nicht rückgängig</strong> gemacht werden.<br /><br />
+              Tippe zur Bestätigung den vollständigen Namen ein:
+            </p>
+            <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "8px 12px", marginBottom: 12, fontWeight: 700, color: "#991b1b", fontSize: 14 }}>
+              {deleteDialogMa.vorname} {deleteDialogMa.nachname}
+            </div>
+            <input
+              value={deleteBestaetigung}
+              onChange={(e) => setDeleteBestaetigung(e.target.value)}
+              placeholder="Vollständigen Namen eingeben…"
+              style={{ width: "100%", padding: "10px 12px", border: "2px solid #e5e7eb", borderRadius: 8, fontSize: 14, marginBottom: 16, boxSizing: "border-box" }}
+            />
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={() => { setDeleteDialogMa(null); setDeleteBestaetigung(""); }}
+                style={{ flex: 1, padding: "10px 0", background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={() => deleteMa.mutate({ id: deleteDialogMa.id, bestaetigung: deleteBestaetigung })}
+                disabled={deleteBestaetigung.toLowerCase().trim() !== `${deleteDialogMa.vorname} ${deleteDialogMa.nachname}`.toLowerCase().trim() || deleteMa.isPending}
+                style={{ flex: 1, padding: "10px 0", background: deleteBestaetigung.toLowerCase().trim() === `${deleteDialogMa.vorname} ${deleteDialogMa.nachname}`.toLowerCase().trim() ? "#7f1d1d" : "#d1d5db", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: deleteBestaetigung.toLowerCase().trim() === `${deleteDialogMa.vorname} ${deleteDialogMa.nachname}`.toLowerCase().trim() ? "pointer" : "not-allowed" }}
+              >
+                {deleteMa.isPending ? "Löschen…" : "🗑️ Endgültig löschen"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Kunden-Sheet ── */}
       <BottomSheet open={kdSheet} onClose={() => { setKdSheet(false); resetKdForm(); }} title={editKd ? "Kunde bearbeiten" : "Neuer Kunde"}>
