@@ -6,6 +6,7 @@ import { FuehrerscheinCheckTab } from "./FuehrerscheinCheckTab";
 import ComplianceAmpelTab from "./ComplianceAmpelTab";
 import ComplianceGesamtuebersicht from "./ComplianceGesamtuebersicht";
 import { ArbeitssicherheitAdminTab } from "./ArbeitssicherheitAdminTab";
+import ArbeitssicherheitDashboard from "./ArbeitssicherheitDashboard";
 import { UnterschriftenArchivTab } from "./UnterschriftenArchivTab";
 import LohnkostenTab from "./LohnkostenTab";
 import { useState, useEffect } from "react";
@@ -15,7 +16,7 @@ import { toast } from "sonner";
 import BottomSheet from "@/components/BottomSheet";
 import MitarbeiterDetail from "./MitarbeiterDetail";
 
-type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo" | "preise" | "sicherheit" | "fuehrerschein" | "compliance" | "compliance-gesamt" | "arbeitssicherheit" | "unterschriften-archiv" | "lohnkosten";
+type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo" | "preise" | "sicherheit" | "fuehrerschein" | "compliance" | "compliance-gesamt" | "arbeitssicherheit" | "as-dashboard" | "unterschriften-archiv" | "lohnkosten";
 type PortalRolle = "mitarbeiter" | "teamleitung" | "buchhaltung" | "admin";
 
 const ROLLEN_LABEL: Record<PortalRolle, string> = {
@@ -320,6 +321,7 @@ export default function AdminPanel() {
           { key: "compliance" as AdminTab, label: "🚦 Compliance-Ampel" },
           { key: "compliance-gesamt" as AdminTab, label: "📊 Compliance-Gesamt" },
           { key: "arbeitssicherheit" as AdminTab, label: "⛑️ Arbeitssicherheit" },
+          { key: "as-dashboard" as AdminTab, label: "🚦 AS-Dashboard" },
           { key: "unterschriften-archiv" as AdminTab, label: "📋 Unterschriften-Archiv" },
           { key: "lohnkosten" as AdminTab, label: "💰 Lohnkosten" },
         ].map((t) => (
@@ -750,6 +752,9 @@ export default function AdminPanel() {
       )}
       {tab === "arbeitssicherheit" && (
         <ArbeitssicherheitAdminTab />
+      )}
+      {tab === "as-dashboard" && (
+        <ArbeitssicherheitDashboard />
       )}
       {tab === "unterschriften-archiv" && (
         <UnterschriftenArchivTab />

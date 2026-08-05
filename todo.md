@@ -961,3 +961,13 @@
 - [x] CSV: UTF-8 BOM, Semikolon-getrennt, DATEV-kompatibel
 - [x] Excel: Titelzeile fett, Spaltenbreiten automatisch, Dateiname mit Datum
 - [x] TypeScript: 0 Fehler
+
+## Arbeitssicherheits-Dashboard (05.08.2026)
+- [x] Backend: arbeitssicherheit.dashboard Procedure (KPI-Zahlen, Ampel-Status)
+- [x] Backend: arbeitssicherheit.unterweisungenFaellig Procedure (nach MA gruppiert)
+- [x] Backend: arbeitssicherheit.gefaehrdungenFaellig Procedure (offene + überfällige)
+- [x] ArbeitssicherheitDashboard.tsx: KPI-Karten (Grün/Gelb/Rot Ampel-Zähler)
+- [x] ArbeitssicherheitDashboard.tsx: Unterweisungs-Tabelle mit Ampel-Badges pro MA
+- [x] ArbeitssicherheitDashboard.tsx: Gefährdungsbeurteilungs-Tabelle mit Risikostufe
+- [x] Navigation: AS-Dashboard in AdminPanel-Tabs + App.tsx Route einbinden
+- [x] TypeScript: 0 Fehler
