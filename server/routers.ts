@@ -20,7 +20,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { sql, eq, desc, and, isNotNull, lte, isNull } from "drizzle-orm";
 import { getDb } from "./db";
-import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, einsatzAenderungen, kunden as kundenTable, notifications as notificationsTable, ersteHilfeKurse } from "../drizzle/schema";
+import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, einsatzAenderungen, kunden as kundenTable, notifications as notificationsTable, ersteHilfeKurse, mitarbeiterBerechtigungen as mbTable } from "../drizzle/schema";
 import {
   getMitarbeiterByEmail,
   getMitarbeiterById,
@@ -2002,7 +2002,7 @@ export const appRouter = router({
       .query(async ({ input }) => {
         const db = await getDb();
         if (!db) return [];
-        const { mitarbeiterBerechtigungen: mbTable } = await import('../drizzle/schema.js');
+        // mbTable ist statisch importiert
         return db.select().from(mbTable).where(eq(mbTable.mitarbeiterId, input.mitarbeiterId));
       }),
 
@@ -2018,7 +2018,7 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
-        const { mitarbeiterBerechtigungen: mbTable } = await import('../drizzle/schema.js');
+        // mbTable ist statisch importiert
         // Alle bisherigen Berechtigungen dieses MA löschen und neu setzen
         await db.delete(mbTable).where(eq(mbTable.mitarbeiterId, input.mitarbeiterId));
         if (input.berechtigungen.length > 0) {
@@ -3305,7 +3305,7 @@ export const appRouter = router({
     meineBerechtigungen: portalProtected.query(async ({ ctx }) => {
       const db = await getDb();
       if (!db) return [];
-      const { mitarbeiterBerechtigungen: mbTable } = await import('../drizzle/schema.js');
+      // mbTable ist statisch importiert
       return db.select().from(mbTable).where(eq(mbTable.mitarbeiterId, ctx.mitarbeiterId));
     }),
   }),
