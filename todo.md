@@ -827,3 +827,18 @@
 ### Qualität
 - [x] TypeScript: 0 Fehler
 - [x] Tests: 86/86 bestanden
+
+## Unterweisungs-Unterschrift-Modul (05.08.2026)
+- [x] DB: unterweisungsVorlagen (id, titel, thema, inhalt, version, pflicht, gueltigBis, aktiv, erstelltVon, createdAt)
+- [x] DB: unterweisungsNachweise (id, unterweisungId, mitarbeiterId, unterschriftKey, unterschriftUrl, pdfKey, pdfUrl, ipAdresse, browserInfo, bestaetigtAm, inhaltSnapshot, titelSnapshot, versionSnapshot, createdAt)
+- [x] Backend: unterweisungNachweisRouter – vorlagen.list/listAlle/create/update/delete
+- [x] Backend: anMitarbeiterSenden – Vorlage an mehrere MA gleichzeitig senden
+- [x] Backend: bestaetigenMitUnterschrift – Canvas-PNG → S3, PDF generieren → S3, DB-Nachweis speichern
+- [x] Backend: getNachweis / adminGetNachweis – signierte S3-URL für PDF-Download
+- [x] Backend: meineNachweise / adminAlleNachweise / adminNachweiseByMitarbeiter
+- [x] PDF-Generierung: jsPDF, Lebenswert-Branding, Unterschrift eingebettet, IP+Browser-Metadaten, Fußzeile
+- [x] Frontend Admin: UnterweisungNachweisAdminTab.tsx (Vorlagen, Senden, Nachweise)
+- [x] Frontend Admin: ArbeitssicherheitAdminTab – neuer Sub-Tab "📜 Nachweise"
+- [x] Frontend MA: UnterschriftDialog.tsx (Canvas-Pad, Inhalt anzeigen, rechtlicher Hinweis)
+- [x] Frontend MA: MeineArbeitssicherheit.tsx – "✍️ Lesen & Unterschreiben" + "📄 Nachweis-PDF"
+- [x] TypeScript: 0 Fehler | Tests: 86/86 bestanden

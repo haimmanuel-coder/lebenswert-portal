@@ -1133,3 +1133,55 @@ export const arbeitssicherheitUnterweisungen = mysqlTable("arbeitssicherheit_unt
 });
 export type ArbeitssicherheitUnterweisung = typeof arbeitssicherheitUnterweisungen.$inferSelect;
 export type InsertArbeitssicherheitUnterweisung = typeof arbeitssicherheitUnterweisungen.$inferInsert;
+
+/** Unterweisungs-Vorlagen (Admin erstellt Vorlagen mit vollständigem Inhalt) */
+export const unterweisungsVorlagen = mysqlTable("as_unterweisung_vorlagen", {
+  id: int("id").autoincrement().primaryKey(),
+  titel: varchar("titel", { length: 255 }).notNull(),
+  thema: mysqlEnum("thema", [
+    "notfall_erste_hilfe",
+    "hygiene_desinfektion",
+    "ergonomie_heben_tragen",
+    "deeskalation_demenz",
+    "verkehrssicherheit",
+    "psa_verwendung",
+    "alleinarbeit_schutz",
+    "biostoff_infektionsschutz",
+    "sonstiges",
+  ]).notNull(),
+  inhalt: text("inhalt").notNull(),
+  version: varchar("version", { length: 20 }).default("1.0").notNull(),
+  pflicht: boolean("pflicht").default(true).notNull(),
+  gueltigBis: date("gueltigBis"),
+  aktiv: boolean("aktiv").default(true).notNull(),
+  erstelltVon: int("erstelltVon"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type UnterweisungsVorlage = typeof unterweisungsVorlagen.$inferSelect;
+export type InsertUnterweisungsVorlage = typeof unterweisungsVorlagen.$inferInsert;
+
+/** Unterweisungs-Nachweise (rechtssichere Bestätigungen mit Unterschrift + PDF in S3) */
+export const unterweisungsNachweise = mysqlTable("as_unterweisung_nachweise", {
+  id: int("id").autoincrement().primaryKey(),
+  unterweisungId: int("unterweisungId").notNull(),
+  mitarbeiterId: int("mitarbeiterId").notNull(),
+  vorlagenId: int("vorlagenId"),
+  // Unterschrift (als PNG in S3 gespeichert)
+  unterschriftKey: varchar("unterschriftKey", { length: 500 }),
+  unterschriftUrl: varchar("unterschriftUrl", { length: 500 }),
+  // PDF-Nachweis (in S3 gespeichert, unveränderlich)
+  pdfKey: varchar("pdfKey", { length: 500 }),
+  pdfUrl: varchar("pdfUrl", { length: 500 }),
+  // Rechtssichere Metadaten
+  ipAdresse: varchar("ipAdresse", { length: 100 }),
+  browserInfo: varchar("browserInfo", { length: 500 }),
+  bestaetigtAm: timestamp("bestaetigtAm").defaultNow().notNull(),
+  // Snapshot des Inhalts zum Zeitpunkt der Bestätigung (unveränderlich)
+  inhaltSnapshot: text("inhaltSnapshot"),
+  titelSnapshot: varchar("titelSnapshot", { length: 255 }),
+  versionSnapshot: varchar("versionSnapshot", { length: 20 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type UnterweisungsNachweis = typeof unterweisungsNachweise.$inferSelect;
+export type InsertUnterweisungsNachweis = typeof unterweisungsNachweise.$inferInsert;

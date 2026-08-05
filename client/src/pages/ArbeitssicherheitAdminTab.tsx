@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
+import UnterweisungNachweisAdminTab from "./UnterweisungNachweisAdminTab";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -68,7 +69,7 @@ const PSA_LABELS: Record<string, string> = {
 
 // ─── Sub-Tabs ────────────────────────────────────────────────────────────────
 
-type SubTab = "dashboard" | "gefaehrdung" | "psa" | "vorsorge" | "unterweisungen" | "alleinarbeit";
+type SubTab = "dashboard" | "gefaehrdung" | "psa" | "vorsorge" | "unterweisungen" | "nachweise" | "alleinarbeit";
 
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 
@@ -506,6 +507,7 @@ export function ArbeitssicherheitAdminTab() {
     { key: "psa", label: "🦺 PSA-Ausgaben" },
     { key: "vorsorge", label: "🏥 Arbeitsmed. Vorsorge", badge: kpis?.ueberfaelligeVorsorgen },
     { key: "unterweisungen", label: "📋 Unterweisungen", badge: kpis?.offeneUnterweisungen },
+    { key: "nachweise", label: "📜 Nachweise" },
     { key: "alleinarbeit", label: "👤 Alleinarbeit-Monitor", badge: kpis?.offeneAlleinarbeit },
   ];
 
@@ -533,6 +535,7 @@ export function ArbeitssicherheitAdminTab() {
       {subTab === "psa" && <PsaTab />}
       {subTab === "vorsorge" && <VorsorgeTab />}
       {subTab === "unterweisungen" && <UnterweisungenTab />}
+      {subTab === "nachweise" && <UnterweisungNachweisAdminTab />}
       {subTab === "alleinarbeit" && <AlleinarbeitTab />}
     </div>
   );

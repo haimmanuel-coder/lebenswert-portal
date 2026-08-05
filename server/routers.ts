@@ -122,6 +122,7 @@ import { budgetRouter } from "./routers/budgetRouter";
 import { fahrtenAbrechnungRouter } from "./routers/fahrtenAbrechnungRouter";
 import { sicherheitsunterweisungRouter } from "./routers/sicherheitsunterweisungRouter";
 import { arbeitssicherheitRouter } from "./routers/arbeitssicherheitRouter";
+import { unterweisungNachweisRouter } from "./routers/unterweisungNachweisRouter";
 import { notifyOwner } from "./_core/notification";
 import {
   savePushSubscription,
@@ -3052,6 +3053,7 @@ export const appRouter = router({
   import: importRouter,
   sicherheitsunterweisung: sicherheitsunterweisungRouter,
   arbeitssicherheit: arbeitssicherheitRouter,
+  unterweisungNachweis: unterweisungNachweisRouter,
 });
 
 export type AppRouter = typeof appRouter;

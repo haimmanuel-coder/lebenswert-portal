@@ -2,6 +2,7 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import UnterschriftDialog from "@/components/UnterschriftDialog";
 
 // ─── Ampel-Hilfsfunktionen ────────────────────────────────────────────────────
 
@@ -62,6 +63,25 @@ export default function MeineArbeitssicherheit() {
     onSuccess: () => { utils.arbeitssicherheit.unterweisung.meineUnterweisungen.invalidate(); toast.success("Unterweisung bestätigt ✅"); },
     onError: (e) => toast.error(e.message),
   });
+  const bestaetigenMitUnterschrift = (trpc as any).unterweisungNachweis.bestaetigenMitUnterschrift.useMutation({
+    onSuccess: (data: any) => {
+      utils.arbeitssicherheit.unterweisung.meineUnterweisungen.invalidate();
+      toast.success("Unterweisung unterschrieben & Nachweis gespeichert ✅");
+      setUnterschriftDialogOpen(false);
+      setAktiveUnterweisung(null);
+      if (data?.pdfUrl) window.open(data.pdfUrl, "_blank");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const getNachweis = (trpc as any).unterweisungNachweis.getNachweis.useMutation({
+    onSuccess: (data: any) => {
+      if (data?.signedPdfUrl) window.open(data.signedPdfUrl, "_blank");
+      else toast.error("Kein PDF-Nachweis vorhanden");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const [unterschriftDialogOpen, setUnterschriftDialogOpen] = useState(false);
+  const [aktiveUnterweisung, setAktiveUnterweisung] = useState<any>(null);
   const checkIn = trpc.arbeitssicherheit.alleinarbeit.checkIn.useMutation({
     onSuccess: () => { utils.arbeitssicherheit.alleinarbeit.meinStatus.invalidate(); utils.arbeitssicherheit.alleinarbeit.meinVerlauf.invalidate(); toast.success("Check-in erfolgreich"); },
     onError: (e) => toast.error(e.message),
@@ -161,11 +181,18 @@ export default function MeineArbeitssicherheit() {
                       </div>
                     )}
                   </div>
-                  {!u.bestaetigt && (
-                    <Button size="sm" onClick={() => bestaetigen.mutate({ id: u.id })} style={{ marginLeft: 12, background: "#1e3a2f", color: "#fff" }}>
-                      ✅ Bestätigen
-                    </Button>
-                  )}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, marginLeft: 12, flexShrink: 0 }}>
+                    {!u.bestaetigt && (
+                      <Button size="sm" onClick={() => { setAktiveUnterweisung(u); setUnterschriftDialogOpen(true); }} style={{ background: "#1e3a2f", color: "#fff", whiteSpace: "nowrap" }}>
+                        ✍️ Lesen & Unterschreiben
+                      </Button>
+                    )}
+                    {u.bestaetigt && (
+                      <Button size="sm" variant="outline" onClick={() => getNachweis.mutate({ unterweisungId: u.id })} disabled={getNachweis.isPending} style={{ whiteSpace: "nowrap", borderColor: "#16a34a", color: "#16a34a" }}>
+                        📄 Nachweis-PDF
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             );
@@ -173,6 +200,24 @@ export default function MeineArbeitssicherheit() {
         </div>
       </div>
 
+      {/* ── Unterschrift-Dialog ────────────────────────────────────── */}
+      {aktiveUnterweisung && (
+        <UnterschriftDialog
+          open={unterschriftDialogOpen}
+          onClose={() => { setUnterschriftDialogOpen(false); setAktiveUnterweisung(null); }}
+          titel={THEMEN_LABELS[aktiveUnterweisung.thema] ?? aktiveUnterweisung.thema}
+          inhalt={aktiveUnterweisung.inhalt}
+          isPending={bestaetigenMitUnterschrift.isPending}
+          onConfirm={(unterschriftBase64) => {
+            bestaetigenMitUnterschrift.mutate({
+              unterweisungId: aktiveUnterweisung.id,
+              unterschriftBase64,
+              ipAdresse: "browser",
+              browserInfo: navigator.userAgent,
+            });
+          }}
+        />
+      )}
       {/* ── PSA ──────────────────────────────────────────────────────────── */}
       <div style={{ marginBottom: 20 }}>
         <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>🦺 Meine PSA-Ausgaben</h3>
