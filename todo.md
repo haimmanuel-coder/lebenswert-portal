@@ -842,3 +842,12 @@
 - [x] Frontend MA: UnterschriftDialog.tsx (Canvas-Pad, Inhalt anzeigen, rechtlicher Hinweis)
 - [x] Frontend MA: MeineArbeitssicherheit.tsx – "✍️ Lesen & Unterschreiben" + "📄 Nachweis-PDF"
 - [x] TypeScript: 0 Fehler | Tests: 86/86 bestanden
+
+## Bugfix: Unterschriften in PDF/Druckversion (05.08.2026)
+- [x] Audit: Alle 4 Unterschriften-Pfade vollständig analysiert
+- [x] Root Cause: getEinsaetzeWithKunden() hatte explizites select({}) ohne unterschriftMitarbeiter/unterschriftKunde
+- [x] Fix: unterschriftMitarbeiter + unterschriftKunde zu getEinsaetzeWithKunden() select hinzugefügt
+- [x] Kassenanfrage-PDF: SELECT ka.* → alle Felder korrekt (kein Fix nötig)
+- [x] Neukundenaufnahme-PDF: SELECT * → alle Felder korrekt (kein Fix nötig)
+- [x] Leistungsnachweise-PDF: getAllLeistungen() db.select() → alle Felder korrekt (kein Fix nötig)
+- [x] TypeScript: 0 Fehler

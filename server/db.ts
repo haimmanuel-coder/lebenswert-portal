@@ -254,6 +254,8 @@ export async function getEinsaetzeWithKunden(mitarbeiterId?: number) {
       status: einsaetze.status,
       anfahrtPauschale: (einsaetze as any).anfahrtPauschale,
       unterschriftFreigabeStatus: (einsaetze as any).unterschriftFreigabeStatus,
+      unterschriftMitarbeiter: einsaetze.unterschriftMitarbeiter,
+      unterschriftKunde: einsaetze.unterschriftKunde,
       createdAt: einsaetze.createdAt,
       kundeVorname: kunden.vorname,
       kundeNachname: kunden.nachname,
