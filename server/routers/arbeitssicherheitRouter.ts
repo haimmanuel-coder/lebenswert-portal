@@ -10,6 +10,7 @@ import {
   arbeitsmedVorsorgen,
   alleinarbeitsProtokolle,
   arbeitssicherheitUnterweisungen,
+  arbeitssicherheitAuditLog,
   mitarbeiter,
 } from "../../drizzle/schema.js";
 
@@ -538,5 +539,75 @@ export const arbeitssicherheitRouter = router({
       offeneAlleinarbeit: alleinarbeitRows.length,
       offeneUnterweisungen: unterweisungRows.length,
     };
+  }),
+
+  // ─── Audit-Log ────────────────────────────────────────────────────────────
+  auditLog: adminProcedure
+    .input(z.object({ limit: z.number().default(100) }).optional())
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      return db.select().from(arbeitssicherheitAuditLog)
+        .orderBy(desc(arbeitssicherheitAuditLog.createdAt))
+        .limit(input?.limit ?? 100);
+    }),
+
+  // ─── Compliance-Gesamtübersicht ───────────────────────────────────────────────
+  complianceGesamt: adminProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return [];
+    const today = todayStr();
+    const in60 = new Date(); in60.setDate(in60.getDate() + 60);
+    const in60Str = in60.toISOString().split("T")[0];
+
+    const allMA = await db.select({
+      id: mitarbeiter.id,
+      vorname: mitarbeiter.vorname,
+      nachname: mitarbeiter.nachname,
+      urlaubstageJahr: mitarbeiter.urlaubstageJahr,
+      urlaubstageVerbraucht: mitarbeiter.urlaubstageVerbraucht,
+    }).from(mitarbeiter).where(eq(mitarbeiter.aktiv, 1));
+
+    const [unterweisungen, vorsorgen, psa] = await Promise.all([
+      db.select().from(arbeitssicherheitUnterweisungen),
+      db.select().from(arbeitsmedVorsorgen),
+      db.select().from(psaAusgaben),
+    ]);
+
+    return allMA.map(ma => {
+      const maUnterweisungen = unterweisungen.filter(u => u.mitarbeiterId === ma.id);
+      const offeneUnterweisungen = maUnterweisungen.filter(u => !u.bestaetigt).length;
+      const baldFaelligeUnterweisungen = maUnterweisungen.filter(u =>
+        u.naechsteFaelligkeit && String(u.naechsteFaelligkeit) <= in60Str
+      ).length;
+
+      const maVorsorgen = vorsorgen.filter(v => v.mitarbeiterId === ma.id);
+      const ueberfaelligeVorsorgen = maVorsorgen.filter(v =>
+        v.faelligkeit && String(v.faelligkeit) <= today && v.ergebnis === "ausstehend"
+      ).length;
+
+      const maPsa = psa.filter(p => p.mitarbeiterId === ma.id && !p.rueckgabeDatum);
+
+      const urlaubRest = (ma.urlaubstageJahr ?? 24) - (ma.urlaubstageVerbraucht ?? 0);
+
+      // Gesamt-Ampel: rot wenn irgendwas kritisch, gelb wenn bald fällig, grün wenn alles OK
+      let ampel: "gruen" | "gelb" | "rot" = "gruen";
+      if (offeneUnterweisungen > 0 || ueberfaelligeVorsorgen > 0) ampel = "rot";
+      else if (baldFaelligeUnterweisungen > 0) ampel = "gelb";
+
+      return {
+        mitarbeiterId: ma.id,
+        vorname: ma.vorname,
+        nachname: ma.nachname,
+        ampel,
+        offeneUnterweisungen,
+        baldFaelligeUnterweisungen,
+        ueberfaelligeVorsorgen,
+        aktivePsaArtikel: maPsa.length,
+        urlaubRest,
+        urlaubJahr: ma.urlaubstageJahr ?? 24,
+        urlaubVerbraucht: ma.urlaubstageVerbraucht ?? 0,
+      };
+    });
   }),
 });

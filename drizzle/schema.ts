@@ -65,8 +65,33 @@ export const mitarbeiter = mysqlTable("mitarbeiter", {
   notizen: text("notizen"),
   // Jahresurlaubskonto
   urlaubstageJahr: int("urlaubstageJahr").default(24).notNull(),
+  urlaubstageVerbraucht: int("urlaubstageVerbraucht").default(0).notNull(),
   // Fahrzeug (P3: Dienstwagen-Flag)
   hatDienstwagen: boolean("hatDienstwagen").default(false).notNull(),
+  // Vergütung & Vertrag
+  wochenstunden: decimal("wochenstunden", { precision: 5, scale: 2 }).default("0"),
+  monatslohn: decimal("monatslohn", { precision: 10, scale: 2 }).default("0"),
+  stundenlohn: decimal("stundenlohn", { precision: 8, scale: 2 }).default("0"),
+  zuschlaege: text("zuschlaege"),
+  probezeit: int("probezeit").default(6),
+  probeEnde: date("probeEnde"),
+  kuendigungsfrist: int("kuendigungsfrist").default(4),
+  arbeitszeitmodell: mysqlEnum("arbeitszeitmodell", ["flexibel", "fest", "schicht"]).default("flexibel"),
+  // Sozialversicherung & Steuer
+  sozialversicherungsnummer: varchar("sozialversicherungsnummer", { length: 20 }),
+  steuerklasse: int("steuerklasse").default(1),
+  steueridentnummer: varchar("steueridentnummer", { length: 20 }),
+  // Bankdaten
+  iban: varchar("iban", { length: 34 }),
+  bic: varchar("bic", { length: 11 }),
+  bankname: varchar("bankname", { length: 100 }),
+  // Krankenversicherung
+  krankenkasse: varchar("krankenkasse", { length: 100 }),
+  krankenversicherungsart: mysqlEnum("krankenversicherungsart", ["gesetzlich", "privat"]).default("gesetzlich"),
+  // Notfallkontakt
+  notfallkontaktName: varchar("notfallkontaktName", { length: 100 }),
+  notfallkontaktTelefon: varchar("notfallkontaktTelefon", { length: 50 }),
+  notfallkontaktBeziehung: varchar("notfallkontaktBeziehung", { length: 50 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -1198,3 +1223,16 @@ export const datenschutzAuditLog = mysqlTable("datenschutz_audit_log", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type DatenschutzAuditLog = typeof datenschutzAuditLog.$inferSelect;
+
+// ── Arbeitssicherheits-Audit-Log ─────────────────────────────────────────────
+export const arbeitssicherheitAuditLog = mysqlTable("arbeitssicherheit_audit_log", {
+  id: int("id").autoincrement().primaryKey(),
+  aktion: varchar("aktion", { length: 100 }).notNull(),
+  bereich: mysqlEnum("bereich", ["gefaehrdung", "psa", "vorsorge", "alleinarbeit", "unterweisung", "allgemein"]).notNull().default("allgemein"),
+  referenzId: int("referenzId"),
+  adminId: int("adminId"),
+  adminName: varchar("adminName", { length: 200 }),
+  details: text("details"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ArbeitssicherheitAuditLog = typeof arbeitssicherheitAuditLog.$inferSelect;

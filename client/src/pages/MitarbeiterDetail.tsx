@@ -518,6 +518,25 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
                     eintrittsdatum: ma.eintrittsdatum ? String(ma.eintrittsdatum).split("T")[0] : "",
                     position: ma.position ?? "", notizen: ma.notizen ?? "",
                     beschaeftigungsart: beschArt,
+                    wochenstunden: String((ma as any).wochenstunden ?? ""),
+                    monatslohn: String((ma as any).monatslohn ?? ""),
+                    stundenlohn: String((ma as any).stundenlohn ?? ""),
+                    zuschlaege: (ma as any).zuschlaege ?? "",
+                    probezeit: String((ma as any).probezeit ?? ""),
+                    probeEnde: (ma as any).probeEnde ? String((ma as any).probeEnde).split("T")[0] : "",
+                    kuendigungsfrist: String((ma as any).kuendigungsfrist ?? ""),
+                    arbeitszeitmodell: (ma as any).arbeitszeitmodell ?? "",
+                    sozialversicherungsnummer: (ma as any).sozialversicherungsnummer ?? "",
+                    steuerklasse: String((ma as any).steuerklasse ?? ""),
+                    steueridentnummer: (ma as any).steueridentnummer ?? "",
+                    iban: (ma as any).iban ?? "",
+                    bic: (ma as any).bic ?? "",
+                    bankname: (ma as any).bankname ?? "",
+                    krankenkasse: (ma as any).krankenkasse ?? "",
+                    krankenversicherungsart: (ma as any).krankenversicherungsart ?? "",
+                    notfallkontaktName: (ma as any).notfallkontaktName ?? "",
+                    notfallkontaktTelefon: (ma as any).notfallkontaktTelefon ?? "",
+                    notfallkontaktBeziehung: (ma as any).notfallkontaktBeziehung ?? "",
                   });
                   setEditStamm(true);
                 }}>
@@ -622,6 +641,26 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
                     <div><label className="text-xs text-muted-foreground">Eintrittsdatum</label>
                       <Input type="date" value={stammForm.eintrittsdatum ?? ""} onChange={e => setStammForm(f => ({ ...f, eintrittsdatum: e.target.value }))} className="mt-1" /></div>
                   </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div><label className="text-xs text-muted-foreground">Wochenstunden</label>
+                      <Input type="number" step="0.5" value={stammForm.wochenstunden ?? ""} onChange={e => setStammForm(f => ({ ...f, wochenstunden: e.target.value }))} className="mt-1" placeholder="z.B. 20" /></div>
+                    <div><label className="text-xs text-muted-foreground">Arbeitszeitmodell</label>
+                      <select value={stammForm.arbeitszeitmodell ?? ""} onChange={e => setStammForm(f => ({ ...f, arbeitszeitmodell: e.target.value }))}
+                        className="w-full mt-1 p-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                        <option value="">— wählen —</option>
+                        <option value="flexibel">Flexibel</option>
+                        <option value="fest">Feste Arbeitszeiten</option>
+                        <option value="schicht">Schichtdienst</option>
+                      </select></div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div><label className="text-xs text-muted-foreground">Probezeit (Monate)</label>
+                      <Input type="number" value={stammForm.probezeit ?? ""} onChange={e => setStammForm(f => ({ ...f, probezeit: e.target.value }))} className="mt-1" placeholder="z.B. 6" /></div>
+                    <div><label className="text-xs text-muted-foreground">Probezeit-Ende</label>
+                      <Input type="date" value={stammForm.probeEnde ?? ""} onChange={e => setStammForm(f => ({ ...f, probeEnde: e.target.value }))} className="mt-1" /></div>
+                  </div>
+                  <div><label className="text-xs text-muted-foreground">Kündigungsfrist (Tage)</label>
+                    <Input type="number" value={stammForm.kuendigungsfrist ?? ""} onChange={e => setStammForm(f => ({ ...f, kuendigungsfrist: e.target.value }))} className="mt-1" placeholder="z.B. 30" /></div>
                   <div><label className="text-xs text-muted-foreground">Notizen</label>
                     <textarea value={stammForm.notizen ?? ""} onChange={e => setStammForm(f => ({ ...f, notizen: e.target.value }))}
                       className="w-full mt-1 p-2 border rounded-lg text-sm resize-none h-20 focus:outline-none focus:ring-2 focus:ring-primary" /></div>
@@ -633,7 +672,128 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
                     <span>Eintritt: {ma.eintrittsdatum ? new Date(ma.eintrittsdatum).toLocaleDateString("de-DE") : "—"}</span></div>
                   {ma.geburtsdatum && <div className="flex items-center gap-2 text-sm"><Calendar className="w-4 h-4 text-primary" />
                     <span>Geb.: {new Date(ma.geburtsdatum).toLocaleDateString("de-DE")}</span></div>}
+                  {(ma as any).wochenstunden && <div className="flex items-center gap-2 text-sm"><span className="text-muted-foreground">⏱</span><span>{(ma as any).wochenstunden} Std./Woche · {(ma as any).arbeitszeitmodell ?? "—"}</span></div>}
+                  {(ma as any).probeEnde && <div className="flex items-center gap-2 text-sm"><span className="text-muted-foreground">📋</span><span>Probezeit bis: {new Date((ma as any).probeEnde).toLocaleDateString("de-DE")}</span></div>}
+                  {(ma as any).kuendigungsfrist && <div className="flex items-center gap-2 text-sm"><span className="text-muted-foreground">📄</span><span>Kündigungsfrist: {(ma as any).kuendigungsfrist} Tage</span></div>}
                   {ma.notizen && <div className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-2 mt-2">{ma.notizen}</div>}
+                </>
+              )}
+            </div>
+
+            {/* Vergütung */}
+            {isAdmin && (
+            <div className="bg-card rounded-xl p-4 border space-y-3">
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">💶 Vergütung</p>
+              {editStamm ? (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div><label className="text-xs text-muted-foreground">Monatslohn (€)</label>
+                      <Input type="number" step="0.01" value={stammForm.monatslohn ?? ""} onChange={e => setStammForm(f => ({ ...f, monatslohn: e.target.value }))} className="mt-1" placeholder="z.B. 1200.00" /></div>
+                    <div><label className="text-xs text-muted-foreground">Stundenlohn (€)</label>
+                      <Input type="number" step="0.01" value={stammForm.stundenlohn ?? ""} onChange={e => setStammForm(f => ({ ...f, stundenlohn: e.target.value }))} className="mt-1" placeholder="z.B. 14.50" /></div>
+                  </div>
+                  <div><label className="text-xs text-muted-foreground">Zuschläge / Sonderzahlungen</label>
+                    <Input value={stammForm.zuschlaege ?? ""} onChange={e => setStammForm(f => ({ ...f, zuschlaege: e.target.value }))} className="mt-1" placeholder="z.B. Weihnachtsgeld, Nachtschichtzuschlag" /></div>
+                </>
+              ) : (
+                <>
+                  {(ma as any).monatslohn ? <div className="text-sm">💰 Monatslohn: <strong>{Number((ma as any).monatslohn).toFixed(2)} €</strong></div> : null}
+                  {(ma as any).stundenlohn ? <div className="text-sm">⏱ Stundenlohn: <strong>{Number((ma as any).stundenlohn).toFixed(2)} €</strong></div> : null}
+                  {(ma as any).zuschlaege ? <div className="text-sm text-muted-foreground">{(ma as any).zuschlaege}</div> : null}
+                  {!(ma as any).monatslohn && !(ma as any).stundenlohn && <div className="text-sm text-muted-foreground">Keine Vergütungsdaten hinterlegt</div>}
+                </>
+              )}
+            </div>
+            )}
+
+            {/* Sozialversicherung & Steuer */}
+            {isAdmin && (
+            <div className="bg-card rounded-xl p-4 border space-y-3">
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">🏛 Sozialversicherung & Steuer</p>
+              {editStamm ? (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div><label className="text-xs text-muted-foreground">SV-Nummer</label>
+                      <Input value={stammForm.sozialversicherungsnummer ?? ""} onChange={e => setStammForm(f => ({ ...f, sozialversicherungsnummer: e.target.value }))} className="mt-1" placeholder="12 345678 A 123" /></div>
+                    <div><label className="text-xs text-muted-foreground">Steuerklasse</label>
+                      <select value={stammForm.steuerklasse ?? ""} onChange={e => setStammForm(f => ({ ...f, steuerklasse: e.target.value }))}
+                        className="w-full mt-1 p-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                        <option value="">—</option>
+                        {[1,2,3,4,5,6].map(k => <option key={k} value={k}>{k}</option>)}
+                      </select></div>
+                  </div>
+                  <div><label className="text-xs text-muted-foreground">Steueridentnummer</label>
+                    <Input value={stammForm.steueridentnummer ?? ""} onChange={e => setStammForm(f => ({ ...f, steueridentnummer: e.target.value }))} className="mt-1" placeholder="12 345 678 901" /></div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div><label className="text-xs text-muted-foreground">Krankenkasse</label>
+                      <Input value={stammForm.krankenkasse ?? ""} onChange={e => setStammForm(f => ({ ...f, krankenkasse: e.target.value }))} className="mt-1" placeholder="z.B. AOK Bayern" /></div>
+                    <div><label className="text-xs text-muted-foreground">KV-Art</label>
+                      <select value={stammForm.krankenversicherungsart ?? ""} onChange={e => setStammForm(f => ({ ...f, krankenversicherungsart: e.target.value }))}
+                        className="w-full mt-1 p-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                        <option value="">—</option>
+                        <option value="gesetzlich">Gesetzlich</option>
+                        <option value="privat">Privat</option>
+                      </select></div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {(ma as any).sozialversicherungsnummer && <div className="text-sm">SV-Nr.: {(ma as any).sozialversicherungsnummer}</div>}
+                  {(ma as any).steuerklasse && <div className="text-sm">Steuerklasse {(ma as any).steuerklasse} · {(ma as any).steueridentnummer ?? "—"}</div>}
+                  {(ma as any).krankenkasse && <div className="text-sm">{(ma as any).krankenkasse} ({(ma as any).krankenversicherungsart ?? "—"})</div>}
+                  {!(ma as any).sozialversicherungsnummer && !(ma as any).steuerklasse && <div className="text-sm text-muted-foreground">Keine SV/Steuer-Daten hinterlegt</div>}
+                </>
+              )}
+            </div>
+            )}
+
+            {/* Bankverbindung */}
+            {isAdmin && (
+            <div className="bg-card rounded-xl p-4 border space-y-3">
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">🏦 Bankverbindung</p>
+              {editStamm ? (
+                <>
+                  <div><label className="text-xs text-muted-foreground">IBAN</label>
+                    <Input value={stammForm.iban ?? ""} onChange={e => setStammForm(f => ({ ...f, iban: e.target.value }))} className="mt-1" placeholder="DE89 3704 0044 0532 0130 00" /></div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div><label className="text-xs text-muted-foreground">BIC</label>
+                      <Input value={stammForm.bic ?? ""} onChange={e => setStammForm(f => ({ ...f, bic: e.target.value }))} className="mt-1" placeholder="COBADEFFXXX" /></div>
+                    <div><label className="text-xs text-muted-foreground">Bank</label>
+                      <Input value={stammForm.bankname ?? ""} onChange={e => setStammForm(f => ({ ...f, bankname: e.target.value }))} className="mt-1" placeholder="z.B. Commerzbank" /></div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {(ma as any).iban ? <div className="text-sm font-mono">IBAN: {(ma as any).iban}</div> : null}
+                  {(ma as any).bankname ? <div className="text-sm text-muted-foreground">{(ma as any).bankname} · BIC: {(ma as any).bic ?? "—"}</div> : null}
+                  {!(ma as any).iban && <div className="text-sm text-muted-foreground">Keine Bankverbindung hinterlegt</div>}
+                </>
+              )}
+            </div>
+            )}
+
+            {/* Notfallkontakt */}
+            <div className="bg-card rounded-xl p-4 border space-y-3">
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">🚨 Notfallkontakt</p>
+              {editStamm ? (
+                <>
+                  <div><label className="text-xs text-muted-foreground">Name</label>
+                    <Input value={stammForm.notfallkontaktName ?? ""} onChange={e => setStammForm(f => ({ ...f, notfallkontaktName: e.target.value }))} className="mt-1" placeholder="z.B. Maria Mustermann" /></div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div><label className="text-xs text-muted-foreground">Telefon</label>
+                      <Input value={stammForm.notfallkontaktTelefon ?? ""} onChange={e => setStammForm(f => ({ ...f, notfallkontaktTelefon: e.target.value }))} className="mt-1" placeholder="+49 123 456789" /></div>
+                    <div><label className="text-xs text-muted-foreground">Beziehung</label>
+                      <Input value={stammForm.notfallkontaktBeziehung ?? ""} onChange={e => setStammForm(f => ({ ...f, notfallkontaktBeziehung: e.target.value }))} className="mt-1" placeholder="z.B. Ehepartner" /></div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {(ma as any).notfallkontaktName ? (
+                    <div className="space-y-1">
+                      <div className="text-sm font-medium">{(ma as any).notfallkontaktName} <span className="text-muted-foreground font-normal">({(ma as any).notfallkontaktBeziehung ?? "—"})</span></div>
+                      <div className="text-sm text-muted-foreground">📞 {(ma as any).notfallkontaktTelefon ?? "—"}</div>
+                    </div>
+                  ) : <div className="text-sm text-muted-foreground">Kein Notfallkontakt hinterlegt</div>}
                 </>
               )}
             </div>

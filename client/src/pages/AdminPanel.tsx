@@ -4,6 +4,7 @@ import { VerrechnungssaetzeTab } from "./VerrechnungssaetzeTab";
 import { SicherheitsunterweisungenAdminTab } from "./SicherheitsunterweisungenAdminTab";
 import { FuehrerscheinCheckTab } from "./FuehrerscheinCheckTab";
 import ComplianceAmpelTab from "./ComplianceAmpelTab";
+import ComplianceGesamtuebersicht from "./ComplianceGesamtuebersicht";
 import { ArbeitssicherheitAdminTab } from "./ArbeitssicherheitAdminTab";
 import { UnterschriftenArchivTab } from "./UnterschriftenArchivTab";
 import { useState, useEffect } from "react";
@@ -12,7 +13,7 @@ import { toast } from "sonner";
 import BottomSheet from "@/components/BottomSheet";
 import MitarbeiterDetail from "./MitarbeiterDetail";
 
-type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo" | "preise" | "sicherheit" | "fuehrerschein" | "compliance" | "arbeitssicherheit" | "unterschriften-archiv";
+type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo" | "preise" | "sicherheit" | "fuehrerschein" | "compliance" | "compliance-gesamt" | "arbeitssicherheit" | "unterschriften-archiv";
 type PortalRolle = "mitarbeiter" | "teamleitung" | "buchhaltung" | "admin";
 
 const ROLLEN_LABEL: Record<PortalRolle, string> = {
@@ -254,6 +255,7 @@ export default function AdminPanel() {
           { key: "sicherheit" as AdminTab, label: "🦺 Sicherheitsunterweisungen" },
           { key: "fuehrerschein" as AdminTab, label: "🪖 Führerschein-Checks" },
           { key: "compliance" as AdminTab, label: "🚦 Compliance-Ampel" },
+          { key: "compliance-gesamt" as AdminTab, label: "📊 Compliance-Gesamt" },
           { key: "arbeitssicherheit" as AdminTab, label: "⛑️ Arbeitssicherheit" },
           { key: "unterschriften-archiv" as AdminTab, label: "📋 Unterschriften-Archiv" },
         ].map((t) => (
@@ -613,6 +615,9 @@ export default function AdminPanel() {
       )}
             {tab === "compliance" && (
         <ComplianceAmpelTab />
+      )}
+      {tab === "compliance-gesamt" && (
+        <ComplianceGesamtuebersicht />
       )}
       {tab === "arbeitssicherheit" && (
         <ArbeitssicherheitAdminTab />

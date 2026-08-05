@@ -892,3 +892,40 @@
 - [x] Frontend: PortalApp.tsx – DsgvoPflichtModal nach Login einblenden
 - [x] Frontend: Datenschutz.tsx – neuer Tab "🕵️ Audit-Log" (Admin, Farb-Badges je Aktion)
 - [x] TypeScript: 0 Fehler
+
+## 5 Features: Compliance + Mitarbeiterakte (05.08.2026)
+
+### Feature 1: Unterweisungs-Wiederholungs-Intervall
+- [x] DB: arbeitssicherheit_unterweisungen um wiederholungsIntervallMonate (int, nullable) erweitert
+- [x] Backend: unterweisung.adminCreate – wiederholungsIntervallMonate speichern + naechsteFaelligkeit auto berechnen
+- [x] Backend: unterweisung.bestaetigen – nach Bestätigung naechsteFaelligkeit automatisch neu setzen
+- [x] Frontend Admin: Unterweisungs-Formular – Dropdown Wiederholung (einmalig/6M/12M/24M/36M)
+- [x] Frontend MA: Bestätigungs-Button zeigt nächste Fälligkeit nach Bestätigung an
+
+### Feature 2: Arbeitssicherheits-Audit-Log
+- [x] DB: arbeitssicherheit_audit_log (id, aktion, bereich, referenzId, adminId, adminName, details, createdAt)
+- [x] Backend: arbeitssicherheitRouter – auditLog bei gefaehrdung.create/update/delete + psa.create/rueckgabe/delete
+- [x] Backend: arbeitssicherheitRouter – auditLog.list Procedure (Admin)
+- [x] Frontend Admin: Neuer Sub-Tab "🔍 Audit-Log" in ArbeitssicherheitAdminTab.tsx
+
+### Feature 3: Compliance-Gesamtübersicht
+- [x] Backend: compliance.gesamtuebersicht – Procedure die alle Ampeln je MA zusammenführt (Erste-Hilfe, Führerschein, Unterweisungen, Datenschutz, Vorsorge)
+- [x] Frontend Admin: ComplianceGesamtuebersicht.tsx – Tabelle MA-Zeile × Ampel-Spalten + Gesamt-Score
+- [x] Frontend Admin: Filter nach Ampel-Status + CSV-Export
+- [x] AdminPanel: neuer Tab "📊 Compliance" eingebunden
+
+### Feature 4: Mitarbeiterakte vollständig
+- [x] DB: 23 neue Felder: sozialversicherungsnummer, steuerklasse, steueridentnummer, iban, bic, bankname, krankenkasse, krankenversicherungsart, notfallkontaktName/Telefon/Beziehung, wochenstunden, monatslohn, stundenlohn, zuschlaege, probezeit, probeEnde, kuendigungsfrist, arbeitszeitmodell
+- [x] Backend: updateStammdaten um alle neuen Felder erweitert
+- [x] Backend: mitarbeiter.delete (Soft-Delete via aktiv=false, Admin-only)
+- [x] Frontend Admin: MitarbeiterDetail.tsx – Stammdaten-Tab mit Vergütung, Sozialversicherung, Notfallkontakt, Probezeit
+- [x] db.ts: getAllMitarbeiter() gibt alle neuen Felder zurück
+
+### Feature 5: Urlaubstage-Automatik
+- [x] Backend: urlaubsantraege.genehmigen – urlaubstageVerbraucht automatisch erhöht
+- [x] Backend: urlaubsantraege.ablehnen/stornieren – Tage wieder gutgeschrieben
+- [x] Backend: mitarbeiter.urlaubsKonto – Procedure gibt Jahresbudget/Verbraucht/Rest zurück
+- [x] Frontend MA: Urlaub-Tab zeigt Fortschrittsbalken (Konto/Verbraucht/Rest) aktuell
+- [x] Frontend Admin: Urlaub-Tab in Mitarbeiterakte zeigt vollständigen Verlauf + Konto-Anpassung
+
+- [x] TypeScript: 0 Fehler
