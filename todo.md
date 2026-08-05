@@ -971,3 +971,8 @@
 - [x] ArbeitssicherheitDashboard.tsx: Gefährdungsbeurteilungs-Tabelle mit Risikostufe
 - [x] Navigation: AS-Dashboard in AdminPanel-Tabs + App.tsx Route einbinden
 - [x] TypeScript: 0 Fehler
+
+## Unterweisungs-PDF-Nachweis (05.08.2026)
+- [x] unterweisungPdfGenerator.ts: Nachweis-Layout (Briefkopf, Thema, Datum, Unterschriftszeilen)
+- [x] ArbeitssicherheitDashboard.tsx: "📄 PDF"-Button pro Unterweisung in der Tabelle
+- [x] TypeScript: 0 Fehler

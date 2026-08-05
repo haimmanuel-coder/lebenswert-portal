@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { generateUnterweisungsNachweis } from "@/lib/unterweisungPdfGenerator";
 
 // ─── Hilfsfunktionen ─────────────────────────────────────────────────────────
 const THEMEN_LABELS: Record<string, string> = {
@@ -460,6 +461,7 @@ export default function ArbeitssicherheitDashboard() {
                         <th className="text-left py-2 pr-4 font-medium">Nächste Fälligkeit</th>
                         <th className="text-center py-2 px-3 font-medium">Status</th>
                         <th className="text-center py-2 px-3 font-medium">Ampel</th>
+                        <th className="text-center py-2 px-3 font-medium">Nachweis</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -498,11 +500,36 @@ export default function ArbeitssicherheitDashboard() {
                               <td className="py-2.5 px-3 text-center">
                                 <AmpelBadge status={ampel} label={ampel === "gruen" ? "OK" : ampel === "gelb" ? "Bald" : "Kritisch"} />
                               </td>
+                              <td className="py-2.5 px-3 text-center">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 px-2 text-xs border-green-300 text-green-700 hover:bg-green-50"
+                                  title="Unterweisungsnachweis als PDF herunterladen"
+                                  onClick={() => {
+                                    generateUnterweisungsNachweis({
+                                      mitarbeiterVorname: uw.maVorname ?? "",
+                                      mitarbeiterNachname: uw.maNachname ?? "",
+                                      mitarbeiterEmail: (uw as any).maEmail ?? null,
+                                      thema: uw.thema,
+                                      unterweisungsDatum: uw.unterweisungsDatum,
+                                      naechsteFaelligkeit: uw.naechsteFaelligkeit ?? null,
+                                      bestaetigt: uw.bestaetigt,
+                                      bestaetigtAm: (uw as any).bestaetigtAm ?? null,
+                                      inhalt: (uw as any).inhalt ?? null,
+                                      durchgefuehrtVon: (uw as any).durchgefuehrtVon ?? null,
+                                    });
+                                    toast.success("📄 PDF wird heruntergeladen…");
+                                  }}
+                                >
+                                  📄 PDF
+                                </Button>
+                              </td>
                             </tr>
                           );
                         })}
                       {uwGefiltert.length === 0 && (
-                        <tr><td colSpan={6} className="py-8 text-center text-gray-400">
+                        <tr><td colSpan={7} className="py-8 text-center text-gray-400">
                           {suchbegriff ? "Keine Treffer für diese Suche" : "Noch keine Unterweisungen erfasst"}
                         </td></tr>
                       )}
