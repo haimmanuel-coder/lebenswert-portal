@@ -63,6 +63,8 @@ export const mitarbeiter = mysqlTable("mitarbeiter", {
   arbeitsvertragDateiname: varchar("arbeitsvertragDateiname", { length: 255 }),
   // Notizen
   notizen: text("notizen"),
+  // Jahresurlaubskonto
+  urlaubstageJahr: int("urlaubstageJahr").default(24).notNull(),
   // Fahrzeug (P3: Dienstwagen-Flag)
   hatDienstwagen: boolean("hatDienstwagen").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -409,6 +411,7 @@ export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 export type InsertPushSubscription = typeof pushSubscriptions.$inferInsert;
 
 // ── MODUL 15: URLAUBSVERWALTUNG ───────────────────────────────────
+// urlaubsantraege – keineVertretung-Feld wird per ALTER TABLE hinzugefügt
 export const urlaubsantraege = mysqlTable("urlaubsantraege", {
   id: int("id").autoincrement().primaryKey(),
   mitarbeiterId: int("mitarbeiterId").notNull(),
@@ -418,6 +421,8 @@ export const urlaubsantraege = mysqlTable("urlaubsantraege", {
   notizen: text("notizen"),
   status: mysqlEnum("status", ["beantragt", "genehmigt", "abgelehnt"]).default("beantragt").notNull(),
   adminNotiz: text("adminNotiz"),
+  // Kunde wünscht keine Vertretung während des Urlaubs
+  keineVertretung: int("keineVertretung").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   // Soft-Delete (Phase 31)
   geloeschtAt: timestamp("geloeschtAt"),
@@ -426,6 +431,24 @@ export const urlaubsantraege = mysqlTable("urlaubsantraege", {
 });
 export type Urlaubsantrag = typeof urlaubsantraege.$inferSelect;
 export type InsertUrlaubsantrag = typeof urlaubsantraege.$inferInsert;
+
+// ── MODUL 14b: ERSTE-HILFE-KURSE ────────────────────────────────────
+export const ersteHilfeKurse = mysqlTable("erste_hilfe_kurse", {
+  id: int("id").autoincrement().primaryKey(),
+  mitarbeiterId: int("mitarbeiterId").notNull(),
+  kursName: varchar("kursName", { length: 255 }).notNull().default("Erste-Hilfe-Kurs"),
+  kursAnbieter: varchar("kursAnbieter", { length: 255 }),
+  kursDatum: date("kursDatum").notNull(),
+  ablaufDatum: date("ablaufDatum"),
+  status: mysqlEnum("status", ["bestanden", "angemeldet", "abgelaufen"]).default("bestanden").notNull(),
+  fotoBase64: text("fotoBase64"),
+  fotoMimeType: varchar("fotoMimeType", { length: 100 }),
+  bemerkung: text("bemerkung"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type ErsteHilfeKurs = typeof ersteHilfeKurse.$inferSelect;
+export type InsertErsteHilfeKurs = typeof ersteHilfeKurse.$inferInsert;
 
 // ── MODUL 15: KRANKMELDUNGEN ──────────────────────────────────────
 export const krankmeldungen = mysqlTable("krankmeldungen", {

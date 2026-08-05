@@ -16,7 +16,7 @@ import { Switch } from "@/components/ui/switch";
 // ─── Typen ────────────────────────────────────────────────────────────────────
 type ZertifikatStatus = "erhalten" | "angemeldet" | "nicht_angemeldet";
 type Beschaeftigungsart = "minijob" | "teilzeit" | "vollzeit";
-type AkteTab = "stamm" | "dokumente" | "zertifikat" | "vertrag" | "rechte" | "urlaubkrank";
+type AkteTab = "stamm" | "dokumente" | "zertifikat" | "vertrag" | "rechte" | "urlaubkrank" | "erstehilfe";
 type DokTyp = "zertifikat" | "arbeitsvertrag" | "krankmeldung" | "fuehrerschein" | "erstehilfe" | "sonstiges";
 
 // ─── Konfigurationen ──────────────────────────────────────────────────────────
@@ -159,9 +159,13 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
 
   // Urlaub/Krank Admin-States
   const [showUrlaubForm, setShowUrlaubForm] = useState(false);
-  const [urlaubForm, setUrlaubForm] = useState({ von: "", bis: "", tage: 1, notizen: "", status: "genehmigt" as "beantragt" | "genehmigt" | "abgelehnt" });
+  const [urlaubForm, setUrlaubForm] = useState({ von: "", bis: "", tage: 1, notizen: "", status: "genehmigt" as "beantragt" | "genehmigt" | "abgelehnt", keineVertretung: false });
   const [showKrankForm, setShowKrankForm] = useState(false);
   const [krankForm, setKrankForm] = useState({ von: "", bis: "", tage: 1, notizen: "", auAttest: false });
+  // Erste-Hilfe States
+  const [ehShowForm, setEhShowForm] = useState(false);
+  const [ehForm, setEhForm] = useState({ kursName: 'Erste-Hilfe-Kurs', kursAnbieter: '', kursDatum: '', ablaufDatum: '', status: 'bestanden' as 'bestanden'|'angemeldet'|'abgelaufen', bemerkung: '' });
+  const [ehFoto, setEhFoto] = useState<{ base64: string; mime: string } | null>(null);
 
   // ─── Queries ───────────────────────────────────────────────────────────────
   const utils = trpc.useUtils();
@@ -170,10 +174,27 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
     { mitarbeiterId },
     { enabled: activeTab === "urlaubkrank" }
   );
+  const { data: urlaubsKonto } = (trpc as any).urlaubAdmin.urlaubsKonto.useQuery(
+    { mitarbeiterId },
+    { enabled: activeTab === "urlaubkrank" }
+  );
   const { data: krankListe = [] } = (trpc as any).krankAdmin.listByMitarbeiter.useQuery(
     { mitarbeiterId },
     { enabled: activeTab === "urlaubkrank" }
   );
+  // Erste-Hilfe Queries
+  const { data: ersteHilfeList = [], refetch: refetchEH } = (trpc as any).ersteHilfe.listByMitarbeiter.useQuery(
+    { mitarbeiterId },
+    { enabled: activeTab === "erstehilfe" }
+  );
+  const ersteHilfeCreate = (trpc as any).ersteHilfe.create.useMutation({
+    onSuccess: () => { toast.success('✅ Erste-Hilfe-Kurs gespeichert'); refetchEH(); setEhShowForm(false); setEhForm({ kursName: 'Erste-Hilfe-Kurs', kursAnbieter: '', kursDatum: '', ablaufDatum: '', status: 'bestanden', bemerkung: '' }); setEhFoto(null); },
+    onError: (e: any) => toast.error('❌ ' + e.message),
+  });
+  const ersteHilfeDelete = (trpc as any).ersteHilfe.delete.useMutation({
+    onSuccess: () => { toast.success('Eintrag gelöscht'); refetchEH(); },
+    onError: (e: any) => toast.error('❌ ' + e.message),
+  });
   const { data: mitarbeiterDoks = [] } = (trpc.mitarbeiterakte as any).listDokumente.useQuery({ mitarbeiterId });
   const { data: berechtigungenData = [] } = (trpc.admin as any).getBerechtigungen.useQuery(
     { mitarbeiterId },
@@ -262,7 +283,7 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
       toast.success("Urlaubsantrag gespeichert");
       (trpc as any).urlaubAdmin.listByMitarbeiter.invalidate({ mitarbeiterId });
       setShowUrlaubForm(false);
-      setUrlaubForm({ von: "", bis: "", tage: 1, notizen: "", status: "genehmigt" });
+      setUrlaubForm({ von: "", bis: "", tage: 1, notizen: "", status: "genehmigt", keineVertretung: false });
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -424,6 +445,7 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
     { id: "vertrag",   label: "Vertrag",     icon: FileText },
     { id: "rechte",    label: "Rechte",      icon: Shield },
     { id: "urlaubkrank", label: "Urlaub/Krank", icon: Calendar },
+    { id: "erstehilfe", label: "Erste Hilfe", icon: Award },
   ];
 
   return (
@@ -1076,9 +1098,47 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
         {/* ═══════════════════════════════════════════════════════════════════
             TAB 6: URLAUB & KRANKMELDUNGEN (ADMIN)
         ═══════════════════════════════════════════════════════════════════ */}
-        {activeTab === "urlaubkrank" && (
+                {activeTab === "urlaubkrank" && (
           <div className="space-y-6">
-
+            {/* ── URLAUBSKONTO ── */}
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-blue-900 flex items-center gap-2">
+                  <Calendar className="w-4 h-4" /> Jahresurlaubskonto {new Date().getFullYear()}
+                </h3>
+                {isAdmin && (
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-blue-700">Jahresanspruch:</label>
+                    <input
+                      type="number" min={0} max={365}
+                      defaultValue={urlaubsKonto?.urlaubstageJahr ?? (ma as any)?.urlaubstageJahr ?? 24}
+                      onBlur={(e) => updateStamm.mutate({ id: mitarbeiterId, urlaubstageJahr: Number(e.target.value) })}
+                      className="w-16 px-2 py-1 border border-blue-300 rounded-lg text-sm text-center bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    />
+                    <span className="text-xs text-blue-700">Tage</span>
+                  </div>
+                )}
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-white rounded-lg p-3 text-center border border-blue-100">
+                  <p className="text-2xl font-bold text-blue-700">{urlaubsKonto?.urlaubstageJahr ?? 24}</p>
+                  <p className="text-xs text-muted-foreground">Jahresanspruch</p>
+                </div>
+                <div className="bg-white rounded-lg p-3 text-center border border-orange-100">
+                  <p className="text-2xl font-bold text-orange-600">{urlaubsKonto?.genommen ?? 0}</p>
+                  <p className="text-xs text-muted-foreground">Genommen</p>
+                </div>
+                <div className="bg-white rounded-lg p-3 text-center border border-green-100">
+                  <p className={`text-2xl font-bold ${(urlaubsKonto?.rest ?? 24) <= 5 ? "text-red-600" : "text-green-600"}`}>{urlaubsKonto?.rest ?? 24}</p>
+                  <p className="text-xs text-muted-foreground">Resturlaub</p>
+                </div>
+              </div>
+              {(urlaubsKonto?.rest ?? 24) <= 5 && (
+                <p className="text-xs text-red-600 mt-2 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" /> Weniger als 5 Resturlaubstage!
+                </p>
+              )}
+            </div>
             {/* ── URLAUB ── */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -1115,6 +1175,17 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
                   <div><label className="text-xs text-muted-foreground">Notizen</label>
                     <textarea value={urlaubForm.notizen} onChange={e => setUrlaubForm(f => ({ ...f, notizen: e.target.value }))}
                       className="w-full mt-1 p-2 border rounded-lg text-sm resize-none h-16 focus:outline-none focus:ring-2 focus:ring-primary" /></div>
+                  {/* Keine Vertretung Toggle */}
+                  <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <Switch
+                      checked={urlaubForm.keineVertretung}
+                      onCheckedChange={(val) => setUrlaubForm(f => ({ ...f, keineVertretung: val }))}
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-amber-900">Kunde wünscht keine Vertretung</p>
+                      <p className="text-xs text-amber-700">Kein Mitarbeiter erhält eine Vertretungsanfrage für diesen Urlaub</p>
+                    </div>
+                  </div>
                   <div className="flex gap-2">
                     <Button size="sm" onClick={() => urlaubCreate.mutate({ mitarbeiterId, ...urlaubForm })} disabled={!urlaubForm.von || !urlaubForm.bis || urlaubCreate.isPending}>
                       <Save className="w-4 h-4 mr-1" /> Speichern
@@ -1147,6 +1218,11 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
                           }`}>
                             {u.status === "genehmigt" ? "✅ Genehmigt" : u.status === "abgelehnt" ? "❌ Abgelehnt" : "🟡 Beantragt"}
                           </span>
+                          {u.keineVertretung === 1 && (
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                              🚫 Keine Vertretung
+                            </span>
+                          )}
                         </div>
                         {u.notizen && <p className="text-xs text-muted-foreground mt-1 italic">{u.notizen}</p>}
                         {isAdmin && u.status === "beantragt" && (
@@ -1250,6 +1326,150 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
         )}
 
       </div>
+
+      {/* ── TAB: ERSTE HILFE ────────────────────────────────────────────── */}
+      {activeTab === "erstehilfe" && (
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-semibold">🩺 Erste-Hilfe-Kurse</h3>
+            {isAdmin && (
+              <button onClick={() => setEhShowForm(!ehShowForm)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors">
+                <Plus className="w-4 h-4" />
+                Kurs erfassen
+              </button>
+            )}
+          </div>
+
+          {ehShowForm && isAdmin && (
+            <div className="bg-card rounded-xl border p-4 space-y-3">
+              <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Neuer Eintrag</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">Kursname</label>
+                  <input value={ehForm.kursName} onChange={e => setEhForm(p => ({...p, kursName: e.target.value}))}
+                    className="w-full px-3 py-2 rounded-lg border bg-background text-sm" placeholder="Erste-Hilfe-Kurs" />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">Anbieter</label>
+                  <input value={ehForm.kursAnbieter} onChange={e => setEhForm(p => ({...p, kursAnbieter: e.target.value}))}
+                    className="w-full px-3 py-2 rounded-lg border bg-background text-sm" placeholder="DRK, ASB, ..." />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">Kursdatum *</label>
+                  <input type="date" value={ehForm.kursDatum} onChange={e => setEhForm(p => ({...p, kursDatum: e.target.value}))}
+                    className="w-full px-3 py-2 rounded-lg border bg-background text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">Ablaufdatum (auto +2 Jahre)</label>
+                  <input type="date" value={ehForm.ablaufDatum} onChange={e => setEhForm(p => ({...p, ablaufDatum: e.target.value}))}
+                    className="w-full px-3 py-2 rounded-lg border bg-background text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">Status</label>
+                  <select value={ehForm.status} onChange={e => setEhForm(p => ({...p, status: e.target.value as any}))}
+                    className="w-full px-3 py-2 rounded-lg border bg-background text-sm">
+                    <option value="bestanden">✅ Bestanden</option>
+                    <option value="angemeldet">📋 Angemeldet</option>
+                    <option value="abgelaufen">⚠️ Abgelaufen</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">Foto (Zertifikat)</label>
+                  <input type="file" accept="image/*" capture="environment"
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = ev => setEhFoto({ base64: ev.target?.result as string, mime: file.type });
+                      reader.readAsDataURL(file);
+                    }}
+                    className="w-full text-sm" />
+                  {ehFoto && <p className="text-xs text-green-600 mt-1">📷 Foto geladen</p>}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">Bemerkung</label>
+                <textarea value={ehForm.bemerkung} onChange={e => setEhForm(p => ({...p, bemerkung: e.target.value}))}
+                  className="w-full px-3 py-2 rounded-lg border bg-background text-sm resize-none" rows={2} />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => {
+                  if (!ehForm.kursDatum) { toast.error('Bitte Kursdatum angeben'); return; }
+                  ersteHilfeCreate.mutate({
+                    mitarbeiterId: mitarbeiterId!,
+                    kursName: ehForm.kursName,
+                    kursAnbieter: ehForm.kursAnbieter || undefined,
+                    kursDatum: ehForm.kursDatum,
+                    ablaufDatum: ehForm.ablaufDatum || undefined,
+                    status: ehForm.status,
+                    fotoBase64: ehFoto?.base64 || undefined,
+                    fotoMimeType: ehFoto?.mime || undefined,
+                    bemerkung: ehForm.bemerkung || undefined,
+                  });
+                }} disabled={ersteHilfeCreate.isPending}
+                  className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50">
+                  {ersteHilfeCreate.isPending ? 'Speichern…' : '💾 Speichern'}
+                </button>
+                <button onClick={() => setEhShowForm(false)}
+                  className="px-4 py-2 border rounded-lg text-sm hover:bg-muted">
+                  Abbrechen
+                </button>
+              </div>
+            </div>
+          )}
+
+          {ersteHilfeList.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Award className="w-10 h-10 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">Noch keine Erste-Hilfe-Kurse erfasst</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {ersteHilfeList.map((k: any) => {
+                const rawAblauf = k.ablaufDatum;
+                const ablauf = rawAblauf ? new Date(rawAblauf) : null;
+                const heute = new Date();
+                const diffDays = ablauf ? Math.ceil((ablauf.getTime() - heute.getTime()) / 86400000) : null;
+                const ampelColor = diffDays === null ? 'bg-gray-100 text-gray-700' : diffDays > 60 ? 'bg-green-100 text-green-700' : diffDays > 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700';
+                const ampelLabel = diffDays === null ? '⚪ Kein Ablauf' : diffDays > 60 ? '🟢 Gültig' : diffDays > 0 ? '🟡 Läuft ab' : '🔴 Abgelaufen';
+                return (
+                  <div key={k.id} className="bg-card rounded-xl border p-3 flex items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold">{k.kursName}</span>
+                        {k.kursAnbieter && <span className="text-xs text-muted-foreground">({k.kursAnbieter})</span>}
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${ampelColor}`}>{ampelLabel}</span>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                          k.status === 'bestanden' ? 'bg-green-100 text-green-700' :
+                          k.status === 'angemeldet' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'
+                        }`}>{k.status === 'bestanden' ? '✅ Bestanden' : k.status === 'angemeldet' ? '📋 Angemeldet' : '⚠️ Abgelaufen'}</span>
+                      </div>
+                      <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                        <span>📅 Kurs: {k.kursDatum ? new Date(k.kursDatum).toLocaleDateString('de-DE') : '–'}</span>
+                        {ablauf && <span>⏳ Ablauf: {ablauf.toLocaleDateString('de-DE')}</span>}
+                        {diffDays !== null && diffDays > 0 && <span className="text-amber-600">({diffDays} Tage verbleibend)</span>}
+                      </div>
+                      {k.bemerkung && <p className="text-xs text-muted-foreground mt-1 italic">{k.bemerkung}</p>}
+                      {k.fotoBase64 && (
+                        <button onClick={() => window.open(k.fotoBase64, '_blank')}
+                          className="mt-1 text-xs text-blue-600 hover:underline">📷 Zertifikat anzeigen</button>
+                      )}
+                    </div>
+                    {isAdmin && (
+                      <button onClick={() => { if (confirm('Eintrag löschen?')) ersteHilfeDelete.mutate({ id: k.id }); }}
+                        className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-600 transition-colors shrink-0">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
     </div>
   );
 }

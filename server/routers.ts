@@ -20,7 +20,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { sql, eq, desc, and, isNotNull, lte, isNull } from "drizzle-orm";
 import { getDb } from "./db";
-import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, einsatzAenderungen, kunden as kundenTable, notifications as notificationsTable } from "../drizzle/schema";
+import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, einsatzAenderungen, kunden as kundenTable, notifications as notificationsTable, ersteHilfeKurse } from "../drizzle/schema";
 import {
   getMitarbeiterByEmail,
   getMitarbeiterById,
@@ -210,22 +210,27 @@ export const urlaubRouter = router({
           const kundenDsgvo = await getVertretungsKundenFuerUrlaub(input.id);
           if (kundenDsgvo.length > 0) {
             const alleMa = await getAllMitarbeiter();
-            const urlaubsRows = await (await import('./db')).getDb().then(async (db) => {
-              if (!db) return [];
+            const dbInst = await (await import('./db')).getDb();
+            const urlaubsRows = dbInst ? await (async () => {
               const { urlaubsantraege } = await import('../drizzle/schema');
               const { eq } = await import('drizzle-orm');
-              return db.select().from(urlaubsantraege).where(eq(urlaubsantraege.id, input.id)).limit(1);
-            });
-            const urlaubMitarbeiterId = (urlaubsRows as any[])[0]?.mitarbeiterId;
-            const andereMA = alleMa.filter((m: { id: number }) => m.id !== urlaubMitarbeiterId);
-            const kundenNamen = kundenDsgvo.map((k: { vorname: string; nachname: string }) => `${k.vorname} ${k.nachname}`).join(', ');
-            for (const ma of andereMA) {
-              await createNotification({
-                empfaengerId: ma.id,
-                titel: 'Vertretung benötigt – DSGVO-Mindestdaten',
-                nachricht: `Ein Kollege ist im Urlaub. Folgende Kunden benötigen Vertretung: ${kundenNamen}. Bitte Übernahme bestätigen.`,
-                typ: 'warnung',
-              });
+              return dbInst.select().from(urlaubsantraege).where(eq(urlaubsantraege.id, input.id)).limit(1);
+            })() : [];
+            const urlaubRow = (urlaubsRows as any[])[0];
+            const urlaubMitarbeiterId = urlaubRow?.mitarbeiterId;
+            // keineVertretung: Wenn gesetzt, keine Benachrichtigungen senden
+            const keineVertretung = urlaubRow?.keineVertretung === 1 || urlaubRow?.keineVertretung === true;
+            if (!keineVertretung) {
+              const andereMA = alleMa.filter((m: { id: number }) => m.id !== urlaubMitarbeiterId);
+              const kundenNamen = kundenDsgvo.map((k: { vorname: string; nachname: string }) => `${k.vorname} ${k.nachname}`).join(', ');
+              for (const ma of andereMA) {
+                await createNotification({
+                  empfaengerId: ma.id,
+                  titel: 'Vertretung benötigt – DSGVO-Mindestdaten',
+                  nachricht: `Ein Kollege ist im Urlaub. Folgende Kunden benötigen Vertretung: ${kundenNamen}. Bitte Übernahme bestätigen.`,
+                  typ: 'warnung',
+                });
+              }
             }
           }
         } catch (e) { console.warn('[P2] Vertretungs-Push fehlgeschlagen:', e); }
@@ -2042,6 +2047,7 @@ export const appRouter = router({
         rolle: z.enum(["mitarbeiter", "teamleitung", "buchhaltung", "admin"]).optional(),
         aktiv: z.number().int().optional(),
         notizen: z.string().optional(),
+        urlaubstageJahr: z.number().int().min(0).max(365).optional(),
         neuesPasswort: z.string().min(6).optional(),
       }))
       .mutation(async ({ input, ctx }) => {
@@ -2731,6 +2737,23 @@ export const appRouter = router({
           .where(eq(urlaubsantraege.mitarbeiterId, input.mitarbeiterId))
           .orderBy(desc(urlaubsantraege.createdAt));
       }),
+    /** Resturlaub-Berechnung für einen Mitarbeiter (aktuelles Jahr) */
+    urlaubsKonto: adminProcedure
+      .input(z.object({ mitarbeiterId: z.number().int().positive(), jahr: z.number().int().optional() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return { urlaubstageJahr: 24, genommen: 0, rest: 24 };
+        const ma = await getMitarbeiterById(input.mitarbeiterId);
+        const urlaubstageJahr = (ma as any)?.urlaubstageJahr ?? 24;
+        const { urlaubsantraege } = await import('../drizzle/schema.js');
+        const jahr = input.jahr ?? new Date().getFullYear();
+        const alle = await db.select().from(urlaubsantraege)
+          .where(and(eq(urlaubsantraege.mitarbeiterId, input.mitarbeiterId), eq(urlaubsantraege.status, 'genehmigt')));
+        const genommen = alle
+          .filter((a: any) => { const y = new Date(a.von).getFullYear(); return y === jahr; })
+          .reduce((sum: number, a: any) => sum + (a.tage ?? 0), 0);
+        return { urlaubstageJahr, genommen, rest: Math.max(0, urlaubstageJahr - genommen) };
+      }),
     /** Admin legt Urlaubsantrag für Mitarbeiter an */
     create: adminProcedure
       .input(z.object({
@@ -2740,6 +2763,7 @@ export const appRouter = router({
         tage: z.number().int().min(1),
         notizen: z.string().optional(),
         status: z.enum(['beantragt', 'genehmigt', 'abgelehnt']).default('genehmigt'),
+        keineVertretung: z.boolean().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         const db = await getDb();
@@ -2752,6 +2776,7 @@ export const appRouter = router({
           tage: input.tage,
           notizen: input.notizen ?? null,
           status: input.status,
+          keineVertretung: input.keineVertretung ? 1 : 0,
         } as any);
         await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'ADMIN', ressource: 'urlaub', details: `admin-create ma=${input.mitarbeiterId}`, status: 'success' });
         return { success: true };
@@ -2820,6 +2845,89 @@ export const appRouter = router({
         return { success: true };
       }),
   }),
+  ersteHilfe: router({
+    listByMitarbeiter: adminProcedure
+      .input(z.object({ mitarbeiterId: z.number().int().positive() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        return db.select().from(ersteHilfeKurse)
+          .where(eq(ersteHilfeKurse.mitarbeiterId, input.mitarbeiterId))
+          .orderBy(desc(ersteHilfeKurse.kursDatum));
+      }),
+    create: adminProcedure
+      .input(z.object({
+        mitarbeiterId: z.number().int().positive(),
+        kursName: z.string().default('Erste-Hilfe-Kurs'),
+        kursAnbieter: z.string().optional(),
+        kursDatum: z.string(),
+        ablaufDatum: z.string().optional(),
+        status: z.enum(['bestanden', 'angemeldet', 'abgelaufen']).default('bestanden'),
+        fotoBase64: z.string().optional(),
+        fotoMimeType: z.string().optional(),
+        bemerkung: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        let ablauf = input.ablaufDatum;
+        if (!ablauf && input.kursDatum) {
+          const d = new Date(input.kursDatum);
+          d.setFullYear(d.getFullYear() + 2);
+          ablauf = d.toISOString().split('T')[0];
+        }
+        const insertVal: any = {
+          mitarbeiterId: input.mitarbeiterId,
+          kursName: input.kursName,
+          kursAnbieter: input.kursAnbieter ?? null,
+          kursDatum: input.kursDatum,
+          ablaufDatum: ablauf ?? null,
+          status: input.status,
+          fotoBase64: input.fotoBase64 ?? null,
+          fotoMimeType: input.fotoMimeType ?? null,
+          bemerkung: input.bemerkung ?? null,
+        };
+        await db.insert(ersteHilfeKurse).values(insertVal);
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'ADMIN', ressource: 'erste_hilfe', details: `create maId=${input.mitarbeiterId}`, status: 'success' });
+        return { success: true };
+      }),
+    delete: adminProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(async ({ input, ctx }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        await db.delete(ersteHilfeKurse).where(eq(ersteHilfeKurse.id, input.id));
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'ADMIN', ressource: 'erste_hilfe', details: `delete id=${input.id}`, status: 'success' });
+        return { success: true };
+      }),
+    alleStatus: adminProcedure.query(async () => {
+      const db = await getDb();
+      if (!db) return [];
+      const alle = await db.select().from(mitarbeiter).where(eq(mitarbeiter.aktiv, 1));
+      const heute = new Date();
+      const result = await Promise.all(alle.map(async (ma) => {
+        const kurse = await db!.select().from(ersteHilfeKurse)
+          .where(eq(ersteHilfeKurse.mitarbeiterId, ma.id))
+          .orderBy(desc(ersteHilfeKurse.kursDatum))
+          .limit(1);
+        const letzter = kurse[0];
+        let ampel: 'gruen' | 'gelb' | 'rot' = 'rot';
+        let ablaufDatum: string | null = null;
+        if (letzter) {
+          const rawAblauf = letzter.ablaufDatum;
+          ablaufDatum = rawAblauf ? (rawAblauf instanceof Date ? rawAblauf.toISOString().split('T')[0] : String(rawAblauf)) : null;
+          if (ablaufDatum) {
+            const diffDays = Math.ceil((new Date(ablaufDatum).getTime() - heute.getTime()) / 86400000);
+            ampel = diffDays > 60 ? 'gruen' : diffDays > 0 ? 'gelb' : 'rot';
+          } else { ampel = 'gelb'; }
+        }
+        const rawKurs = letzter?.kursDatum;
+        const letzterKursStr = rawKurs ? (rawKurs instanceof Date ? rawKurs.toISOString().split('T')[0] : String(rawKurs)) : null;
+        return { mitarbeiterId: ma.id, name: `${ma.vorname} ${ma.nachname}`, ampel, letzterKurs: letzterKursStr, ablaufDatum, kursName: letzter?.kursName ?? null };
+      }));
+      return result;
+    }),
+  }),
     twoFactor: twoFactorRouter,
   // ── COMPLIANCE & DOKUMENT-ABLAUF-ERINNERUNGEN ────────────────────────────────
   compliance: router({
@@ -2865,12 +2973,21 @@ export const appRouter = router({
       const in30 = new Date(jetzt.getTime() + 30 * 24 * 60 * 60 * 1000);
       const maListe = await db.select().from(maTable).where(eq(maTable.aktiv, 1));
       const alleDoks = await db.select().from(dokTable);
+      const alleEHKurse = await db.select().from(ersteHilfeKurse);
       return maListe.map(ma => {
         const maDoks = alleDoks.filter(d => d.mitarbeiterId === ma.id);
         const abgelaufen = maDoks.filter(d => d.ablaufdatum && new Date(d.ablaufdatum) < jetzt);
         const baldAblaufend = maDoks.filter(d => d.ablaufdatum && new Date(d.ablaufdatum) >= jetzt && new Date(d.ablaufdatum) <= in30);
         const hatVertrag = maDoks.some(d => d.typ === 'arbeitsvertrag');
-        const hatErsteHilfe = maDoks.some(d => d.typ === 'erstehilfe');
+        // Erste-Hilfe: aus Dokumenten ODER aus erste_hilfe_kurse Tabelle (bestanden + nicht abgelaufen)
+        const hatEHDok = maDoks.some(d => d.typ === 'erstehilfe');
+        const hatEHKurs = alleEHKurse.some(k => {
+          if (k.mitarbeiterId !== ma.id || k.status !== 'bestanden') return false;
+          if (!k.ablaufDatum) return true;
+          const ablauf = k.ablaufDatum instanceof Date ? k.ablaufDatum : new Date(k.ablaufDatum as string);
+          return ablauf >= jetzt;
+        });
+        const hatErsteHilfe = hatEHDok || hatEHKurs;
         const zertStatus = (ma as any).zertifikatStatus ?? 'nicht_angemeldet';
         let ampel: 'gruen' | 'gelb' | 'rot' = 'gruen';
         if (abgelaufen.length > 0 || !hatVertrag || zertStatus === 'nicht_angemeldet') ampel = 'rot';

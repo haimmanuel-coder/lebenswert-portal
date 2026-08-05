@@ -775,3 +775,18 @@
 - [x] Frontend: Krankmeldungen anlegen (Von, Bis optional, Tage, AU-Attest-Toggle, Notizen)
 - [x] Frontend: Löschen für Urlaub und Krankmeldungen
 - [x] TypeScript: 0 Fehler
+
+## Vier neue Features (04.08.2026)
+- [x] Feature 1: Jahresurlaubskonto – DB-Feld urlaubstageJahr in mitarbeiter, Resturlaub automatisch berechnen
+- [x] Feature 1: Resturlaub-Anzeige im Tab Urlaub/Krank (Konto/Verbraucht/Rest als Fortschrittsbalken)
+- [x] Feature 1: Admin kann Jahresurlaubskonto manuell einstellen
+- [x] Feature 2: Erste-Hilfe-Kurs-Modul – DB-Tabelle erste_hilfe_kurse
+- [x] Feature 2: Router ersteHilfe: listByMitarbeiter, create, delete, alleStatus
+- [x] Feature 2: Tab 7 'Erste-Hilfe' in MitarbeiterDetail.tsx (Kursformular, Foto-Upload, Ampel-Badges)
+- [x] Feature 2: Compliance-Ampel: hatErsteHilfe-Status in Mitarbeiter-Zeile eingebaut
+- [x] Feature 3: Budget-Sync – tRPC-Invalidierung bereits vollständig implementiert (bestätigt)
+- [x] Feature 4: Urlaubsplanung – 'Kunde wünscht keine Vertretung' Toggle in Tab Urlaub/Krank
+- [x] Feature 4: keineVertretung-Feld in urlaubsantraege-Tabelle + Schema
+- [x] Feature 4: updateStatus-Procedure prüft keineVertretung-Flag vor Vertretungs-Push
+- [x] Bugfix: longtext-ReferenceError (nur historisch in Logs, schema.ts verwendet text())
+- [x] TypeScript: 0 Fehler | Tests: 86/86 bestanden
