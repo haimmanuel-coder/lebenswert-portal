@@ -861,3 +861,9 @@
 - [x] Feature 3: PDF-Vorschau-Modal direkt nach Einsatz-Abschluss (automatisch geöffnet)
 - [x] Feature 3: Vorschau-Modal zeigt generierten LNW-Entwurf mit Unterschrift sofort nach Abschluss + Download-Button
 - [x] TypeScript: 0 Fehler
+
+## ZIP-Export Unterschriften-Archiv (05.08.2026)
+- [x] Backend: einsaetze.unterschriftenZipDaten (Admin, Monat-Filter, vollständige Einsatz+Unterschrift-Daten)
+- [x] Frontend: ZIP-Download-Button im UnterschriftenArchivTab mit Lade-Spinner und Hinweis-Banner
+- [x] ZIP-Logik: JSZip + jsPDF, Dateiname DATUM_Kunde_MA_ID.pdf, DEFLATE-Kompression
+- [x] TypeScript: 0 Fehler

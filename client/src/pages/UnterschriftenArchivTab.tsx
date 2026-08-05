@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { previewLeistungsnachweisPdf } from "@/lib/pdfGenerator";
 
 type ArchivRow = {
   id: number;
@@ -18,6 +19,30 @@ type ArchivRow = {
   maNachname: string | null;
 };
 
+type ZipRow = {
+  id: number;
+  datum: string;
+  paragraph: string;
+  dauerStunden: number | null;
+  startzeit: string | null;
+  anfahrtPauschale: number | null;
+  unterschriftMitarbeiter: string | null;
+  unterschriftKunde: string | null;
+  kundeVorname: string | null;
+  kundeNachname: string | null;
+  kundeGeburtsdatum: string | null;
+  kundeStrasse: string | null;
+  kundePlz: string | null;
+  kundeOrt: string | null;
+  kundeVersicherungsnummer: string | null;
+  kundeKostentraeger: string | null;
+  kundePflegegrad: number | null;
+  kundePflegegradSeit: string | null;
+  maVorname: string | null;
+  maNachname: string | null;
+  maPosition: string | null;
+};
+
 function ampel(hatMA: number, hatKunde: number, ersatzTyp: string | null, freigabe: string | null) {
   if (hatMA && hatKunde) return { color: "#16a34a", bg: "#dcfce7", label: "✅ Vollständig" };
   if (hatMA && ersatzTyp && ersatzTyp !== "keine") {
@@ -29,16 +54,29 @@ function ampel(hatMA: number, hatKunde: number, ersatzTyp: string | null, freiga
   return { color: "#d97706", bg: "#fef3c7", label: "⚠️ Kunde fehlt" };
 }
 
+function fmtMonatLabel(m: string) {
+  const [y, mo] = m.split("-");
+  const namen = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+  return `${namen[parseInt(mo) - 1]} ${y}`;
+}
+
 export function UnterschriftenArchivTab() {
   const heute = new Date();
   const [monat, setMonat] = useState(`${heute.getFullYear()}-${String(heute.getMonth() + 1).padStart(2, "0")}`);
   const [filterMaId, setFilterMaId] = useState<number | undefined>(undefined);
   const [filterStatus, setFilterStatus] = useState<"alle" | "vollstaendig" | "unvollstaendig">("alle");
+  const [zipLaed, setZipLaed] = useState(false);
 
   const { data: maList = [] } = trpc.admin.mitarbeiterList.useQuery();
   const { data: rows = [], isLoading, refetch } = (trpc.einsaetze as any).unterschriftenArchiv.useQuery(
     { monat, mitarbeiterId: filterMaId },
     { refetchOnWindowFocus: false }
+  );
+
+  // Lazy-Query für ZIP-Daten (wird nur beim Klick ausgelöst)
+  const zipQuery = (trpc.einsaetze as any).unterschriftenZipDaten.useQuery(
+    { monat, mitarbeiterId: filterMaId },
+    { enabled: false, refetchOnWindowFocus: false }
   );
 
   const archivRows = rows as ArchivRow[];
@@ -59,16 +97,128 @@ export function UnterschriftenArchivTab() {
     return { gesamt, vollst, ohneMA, ohneKunde };
   }, [archivRows]);
 
+  const handleZipExport = async () => {
+    setZipLaed(true);
+    try {
+      toast.info(`⏳ Lade Daten für ${fmtMonatLabel(monat)}...`);
+      const result = await zipQuery.refetch();
+      const zipRows = (result.data ?? []) as ZipRow[];
+
+      if (zipRows.length === 0) {
+        toast.warning("Keine Einsätze für diesen Monat gefunden.");
+        setZipLaed(false);
+        return;
+      }
+
+      // JSZip dynamisch importieren
+      const JSZip = (await import("jszip")).default;
+      const zip = new JSZip();
+      const folder = zip.folder(`Unterschriften_${monat}`)!;
+
+      let erfolgreich = 0;
+      let fehlgeschlagen = 0;
+
+      for (const row of zipRows) {
+        try {
+          const pdfData = {
+            kundeVorname: row.kundeVorname ?? "",
+            kundeNachname: row.kundeNachname ?? "",
+            kundeGeburtsdatum: row.kundeGeburtsdatum ?? null,
+            kundeStrasse: row.kundeStrasse ?? null,
+            kundePlz: row.kundePlz ?? null,
+            kundeOrt: row.kundeOrt ?? null,
+            kundeVersicherungsnummer: row.kundeVersicherungsnummer ?? null,
+            kundeKostentraeger: row.kundeKostentraeger ?? null,
+            kundePflegegrad: row.kundePflegegrad ?? null,
+            kundePflegegradSeit: row.kundePflegegradSeit ?? null,
+            monat,
+            paragraph: row.paragraph ?? "45b",
+            stunden: row.dauerStunden ?? 0,
+            anzahlEinsaetze: 1,
+            status: "abgeschlossen",
+            einsaetze: [{
+              datum: row.datum,
+              startzeit: row.startzeit ?? null,
+              dauerStunden: row.dauerStunden ?? null,
+              anfahrtPauschale: row.anfahrtPauschale ?? 6,
+              km: null,
+            }],
+            unterschriftMitarbeiter: row.unterschriftMitarbeiter ?? null,
+            unterschriftKunde: row.unterschriftKunde ?? null,
+            mitarbeiterName: row.maVorname && row.maNachname ? `${row.maVorname} ${row.maNachname}` : "Mitarbeiter",
+            mitarbeiterPosition: row.maPosition ?? null,
+          };
+
+          // PDF als Blob-URL generieren, dann als ArrayBuffer holen
+          const blobUrl = previewLeistungsnachweisPdf(pdfData);
+          const response = await fetch(blobUrl);
+          const arrayBuffer = await response.arrayBuffer();
+          URL.revokeObjectURL(blobUrl);
+
+          // Dateiname: DATUM_Kunde_MA.pdf
+          const datumStr = row.datum ? row.datum.slice(0, 10) : "unbekannt";
+          const kundeStr = `${row.kundeVorname ?? ""}_${row.kundeNachname ?? ""}`.replace(/\s+/g, "_");
+          const maStr = `${row.maVorname ?? ""}_${row.maNachname ?? ""}`.replace(/\s+/g, "_");
+          const dateiname = `${datumStr}_${kundeStr}_${maStr}_ID${row.id}.pdf`;
+
+          folder.file(dateiname, arrayBuffer);
+          erfolgreich++;
+        } catch {
+          fehlgeschlagen++;
+        }
+      }
+
+      // ZIP generieren und herunterladen
+      const zipBlob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
+      const zipUrl = URL.createObjectURL(zipBlob);
+      const a = document.createElement("a");
+      a.href = zipUrl;
+      a.download = `Unterschriften_Archiv_${monat}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(zipUrl), 5000);
+
+      if (fehlgeschlagen > 0) {
+        toast.warning(`✅ ZIP erstellt: ${erfolgreich} PDFs, ${fehlgeschlagen} fehlgeschlagen.`);
+      } else {
+        toast.success(`✅ ZIP heruntergeladen: ${erfolgreich} PDFs für ${fmtMonatLabel(monat)}`);
+      }
+    } catch (err) {
+      toast.error("❌ ZIP-Export fehlgeschlagen: " + (err instanceof Error ? err.message : "Unbekannter Fehler"));
+    } finally {
+      setZipLaed(false);
+    }
+  };
+
   return (
     <div style={{ padding: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
         <h2 style={{ fontSize: 18, fontWeight: 700, color: "#1e3a2f", margin: 0 }}>📋 Unterschriften-Archiv</h2>
-        <button
-          onClick={() => refetch()}
-          style={{ padding: "6px 14px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
-        >
-          🔄 Aktualisieren
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={handleZipExport}
+            disabled={zipLaed || archivRows.length === 0}
+            style={{
+              padding: "7px 14px", background: zipLaed ? "#9ca3af" : "#1d4ed8", color: "#fff",
+              border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: zipLaed ? "not-allowed" : "pointer",
+              display: "flex", alignItems: "center", gap: 5,
+            }}
+          >
+            {zipLaed ? "⏳ Erstelle ZIP..." : "📦 ZIP-Export"}
+          </button>
+          <button
+            onClick={() => refetch()}
+            style={{ padding: "7px 14px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+          >
+            🔄 Aktualisieren
+          </button>
+        </div>
+      </div>
+
+      {/* ZIP-Hinweis */}
+      <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: "10px 14px", marginBottom: 14, fontSize: 12, color: "#1e40af" }}>
+        <strong>📦 ZIP-Export:</strong> Lädt alle Einsatz-Nachweise des gewählten Monats als PDF-Dateien in einem ZIP-Archiv herunter. Jede PDF enthält Kunden- und Mitarbeiterdaten sowie die digitalen Unterschriften.
       </div>
 
       {/* KPI-Karten */}

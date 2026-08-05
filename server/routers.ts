@@ -1411,6 +1411,54 @@ export const appRouter = router({
         });
         return { success: true };
       }),
+    /** Admin: ZIP-Export – vollständige Einsatz-Daten inkl. Unterschriften für PDF-Generierung im Browser */
+    unterschriftenZipDaten: adminProcedure
+      .input(z.object({
+        monat: z.string().regex(/^\d{4}-\d{2}$/),
+        mitarbeiterId: z.number().int().positive().optional(),
+      }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        const rows = await db.execute(sql`
+          SELECT
+            e.id,
+            e.datum,
+            e.paragraph,
+            e.status,
+            e.dauerStunden,
+            e.startzeit,
+            e.anfahrtPauschale,
+            e.unterschriftMitarbeiter,
+            e.unterschriftKunde,
+            e.unterschriftErsatzTyp,
+            e.unterschriftErsatzName,
+            e.unterschriftBegruendung,
+            k.vorname as kundeVorname,
+            k.nachname as kundeNachname,
+            k.geburtsdatum as kundeGeburtsdatum,
+            k.strasse as kundeStrasse,
+            k.plz as kundePlz,
+            k.ort as kundeOrt,
+            k.versicherungsnummer as kundeVersicherungsnummer,
+            k.kostentraeger as kundeKostentraeger,
+            k.pflegegrad as kundePflegegrad,
+            k.pflegegradSeit as kundePflegegradSeit,
+            m.vorname as maVorname,
+            m.nachname as maNachname,
+            m.position as maPosition
+          FROM einsaetze e
+          LEFT JOIN kunden k ON e.kundenId = k.id
+          LEFT JOIN mitarbeiter m ON e.mitarbeiterId = m.id
+          WHERE e.status = 'abgeschlossen'
+            AND (e.geloeschtAt IS NULL)
+            AND DATE_FORMAT(e.datum, '%Y-%m') = ${input.monat}
+            ${input.mitarbeiterId ? sql`AND e.mitarbeiterId = ${input.mitarbeiterId}` : sql``}
+          ORDER BY e.datum DESC
+          LIMIT 200
+        `);
+        return (rows as any)[0] as any[];
+      }),
     /** Admin: Unterschriften-Archiv – alle abgeschlossenen Einsätze mit Unterschrift-Status */
     unterschriftenArchiv: adminProcedure
       .input(z.object({
