@@ -953,3 +953,11 @@
 - [x] AdminPanel: Lösch-Button pro Mitarbeiter mit Bestätigungsdialog (Name eintippen)
 - [x] AdminPanel: Nach Anlegen/Löschen Liste automatisch aktualisieren
 - [x] TypeScript: 0 Fehler
+
+## MA-Export Excel + CSV (05.08.2026)
+- [x] xlsx-Paket installieren (SheetJS)
+- [x] Backend: admin.mitarbeiterExport Procedure – alle Felder inkl. Lohn, Urlaub, Compliance
+- [x] AdminPanel: Export-Buttons "📥 Excel" und "📥 CSV" in der MA-Übersicht
+- [x] CSV: UTF-8 BOM, Semikolon-getrennt, DATEV-kompatibel
+- [x] Excel: Titelzeile fett, Spaltenbreiten automatisch, Dateiname mit Datum
+- [x] TypeScript: 0 Fehler

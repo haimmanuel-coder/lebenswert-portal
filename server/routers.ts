@@ -1974,6 +1974,28 @@ export const appRouter = router({
         await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'ADMIN', ressource: 'mitarbeiter', details: `HARD-DELETE id=${input.id} name=${ma.vorname} ${ma.nachname}`, status: 'success' });
         return { success: true };
       }),
+    /** Mitarbeiterliste als strukturierte Daten für Export */
+    mitarbeiterExport: adminProcedure.query(async () => {
+      const allMa = await getAllMitarbeiter();
+      return allMa.map((ma: any) => ({
+        id: ma.id,
+        vorname: ma.vorname ?? "",
+        nachname: ma.nachname ?? "",
+        email: ma.email ?? "",
+        rolle: ma.rolle ?? "",
+        beschaeftigungsart: ma.beschaeftigungsart ?? "",
+        telefon: ma.telefon ?? "",
+        aktiv: ma.aktiv ? "Ja" : "Nein",
+        urlaubstageJahr: ma.urlaubstageJahr ?? 24,
+        urlaubstageVerbraucht: ma.urlaubstageVerbraucht ?? 0,
+        urlaubstageRest: (ma.urlaubstageJahr ?? 24) - (ma.urlaubstageVerbraucht ?? 0),
+        wochenstunden: ma.wochenstunden ? parseFloat(String(ma.wochenstunden)) : 0,
+        monatslohn: ma.monatslohn ? parseFloat(String(ma.monatslohn)) : 0,
+        stundenlohn: ma.stundenlohn ? parseFloat(String(ma.stundenlohn)) : 0,
+        einstellungsdatum: ma.createdAt ? new Date(ma.createdAt).toLocaleDateString("de-DE") : "",
+        notizen: ma.notizen ?? "",
+      }));
+    }),
     /** Mitarbeiter-Berechtigungen lesen */
     getBerechtigungen: adminProcedure
       .input(z.object({ mitarbeiterId: z.number().int().positive() }))

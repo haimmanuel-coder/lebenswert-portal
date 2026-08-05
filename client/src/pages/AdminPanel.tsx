@@ -9,6 +9,7 @@ import { ArbeitssicherheitAdminTab } from "./ArbeitssicherheitAdminTab";
 import { UnterschriftenArchivTab } from "./UnterschriftenArchivTab";
 import LohnkostenTab from "./LohnkostenTab";
 import { useState, useEffect } from "react";
+import * as XLSX from "xlsx";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import BottomSheet from "@/components/BottomSheet";
@@ -69,6 +70,52 @@ export default function AdminPanel() {
   });
 
   const resetMaForm = () => { setEditMa(null); setMaVorname(""); setMaNachname(""); setMaEmail(""); setMaPasswort(""); setMaRolle("mitarbeiter"); setMaTelefon(""); setMaBeschaeftigung("minijob"); setMaUrlaubstage(24); setMaWochenstunden(0); setMaMonatslohn(0); setMaStundenlohn(0); };
+  // ── Export ───────────────────────────────────────────
+  const { data: exportDaten = [] } = trpc.admin.mitarbeiterExport.useQuery();
+
+  const EXPORT_HEADER = ["ID", "Vorname", "Nachname", "E-Mail", "Rolle", "Beschäftigungsart", "Telefon", "Aktiv", "Urlaubstage/Jahr", "Urlaub verbraucht", "Urlaub Rest", "Wochenstunden", "Monatslohn (€)", "Stundenlohn (€)", "Einstellungsdatum", "Notizen"];
+  const EXPORT_KEYS: Array<keyof typeof exportDaten[0]> = ["id", "vorname", "nachname", "email", "rolle", "beschaeftigungsart", "telefon", "aktiv", "urlaubstageJahr", "urlaubstageVerbraucht", "urlaubstageRest", "wochenstunden", "monatslohn", "stundenlohn", "einstellungsdatum", "notizen"];
+
+  const dateiname = () => `mitarbeiterliste_${new Date().toISOString().slice(0, 10)}`;
+
+  const exportExcel = () => {
+    if (exportDaten.length === 0) { toast.error("Keine Daten zum Exportieren"); return; }
+    const ws = XLSX.utils.aoa_to_sheet([
+      EXPORT_HEADER,
+      ...exportDaten.map(ma => EXPORT_KEYS.map(k => (ma as any)[k] ?? "")),
+    ]);
+    // Spaltenbreiten automatisch
+    ws["!cols"] = EXPORT_HEADER.map((h, i) => {
+      const maxLen = Math.max(h.length, ...exportDaten.map(ma => String((ma as any)[EXPORT_KEYS[i]] ?? "").length));
+      return { wch: Math.min(maxLen + 2, 40) };
+    });
+    // Titelzeile fett
+    EXPORT_HEADER.forEach((_, i) => {
+      const cell = XLSX.utils.encode_cell({ r: 0, c: i });
+      if (ws[cell]) ws[cell].s = { font: { bold: true } };
+    });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Mitarbeiter");
+    XLSX.writeFile(wb, `${dateiname()}.xlsx`);
+    toast.success("✅ Excel-Export erfolgreich");
+  };
+
+  const exportCSV = () => {
+    if (exportDaten.length === 0) { toast.error("Keine Daten zum Exportieren"); return; }
+    const rows = [
+      EXPORT_HEADER,
+      ...exportDaten.map(ma => EXPORT_KEYS.map(k => String((ma as any)[k] ?? "").replace(/;/g, ","))),
+    ];
+    const csv = rows.map(r => r.map(v => `"${v}"`).join(";")).join("\n");
+    const bom = "\uFEFF";
+    const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `${dateiname()}.csv`; a.click();
+    URL.revokeObjectURL(url);
+    toast.success("✅ CSV-Export erfolgreich");
+  };
+
   // ── Löschen ──────────────────────────────────────────
   const [deleteDialogMa, setDeleteDialogMa] = useState<{ id: number; vorname: string; nachname: string } | null>(null);
   const [deleteBestaetigung, setDeleteBestaetigung] = useState("");
@@ -288,7 +335,11 @@ export default function AdminPanel() {
             <span style={{ fontSize: 14, fontWeight: 600 }}>
               {maList.filter(m => maZeigeInaktiv || m.aktiv).length} Mitarbeiter
             </span>
-            <button onClick={() => { resetMaForm(); setMaSheet(true); }} style={{ padding: "8px 14px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>+ Neu anlegen</button>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <button onClick={exportExcel} title="Als Excel-Datei herunterladen" style={{ padding: "8px 12px", background: "#1d6f42", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>📥 Excel</button>
+              <button onClick={exportCSV} title="Als CSV-Datei herunterladen (DATEV-kompatibel)" style={{ padding: "8px 12px", background: "#1e40af", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>📥 CSV</button>
+              <button onClick={() => { resetMaForm(); setMaSheet(true); }} style={{ padding: "8px 14px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>+ Neu anlegen</button>
+            </div>
           </div>
           {/* Suchfeld */}
           <input
