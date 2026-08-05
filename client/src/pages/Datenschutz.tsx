@@ -137,11 +137,13 @@ export default function Datenschutz() {
                 </thead>
                 <tbody>
                   {(alleZustimmungen as any[]).map((z: any, i: number) => (
-                    <tr key={z.id} style={{ borderTop: i > 0 ? "1px solid #f3f4f6" : "none" }}>
+                    <tr key={z.mitarbeiterId ?? i} style={{ borderTop: i > 0 ? "1px solid #f3f4f6" : "none" }}>
                       <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600, color: "#111827" }}>
-                        {z.mitarbeiter?.vorname} {z.mitarbeiter?.nachname}
+                        {z.name ?? `${z.mitarbeiter?.vorname ?? ""} ${z.mitarbeiter?.nachname ?? ""}`}
                       </td>
-                      <td style={{ padding: "12px 16px", fontSize: 13, color: "#374151" }}>{z.vorlage?.titel ?? "—"}</td>
+                      <td style={{ padding: "12px 16px", fontSize: 13, color: "#374151" }}>
+                        {z.zustimmungen ? z.zustimmungen.map((s: any) => s.titel).join(", ") : (z.vorlage?.titel ?? "—")}
+                      </td>
                       <td style={{ padding: "12px 16px", fontSize: 12, color: "#6b7280" }}>v{z.vorlage?.version ?? "1.0"}</td>
                       <td style={{ padding: "12px 16px" }}>
                         <span style={{
