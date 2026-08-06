@@ -254,7 +254,6 @@ export default function PortalApp() {
       ],
     },
     // ── ⚙️ EINSTELLUNGEN ──────────────────────────────────────────────────
-    // ── ⚙️ EINSTELLUNGEN ──────────────────────────────────────────────────
     {
       title: "⚙️ Einstellungen",
       items: [
