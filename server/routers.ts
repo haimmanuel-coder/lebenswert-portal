@@ -1899,6 +1899,11 @@ export const appRouter = router({
         stundenlohn: z.number().min(0).optional(),
       }))
       .mutation(async ({ input, ctx }) => {
+        // Duplikat-Prüfung: E-Mail bereits vorhanden?
+        const vorhandener = await getMitarbeiterByEmail(input.email);
+        if (vorhandener) {
+          throw new TRPCError({ code: 'CONFLICT', message: `Die E-Mail-Adresse ist bereits vergeben (Mitarbeiter: ${vorhandener.vorname} ${vorhandener.nachname}).` });
+        }
         const hash = await bcrypt.hash(input.passwort, 10);
         const { wochenstunden, monatslohn, stundenlohn, ...restInput } = input;
         await createMitarbeiter({
@@ -1972,6 +1977,20 @@ export const appRouter = router({
         }
         await deleteMitarbeiter(input.id);
         await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'ADMIN', ressource: 'mitarbeiter', details: `HARD-DELETE id=${input.id} name=${ma.vorname} ${ma.nachname}`, status: 'success' });
+        return { success: true };
+      }),
+    /** Admin: Passwort eines Mitarbeiters direkt zurücksetzen */
+    mitarbeiterPasswortReset: adminProcedure
+      .input(z.object({
+        id: z.number().int().positive(),
+        neuesPasswort: z.string().min(6, "Passwort muss mindestens 6 Zeichen haben"),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const ma = await getMitarbeiterById(input.id);
+        if (!ma) throw new TRPCError({ code: 'NOT_FOUND', message: 'Mitarbeiter nicht gefunden.' });
+        const hash = await bcrypt.hash(input.neuesPasswort, 10);
+        await updateMitarbeiter(input.id, { passwortHash: hash } as any);
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'ADMIN', ressource: 'mitarbeiter', details: `passwort-reset id=${input.id}`, status: 'success' });
         return { success: true };
       }),
     /** Mitarbeiterliste als strukturierte Daten für Export */

@@ -976,3 +976,9 @@
 - [x] unterweisungPdfGenerator.ts: Nachweis-Layout (Briefkopf, Thema, Datum, Unterschriftszeilen)
 - [x] ArbeitssicherheitDashboard.tsx: "📄 PDF"-Button pro Unterweisung in der Tabelle
 - [x] TypeScript: 0 Fehler
+
+## 3 Features: Führerschein-Fix + Passwort-Reset + Duplikat-Prüfung (06.08.2026)
+- [x] Führerschein-Check-Modul: FuehrerscheinCheckTab.tsx testen und Fehler beheben
+- [x] Passwort-Reset-Button im MA-Bearbeiten-Sheet (Backend-Procedure + Frontend)
+- [x] Duplikat-Prüfung beim MA-Anlegen: E-Mail bereits vorhanden → Fehlermeldung mit Name
+- [x] TypeScript: 0 Fehler

@@ -120,6 +120,13 @@ export default function AdminPanel() {
   // ── Löschen ──────────────────────────────────────────
   const [deleteDialogMa, setDeleteDialogMa] = useState<{ id: number; vorname: string; nachname: string } | null>(null);
   const [deleteBestaetigung, setDeleteBestaetigung] = useState("");
+  // ── Passwort-Reset ───────────────────────────────────
+  const [pwResetMa, setPwResetMa] = useState<{ id: number; vorname: string; nachname: string } | null>(null);
+  const [pwResetNeu, setPwResetNeu] = useState("");
+  const passwortReset = trpc.admin.mitarbeiterPasswortReset.useMutation({
+    onSuccess: () => { toast.success("🔑 Passwort wurde zurückgesetzt"); setPwResetMa(null); setPwResetNeu(""); },
+    onError: (e) => toast.error("❌ " + e.message),
+  });
   const deleteMa = trpc.admin.mitarbeiterDelete.useMutation({
     onSuccess: () => { refetchMa(); toast.success("🗑️ Mitarbeiter gelöscht"); setDeleteDialogMa(null); setDeleteBestaetigung(""); },
     onError: (e) => toast.error("❌ " + e.message),
@@ -412,6 +419,9 @@ export default function AdminPanel() {
                   <button onClick={() => { updateMa.mutate({ id: ma.id, aktiv: ma.aktiv ? 0 : 1 }); }} style={{ padding: "4px 10px", background: ma.aktiv ? "#fee2e2" : "#e8f5e4", color: ma.aktiv ? "#991b1b" : "#4a8c3f", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                     {ma.aktiv ? "Deaktivieren" : "Aktivieren"}
                   </button>
+                  <button onClick={() => { setPwResetMa({ id: ma.id, vorname: ma.vorname, nachname: ma.nachname }); setPwResetNeu(""); }} style={{ padding: "4px 10px", background: "#1e3a5f", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                    🔑 Passwort
+                  </button>
                   <button onClick={() => { setDeleteDialogMa({ id: ma.id, vorname: ma.vorname, nachname: ma.nachname }); setDeleteBestaetigung(""); }} style={{ padding: "4px 10px", background: "#7f1d1d", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                     🗑️ Löschen
                   </button>
@@ -683,6 +693,36 @@ export default function AdminPanel() {
 
       {/* ── Kunden-Sheet ── */}
       <BottomSheet open={kdSheet} onClose={() => { setKdSheet(false); resetKdForm(); }} title={editKd ? "Kunde bearbeiten" : "Neuer Kunde"}>
+      {/* ── Passwort-Reset-Dialog ── */}
+      {pwResetMa && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: 28, maxWidth: 400, width: "90%", boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}>
+            <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}>🔑 Passwort zurücksetzen</div>
+            <div style={{ fontSize: 14, color: "#6b7280", marginBottom: 16 }}>
+              Neues Passwort für <strong>{pwResetMa.vorname} {pwResetMa.nachname}</strong> setzen:
+            </div>
+            <input
+              type="password"
+              placeholder="Neues Passwort (min. 6 Zeichen)"
+              value={pwResetNeu}
+              onChange={(e) => setPwResetNeu(e.target.value)}
+              style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 14, marginBottom: 16, boxSizing: "border-box" as const }}
+            />
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => { setPwResetMa(null); setPwResetNeu(""); }} style={{ flex: 1, padding: "10px 0", background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+                Abbrechen
+              </button>
+              <button
+                onClick={() => passwortReset.mutate({ id: pwResetMa.id, neuesPasswort: pwResetNeu })}
+                disabled={pwResetNeu.length < 6 || passwortReset.isPending}
+                style={{ flex: 1, padding: "10px 0", background: pwResetNeu.length >= 6 ? "#1e3a5f" : "#d1d5db", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: pwResetNeu.length >= 6 ? "pointer" : "not-allowed" }}
+              >
+                {passwortReset.isPending ? "Speichern…" : "🔑 Passwort setzen"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
           <div>
             <label style={labelStyle}>Vorname *</label>
