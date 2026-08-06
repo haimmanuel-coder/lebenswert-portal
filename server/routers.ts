@@ -675,6 +675,75 @@ const vertretungenRouter = router({
 });
 
 
+
+// ── Onboarding-Checkliste ────────────────────────────────────────────────────
+const ONBOARDING_STANDARD_AUFGABEN = [
+  { aufgabe: "Arbeitsvertrag unterschrieben und eingereicht", kategorie: "dokumente", reihenfolge: 1 },
+  { aufgabe: "Personalausweis / Reisepass kopiert", kategorie: "dokumente", reihenfolge: 2 },
+  { aufgabe: "Bankverbindung für Lohnzahlung hinterlegt", kategorie: "dokumente", reihenfolge: 3 },
+  { aufgabe: "Krankenkassenbescheinigung eingereicht", kategorie: "dokumente", reihenfolge: 4 },
+  { aufgabe: "Führerschein-Check durchgeführt", kategorie: "sicherheit", reihenfolge: 5 },
+  { aufgabe: "Erstunterweisung Arbeitssicherheit abgeschlossen", kategorie: "sicherheit", reihenfolge: 6 },
+  { aufgabe: "Hygieneschulung absolviert", kategorie: "einweisung", reihenfolge: 7 },
+  { aufgabe: "Erste-Hilfe-Kurs Nachweis eingereicht", kategorie: "einweisung", reihenfolge: 8 },
+  { aufgabe: "Einweisung in das Mitarbeiter-Portal", kategorie: "system", reihenfolge: 9 },
+  { aufgabe: "Zugangsdaten Portal erhalten und getestet", kategorie: "system", reihenfolge: 10 },
+  { aufgabe: "DSGVO-Verpflichtungserklärung unterschrieben", kategorie: "dokumente", reihenfolge: 11 },
+  { aufgabe: "Pflegehilfsmittel / PSA ausgegeben", kategorie: "sicherheit", reihenfolge: 12 },
+];
+
+const onboardingRouter = router({
+  list: adminProcedure
+    .input(z.object({ mitarbeiterId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      const mid = input.mitarbeiterId;
+      const rows = await db!.execute(sql`SELECT * FROM onboarding_checklisten WHERE mitarbeiterId = ${mid} ORDER BY reihenfolge ASC, id ASC`);
+      return (rows as any).rows as Array<{
+        id: number; mitarbeiterId: number; aufgabe: string; kategorie: string;
+        erledigt: number; erledigtAm: string | null; notiz: string | null; reihenfolge: number;
+      }>;
+    }),
+
+  erstellen: adminProcedure
+    .input(z.object({ mitarbeiterId: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      const mid = input.mitarbeiterId;
+      const existing = await db!.execute(sql`SELECT COUNT(*) as cnt FROM onboarding_checklisten WHERE mitarbeiterId = ${mid}`);
+      const cnt = Number((existing as any).rows[0]?.cnt ?? 0);
+      if (cnt > 0) return { created: 0 };
+      for (const a of ONBOARDING_STANDARD_AUFGABEN) {
+        const aufgabe = a.aufgabe; const kat = a.kategorie; const reihe = a.reihenfolge;
+        await db!.execute(sql`INSERT INTO onboarding_checklisten (mitarbeiterId, aufgabe, kategorie, reihenfolge) VALUES (${mid}, ${aufgabe}, ${kat}, ${reihe})`);
+      }
+      return { created: ONBOARDING_STANDARD_AUFGABEN.length };
+    }),
+
+  abhaken: adminProcedure
+    .input(z.object({ id: z.number(), erledigt: z.boolean(), notiz: z.string().optional() }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      const id = input.id;
+      const erledigt = input.erledigt ? 1 : 0;
+      const erledigtAm = input.erledigt ? new Date() : null;
+      const erledigtVon = input.erledigt ? (ctx as any).mitarbeiterId ?? null : null;
+      const notiz = input.notiz ?? null;
+      await db!.execute(sql`UPDATE onboarding_checklisten SET erledigt = ${erledigt}, erledigtAm = ${erledigtAm}, erledigtVon = ${erledigtVon}, notiz = ${notiz} WHERE id = ${id}`);
+      return { ok: true };
+    }),
+
+  fortschritt: adminProcedure
+    .input(z.object({ mitarbeiterId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      const mid = input.mitarbeiterId;
+      const rows = await db!.execute(sql`SELECT COUNT(*) as gesamt, SUM(erledigt) as erledigt FROM onboarding_checklisten WHERE mitarbeiterId = ${mid}`);
+      const row = (rows as any).rows[0];
+      return { gesamt: Number(row?.gesamt ?? 0), erledigt: Number(row?.erledigt ?? 0) };
+    }),
+});
+
 // ── KI-Assistent ────────────────────────────────────────────────────────────
 const kiRouter = router({
   chat: protectedProcedure
@@ -729,6 +798,7 @@ Wenn du etwas nicht weißt, sage es ehrlich.`;
 export const appRouter = router({
   system: systemRouter,
   ki: kiRouter,
+  onboarding: onboardingRouter,
   pflichtenheft: pflichtenheftRouter,
   /** Einsatzplanung: Termine, Budgetstunden, Lohnkosten, Warnungen, Touren */
   planung: planungRouter,
@@ -1971,6 +2041,34 @@ export const appRouter = router({
           ...(stundenlohn !== undefined ? { stundenlohn: String(stundenlohn) } : {}),
         } as any);
         await createAuditLog({ mitarbeiterId: ctx.adminId, action: "ADMIN", ressource: "mitarbeiter", details: `create ${input.email} urlaubstage=${restInput.urlaubstageJahr ?? 24}`, status: "success" });
+        // Onboarding-Checkliste automatisch erstellen
+        try {
+          const db = await getDb();
+          const AUFGABEN = [
+            { aufgabe: "Arbeitsvertrag unterschrieben und eingereicht", kategorie: "dokumente", reihenfolge: 1 },
+            { aufgabe: "Personalausweis / Reisepass kopiert", kategorie: "dokumente", reihenfolge: 2 },
+            { aufgabe: "Bankverbindung für Lohnzahlung hinterlegt", kategorie: "dokumente", reihenfolge: 3 },
+            { aufgabe: "Krankenkassenbescheinigung eingereicht", kategorie: "dokumente", reihenfolge: 4 },
+            { aufgabe: "Führerschein-Check durchgeführt", kategorie: "sicherheit", reihenfolge: 5 },
+            { aufgabe: "Erstunterweisung Arbeitssicherheit abgeschlossen", kategorie: "sicherheit", reihenfolge: 6 },
+            { aufgabe: "Hygieneschulung absolviert", kategorie: "einweisung", reihenfolge: 7 },
+            { aufgabe: "Erste-Hilfe-Kurs Nachweis eingereicht", kategorie: "einweisung", reihenfolge: 8 },
+            { aufgabe: "Einweisung in das Mitarbeiter-Portal", kategorie: "system", reihenfolge: 9 },
+            { aufgabe: "Zugangsdaten Portal erhalten und getestet", kategorie: "system", reihenfolge: 10 },
+            { aufgabe: "DSGVO-Verpflichtungserklärung unterschrieben", kategorie: "dokumente", reihenfolge: 11 },
+            { aufgabe: "Pflegehilfsmittel / PSA ausgegeben", kategorie: "sicherheit", reihenfolge: 12 },
+          ];
+          // Neue mitarbeiterId aus DB holen
+          const emailVal = input.email;
+          const idRows = await db!.execute(sql`SELECT id FROM mitarbeiter WHERE email = ${emailVal} ORDER BY id DESC LIMIT 1`);
+          const newId = (idRows as any).rows?.[0]?.id;
+          if (newId) {
+            for (const a of AUFGABEN) {
+              const aufgabe = a.aufgabe; const kat = a.kategorie; const reihe = a.reihenfolge;
+              await db!.execute(sql`INSERT INTO onboarding_checklisten (mitarbeiterId, aufgabe, kategorie, reihenfolge) VALUES (${newId}, ${aufgabe}, ${kat}, ${reihe})`);
+            }
+          }
+        } catch (_e) { /* Onboarding-Fehler nicht kritisch */ }
         return { success: true };
       }),
 

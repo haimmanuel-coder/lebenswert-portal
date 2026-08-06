@@ -9,6 +9,8 @@ import { ArbeitssicherheitAdminTab } from "./ArbeitssicherheitAdminTab";
 import ArbeitssicherheitDashboard from "./ArbeitssicherheitDashboard";
 import { UnterschriftenArchivTab } from "./UnterschriftenArchivTab";
 import LohnkostenTab from "./LohnkostenTab";
+import OnboardingTab from "./OnboardingTab";
+import CsvImportTab from "./CsvImportTab";
 import { useState, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { trpc } from "@/lib/trpc";
@@ -16,7 +18,7 @@ import { toast } from "sonner";
 import BottomSheet from "@/components/BottomSheet";
 import MitarbeiterDetail from "./MitarbeiterDetail";
 
-type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo" | "preise" | "sicherheit" | "fuehrerschein" | "compliance" | "compliance-gesamt" | "arbeitssicherheit" | "as-dashboard" | "unterschriften-archiv" | "lohnkosten";
+type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo" | "preise" | "sicherheit" | "fuehrerschein" | "compliance" | "compliance-gesamt" | "arbeitssicherheit" | "as-dashboard" | "unterschriften-archiv" | "lohnkosten" | "onboarding" | "csv-import";
 type PortalRolle = "mitarbeiter" | "teamleitung" | "buchhaltung" | "admin";
 
 const ROLLEN_LABEL: Record<PortalRolle, string> = {
@@ -331,6 +333,8 @@ export default function AdminPanel() {
           { key: "as-dashboard" as AdminTab, label: "🚦 AS-Dashboard" },
           { key: "unterschriften-archiv" as AdminTab, label: "📋 Unterschriften-Archiv" },
           { key: "lohnkosten" as AdminTab, label: "💰 Lohnkosten" },
+          { key: "onboarding" as AdminTab, label: "🎯 Onboarding" },
+          { key: "csv-import" as AdminTab, label: "📥 CSV-Import" },
         ].map((t) => (
           <button key={t.key} style={tabStyle(t.key)} onClick={() => setTab(t.key)}>{t.label}</button>
         ))}
@@ -801,6 +805,12 @@ export default function AdminPanel() {
       )}
       {tab === "lohnkosten" && (
         <LohnkostenTab />
+      )}
+      {tab === "onboarding" && (
+        <OnboardingTab maList={maList} />
+      )}
+      {tab === "csv-import" && (
+        <CsvImportTab />
       )}
       <BottomSheet open={budgetSheet} onClose={() => setBudgetSheet(false)} title={budgetKunde ? `Budget: ${budgetKunde.vorname} ${budgetKunde.nachname}` : "Budget bearbeiten"}>
         {/* §45b */}

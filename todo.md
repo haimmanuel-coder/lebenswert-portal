@@ -1018,3 +1018,10 @@
 - [x] LENA: Chat-Verlauf im LocalStorage speichern + laden
 - [x] LENA: Spracheingabe per Web Speech API (Mikrofon-Button)
 - [x] TypeScript: 0 Fehler
+
+## Onboarding-Checkliste + CSV-Import (07.08.2026)
+- [x] DB: onboarding_checklisten Tabelle
+- [x] Backend: onboarding.list, onboarding.abhaken, onboarding.erstellen Procedures
+- [x] AdminPanel: Onboarding-Tab mit Checkliste pro Mitarbeiter
+- [x] AdminPanel: CSV-Import Button + Template-Download + Vorschau + Batch-Create
+- [x] TypeScript: 0 Fehler
