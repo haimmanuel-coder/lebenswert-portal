@@ -187,8 +187,9 @@ export default function PortalApp() {
     {
       title: "🏠 Dashboard",
       items: [
-        { id: "home", icon: "🏠", label: "Dashboard" },
+        { id: "home", icon: "🏠", label: "Übersicht" },
         ...(isAdmin ? [{ id: "admindashboard" as PageId, icon: "🚦", label: "Ampel-Dashboard", adminOnly: true }] : []),
+        { id: "benachrichtigungen", icon: "🔔", label: "Benachrichtigungen", badge: unreadCount },
       ],
     },
     // ── 📅 PLANUNG ────────────────────────────────────────────────────────
@@ -196,7 +197,6 @@ export default function PortalApp() {
       title: "📅 Planung",
       items: [
         { id: "planung", icon: "📅", label: "Einsatzplanung", badge: planungsBadge },
-        { id: "einsaetze", icon: "📋", label: "Einsätze" },
         { id: "kalender", icon: "📆", label: "Kalender" },
         { id: "verfuegbarkeiten" as PageId, icon: "🕐", label: "Verfügbarkeiten" },
         ...(isAdmin || isTeamleitung ? [{ id: "kundenzuteilung" as PageId, icon: "📌", label: "Kundenzuteilung", adminOnly: true }] : []),
@@ -253,6 +253,7 @@ export default function PortalApp() {
         { id: "benachrichtigungen", icon: "🔔", label: "Benachrichtigungen", badge: unreadCount },
       ],
     },
+    // ── ⚙️ EINSTELLUNGEN ──────────────────────────────────────────────────
     // ── ⚙️ EINSTELLUNGEN ──────────────────────────────────────────────────
     {
       title: "⚙️ Einstellungen",
