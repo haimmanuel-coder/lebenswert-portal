@@ -994,3 +994,8 @@
 - [x] 🔔 Kommunikation: Benachrichtigungen
 - [x] ⚙️ Einstellungen: Admin-Panel
 - [x] TypeScript: 0 Fehler
+
+## Controlling-Bündelung: 4 Tabs (07.08.2026)
+- [x] ControllingPage.tsx: Management + Analysen + Controlling + Buchhaltungs-Export als Tabs
+- [x] PortalApp.tsx: 3 separate Menüpunkte durch 1 "📈 Controlling" ersetzen
+- [x] TypeScript: 0 Fehler

@@ -32,7 +32,8 @@ export type SeitenId =
   | "besuchsberichte" | "datenschutz" | "integrationen" | "arbeitszentrum"
   | "zweifaktor" | "verfuegbarkeiten" | "analysen" | "backupstatus"
   | "import" | "privatrechnung" | "budget" | "controlling" | "fahrtenabrechnung"
-  | "sicherheitsunterweisung" | "meinearbeitssicherheit";
+  | "sicherheitsunterweisung" | "meinearbeitssicherheit"
+  | "controllingpage" | "mobilitaetpage";
 
 type NavigationWert = {
   /** Wechselt zur angegebenen Seite. */

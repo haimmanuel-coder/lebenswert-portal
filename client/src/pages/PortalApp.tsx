@@ -50,6 +50,7 @@ import Einsatzplanung from "./Einsatzplanung";
 import ImportAssistent from "./ImportAssistent";
 import BudgetVerwaltung from "./BudgetVerwaltung";
 import ControllingDashboard from "./ControllingDashboard";
+import ControllingPage from "./ControllingPage";
 import FahrtenAbrechnung from "./FahrtenAbrechnung";
 import Privatrechnung from "./Privatrechnung";
 import { NavigationProvider, type SeitenId } from "@/contexts/NavigationContext";
@@ -203,10 +204,7 @@ export default function PortalApp() {
     ...(isAdmin || isTeamleitung ? [{
       title: "📈 Controlling",
       items: [
-        { id: "management" as PageId, icon: "📈", label: "Management", adminOnly: true },
-        { id: "analysen" as PageId, icon: "📊", label: "Analysen", adminOnly: true },
-        { id: "controlling" as PageId, icon: "📉", label: "Controlling", adminOnly: true },
-        { id: "buchhaltung" as PageId, icon: "💼", label: "Buchhaltungs-Export", adminOnly: true },
+        { id: "controllingpage" as PageId, icon: "📈", label: "Controlling", adminOnly: true },
       ],
     }] : []),
     // ── ✅ QUALITÄT & COMPLIANCE ──────────────────────────────────────────
@@ -290,6 +288,7 @@ export default function PortalApp() {
       case "import": return <ImportAssistent />;
       case "budget": return <BudgetVerwaltung />;
       case "controlling": return <ControllingDashboard />;
+      case "controllingpage": return <ControllingPage />;
       case "fahrtenabrechnung": return <FahrtenAbrechnung />;
       case "privatrechnung": return <Privatrechnung />;
       default: return <Dashboard />;
