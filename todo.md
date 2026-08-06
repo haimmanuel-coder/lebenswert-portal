@@ -1012,3 +1012,9 @@
 - [x] Onboarding-Tour: neue 8-Bereiche-Struktur
 - [x] KI-Avatar: Backend-Procedure (invokeLLM) + Chat-Widget mit Avatar-Bild
 - [x] TypeScript: 0 Fehler
+
+## LENA KI-Erweiterungen (07.08.2026)
+- [x] LENA: Portal-Kontext (Mitarbeitername + aktive Seite im System-Prompt)
+- [x] LENA: Chat-Verlauf im LocalStorage speichern + laden
+- [x] LENA: Spracheingabe per Web Speech API (Mikrofon-Button)
+- [x] TypeScript: 0 Fehler

@@ -683,20 +683,37 @@ const kiRouter = router({
         role: z.enum(["user", "assistant"]),
         content: z.string(),
       })),
+      kontext: z.object({
+        mitarbeiterName: z.string().optional(),
+        aktiveSeite: z.string().optional(),
+        rolle: z.string().optional(),
+      }).optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const { invokeLLM } = await import("./_core/llm");
-      const systemPrompt = `Du bist LENA, der freundliche KI-Assistent des Lebenswert Betreuung Mitarbeiter-Portals.
-Du hilfst Mitarbeitern und Administratoren bei allen Fragen rund um:
+      const name = input.kontext?.mitarbeiterName ?? ctx.user?.name ?? "Mitarbeiter";
+      const seite = input.kontext?.aktiveSeite ?? "unbekannt";
+      const rolle = input.kontext?.rolle ?? "mitarbeiter";
+      const rolleText = rolle === "admin" ? "Administrator" : rolle === "teamleitung" ? "Teamleitung" : "Mitarbeiter";
+
+      const systemPrompt = `Du bist LENA, die freundliche KI-Assistentin des Lebenswert Betreuung Mitarbeiter-Portals.
+
+AKTUELLER NUTZER: ${name} (${rolleText})
+AKTUELLE SEITE: ${seite}
+
+Du hilfst bei allen Fragen rund um:
 - Das Portal und seine Funktionen (Einsatzplanung, Leistungsnachweise, Fahrtenbuch, Urlaubsverwaltung, etc.)
-- Pflegeprozesse und Dokumentation
-- Arbeitssicherheit und Compliance
-- Administrative Aufgaben
+- Pflegeprozesse und Dokumentation in der ambulanten Pflege
+- Arbeitssicherheit und Compliance (Führerschein-Checks, Unterweisungen)
+- Administrative Aufgaben (nur für Admins/Teamleitung)
 
 Das Portal hat 8 Hauptbereiche: 🏠 Dashboard, 📅 Planung, 👥 Kunden, 👨 Mitarbeiter, 📈 Controlling, ✅ Qualität, 🔔 Kommunikation, ⚙️ Einstellungen.
 
-Antworte immer auf Deutsch, freundlich, präzise und hilfreich. Halte Antworten kurz und verständlich.
-Wenn du etwas nicht weißt, sage es ehrlich und empfehle den Admin zu kontaktieren.`;
+Wenn ${name} auf der Seite "${seite}" ist, beziehe dich in deiner Antwort darauf wenn sinnvoll.
+Sprich ${name} direkt mit dem Vornamen an, wenn es natürlich wirkt.
+
+Antworte immer auf Deutsch, freundlich, präzise und hilfreich. Halte Antworten kurz (max. 3-4 Sätze).
+Wenn du etwas nicht weißt, sage es ehrlich.`;
 
       const response = await invokeLLM({
         messages: [
