@@ -959,10 +959,10 @@ export async function getFuehrerscheinChecks(mitarbeiterId?: number) {
   const db = await getDb();
   if (!db) return [];
   if (mitarbeiterId) {
-    const r = await db.execute(sql`SELECT * FROM fuehrerschein_checks WHERE mitarbeiter_id = ${mitarbeiterId} ORDER BY pruef_datum DESC`);
+    const r = await db.execute(sql`SELECT * FROM fuehrerschein_checks WHERE mitarbeiterId = ${mitarbeiterId} ORDER BY pruefDatum DESC`);
     return (r as any)[0] as any[];
   }
-  const r = await db.execute(sql`SELECT * FROM fuehrerschein_checks ORDER BY naechstes_pruef_datum ASC`);
+  const r = await db.execute(sql`SELECT * FROM fuehrerschein_checks ORDER BY naechstePruefung ASC`);
   return (r as any)[0] as any[];
 }
 
@@ -978,7 +978,7 @@ export async function createFuehrerscheinCheck(data: {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   const result = await db.execute(sql`
-    INSERT INTO fuehrerschein_checks (mitarbeiter_id, foto_key, foto_url, pruef_datum, naechstes_pruef_datum, status, bemerkung)
+    INSERT INTO fuehrerschein_checks (mitarbeiterId, fotoKey, fotoUrl, pruefDatum, naechstePruefung, status, bemerkung)
     VALUES (${data.mitarbeiterId}, ${data.fotoKey ?? null}, ${data.fotoUrl ?? null}, ${data.pruefDatum}, ${data.naechstesPruefDatum}, ${data.status}, ${data.bemerkung ?? null})
   `);
   return result;
