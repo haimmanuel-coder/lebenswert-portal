@@ -999,3 +999,9 @@
 - [x] ControllingPage.tsx: Management + Analysen + Controlling + Buchhaltungs-Export als Tabs
 - [x] PortalApp.tsx: 3 separate Menüpunkte durch 1 "📈 Controlling" ersetzen
 - [x] TypeScript: 0 Fehler
+
+## 3 Features: Pflegekassen + Collapse-Menü + Startseite (07.08.2026)
+- [x] PflegekassenPage.tsx: Kassenanfragen + Kostenträger als Tabs
+- [x] Menü: Collapse-Button pro Hauptbereich (▶/▼)
+- [x] Startseite: Admin → controllingpage, Mitarbeiter → planung
+- [x] TypeScript: 0 Fehler

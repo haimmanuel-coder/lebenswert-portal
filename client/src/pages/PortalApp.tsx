@@ -20,6 +20,7 @@ import MeineArbeitssicherheit from "./MeineArbeitssicherheit";
 import NeukundenAufnahme from "./NeukundenAufnahme";
 import Kalender from "./Kalender";
 import Kassenanfrage from "./Kassenanfrage";
+import PflegekassenPage from "./PflegekassenPage";
 import Urlaubsverwaltung from "./Urlaubsverwaltung";
 import Krankmeldung from "./Krankmeldung";
 import Benachrichtigungen from "./Benachrichtigungen";
@@ -78,7 +79,16 @@ interface NavSection {
 export default function PortalApp() {
   const { mitarbeiter, logout } = usePortalAuth();
   const [activePage, setActivePage] = useState<PageId>("home");
+  const [startPageSet, setStartPageSet] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  const toggleSection = (title: string) => {
+    setCollapsedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(title)) next.delete(title); else next.add(title);
+      return next;
+    });
+  };
   const [kundenDetailId, setKundenDetailId] = useState<number | null>(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
@@ -119,6 +129,17 @@ export default function PortalApp() {
   // Offene Pflicht-Sicherheitsunterweisungen für Badge
   const { data: sicherheitOffen } = (trpc as any).sicherheitsunterweisung.countOffen.useQuery();
   const sicherheitBadge = (sicherheitOffen as any)?.count > 0 ? (sicherheitOffen as any).count : undefined;
+  // Personalisierte Startseite: einmalig nach Login setzen
+  useEffect(() => {
+    if (mitarbeiter && !startPageSet) {
+      setStartPageSet(true);
+      if (mitarbeiter.rolle === "admin" || mitarbeiter.rolle === "teamleitung") {
+        setActivePage("controllingpage");
+      } else {
+        setActivePage("planung");
+      }
+    }
+  }, [mitarbeiter, startPageSet]);
   const { isOnline, offlineCount } = useOfflineSync();
   const { show: showTour, startTour, closeTour } = useOnboardingTour();
   useSSENotifications(mitarbeiter?.id);
@@ -180,7 +201,7 @@ export default function PortalApp() {
         { id: "kunden", icon: "👥", label: "Kundenliste", badge: warnungen.length > 0 ? warnungen.length : undefined },
         ...(isAdmin ? [
           { id: "neukundenaufnahme" as PageId, icon: "➕", label: "Neukundenaufnahme", badge: neukundenPushCount > 0 ? neukundenPushCount : undefined },
-          { id: "kassenanfrage" as PageId, icon: "🏥", label: "Pflegekassen", adminOnly: true },
+          { id: "pflegekassen" as PageId, icon: "🏥", label: "Pflegekassen", adminOnly: true },
           { id: "budget" as PageId, icon: "💰", label: "Budgetverwaltung", adminOnly: true },
         ] : []),
         { id: "besuchsberichte" as PageId, icon: "📋", label: "Dokumentation" },
@@ -265,6 +286,7 @@ export default function PortalApp() {
       case "neukundenaufnahme": return <NeukundenAufnahme />;
       case "kalender": return <Kalender />;
       case "kassenanfrage": return <Kassenanfrage />;
+      case "pflegekassen": return <PflegekassenPage />;
       case "urlaub": return <Urlaubsverwaltung />;
       case "krank": return <Krankmeldung />;
       case "benachrichtigungen": return <Benachrichtigungen />;
@@ -322,19 +344,26 @@ export default function PortalApp() {
       <nav style={{ flex: 1, padding: "8px 0", overflowY: "auto" }}>
         {sections.map((section) => (
           <div key={section.title} style={{ marginBottom: 4 }}>
-            <div style={{
-              fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.55)",
-              padding: "12px 12px 4px",
-              display: "flex", alignItems: "center", gap: 6,
-              borderTop: "1px solid rgba(255,255,255,0.06)",
-              marginTop: 2,
-            }}>
+            <button
+              onClick={() => toggleSection(section.title)}
+              style={{
+                width: "100%", background: "none", border: "none", cursor: "pointer",
+                fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.55)",
+                padding: "12px 12px 4px",
+                display: "flex", alignItems: "center", gap: 6,
+                borderTop: "1px solid rgba(255,255,255,0.06)",
+                marginTop: 2, textAlign: "left",
+              }}
+            >
               <span style={{ fontSize: 13 }}>{section.title.split(" ")[0]}</span>
-              <span style={{ letterSpacing: 0.5, textTransform: "uppercase", fontSize: 9, fontWeight: 800 }}>
+              <span style={{ letterSpacing: 0.5, textTransform: "uppercase", fontSize: 9, fontWeight: 800, flex: 1 }}>
                 {section.title.split(" ").slice(1).join(" ")}
               </span>
-            </div>
-            {section.items.filter(item => darfModulNutzen(item.id)).map((item) => {
+              <span style={{ fontSize: 9, opacity: 0.6, marginRight: 4 }}>
+                {collapsedSections.has(section.title) ? "▶" : "▼"}
+              </span>
+            </button>
+            {!collapsedSections.has(section.title) && section.items.filter(item => darfModulNutzen(item.id)).map((item) => {
               const isActive = activePage === item.id && kundenDetailId === null;
               return (
                 <button

@@ -33,7 +33,7 @@ export type SeitenId =
   | "zweifaktor" | "verfuegbarkeiten" | "analysen" | "backupstatus"
   | "import" | "privatrechnung" | "budget" | "controlling" | "fahrtenabrechnung"
   | "sicherheitsunterweisung" | "meinearbeitssicherheit"
-  | "controllingpage" | "mobilitaetpage";
+  | "controllingpage" | "mobilitaetpage" | "pflegekassen";
 
 type NavigationWert = {
   /** Wechselt zur angegebenen Seite. */
