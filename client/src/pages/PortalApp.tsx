@@ -153,85 +153,96 @@ export default function PortalApp() {
   };
 
   const sections: NavSection[] = [
-    // ── Entscheidung 7: Kern-Arbeitsablauf in der Reihenfolge, die der
-    // Mitarbeiter tatsächlich durchläuft (Planung → Besuch → Nachbereitung).
-    // Dashboard bleibt als Startpunkt (Timer, Tages-KPIs, "Heute"-Liste).
+    // ── 🏠 DASHBOARD ──────────────────────────────────────────────────────
     {
-      title: "Arbeitsablauf",
+      title: "🏠 Dashboard",
       items: [
         { id: "home", icon: "🏠", label: "Dashboard" },
-        { id: "planung", icon: "🗓️", label: "Einsatzplanung", badge: planungsBadge },
-        { id: "einsaetze", icon: "📅", label: "Einsätze" },
-        { id: "lnw", icon: "📋", label: "Leistungsnachweise", badge: offenCount > 0 ? offenCount : undefined },
-        { id: "fahrt", icon: "🚗", label: "Fahrtenbuch" },
-        { id: "zeit", icon: "⏱", label: "Zeiterfassung" },
+        ...(isAdmin ? [{ id: "admindashboard" as PageId, icon: "🚦", label: "Ampel-Dashboard", adminOnly: true }] : []),
       ],
     },
-    // ── GRUPPE 2: KUNDEN & COMPLIANCE ──────────────────────────────────────
-    // Kundenbezogenes + Pflichtmodule (Urlaub, Krank, Compliance, Profil).
+    // ── 📅 PLANUNG ────────────────────────────────────────────────────────
     {
-      title: "Kunden & Compliance",
+      title: "📅 Planung",
+      items: [
+        { id: "planung", icon: "📅", label: "Einsatzplanung", badge: planungsBadge },
+        { id: "einsaetze", icon: "📋", label: "Einsätze" },
+        { id: "kalender", icon: "📆", label: "Kalender" },
+        { id: "verfuegbarkeiten" as PageId, icon: "🕐", label: "Verfügbarkeiten" },
+        ...(isAdmin || isTeamleitung ? [{ id: "kundenzuteilung" as PageId, icon: "📌", label: "Kundenzuteilung", adminOnly: true }] : []),
+      ],
+    },
+    // ── 👥 KUNDEN ─────────────────────────────────────────────────────────
+    {
+      title: "👥 Kunden",
       items: [
         { id: "kunden", icon: "👥", label: "Kundenliste", badge: warnungen.length > 0 ? warnungen.length : undefined },
-        { id: "benachrichtigungen", icon: "🔔", label: "Benachrichtigungen", badge: unreadCount },
-        { id: "kalender", icon: "📆", label: "Kalender" },
-        { id: "urlaub", icon: "🌴", label: "Urlaubsverwaltung" },
+        ...(isAdmin ? [
+          { id: "neukundenaufnahme" as PageId, icon: "➕", label: "Neukundenaufnahme", badge: neukundenPushCount > 0 ? neukundenPushCount : undefined },
+          { id: "kassenanfrage" as PageId, icon: "🏥", label: "Pflegekassen", adminOnly: true },
+          { id: "budget" as PageId, icon: "💰", label: "Budgetverwaltung", adminOnly: true },
+        ] : []),
+        { id: "besuchsberichte" as PageId, icon: "📋", label: "Dokumentation" },
+        { id: "lnw", icon: "📝", label: "Leistungsnachweise", badge: offenCount > 0 ? offenCount : undefined },
+      ],
+    },
+    // ── 👨 MITARBEITER ────────────────────────────────────────────────────
+    {
+      title: "👨 Mitarbeiter",
+      items: [
+        ...(isAdmin ? [{ id: "mitarbeiterakte" as PageId, icon: "📂", label: "Mitarbeiterakte", adminOnly: true }] : []),
+        { id: "zeit", icon: "⏱", label: "Zeiterfassung" },
+        { id: "fahrt", icon: "🚗", label: "Mobilität" },
+        { id: "urlaub", icon: "🌴", label: "Urlaub" },
         { id: "krank", icon: "🤒", label: "Krankmeldung" },
-        { id: "fuehrerschein", icon: "🪪", label: "Führerschein-Check" },
-        { id: "sicherheitsunterweisung", icon: "🛡️", label: "Sicherheitsunterweisungen", badge: sicherheitBadge > 0 ? sicherheitBadge : undefined },
-        { id: "meinearbeitssicherheit" as PageId, icon: "⛑️", label: "Arbeitssicherheit" },
-        { id: "verfuegbarkeiten" as PageId, icon: "📅", label: "Verfügbarkeiten" },
         { id: "profil", icon: "👤", label: "Mein Profil" },
         { id: "zweifaktor" as PageId, icon: "🔒", label: "2FA-Sicherheit" },
       ],
     },
-    // ── GRUPPE 3: ADMINISTRATION ────────────────────────────────────────────
-    // Nur für Admin/Teamleitung: Verwaltung, Export, Systemeinstellungen.
-    {
-      title: "Administration",
+    // ── 📈 CONTROLLING ────────────────────────────────────────────────────
+    ...(isAdmin || isTeamleitung ? [{
+      title: "📈 Controlling",
       items: [
-        ...(isTeamleitung && !isAdmin ? [
-          { id: "leistungsfreigabe" as PageId, icon: "✅", label: "LNW-Freigabe" },
-          { id: "besuchsberichte" as PageId, icon: "📋", label: "Besuchsberichte" },
-          { id: "datenschutz" as PageId, icon: "🔐", label: "Datenschutz" },
-          { id: "export" as PageId, icon: "📮", label: "Export & Briefe" },
-        ] : []),
-        ...(isAdmin ? [
-          // Übersicht & Steuerung
-          { id: "admindashboard" as PageId, icon: "📊", label: "Ampel-Dashboard", adminOnly: true },
-          { id: "management" as PageId, icon: "📈", label: "Management", adminOnly: true },
-          { id: "analysen" as PageId, icon: "📊", label: "Analysen", adminOnly: true },
-          { id: "controlling" as PageId, icon: "📊", label: "Controlling", adminOnly: true },
-          // Mitarbeiter & Kunden
-          { id: "leistungsfreigabe" as PageId, icon: "✅", label: "LNW-Freigabe", adminOnly: true },
-          { id: "mitarbeiterakte" as PageId, icon: "📂", label: "Mitarbeiterakte", adminOnly: true },
-          { id: "kundenzuteilung" as PageId, icon: "📌", label: "Kundenzuteilung", adminOnly: true },
-          { id: "neukundenaufnahme" as PageId, icon: "➕", label: "Neukundenaufnahme", badge: neukundenPushCount > 0 ? neukundenPushCount : undefined },
-          { id: "kassenanfrage" as PageId, icon: "🏥", label: "Kassenanfragen" },
-          { id: "kostentraeger" as PageId, icon: "🏦", label: "Kostenträger" },
-          { id: "budget" as PageId, icon: "💰", label: "Budgetverwaltung", adminOnly: false },
-          { id: "besuchsberichte" as PageId, icon: "📋", label: "Besuchsberichte" },
-          // Export & Buchhaltung
-          { id: "buchhaltung" as PageId, icon: "💼", label: "Buchhaltungs-Export", adminOnly: true },
-          { id: "fahrtenabrechnung" as PageId, icon: "🚗", label: "Fahrtabrechnung", adminOnly: true },
-          { id: "privatrechnung" as PageId, icon: "🧾", label: "Privatrechnung", adminOnly: true },
-          { id: "export" as PageId, icon: "📮", label: "Export & Briefe", adminOnly: true },
-          // Einstellungen & System
-          { id: "rollenverwaltung" as PageId, icon: "🔑", label: "Rollenverwaltung", adminOnly: true },
-          { id: "rbacverwaltung" as PageId, icon: "🛡️", label: "Rollen & Rechte", adminOnly: true },
-          { id: "vertretungen" as PageId, icon: "🔄", label: "Vertretungen", adminOnly: true },
-          { id: "textbausteine" as PageId, icon: "📝", label: "Textbausteine", adminOnly: true },
-          { id: "datenschutz" as PageId, icon: "🔐", label: "Datenschutz" },
-          { id: "integrationen" as PageId, icon: "🔌", label: "Integrationen", adminOnly: true },
-          { id: "import" as PageId, icon: "📥", label: "Import-Assistent", adminOnly: true },
-          { id: "logbuch" as PageId, icon: "🗒️", label: "Logbuch", adminOnly: true },
-          { id: "backupstatus" as PageId, icon: "💾", label: "Backup-Status", adminOnly: true },
-        ] : !isTeamleitung ? [
-          { id: "export" as PageId, icon: "📮", label: "Export & Briefe" },
-        ] : []),
+        { id: "management" as PageId, icon: "📈", label: "Management", adminOnly: true },
+        { id: "analysen" as PageId, icon: "📊", label: "Analysen", adminOnly: true },
+        { id: "controlling" as PageId, icon: "📉", label: "Controlling", adminOnly: true },
+        { id: "buchhaltung" as PageId, icon: "💼", label: "Buchhaltungs-Export", adminOnly: true },
+      ],
+    }] : []),
+    // ── ✅ QUALITÄT & COMPLIANCE ──────────────────────────────────────────
+    {
+      title: "✅ Qualität",
+      items: [
+        { id: "fuehrerschein", icon: "🪪", label: "Führerschein-Check" },
+        { id: "sicherheitsunterweisung", icon: "🛡️", label: "Unterweisungen", badge: sicherheitBadge },
+        { id: "meinearbeitssicherheit" as PageId, icon: "⛑️", label: "Arbeitssicherheit" },
+        ...(isAdmin || isTeamleitung ? [{ id: "leistungsfreigabe" as PageId, icon: "✅", label: "LNW-Freigabe" }] : []),
       ],
     },
-  ];
+    // ── 🔔 KOMMUNIKATION ──────────────────────────────────────────────────
+    {
+      title: "🔔 Kommunikation",
+      items: [
+        { id: "benachrichtigungen", icon: "🔔", label: "Benachrichtigungen", badge: unreadCount },
+      ],
+    },
+    // ── ⚙️ EINSTELLUNGEN ──────────────────────────────────────────────────
+    {
+      title: "⚙️ Einstellungen",
+      items: [
+        ...(isAdmin ? [
+          { id: "admin" as PageId, icon: "⚙️", label: "Admin-Panel", adminOnly: true },
+          { id: "datenschutz" as PageId, icon: "🔐", label: "Datenschutz" },
+          { id: "integrationen" as PageId, icon: "🔌", label: "Integrationen", adminOnly: true },
+          { id: "export" as PageId, icon: "📮", label: "Export & Briefe", adminOnly: true },
+          { id: "logbuch" as PageId, icon: "🗒️", label: "Logbuch", adminOnly: true },
+        ] : [
+          { id: "export" as PageId, icon: "📮", label: "Export & Briefe" },
+          { id: "datenschutz" as PageId, icon: "🔐", label: "Datenschutz" },
+        ]),
+      ],
+    },
+  ]
 
   const renderPage = () => {
     if (kundenDetailId !== null) {
@@ -313,10 +324,17 @@ export default function PortalApp() {
         {sections.map((section) => (
           <div key={section.title} style={{ marginBottom: 4 }}>
             <div style={{
-              fontSize: 9, fontWeight: 800, color: "rgba(255,255,255,0.3)",
-              textTransform: "uppercase", letterSpacing: 1.2,
-              padding: "10px 16px 4px",
-            }}>{section.title}</div>
+              fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.55)",
+              padding: "12px 12px 4px",
+              display: "flex", alignItems: "center", gap: 6,
+              borderTop: "1px solid rgba(255,255,255,0.06)",
+              marginTop: 2,
+            }}>
+              <span style={{ fontSize: 13 }}>{section.title.split(" ")[0]}</span>
+              <span style={{ letterSpacing: 0.5, textTransform: "uppercase", fontSize: 9, fontWeight: 800 }}>
+                {section.title.split(" ").slice(1).join(" ")}
+              </span>
+            </div>
             {section.items.filter(item => darfModulNutzen(item.id)).map((item) => {
               const isActive = activePage === item.id && kundenDetailId === null;
               return (

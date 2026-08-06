@@ -982,3 +982,15 @@
 - [x] Passwort-Reset-Button im MA-Bearbeiten-Sheet (Backend-Procedure + Frontend)
 - [x] Duplikat-Prüfung beim MA-Anlegen: E-Mail bereits vorhanden → Fehlermeldung mit Name
 - [x] TypeScript: 0 Fehler
+
+## Menü-Umstrukturierung: 7 Hauptbereiche (07.08.2026)
+- [x] DashboardLayout.tsx: 7 Hauptbereiche mit aufklappbaren Untermenüs
+- [x] 🏠 Dashboard: Dashboard + Ampel-Dashboard als Widgets zusammenführen
+- [x] 📅 Planung: Einsatzplanung, Einsätze, Kalender, Verfügbarkeiten, Kundenzuteilung
+- [x] 👥 Kunden: Kundenliste, Neukundenaufnahme, Pflegekassen (Kassenanfragen+Kostenträger), Dokumentation (LNW+Besuchsberichte)
+- [x] 👨 Mitarbeiter: Mitarbeiterakte, Zeiterfassung, Mobilität (Fahrtenbuch+Fahrtabrechnung), Urlaub, Krankmeldung, Mein Profil, 2FA
+- [x] 📈 Controlling: Management+Analysen+Controlling als Tabs, Buchhaltungsexport
+- [x] ✅ Qualität: Führerschein, Unterweisungen, Arbeitssicherheit, LNW-Freigabe
+- [x] 🔔 Kommunikation: Benachrichtigungen
+- [x] ⚙️ Einstellungen: Admin-Panel
+- [x] TypeScript: 0 Fehler
