@@ -1005,3 +1005,10 @@
 - [x] Menü: Collapse-Button pro Hauptbereich (▶/▼)
 - [x] Startseite: Admin → controllingpage, Mitarbeiter → planung
 - [x] TypeScript: 0 Fehler
+
+## 4 Features: LocalStorage + Suche + Tour + KI-Avatar (07.08.2026)
+- [x] Menü-Collapse im LocalStorage speichern
+- [x] Menü-Suchfeld (filtert alle Menüpunkte live)
+- [x] Onboarding-Tour: neue 8-Bereiche-Struktur
+- [x] KI-Avatar: Backend-Procedure (invokeLLM) + Chat-Widget mit Avatar-Bild
+- [x] TypeScript: 0 Fehler

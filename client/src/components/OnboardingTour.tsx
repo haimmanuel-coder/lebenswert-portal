@@ -28,9 +28,9 @@ const SCHRITTE: TourStep[] = [
     emoji: "🧭",
     title: "So findest du dich zurecht",
     beschreibung:
-      "Unten auf dem Bildschirm siehst du die Navigationsleiste mit den wichtigsten Bereichen: 🏠 Home (Übersicht & Benachrichtigungen), 📅 Einsätze (deine Termine), 📋 Leistungsnachweise, 🚗 Fahrten und 🕐 Zeiterfassung.",
-    tipp: "Das ⚙️-Symbol oben rechts öffnet das Admin-Menü mit weiteren Modulen wie Kundenliste, Kalender, Führerschein-Kontrolle und mehr.",
-    aktion: "Tippe auf die verschiedenen Symbole in der Navigationsleiste, um die Bereiche zu erkunden.",
+      "Das Menü auf der linken Seite ist in 8 Hauptbereiche gegliedert: 🏠 Dashboard, 📅 Planung, 👥 Kunden, 👨 Mitarbeiter, 📈 Controlling, ✅ Qualität, 🔔 Kommunikation und ⚙️ Einstellungen. Jeder Bereich lässt sich mit einem Klick auf den Titel ein- und ausklappen.",
+    tipp: "Nutze das 🔍 Suchfeld oben in der Sidebar, um schnell jeden Menüpunkt zu finden – tippe einfach den Namen ein, z.B. 'Urlaub' oder 'Fahrt'.",
+    aktion: "Klicke auf einen Bereichstitel im linken Menü, um ihn ein- oder auszuklappen.",
     bild: "📱",
   },
   {
@@ -68,9 +68,9 @@ const SCHRITTE: TourStep[] = [
     emoji: "🚗",
     title: "Fahrt dokumentieren",
     beschreibung:
-      "Fahrten zu Kunden koennen ebenfalls dokumentiert werden. Tippe auf den Bereich 'Fahrten' in der Navigation. Trage Startort, Zielort und die gefahrenen Kilometer ein. Diese Daten werden fuer die Abrechnung und den Kilometernachweis benoetigt.",
-    tipp: "Alle Fahrten werden automatisch dem richtigen Kunden zugeordnet, wenn du den Kunden beim Erstellen der Fahrt auswählst.",
-    aktion: "Wechsle zur Fahrten-Seite und sieh dir die Erfassungsmaske an.",
+      "Unter 👨 Mitarbeiter → 🚗 Mobilität findest du das kombinierte Fahrten-Modul. Es enthält zwei Tabs: 'Fahrtenbuch' zum Erfassen einzelner Fahrten und 'Fahrtabrechnung' für die monatliche Gesamtabrechnung.",
+    tipp: "Admins und Teamleitungen sehen beide Tabs. Normale Mitarbeiter sehen nur das Fahrtenbuch.",
+    aktion: "Wechsle zu 👨 Mitarbeiter → 🚗 Mobilität und erkunde die beiden Tabs.",
     bild: "🗺️",
   },
   {
@@ -88,9 +88,9 @@ const SCHRITTE: TourStep[] = [
     emoji: "🆘",
     title: "Hilfe & nächste Schritte",
     beschreibung:
-            "Du hast die Tour abgeschlossen - herzlichen Glückwunsch! Du kennst jetzt die wichtigsten Funktionen des Portals. Bei Fragen oder Problemen wende dich an deinen Administrator. Die Tour kannst du jederzeit über den '?' Hilfe-Button unten rechts erneut starten.",
-    tipp: "Tipp für Admins: Im ⚙️ Admin-Menü findest du erweiterte Funktionen wie Kundenverwaltung, Mitarbeiterzuordnung, Führerschein-Kontrolle, Neukundenaufnahme und den Einsatz-Kalender.",
-        aktion: "Klicke auf 'Tour beenden', um loszulegen. Viel Erfolg!",
+      "Tour abgeschlossen – herzlichen Glückwunsch! Du kennst jetzt alle 8 Hauptbereiche. Bei Fragen steht dir der 🤖 KI-Assistent unten rechts im Portal zur Verfügung – er beantwortet alle Fragen rund um das Portal, Pflegeprozesse und Funktionen.",
+    tipp: "Tipp für Admins: Unter ⚙️ Einstellungen → Admin-Panel findest du die vollständige Mitarbeiter- und Kundenverwaltung, Exporte und Systemeinstellungen.",
+    aktion: "Klicke auf 'Tour beenden', um loszulegen. Viel Erfolg!",
     bild: "🎉",
   },
 ];

@@ -81,14 +81,22 @@ export default function PortalApp() {
   const [activePage, setActivePage] = useState<PageId>("home");
   const [startPageSet, setStartPageSet] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem("menu-collapsed");
+      return saved ? new Set(JSON.parse(saved)) : new Set<string>();
+    } catch { return new Set<string>(); }
+  });
   const toggleSection = (title: string) => {
     setCollapsedSections(prev => {
       const next = new Set(prev);
       if (next.has(title)) next.delete(title); else next.add(title);
+      try { localStorage.setItem("menu-collapsed", JSON.stringify(Array.from(next))); } catch {}
       return next;
     });
   };
+  // ── Menü-Suche ───────────────────────────────────────
+  const [menuSearch, setMenuSearch] = useState("");
   const [kundenDetailId, setKundenDetailId] = useState<number | null>(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
@@ -340,9 +348,51 @@ export default function PortalApp() {
         </div>
       </div>
 
+      {/* Suchfeld */}
+      <div style={{ padding: "8px 12px 4px", flexShrink: 0 }}>
+        <div style={{ position: "relative" }}>
+          <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 12, opacity: 0.4 }}>🔍</span>
+          <input
+            type="text"
+            placeholder="Suchen…"
+            value={menuSearch}
+            onChange={e => setMenuSearch(e.target.value)}
+            style={{
+              width: "100%", padding: "7px 10px 7px 28px",
+              background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 8, color: "#fff", fontSize: 12, outline: "none",
+              boxSizing: "border-box" as const,
+            }}
+          />
+          {menuSearch && (
+            <button onClick={() => setMenuSearch("")} style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 14, padding: 0 }}>×</button>
+          )}
+        </div>
+      </div>
       {/* Nav */}
       <nav style={{ flex: 1, padding: "8px 0", overflowY: "auto" }}>
-        {sections.map((section) => (
+        {menuSearch.trim() ? (
+          // Suche aktiv: alle passenden Items flach anzeigen
+          <div>
+            {sections.flatMap(s => s.items.filter(item => darfModulNutzen(item.id) && item.label.toLowerCase().includes(menuSearch.toLowerCase()))).map(item => {
+              const isActive = activePage === item.id && kundenDetailId === null;
+              return (
+                <button key={item.id} onClick={() => { navTo(item.id); setMenuSearch(""); }}
+                  style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 16px",
+                    background: isActive ? "rgba(74,140,63,0.25)" : "transparent", border: "none",
+                    borderLeft: isActive ? "3px solid #4a8c3f" : "3px solid transparent",
+                    cursor: "pointer", textAlign: "left", transition: "background 0.12s" }}>
+                  <span style={{ fontSize: 15, lineHeight: 1, flexShrink: 0 }}>{item.icon}</span>
+                  <span style={{ fontSize: 12.5, fontWeight: isActive ? 700 : 500, flex: 1, color: isActive ? "#6ee7b7" : "rgba(255,255,255,0.72)" }}>{item.label}</span>
+                </button>
+              );
+            })}
+            {sections.flatMap(s => s.items.filter(item => darfModulNutzen(item.id) && item.label.toLowerCase().includes(menuSearch.toLowerCase()))).length === 0 && (
+              <div style={{ padding: "16px", fontSize: 12, color: "rgba(255,255,255,0.3)", textAlign: "center" }}>Keine Ergebnisse</div>
+            )}
+          </div>
+        ) : (
+        <>{sections.map((section) => (
           <div key={section.title} style={{ marginBottom: 4 }}>
             <button
               onClick={() => toggleSection(section.title)}
@@ -407,7 +457,7 @@ export default function PortalApp() {
               );
             })}
           </div>
-        ))}
+        ))}</>)}
       </nav>
 
       {/* User-Footer */}

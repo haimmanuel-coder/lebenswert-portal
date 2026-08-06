@@ -674,8 +674,44 @@ const vertretungenRouter = router({
   }),
 });
 
+
+// ── KI-Assistent ────────────────────────────────────────────────────────────
+const kiRouter = router({
+  chat: protectedProcedure
+    .input(z.object({
+      messages: z.array(z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string(),
+      })),
+    }))
+    .mutation(async ({ input }) => {
+      const { invokeLLM } = await import("./_core/llm");
+      const systemPrompt = `Du bist LENA, der freundliche KI-Assistent des Lebenswert Betreuung Mitarbeiter-Portals.
+Du hilfst Mitarbeitern und Administratoren bei allen Fragen rund um:
+- Das Portal und seine Funktionen (Einsatzplanung, Leistungsnachweise, Fahrtenbuch, Urlaubsverwaltung, etc.)
+- Pflegeprozesse und Dokumentation
+- Arbeitssicherheit und Compliance
+- Administrative Aufgaben
+
+Das Portal hat 8 Hauptbereiche: 🏠 Dashboard, 📅 Planung, 👥 Kunden, 👨 Mitarbeiter, 📈 Controlling, ✅ Qualität, 🔔 Kommunikation, ⚙️ Einstellungen.
+
+Antworte immer auf Deutsch, freundlich, präzise und hilfreich. Halte Antworten kurz und verständlich.
+Wenn du etwas nicht weißt, sage es ehrlich und empfehle den Admin zu kontaktieren.`;
+
+      const response = await invokeLLM({
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...input.messages.map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
+        ],
+      });
+      const content = response?.choices?.[0]?.message?.content ?? "Entschuldigung, ich konnte keine Antwort generieren.";
+      return { content };
+    }),
+});
+
 export const appRouter = router({
   system: systemRouter,
+  ki: kiRouter,
   pflichtenheft: pflichtenheftRouter,
   /** Einsatzplanung: Termine, Budgetstunden, Lohnkosten, Warnungen, Touren */
   planung: planungRouter,
