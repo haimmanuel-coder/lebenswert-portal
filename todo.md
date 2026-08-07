@@ -1034,3 +1034,8 @@
 - [x] Backend: csvImport.protokoll.list + csvImport.protokoll.create Procedures
 - [x] CsvImportTab: Import-Protokoll speichern + Verlauf anzeigen
 - [x] TypeScript: 0 Fehler
+
+## Kundenlisten-Export Excel + CSV (07.08.2026)
+- [x] Backend: kunden.kundenExport Procedure mit Pflegegrad, Paragraph, Budget, Adresse, MA
+- [x] AdminPanel Kunden-Tab: Excel + CSV Export-Buttons
+- [x] TypeScript: 0 Fehler

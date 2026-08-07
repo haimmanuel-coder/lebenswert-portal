@@ -1290,6 +1290,48 @@ export const appRouter = router({
         const start = (input.seite - 1) * input.proSeite;
         return { kunden: aktive.slice(start, start + input.proSeite), total, seiten: Math.ceil(total / input.proSeite), seite: input.seite };
       }),
+
+    export: adminProcedure
+      .query(async () => {
+        const db = await getDb();
+        const rows = await db!.execute(sql`
+          SELECT
+            k.id,
+            k.vorname,
+            k.nachname,
+            k.strasse,
+            k.plz,
+            k.ort,
+            k.telefon,
+            k.pflegegrad,
+            k.paragraph,
+            k.aktiv,
+            k.createdAt,
+            k.notizen,
+            b45.jahresbudget AS budget45b,
+            b45.verbraucht AS verbraucht45b,
+            b45.jahresbudget - COALESCE(b45.verbraucht, 0) AS rest45b,
+            b39.monatlicheStunden AS stunden39,
+            (SELECT CONCAT(m.vorname, ' ', m.nachname)
+             FROM kunden_zuordnung kz
+             JOIN mitarbeiter m ON m.id = kz.mitarbeiterId
+             WHERE kz.kundenId = k.id AND kz.aktiv = 1
+             LIMIT 1) AS zugeordneterMitarbeiter
+          FROM kunden k
+          LEFT JOIN budget_45b b45 ON b45.kundenId = k.id
+          LEFT JOIN budget_39 b39 ON b39.kundenId = k.id
+          ORDER BY k.nachname ASC, k.vorname ASC
+        `);
+        return (rows as any).rows as Array<{
+          id: number; vorname: string; nachname: string;
+          strasse: string | null; plz: string | null; ort: string | null;
+          telefon: string | null; pflegegrad: number | null; paragraph: string | null;
+          aktiv: number; createdAt: string; notizen: string | null;
+          budget45b: number | null; verbraucht45b: number | null; rest45b: number | null;
+          stunden39: number | null; zugeordneterMitarbeiter: string | null;
+        }>;
+      }),
+
   }),
 
   // ── EINSÄTZE ─────────────────────────────────────────────────────────────

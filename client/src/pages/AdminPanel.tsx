@@ -77,6 +77,51 @@ export default function AdminPanel() {
   const { data: exportDaten = [] } = trpc.admin.mitarbeiterExport.useQuery();
   const { data: onboardingFortschritte = [] } = (trpc as any).onboarding.alleFortschritte.useQuery();
   const onboardingMap = Object.fromEntries(onboardingFortschritte.map((f: any) => [f.mitarbeiterId, f]));
+  const { data: kundenExportDaten = [] } = (trpc as any).kunden.export.useQuery();
+
+  const KD_EXPORT_HEADER = ["ID","Vorname","Nachname","Straße","PLZ","Ort","Telefon","Pflegegrad","Paragraph","Aktiv","Budget §45b (€)","Verbraucht §45b (€)","Rest §45b (€)","Stunden §39","Zugeordneter MA","Notizen","Angelegt am"];
+  const KD_EXPORT_KEYS = ["id","vorname","nachname","strasse","plz","ort","telefon","pflegegrad","paragraph","aktiv","budget45b","verbraucht45b","rest45b","stunden39","zugeordneterMitarbeiter","notizen","createdAt"];
+  const kdDateiname = () => `kundenliste_${new Date().toISOString().slice(0, 10)}`;
+
+  const exportKundenExcel = () => {
+    if (kundenExportDaten.length === 0) { toast.error("Keine Daten zum Exportieren"); return; }
+    const ws = XLSX.utils.aoa_to_sheet([
+      KD_EXPORT_HEADER,
+      ...kundenExportDaten.map((k: any) => KD_EXPORT_KEYS.map(key => {
+        const v = k[key];
+        if (key === "aktiv") return v ? "Aktiv" : "Inaktiv";
+        if (key === "createdAt" && v) return new Date(v).toLocaleDateString("de-DE");
+        return v ?? "";
+      })),
+    ]);
+    ws["!cols"] = KD_EXPORT_HEADER.map((h, i) => {
+      const maxLen = Math.max(h.length, ...kundenExportDaten.map((k: any) => String(k[KD_EXPORT_KEYS[i]] ?? "").length));
+      return { wch: Math.min(maxLen + 2, 40) };
+    });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Kunden");
+    XLSX.writeFile(wb, `${kdDateiname()}.xlsx`);
+    toast.success("✅ Excel-Export erfolgreich");
+  };
+
+  const exportKundenCSV = () => {
+    if (kundenExportDaten.length === 0) { toast.error("Keine Daten zum Exportieren"); return; }
+    const rows = [
+      KD_EXPORT_HEADER,
+      ...kundenExportDaten.map((k: any) => KD_EXPORT_KEYS.map(key => {
+        const v = k[key];
+        if (key === "aktiv") return v ? "Aktiv" : "Inaktiv";
+        if (key === "createdAt" && v) return new Date(v).toLocaleDateString("de-DE");
+        return String(v ?? "").replace(/;/g, ",");
+      })),
+    ];
+    const csv = rows.map((r: string[]) => r.map((v: string) => `"${v}"`).join(";")).join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = `${kdDateiname()}.csv`; a.click();
+    URL.revokeObjectURL(url);
+    toast.success("✅ CSV-Export erfolgreich");
+  };
 
   const EXPORT_HEADER = ["ID", "Vorname", "Nachname", "E-Mail", "Rolle", "Beschäftigungsart", "Telefon", "Aktiv", "Urlaubstage/Jahr", "Urlaub verbraucht", "Urlaub Rest", "Wochenstunden", "Monatslohn (€)", "Stundenlohn (€)", "Einstellungsdatum", "Notizen"];
   const EXPORT_KEYS: Array<keyof typeof exportDaten[0]> = ["id", "vorname", "nachname", "email", "rolle", "beschaeftigungsart", "telefon", "aktiv", "urlaubstageJahr", "urlaubstageVerbraucht", "urlaubstageRest", "wochenstunden", "monatslohn", "stundenlohn", "einstellungsdatum", "notizen"];
@@ -454,7 +499,11 @@ export default function AdminPanel() {
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
             <span style={{ fontSize: 14, fontWeight: 600 }}>{kundenList.length} Kunden</span>
-            <button onClick={() => { resetKdForm(); setKdSheet(true); }} style={{ padding: "8px 14px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>+ Neu</button>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button onClick={exportKundenExcel} style={{ padding: "8px 12px", background: "#166534", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>📥 Excel</button>
+              <button onClick={exportKundenCSV} style={{ padding: "8px 12px", background: "#1d4ed8", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>📥 CSV</button>
+              <button onClick={() => { resetKdForm(); setKdSheet(true); }} style={{ padding: "8px 14px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>+ Neu</button>
+            </div>
           </div>
           {kundenList.map((k) => (
             <div key={k.id} style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 10px rgba(0,0,0,.08)", padding: 14, marginBottom: 10 }}>
