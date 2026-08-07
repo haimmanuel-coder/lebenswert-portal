@@ -16,6 +16,9 @@ interface Props {
 
 export default function OnboardingTab({ maList }: Props) {
   const [selectedMaId, setSelectedMaId] = useState<number | null>(null);
+  const [neueAufgabe, setNeueAufgabe] = useState("");
+  const [neueKat, setNeueKat] = useState<"dokumente"|"sicherheit"|"einweisung"|"system"|"sonstiges">("sonstiges");
+  const [showAddForm, setShowAddForm] = useState(false);
 
   const { data: checkliste = [], refetch } = (trpc as any).onboarding.list.useQuery(
     { mitarbeiterId: selectedMaId! },
@@ -38,6 +41,16 @@ export default function OnboardingTab({ maList }: Props) {
 
   const abhaken = (trpc as any).onboarding.abhaken.useMutation({
     onSuccess: () => refetch(),
+    onError: (e: any) => toast.error("❌ " + e.message),
+  });
+
+  const hinzufuegen = (trpc as any).onboarding.aufgabeHinzufuegen.useMutation({
+    onSuccess: () => { toast.success("✅ Aufgabe hinzugefügt"); setNeueAufgabe(""); setShowAddForm(false); refetch(); },
+    onError: (e: any) => toast.error("❌ " + e.message),
+  });
+
+  const loeschen = (trpc as any).onboarding.aufgabeLoeschen.useMutation({
+    onSuccess: () => { toast.success("🗑️ Aufgabe gelöscht"); refetch(); },
     onError: (e: any) => toast.error("❌ " + e.message),
   });
 
@@ -149,12 +162,53 @@ export default function OnboardingTab({ maList }: Props) {
                       {new Date(a.erledigtAm).toLocaleDateString("de-DE")}
                     </span>
                   )}
+                  <button
+                    onClick={e => { e.stopPropagation(); if (window.confirm("Aufgabe löschen?")) loeschen.mutate({ id: a.id }); }}
+                    style={{ padding: "2px 6px", background: "transparent", border: "none", color: "#d1d5db", cursor: "pointer", fontSize: 14, flexShrink: 0 }}
+                    title="Aufgabe löschen"
+                  >🗑</button>
                 </div>
               ))}
             </div>
           </div>
         );
       })}
+
+      {/* Aufgabe hinzufügen */}
+      {selectedMaId && checkliste.length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          {!showAddForm ? (
+            <button onClick={() => setShowAddForm(true)} style={{ padding: "8px 14px", background: "#f3f4f6", color: "#374151", border: "1px dashed #d1d5db", borderRadius: 10, fontSize: 13, cursor: "pointer", width: "100%" }}>
+              ＋ Eigene Aufgabe hinzufügen
+            </button>
+          ) : (
+            <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 12, padding: 14 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Neue Aufgabe</div>
+              <input
+                value={neueAufgabe}
+                onChange={e => setNeueAufgabe(e.target.value)}
+                placeholder="Aufgabenbeschreibung..."
+                style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 13, marginBottom: 8, boxSizing: "border-box" }}
+              />
+              <select value={neueKat} onChange={e => setNeueKat(e.target.value as any)} style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 13, marginBottom: 10 }}>
+                {Object.entries(KAT_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
+              </select>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => { if (!neueAufgabe.trim()) { toast.error("Aufgabe eingeben"); return; } hinzufuegen.mutate({ mitarbeiterId: selectedMaId!, aufgabe: neueAufgabe.trim(), kategorie: neueKat }); }}
+                  disabled={hinzufuegen.isPending}
+                  style={{ flex: 1, padding: "8px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+                >
+                  {hinzufuegen.isPending ? "…" : "✓ Hinzufügen"}
+                </button>
+                <button onClick={() => { setShowAddForm(false); setNeueAufgabe(""); }} style={{ padding: "8px 14px", background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>
+                  Abbrechen
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

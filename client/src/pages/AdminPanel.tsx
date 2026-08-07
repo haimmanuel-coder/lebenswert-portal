@@ -75,6 +75,8 @@ export default function AdminPanel() {
   const resetMaForm = () => { setEditMa(null); setMaVorname(""); setMaNachname(""); setMaEmail(""); setMaPasswort(""); setMaRolle("mitarbeiter"); setMaTelefon(""); setMaBeschaeftigung("minijob"); setMaUrlaubstage(24); setMaWochenstunden(0); setMaMonatslohn(0); setMaStundenlohn(0); };
   // ── Export ───────────────────────────────────────────
   const { data: exportDaten = [] } = trpc.admin.mitarbeiterExport.useQuery();
+  const { data: onboardingFortschritte = [] } = (trpc as any).onboarding.alleFortschritte.useQuery();
+  const onboardingMap = Object.fromEntries(onboardingFortschritte.map((f: any) => [f.mitarbeiterId, f]));
 
   const EXPORT_HEADER = ["ID", "Vorname", "Nachname", "E-Mail", "Rolle", "Beschäftigungsart", "Telefon", "Aktiv", "Urlaubstage/Jahr", "Urlaub verbraucht", "Urlaub Rest", "Wochenstunden", "Monatslohn (€)", "Stundenlohn (€)", "Einstellungsdatum", "Notizen"];
   const EXPORT_KEYS: Array<keyof typeof exportDaten[0]> = ["id", "vorname", "nachname", "email", "rolle", "beschaeftigungsart", "telefon", "aktiv", "urlaubstageJahr", "urlaubstageVerbraucht", "urlaubstageRest", "wochenstunden", "monatslohn", "stundenlohn", "einstellungsdatum", "notizen"];
@@ -412,6 +414,17 @@ export default function AdminPanel() {
                     {(ma as any).arbeitsvertragUrl && (
                       <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700, background: "#e8f5e4", color: "#4a8c3f" }}>📄 Vertrag vorhanden</span>
                     )}
+                    {(() => {
+                      const ob = onboardingMap[ma.id];
+                      if (!ob) return null;
+                      const pct = ob.gesamt > 0 ? Math.round((ob.erledigt / ob.gesamt) * 100) : 0;
+                      const done = ob.erledigt >= ob.gesamt;
+                      return (
+                        <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700, background: done ? "#e8f5e4" : "#eff6ff", color: done ? "#4a8c3f" : "#1d4ed8" }}>
+                          🎯 {ob.erledigt}/{ob.gesamt} ({pct}%)
+                        </span>
+                      );
+                    })()}
                   </div>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end", flexShrink: 0 }}>

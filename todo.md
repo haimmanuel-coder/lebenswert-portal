@@ -1025,3 +1025,12 @@
 - [x] AdminPanel: Onboarding-Tab mit Checkliste pro Mitarbeiter
 - [x] AdminPanel: CSV-Import Button + Template-Download + Vorschau + Batch-Create
 - [x] TypeScript: 0 Fehler
+
+## 3 Features: Onboarding-Badge + Custom-Aufgaben + Import-Log (07.08.2026)
+- [x] Backend: onboarding.alleFortschritte Procedure (alle MA auf einmal)
+- [x] AdminPanel MA-Liste: Onboarding-Fortschritt-Badge (X/12 ✓)
+- [x] OnboardingTab: Aufgabe hinzufügen + löschen (benutzerdefiniert)
+- [x] DB: csv_import_protokolle Tabelle
+- [x] Backend: csvImport.protokoll.list + csvImport.protokoll.create Procedures
+- [x] CsvImportTab: Import-Protokoll speichern + Verlauf anzeigen
+- [x] TypeScript: 0 Fehler

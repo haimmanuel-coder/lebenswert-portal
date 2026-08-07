@@ -742,6 +742,87 @@ const onboardingRouter = router({
       const row = (rows as any).rows[0];
       return { gesamt: Number(row?.gesamt ?? 0), erledigt: Number(row?.erledigt ?? 0) };
     }),
+
+  alleFortschritte: adminProcedure
+    .query(async () => {
+      const db = await getDb();
+      const rows = await db!.execute(sql`
+        SELECT mitarbeiterId,
+               COUNT(*) as gesamt,
+               SUM(erledigt) as erledigt
+        FROM onboarding_checklisten
+        GROUP BY mitarbeiterId
+      `);
+      const data = (rows as any).rows as Array<{ mitarbeiterId: number; gesamt: number; erledigt: number }>;
+      return data.map(r => ({ mitarbeiterId: Number(r.mitarbeiterId), gesamt: Number(r.gesamt), erledigt: Number(r.erledigt ?? 0) }));
+    }),
+
+
+  aufgabeHinzufuegen: adminProcedure
+    .input(z.object({
+      mitarbeiterId: z.number(),
+      aufgabe: z.string().min(3).max(255),
+      kategorie: z.enum(["dokumente","sicherheit","einweisung","system","sonstiges"]).default("sonstiges"),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      const mid = input.mitarbeiterId; const aufgabe = input.aufgabe; const kat = input.kategorie;
+      await db!.execute(sql`INSERT INTO onboarding_checklisten (mitarbeiterId, aufgabe, kategorie, reihenfolge) VALUES (${mid}, ${aufgabe}, ${kat}, 99)`);
+      return { ok: true };
+    }),
+
+  aufgabeLoeschen: adminProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      const id = input.id;
+      await db!.execute(sql`DELETE FROM onboarding_checklisten WHERE id = ${id}`);
+      return { ok: true };
+    }),
+
+
+});
+
+
+// ── CSV-Import-Protokoll ─────────────────────────────────────────────────────
+const csvImportRouter = router({
+  protokollSpeichern: adminProcedure
+    .input(z.object({
+      dateiname: z.string().optional(),
+      gesamtZeilen: z.number(),
+      erfolgreich: z.number(),
+      fehlgeschlagen: z.number(),
+      fehlerDetails: z.string().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      const von = (ctx as any).adminId ?? 1;
+      const datei = input.dateiname ?? null;
+      const gesamt = input.gesamtZeilen;
+      const ok = input.erfolgreich;
+      const fail = input.fehlgeschlagen;
+      const details = input.fehlerDetails ?? null;
+      await db!.execute(sql`INSERT INTO csv_import_protokolle (importiertVon, dateiname, gesamtZeilen, erfolgreich, fehlgeschlagen, fehlerDetails) VALUES (${von}, ${datei}, ${gesamt}, ${ok}, ${fail}, ${details})`);
+      return { ok: true };
+    }),
+
+  protokollListe: adminProcedure
+    .query(async () => {
+      const db = await getDb();
+      const rows = await db!.execute(sql`
+        SELECT p.*, m.vorname, m.nachname
+        FROM csv_import_protokolle p
+        LEFT JOIN mitarbeiter m ON m.id = p.importiertVon
+        ORDER BY p.createdAt DESC
+        LIMIT 50
+      `);
+      return (rows as any).rows as Array<{
+        id: number; importiertVon: number; dateiname: string | null;
+        gesamtZeilen: number; erfolgreich: number; fehlgeschlagen: number;
+        fehlerDetails: string | null; createdAt: string;
+        vorname: string | null; nachname: string | null;
+      }>;
+    }),
 });
 
 // ── KI-Assistent ────────────────────────────────────────────────────────────
@@ -799,6 +880,7 @@ export const appRouter = router({
   system: systemRouter,
   ki: kiRouter,
   onboarding: onboardingRouter,
+  csvImport: csvImportRouter,
   pflichtenheft: pflichtenheftRouter,
   /** Einsatzplanung: Termine, Budgetstunden, Lohnkosten, Warnungen, Touren */
   planung: planungRouter,

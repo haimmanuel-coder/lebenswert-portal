@@ -74,12 +74,17 @@ export default function CsvImportTab() {
   const [importing, setImporting] = useState(false);
   const [ergebnisse, setErgebnisse] = useState<Array<{ email: string; ok: boolean; fehler?: string }>>([]);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [dateiname, setDateiname] = useState("");
+  const [showVerlauf, setShowVerlauf] = useState(false);
 
   const createMa = (trpc as any).admin.mitarbeiterCreate.useMutation();
+  const protokollSpeichern = (trpc as any).csvImport.protokollSpeichern.useMutation();
+  const { data: protokollListe = [], refetch: refetchProtokolle } = (trpc as any).csvImport.protokollListe.useQuery();
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setDateiname(file.name);
     const reader = new FileReader();
     reader.onload = ev => {
       const text = ev.target?.result as string;
@@ -122,6 +127,12 @@ export default function CsvImportTab() {
     const fail = results.filter(r => !r.ok).length;
     if (fail === 0) toast.success(`✅ ${ok} Mitarbeiter erfolgreich importiert`);
     else toast.warning(`⚠️ ${ok} OK, ${fail} Fehler`);
+    // Protokoll speichern
+    try {
+      const fehlerDetails = results.filter(r => !r.ok).map(r => `${r.email}: ${r.fehler}`).join("; ");
+      await protokollSpeichern.mutateAsync({ dateiname, gesamtZeilen: gueltig.length, erfolgreich: ok, fehlgeschlagen: fail, fehlerDetails: fehlerDetails || undefined });
+      refetchProtokolle();
+    } catch (_e) {}
   };
 
   const gueltigCount = rows.filter(r => !r._fehler).length;
@@ -135,6 +146,48 @@ export default function CsvImportTab() {
           Importiere mehrere Mitarbeiter auf einmal. Lade zuerst die Vorlage herunter, fülle sie aus und lade sie hoch.
         </p>
       </div>
+
+
+      {/* Verlauf-Toggle */}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+        <button onClick={() => setShowVerlauf(v => !v)} style={{ padding: "6px 12px", background: "#f3f4f6", color: "#374151", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12, cursor: "pointer" }}>
+          {showVerlauf ? "▲ Verlauf ausblenden" : "📋 Import-Verlauf anzeigen"}
+        </button>
+      </div>
+
+      {/* Verlauf */}
+      {showVerlauf && (
+        <div style={{ marginBottom: 20, background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 12, padding: 14 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>📋 Import-Protokoll (letzte 50)</div>
+          {protokollListe.length === 0 ? (
+            <div style={{ fontSize: 12, color: "#9ca3af", textAlign: "center", padding: 16 }}>Noch keine Importe durchgeführt.</div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: "#f3f4f6" }}>
+                    {["Datum","Datei","Gesamt","✓ OK","✗ Fehler","Importiert von"].map(h => (
+                      <th key={h} style={{ padding: "6px 10px", textAlign: "left", fontWeight: 700, borderBottom: "1px solid #e5e7eb", whiteSpace: "nowrap" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {protokollListe.map((p: any) => (
+                    <tr key={p.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                      <td style={{ padding: "6px 10px", whiteSpace: "nowrap" }}>{new Date(p.createdAt).toLocaleString("de-DE")}</td>
+                      <td style={{ padding: "6px 10px", maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.dateiname ?? "–"}</td>
+                      <td style={{ padding: "6px 10px", textAlign: "center" }}>{p.gesamtZeilen}</td>
+                      <td style={{ padding: "6px 10px", textAlign: "center", color: "#4a8c3f", fontWeight: 700 }}>{p.erfolgreich}</td>
+                      <td style={{ padding: "6px 10px", textAlign: "center", color: p.fehlgeschlagen > 0 ? "#dc2626" : "#9ca3af", fontWeight: p.fehlgeschlagen > 0 ? 700 : 400 }}>{p.fehlgeschlagen}</td>
+                      <td style={{ padding: "6px 10px" }}>{p.vorname ? `${p.vorname} ${p.nachname}` : "–"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Schritt 1: Template */}
       <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 12, padding: 16, marginBottom: 16 }}>
