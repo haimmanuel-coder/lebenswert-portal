@@ -1045,3 +1045,10 @@
 - [x] KundenCsvImportTab.tsx: Vorlage, Upload, Vorschau, Validierung, Import, Protokoll
 - [x] AdminPanel: neuer Tab "📥 Kunden-Import"
 - [x] TypeScript: 0 Fehler
+
+## Steuerberater-E-Mail nach MA-Anlegen (07.08.2026)
+- [x] DB: system_einstellungen Tabelle (key/value) für Steuerberater-E-Mail
+- [x] Backend: E-Mail-Versand nach mitarbeiterCreate (HTML mit Personaldaten)
+- [x] Backend: einstellungen.get/set Procedures
+- [x] AdminPanel Einstellungen-Tab: Steuerberater-E-Mail konfigurieren + Test-Mail senden
+- [x] TypeScript: 0 Fehler

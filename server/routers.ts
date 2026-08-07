@@ -113,6 +113,7 @@ import { pflichtenheftRouter } from "./pflichtenheftRouter";
 import { planungRouter } from "./planungRouter";
 import { VAPID_PUBLIC, sendBudgetWarnungPush } from "./webpush";
 import { twoFactorRouter } from "./routers/twoFactorRouter";
+import { sendEmail, buildSteuerberaterEmail } from "./emailService";
 import { datenschutzRouter } from "./routers/datenschutzRouter";
 import { verfuegbarkeitenRouter } from "./routers/verfuegbarkeitenRouter";
 import { besuchsberichteRouter } from "./routers/besuchsberichteRouter";
@@ -784,6 +785,58 @@ const onboardingRouter = router({
 });
 
 
+
+// ── System-Einstellungen ─────────────────────────────────────────────────────
+const einstellungenRouter = router({
+  getAll: adminProcedure
+    .query(async () => {
+      const db = await getDb();
+      const rows = await db!.execute(sql`SELECT schluessel, wert, beschreibung FROM system_einstellungen ORDER BY schluessel ASC`);
+      return (rows as any).rows as Array<{ schluessel: string; wert: string | null; beschreibung: string | null }>;
+    }),
+
+  set: adminProcedure
+    .input(z.object({ schluessel: z.string(), wert: z.string() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      const key = input.schluessel; const val = input.wert;
+      await db!.execute(sql`INSERT INTO system_einstellungen (schluessel, wert) VALUES (${key}, ${val}) ON DUPLICATE KEY UPDATE wert = ${val}`);
+      return { ok: true };
+    }),
+
+  testSteuerberaterMail: adminProcedure
+    .input(z.object({ mitarbeiterId: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      const maRows = await db!.execute(sql`SELECT * FROM mitarbeiter WHERE id = ${input.mitarbeiterId} LIMIT 1`);
+      const ma = (maRows as any).rows?.[0];
+      if (!ma) throw new TRPCError({ code: "NOT_FOUND", message: "Mitarbeiter nicht gefunden" });
+      const stRows = await db!.execute(sql`SELECT schluessel, wert FROM system_einstellungen WHERE schluessel IN ('steuerberater_email','firma_name')`);
+      const settings: Record<string, string> = {};
+      for (const r of (stRows as any).rows ?? []) settings[r.schluessel] = r.wert ?? "";
+      const stEmail = settings["steuerberater_email"] ?? "";
+      if (!stEmail || !stEmail.includes("@")) throw new TRPCError({ code: "BAD_REQUEST", message: "Steuerberater-E-Mail nicht konfiguriert" });
+      const html = buildSteuerberaterEmail({
+        vorname: ma.vorname, nachname: ma.nachname, email: ma.email,
+        telefon: ma.telefon, rolle: ma.rolle,
+        beschaeftigungsart: ma.beschaeftigungsart,
+        urlaubstageJahr: ma.urlaubstageJahr ?? 24,
+        wochenstunden: ma.wochenstunden ? Number(ma.wochenstunden) : undefined,
+        monatslohn: ma.monatslohn ? Number(ma.monatslohn) : undefined,
+        stundenlohn: ma.stundenlohn ? Number(ma.stundenlohn) : undefined,
+        einstellungsdatum: ma.createdAt ? new Date(ma.createdAt).toLocaleDateString("de-DE") : new Date().toLocaleDateString("de-DE"),
+        firmaName: settings["firma_name"] || "Lebenswert Betreuung",
+      });
+      const result = await sendEmail({
+        to: stEmail,
+        subject: `[TEST] Mitarbeitermeldung: ${ma.vorname} ${ma.nachname} – Knappschaft-Anmeldung`,
+        html,
+      });
+      if (!result.success) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.error ?? "E-Mail konnte nicht gesendet werden" });
+      return { ok: true, to: stEmail };
+    }),
+});
+
 // ── CSV-Import-Protokoll ─────────────────────────────────────────────────────
 const csvImportRouter = router({
   protokollSpeichern: adminProcedure
@@ -881,6 +934,7 @@ export const appRouter = router({
   ki: kiRouter,
   onboarding: onboardingRouter,
   csvImport: csvImportRouter,
+  einstellungen: einstellungenRouter,
   pflichtenheft: pflichtenheftRouter,
   /** Einsatzplanung: Termine, Budgetstunden, Lohnkosten, Warnungen, Touren */
   planung: planungRouter,
@@ -2193,6 +2247,38 @@ export const appRouter = router({
             }
           }
         } catch (_e) { /* Onboarding-Fehler nicht kritisch */ }
+        // Steuerberater-E-Mail senden
+        try {
+          const dbInst = await getDb();
+          const stRows = await dbInst!.execute(sql`SELECT schluessel, wert FROM system_einstellungen WHERE schluessel IN ('steuerberater_email','steuerberater_name','firma_name')`);
+          const settings: Record<string, string> = {};
+          for (const r of (stRows as any).rows ?? []) settings[r.schluessel] = r.wert ?? "";
+          const stEmail = settings["steuerberater_email"] ?? "";
+          if (stEmail && stEmail.includes("@")) {
+            const html = buildSteuerberaterEmail({
+              vorname: input.vorname,
+              nachname: input.nachname,
+              email: input.email,
+              telefon: input.telefon,
+              rolle: input.rolle ?? "mitarbeiter",
+              beschaeftigungsart: input.beschaeftigungsart,
+              urlaubstageJahr: input.urlaubstageJahr ?? 24,
+              wochenstunden: input.wochenstunden,
+              monatslohn: input.monatslohn,
+              stundenlohn: input.stundenlohn,
+              einstellungsdatum: new Date().toLocaleDateString("de-DE"),
+              firmaName: settings["firma_name"] || "Lebenswert Betreuung",
+            });
+            await sendEmail({
+              to: stEmail,
+              subject: `Neue Mitarbeitermeldung: ${input.vorname} ${input.nachname} – Knappschaft-Anmeldung`,
+              html,
+            });
+            console.log(`[Steuerberater-Mail] Gesendet an ${stEmail} für ${input.vorname} ${input.nachname}`);
+          }
+        } catch (mailErr: any) {
+          console.warn("[Steuerberater-Mail] Fehler:", mailErr.message);
+        }
         return { success: true };
       }),
 
