@@ -46,17 +46,24 @@ Die vier dringendsten Punkte wurden umgesetzt und verprobt (Commit auf
 | **K-3** | ✅ behoben | `fuehrerschein.create` → `portalProtected` |
 | **K-4** | ✅ behoben | JWT-Fallback entfernt; Produktion bricht ohne `JWT_SECRET` ab, Entwicklung nutzt ein Prozess-Zufalls-Secret |
 | **S-1** | ✅ behoben | Rate-Limiting für Login, Passwort-Reset und 2FA-Prüfung (`server/rateLimit.ts`) |
+| **K-9** | ✅ behoben | `requestPasswordReset` versendet das Token jetzt per E-Mail und gibt es nicht mehr zurück; einheitliche neutrale Antwort gegen User-Enumeration |
 
 Verprobt: 94 Tests bestanden (11 neu für den Rate-Limiter), 0 TypeScript-Fehler,
 Build erfolgreich. K-4 im Laufzeittest bestätigt (Produktionsabbruch ohne
 Secret, Entwicklungsstart mit Zufalls-Secret).
 
+**K-9 (Passwort-Reset-Token) – behoben.** Der während der Umsetzung gefundene
+Befund war zunächst offen: `requestPasswordReset` gab das Reset-Token direkt in
+der Antwort zurück, wodurch jeder ein Token für eine beliebige Adresse anfordern
+konnte. Der Ablauf versendet das Token jetzt per E-Mail (`sendEmail` /
+`buildPasswortResetEmail`) und gibt es nicht mehr zurück. Zusätzlich liefert die
+Route für registrierte und unbekannte Adressen dieselbe neutrale Antwort
+(User-Enumeration geschlossen). Bei fehlendem SMTP wird der Link nur ins
+Serverprotokoll geschrieben, nie an den Aufrufer. Voraussetzung im Betrieb:
+`SMTP_HOST`/`SMTP_USER`/`SMTP_PASS` und `APP_BASE_URL` setzen.
+
 **Noch offen** (nicht in diesem Änderungssatz): K-5 bis K-8, S-2 bis S-6 sowie
-die Performance- und UX-Punkte. Ein zusätzlicher Befund während der Umsetzung:
-`requestPasswordReset` gibt das Reset-Token direkt in der Antwort zurück
-(`server/routers.ts:748`) – ohne E-Mail-Versand kann damit jeder ein Token für
-eine beliebige Adresse anfordern. Das gehört bei nächster Gelegenheit auf einen
-E-Mail-basierten Ablauf umgestellt.
+die Performance- und UX-Punkte.
 
 ---
 

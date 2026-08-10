@@ -105,6 +105,7 @@ import {
 import { ENV } from "./_core/env";
 import { adminProcedure, decryptSecret, encryptSecret, portalProcedure, portalProtected, PORTAL_COOKIE, signPortalToken, verifyPortalToken, roleProcedure } from "./portalAuth";
 import { pruefeRateLimit, ratelimitZuruecksetzen, clientIp, LOGIN_LIMIT, RESET_LIMIT } from "./rateLimit";
+import { sendEmail, buildPasswortResetEmail } from "./emailService";
 import * as OTPAuth from "otpauth";
 import QRCode from "qrcode";
 import { pflichtenheftRouter } from "./pflichtenheftRouter";
@@ -744,17 +745,48 @@ export const appRouter = router({
         // S-1: Drosselung, damit Reset-Anforderungen nicht massenhaft
         // ausgelöst werden können.
         pruefeRateLimit(`reset-req:${clientIp(ctx.req)}`, RESET_LIMIT);
+
+        // Sicherheit: Für jede Eingabe dieselbe neutrale Antwort. Ein
+        // abweichender Text würde verraten, ob eine E-Mail registriert ist
+        // (User Enumeration). Das Token wird NIE an den Aufrufer
+        // zurückgegeben, sondern ausschließlich per E-Mail zugestellt.
+        const neutraleAntwort = {
+          success: true as const,
+          message:
+            "Falls die E-Mail-Adresse registriert ist, wurde ein Link zum " +
+            "Zurücksetzen des Passworts an diese Adresse versendet.",
+        };
+
         const ma = await getMitarbeiterByEmail(input.email.trim().toLowerCase());
-        if (!ma) return { success: true, message: "Falls die E-Mail registriert ist, wurde ein Reset-Link erstellt." };
+        if (!ma || !ma.aktiv || !ma.email) return neutraleAntwort;
+
         const token = nanoid(64);
         await createPasswordResetToken(ma.id, token);
         await createAuditLog({ mitarbeiterId: ma.id, action: "PASSWORD_RESET_REQUEST", ressource: "portal", status: "success" });
-        return {
-          success: true,
-          message: "Reset-Link wurde erstellt.",
-          resetToken: token,
-          mitarbeiterName: `${ma.vorname} ${ma.nachname}`,
-        };
+
+        // Reset-Link zusammenbauen und per E-Mail versenden.
+        const basis =
+          process.env.APP_BASE_URL?.replace(/\/$/, "") ||
+          `${(ctx.req.headers["x-forwarded-proto"] as string) || "https"}://${ctx.req.headers.host}`;
+        const link = `${basis}/reset-passwort?token=${token}`;
+
+        const versand = await sendEmail({
+          to: ma.email,
+          subject: "Passwort zurücksetzen – Lebenswert Mitarbeiter-Portal",
+          html: buildPasswortResetEmail({ name: `${ma.vorname} ${ma.nachname}`, link }),
+        });
+
+        if (!versand.success) {
+          // SMTP nicht konfiguriert oder Versandfehler: Link serverseitig
+          // protokollieren, damit ein Administrator ihn dem Mitarbeiter auf
+          // sicherem Weg übergeben kann. NIEMALS an den Aufrufer zurückgeben.
+          console.warn(
+            `[Passwort-Reset] E-Mail an Mitarbeiter ${ma.id} nicht versendet ` +
+              `(${versand.error}). Reset-Link (nur Serverprotokoll): ${link}`,
+          );
+        }
+
+        return neutraleAntwort;
       }),
 
     validateResetToken: publicProcedure
