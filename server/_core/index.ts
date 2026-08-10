@@ -3,6 +3,7 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import { createServer } from "http";
 import net from "net";
+import rateLimit from "express-rate-limit";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
@@ -14,6 +15,7 @@ import { handleFahrtenVersandCron } from "../scheduled/fahrtenVersand";
 import { fuehrerscheinErinnerungHandler } from "../scheduled/fuehrerscheinErinnerung";
 import { datenschutzErinnerungHandler } from "../scheduled/datenschutzErinnerung";
 import { unterweisungenFaelligkeitHandler } from "../scheduled/unterweisungenFaelligkeit";
+import { aufbewahrungsfristenHandler } from "../scheduled/aufbewahrungsfristen";
 import { ensureTables } from "../ensureTables";
 import { ensureHeartbeatJobs } from "../ensureHeartbeatJobs";
 import multer from "multer";
@@ -52,6 +54,44 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   app.use(cookieParser());
+
+  // ── Rate-Limiting ──────────────────────────────────────────────────────────
+  // Login-Schutz: max. 10 Versuche pro 15 Minuten pro IP
+  const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Zu viele Anmeldeversuche. Bitte in 15 Minuten erneut versuchen." },
+    skip: (req) => process.env.NODE_ENV === "test",
+  });
+  // Passwort-Reset: max. 5 Versuche pro 15 Minuten pro IP
+  const passwortLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Zu viele Passwort-Anfragen. Bitte in 15 Minuten erneut versuchen." },
+    skip: (req) => process.env.NODE_ENV === "test",
+  });
+  // Allgemeines API-Limit: max. 300 Anfragen pro Minute pro IP (Schutz vor Massenanfragen)
+  const apiLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 300,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Zu viele Anfragen. Bitte kurz warten." },
+    skip: (req) => process.env.NODE_ENV === "test",
+  });
+  // Login-Endpunkte absichern (tRPC batch-kompatibel: URL-Matching)
+  app.use("/api/trpc/portal.login", loginLimiter);
+  app.use("/api/trpc/portal.passwortVergessen", passwortLimiter);
+  app.use("/api/trpc/portal.passwortZuruecksetzen", passwortLimiter);
+  app.use("/api/trpc/admin.mitarbeiterPasswortReset", passwortLimiter);
+  app.use("/api/trpc/admin.mitarbeiterTempPasswort", passwortLimiter);
+  app.use("/api/trpc", apiLimiter);
+  // ──────────────────────────────────────────────────────────────────────────
+
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   // Foto/Audio-Upload-Endpoints
@@ -77,6 +117,7 @@ async function startServer() {
   app.post("/api/scheduled/fuehrerschein-erinnerung", fuehrerscheinErinnerungHandler);
   app.post("/api/scheduled/vertretung-bereinigung", vertretungBereinigungHandler);
   app.post("/api/scheduled/datenschutz-erinnerung", datenschutzErinnerungHandler);
+  app.post("/api/scheduled/aufbewahrungsfristen-pruefung", aufbewahrungsfristenHandler);
   app.post("/api/scheduled/unterweisungen-faelligkeit", unterweisungenFaelligkeitHandler);
   // Fahrtennachweise: automatischer Versand am 18. jeden Monats
   app.post("/api/scheduled/fahrtennachweise-versand", async (_req: any, res: any) => {

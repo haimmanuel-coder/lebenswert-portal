@@ -90,6 +90,9 @@ export default function KundenCsvImportTab() {
   const createKunde = (trpc as any).kunden.create.useMutation();
   const protokollSpeichern = (trpc as any).csvImport.protokollSpeichern.useMutation();
   const { data: protokollListe = [], refetch: refetchProtokolle } = (trpc as any).csvImport.protokollListe.useQuery();
+  const { data: kundenNameListe = [] } = (trpc as any).admin.kundenNameListe.useQuery();
+  const vorhandeneKunden = (kundenNameListe as Array<{ vorname: string; nachname: string; ort: string }>)
+    .map(k => `${k.vorname.toLowerCase()} ${k.nachname.toLowerCase()}`);
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -99,9 +102,21 @@ export default function KundenCsvImportTab() {
     reader.onload = ev => {
       const text = ev.target?.result as string;
       const parsed = parseCSV(text);
-      setRows(parsed);
+      // Duplikat-Prüfung: Vor- + Nachname bereits vorhanden?
+      const mitDuplikat = parsed.map(row => {
+        if (!row._fehler) {
+          const key = `${row.vorname.toLowerCase()} ${row.nachname.toLowerCase()}`;
+          if (vorhandeneKunden.includes(key)) {
+            return { ...row, _fehler: `⚠️ Duplikat: Kunde "${row.vorname} ${row.nachname}" bereits vorhanden` };
+          }
+        }
+        return row;
+      });
+      setRows(mitDuplikat);
       setErgebnisse([]);
-      toast.info(`${parsed.length} Zeilen eingelesen`);
+      const duplikate = mitDuplikat.filter(r => r._fehler?.includes("Duplikat")).length;
+      if (duplikate > 0) toast.warning(`${parsed.length} Zeilen eingelesen – ${duplikate} Duplikat(e) erkannt`);
+      else toast.info(`${parsed.length} Zeilen eingelesen`);
     };
     reader.readAsText(file, "UTF-8");
   };

@@ -78,6 +78,8 @@ export default function CsvImportTab() {
   const [showVerlauf, setShowVerlauf] = useState(false);
 
   const createMa = (trpc as any).admin.mitarbeiterCreate.useMutation();
+  const { data: emailListe = [] } = (trpc as any).admin.mitarbeiterEmailListe.useQuery();
+  const vorhandeneEmails = new Set((emailListe as Array<{ email: string }>).map(e => e.email.toLowerCase()));
   const protokollSpeichern = (trpc as any).csvImport.protokollSpeichern.useMutation();
   const { data: protokollListe = [], refetch: refetchProtokolle } = (trpc as any).csvImport.protokollListe.useQuery();
 
@@ -89,9 +91,19 @@ export default function CsvImportTab() {
     reader.onload = ev => {
       const text = ev.target?.result as string;
       const parsed = parseCSV(text);
-      setRows(parsed);
+      // Duplikat-Prüfung gegen vorhandene E-Mails
+      const mitDuplikat = parsed.map(row => {
+        if (!row._fehler && vorhandeneEmails.has(row.email.toLowerCase())) {
+          const vorhandener = (emailListe as Array<{ email: string; name: string }>).find(e => e.email.toLowerCase() === row.email.toLowerCase());
+          return { ...row, _fehler: `⚠️ Duplikat: E-Mail bereits vorhanden (${vorhandener?.name ?? row.email})` };
+        }
+        return row;
+      });
+      setRows(mitDuplikat);
       setErgebnisse([]);
-      toast.info(`${parsed.length} Zeilen eingelesen`);
+      const duplikate = mitDuplikat.filter(r => r._fehler?.includes("Duplikat")).length;
+      if (duplikate > 0) toast.warning(`${parsed.length} Zeilen eingelesen – ${duplikate} Duplikat(e) erkannt`);
+      else toast.info(`${parsed.length} Zeilen eingelesen`);
     };
     reader.readAsText(file, "UTF-8");
   };

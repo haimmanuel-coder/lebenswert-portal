@@ -1,4 +1,5 @@
 import { trpc } from "@/lib/trpc";
+import MitteilungenWidget from "@/components/MitteilungenWidget";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -47,6 +48,9 @@ export default function Benachrichtigungen() {
 
   return (
     <div className="p-4 pb-28 max-w-2xl mx-auto">
+      {/* Mitteilungen von Admin/Geschäftsführung */}
+      <MitteilungenWidget />
+      {/* Systembenachrichtigungen */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <h1 className="text-xl font-bold text-gray-900">🔔 Benachrichtigungen</h1>

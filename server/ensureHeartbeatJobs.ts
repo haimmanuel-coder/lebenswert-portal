@@ -46,6 +46,13 @@ const JOBS = [
     method: "POST" as const,
     description: "Sicherheitsunterweisungen: monatliche Fälligkeitsprüfung",
   },
+  {
+    name: "aufbewahrungsfristen-pruefung",
+    cron: "0 0 7 1 * *",          // am 1. jeden Monats 07:00 UTC
+    path: "/api/scheduled/aufbewahrungsfristen-pruefung",
+    method: "POST" as const,
+    description: "Aufbewahrungsfristen: monatliche Prüfung nach SGB XI (10-Jahres-Frist)",
+  },
 ];
 
 export async function ensureHeartbeatJobs(): Promise<void> {
