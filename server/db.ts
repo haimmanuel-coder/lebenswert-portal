@@ -924,14 +924,23 @@ export async function getPushSubscriptionsByMitarbeiter(mitarbeiterId: number) {
 }
 
 // ── FÜHRERSCHEIN-CHECKS ───────────────────────────────
-export async function getFuehrerscheinChecks(mitarbeiterId?: number) {
+/**
+ * Lädt Führerschein-Kontrollen.
+ *
+ * Sicherheit (K-1): Das Laden ALLER Datensätze ist bewusst nur über den
+ * expliziten Aufruf `getFuehrerscheinChecks("alle")` möglich – reserviert für
+ * die Admin-Route. Ein fehlender oder ungültiger Mitarbeiter-Bezug liefert
+ * eine leere Liste, statt versehentlich sämtliche Daten preiszugeben.
+ */
+export async function getFuehrerscheinChecks(mitarbeiterId: number | "alle") {
   const db = await getDb();
   if (!db) return [];
-  if (mitarbeiterId) {
-    const r = await db.execute(sql`SELECT * FROM fuehrerschein_checks WHERE mitarbeiter_id = ${mitarbeiterId} ORDER BY pruef_datum DESC`);
+  if (mitarbeiterId === "alle") {
+    const r = await db.execute(sql`SELECT * FROM fuehrerschein_checks ORDER BY naechstes_pruef_datum ASC`);
     return (r as any)[0] as any[];
   }
-  const r = await db.execute(sql`SELECT * FROM fuehrerschein_checks ORDER BY naechstes_pruef_datum ASC`);
+  if (typeof mitarbeiterId !== "number" || mitarbeiterId <= 0) return [];
+  const r = await db.execute(sql`SELECT * FROM fuehrerschein_checks WHERE mitarbeiter_id = ${mitarbeiterId} ORDER BY pruef_datum DESC`);
   return (r as any)[0] as any[];
 }
 

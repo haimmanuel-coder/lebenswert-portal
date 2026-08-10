@@ -104,6 +104,7 @@ import {
 } from "./db";
 import { ENV } from "./_core/env";
 import { adminProcedure, decryptSecret, encryptSecret, portalProcedure, portalProtected, PORTAL_COOKIE, signPortalToken, verifyPortalToken, roleProcedure } from "./portalAuth";
+import { pruefeRateLimit, ratelimitZuruecksetzen, clientIp, LOGIN_LIMIT, RESET_LIMIT } from "./rateLimit";
 import * as OTPAuth from "otpauth";
 import QRCode from "qrcode";
 import { pflichtenheftRouter } from "./pflichtenheftRouter";
@@ -683,6 +684,11 @@ export const appRouter = router({
     login: publicProcedure
       .input(z.object({ email: z.string().email(), passwort: z.string().min(1), otp: z.string().regex(/^\d{6}$/).optional() }))
       .mutation(async ({ input, ctx }) => {
+        // S-1: Brute-Force-Drosselung je IP und E-Mail. Wird VOR der
+        // Passwortprüfung gezählt, damit auch Fehlversuche zur Sperre führen.
+        const limitSchluessel = `login:${clientIp(ctx.req)}:${input.email.toLowerCase()}`;
+        pruefeRateLimit(limitSchluessel, LOGIN_LIMIT);
+
         const ma = await getMitarbeiterByEmail(input.email);
         if (!ma || !ma.aktiv) throw new Error("E-Mail oder Passwort ungültig.");
         const valid = await bcrypt.compare(input.passwort, ma.passwortHash);
@@ -700,6 +706,8 @@ export const appRouter = router({
             throw new Error("Der Sicherheitscode ist ungültig oder abgelaufen.");
           }
         }
+        // Erfolgreiche Anmeldung: Fehlversuchszähler dieser Kennung leeren.
+        ratelimitZuruecksetzen(limitSchluessel);
         const token = await signPortalToken(ma.id, { mfa: true });
         const isSecure = ctx.req.secure || ctx.req.headers['x-forwarded-proto'] === 'https';
         ctx.res.cookie(PORTAL_COOKIE, token, {
@@ -732,7 +740,10 @@ export const appRouter = router({
 
     requestPasswordReset: publicProcedure
       .input(z.object({ email: z.string().email() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
+        // S-1: Drosselung, damit Reset-Anforderungen nicht massenhaft
+        // ausgelöst werden können.
+        pruefeRateLimit(`reset-req:${clientIp(ctx.req)}`, RESET_LIMIT);
         const ma = await getMitarbeiterByEmail(input.email.trim().toLowerCase());
         if (!ma) return { success: true, message: "Falls die E-Mail registriert ist, wurde ein Reset-Link erstellt." };
         const token = nanoid(64);
@@ -760,7 +771,9 @@ export const appRouter = router({
         token: z.string().min(1),
         neuesPasswort: z.string().min(6, "Passwort muss mindestens 6 Zeichen haben"),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
+        // S-1: Drosselung gegen Durchprobieren von Reset-Token.
+        pruefeRateLimit(`reset-do:${clientIp(ctx.req)}`, LOGIN_LIMIT);
         const reset = await getValidPasswordResetToken(input.token);
         if (!reset) throw new Error("Ungültiger oder abgelaufener Reset-Link.");
         const hash = await bcrypt.hash(input.neuesPasswort, 10);
@@ -2197,16 +2210,21 @@ export const appRouter = router({
 
   // ── FÜHRERSCHEIN-CHECKS ─────────────────────────────
   fuehrerschein: router({
-    list: portalProcedure.query(async ({ ctx }) => {
-      return getFuehrerscheinChecks(ctx.mitarbeiterId ?? undefined);
+    // Sicherheit (K-1): portalProtected statt portalProcedure. Zuvor lieferte
+    // die Route ohne Anmeldung getFuehrerscheinChecks(undefined) und damit die
+    // Führerschein-Daten ALLER Mitarbeiter inkl. Foto-URLs.
+    list: portalProtected.query(async ({ ctx }) => {
+      return getFuehrerscheinChecks(ctx.mitarbeiterId);
     }),
 
     listAll: adminProcedure.query(async () => {
-      const rows = await getFuehrerscheinChecks();
+      const rows = await getFuehrerscheinChecks("alle");
       return (rows as any).rows ?? rows;
     }),
 
-    create: portalProcedure
+    // Sicherheit (K-3): portalProtected statt portalProcedure. Zuvor konnten
+    // ohne Anmeldung Datensätze mit mitarbeiterId = 0 angelegt werden.
+    create: portalProtected
       .input(z.object({
         fotoUrl: z.string().optional(),
         fotoKey: z.string().optional(),
@@ -2216,7 +2234,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ input, ctx }) => {
         await createFuehrerscheinCheck({
-          mitarbeiterId: ctx.mitarbeiterId ?? 0,
+          mitarbeiterId: ctx.mitarbeiterId,
           fotoKey: input.fotoKey,
           fotoUrl: input.fotoUrl,
           pruefDatum: input.pruefDatum,
@@ -2243,7 +2261,10 @@ export const appRouter = router({
       return getAllNeukundenaufnahmen();
     }),
 
-    create: portalProcedure
+    // Sicherheit (K-2): portalProtected statt portalProcedure. Zuvor konnten
+    // ohne Anmeldung Kundendatensätze mit Geburtsdatum, Pflegegrad und
+    // digitalen Unterschriften angelegt werden, ohne Zurechenbarkeit.
+    create: portalProtected
       .input(z.object({
         vorname: z.string().min(1),
         nachname: z.string().min(1),
@@ -2262,7 +2283,8 @@ export const appRouter = router({
         notizen: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
-        await createNeukundenaufnahme({ ...input, erstelltVon: ctx.mitarbeiterId ?? undefined });
+        await createNeukundenaufnahme({ ...input, erstelltVon: ctx.mitarbeiterId });
+        await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "CREATE", ressource: "neukundenaufnahme", details: `${input.vorname} ${input.nachname}`, status: "success" });
         return { success: true };
       }),
 

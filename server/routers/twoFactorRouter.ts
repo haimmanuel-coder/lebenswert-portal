@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { router } from "../_core/trpc";
 import { portalProtected } from "../portalAuth";
+import { pruefeRateLimit, ratelimitZuruecksetzen, LOGIN_LIMIT } from "../rateLimit";
 import { TRPCError } from "@trpc/server";
 import {
   generate2FASetup,
@@ -79,6 +80,9 @@ export const twoFactorRouter = router({
   verifyLogin: portalProtected
     .input(z.object({ token: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      // S-1: Drosselung gegen Durchprobieren des sechsstelligen 2FA-Codes
+      // bzw. der Wiederherstellungscodes (je Mitarbeiter).
+      pruefeRateLimit(`2fa:${ctx.mitarbeiterId}`, LOGIN_LIMIT);
       const secret = await get2FASecret(ctx.mitarbeiterId);
       if (!secret) return { success: true, required: false };
       const validTotp = verifyTOTP(secret, input.token);
@@ -86,6 +90,8 @@ export const twoFactorRouter = router({
       if (!validTotp && !validRecovery) {
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Ungültiger 2FA-Code" });
       }
+      // Erfolg: Zähler dieses Mitarbeiters zurücksetzen.
+      ratelimitZuruecksetzen(`2fa:${ctx.mitarbeiterId}`);
       return { success: true, required: true };
     }),
 });

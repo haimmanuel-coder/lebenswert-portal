@@ -34,6 +34,32 @@ tatsächliche Datenmengen.
 
 ---
 
+## Behebungsstand (28.07.2026)
+
+Die vier dringendsten Punkte wurden umgesetzt und verprobt (Commit auf
+`claude/lebenswert-portal-implementation-rpgr7q`):
+
+| Nr. | Status | Umsetzung |
+|---|---|---|
+| **K-1** | ✅ behoben | `fuehrerschein.list` → `portalProtected`; `getFuehrerscheinChecks` gibt „alle" nur noch bei explizitem `"alle"`-Aufruf zurück |
+| **K-2** | ✅ behoben | `neukundenaufnahme.create` → `portalProtected`, `erstelltVon` verpflichtend, Audit-Eintrag ergänzt |
+| **K-3** | ✅ behoben | `fuehrerschein.create` → `portalProtected` |
+| **K-4** | ✅ behoben | JWT-Fallback entfernt; Produktion bricht ohne `JWT_SECRET` ab, Entwicklung nutzt ein Prozess-Zufalls-Secret |
+| **S-1** | ✅ behoben | Rate-Limiting für Login, Passwort-Reset und 2FA-Prüfung (`server/rateLimit.ts`) |
+
+Verprobt: 94 Tests bestanden (11 neu für den Rate-Limiter), 0 TypeScript-Fehler,
+Build erfolgreich. K-4 im Laufzeittest bestätigt (Produktionsabbruch ohne
+Secret, Entwicklungsstart mit Zufalls-Secret).
+
+**Noch offen** (nicht in diesem Änderungssatz): K-5 bis K-8, S-2 bis S-6 sowie
+die Performance- und UX-Punkte. Ein zusätzlicher Befund während der Umsetzung:
+`requestPasswordReset` gibt das Reset-Token direkt in der Antwort zurück
+(`server/routers.ts:748`) – ohne E-Mail-Versand kann damit jeder ein Token für
+eine beliebige Adresse anfordern. Das gehört bei nächster Gelegenheit auf einen
+E-Mail-basierten Ablauf umgestellt.
+
+---
+
 ## 1. Kritische Sicherheits- und DSGVO-Mängel
 
 ### K-1 · Unauthentifizierter Zugriff auf alle Führerschein-Daten

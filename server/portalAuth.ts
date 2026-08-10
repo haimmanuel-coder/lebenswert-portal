@@ -5,7 +5,46 @@ import { publicProcedure } from "./_core/trpc";
 import { getMitarbeiterById } from "./db";
 
 export const PORTAL_COOKIE = "lb_portal_token";
-const JWT_SECRET_TEXT = process.env.JWT_SECRET || "lebenswert-secret-key";
+
+/**
+ * JWT-Signaturschlüssel (K-4).
+ *
+ * Früher gab es einen hartcodierten Fallback ("lebenswert-secret-key"). In
+ * einem öffentlichen Repository ließen sich damit bei fehlender Umgebungs-
+ * variable gültige Token für beliebige Konten – auch Admin – signieren.
+ *
+ * Regeln jetzt:
+ *   • JWT_SECRET gesetzt  → dieser Wert wird verwendet.
+ *   • fehlt in Produktion → der Prozess startet nicht (fail fast).
+ *   • fehlt in Entwicklung/Test → ein zufälliges, nur für diese Prozess-
+ *     laufzeit gültiges Secret. Nie eine allgemein bekannte Konstante.
+ */
+function ermittleJwtSecret(): string {
+  const ausUmgebung = process.env.JWT_SECRET;
+  if (ausUmgebung && ausUmgebung.length >= 16) return ausUmgebung;
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "JWT_SECRET ist nicht gesetzt (oder kürzer als 16 Zeichen). " +
+        "Der Server verweigert aus Sicherheitsgründen den Start. " +
+        "Bitte JWT_SECRET als Umgebungsvariable hinterlegen.",
+    );
+  }
+
+  if (ausUmgebung) {
+    console.warn("[Auth] JWT_SECRET ist kürzer als 16 Zeichen – bitte verlängern.");
+    return ausUmgebung;
+  }
+
+  // Entwicklung/Test: zufälliges Ephemer-Secret statt bekannter Konstante.
+  console.warn(
+    "[Auth] JWT_SECRET nicht gesetzt – nutze ein zufälliges Secret für diese " +
+      "Prozesslaufzeit. Token überstehen keinen Neustart. Nur für Entwicklung/Tests.",
+  );
+  return crypto.randomBytes(32).toString("hex");
+}
+
+const JWT_SECRET_TEXT = ermittleJwtSecret();
 const JWT_SECRET = new TextEncoder().encode(JWT_SECRET_TEXT);
 
 export type PortalRolle = "mitarbeiter" | "teamleitung" | "buchhaltung" | "admin";
@@ -120,6 +159,10 @@ export function requireRecht(recht: PortalRecht) {
 }
 
 function encryptionKey() {
+  // Fällt auf JWT_SECRET_TEXT zurück, falls kein eigener Schlüssel gesetzt ist.
+  // Seit K-4 ist das kein öffentlich bekannter Wert mehr, sondern in Produktion
+  // ein echtes Secret bzw. in Entwicklung ein Prozess-Zufallswert. Für getrennte
+  // Schlüsselverwaltung empfiehlt sich dennoch ein eigenes CREDENTIAL_ENCRYPTION_KEY.
   return crypto.createHash("sha256").update(process.env.CREDENTIAL_ENCRYPTION_KEY || JWT_SECRET_TEXT).digest();
 }
 
