@@ -1346,7 +1346,8 @@ export const appRouter = router({
       }),
 
     export: adminProcedure
-      .query(async () => {
+      .query(async ({ ctx }) => {
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'READ', ressource: 'kunden-export', details: 'Excel/CSV-Export der Kundenliste', status: 'success' });
         const db = await getDb();
         const rows = await db!.execute(sql`
           SELECT
@@ -2374,7 +2375,8 @@ export const appRouter = router({
         return { tempPasswort: tempPw, vorname: ma.vorname, nachname: ma.nachname };
       }),
 
-    mitarbeiterExport: adminProcedure.query(async () => {
+    mitarbeiterExport: adminProcedure.query(async ({ ctx }) => {
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'READ', ressource: 'mitarbeiter-export', details: 'Excel/CSV-Export der Mitarbeiterliste', status: 'success' });
       const allMa = await getAllMitarbeiter();
       return allMa.map((ma: any) => ({
         id: ma.id,

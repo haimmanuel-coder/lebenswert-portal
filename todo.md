@@ -1052,3 +1052,9 @@
 - [x] Backend: einstellungen.get/set Procedures
 - [x] AdminPanel Einstellungen-Tab: Steuerberater-E-Mail konfigurieren + Test-Mail senden
 - [x] TypeScript: 0 Fehler
+
+## Rate-Limiting + Export-Protokollierung + Prüfbericht (10.08.2026)
+- [x] Rate-Limiting: express-rate-limit für Login, Passwort-Reset, Portal-Login
+- [x] Export-Protokollierung: Audit-Log bei kundenExport und mitarbeiterExport
+- [x] Prüfbericht: 8 Bereiche strukturiert als Markdown-Datei
+- [x] TypeScript: 0 Fehler
