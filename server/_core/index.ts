@@ -63,7 +63,7 @@ async function startServer() {
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: "Zu viele Anmeldeversuche. Bitte in 15 Minuten erneut versuchen." },
-    skip: (req) => process.env.NODE_ENV === "test",
+    skip: (_req: import("express").Request) => process.env.NODE_ENV === "test",
   });
   // Passwort-Reset: max. 5 Versuche pro 15 Minuten pro IP
   const passwortLimiter = rateLimit({
@@ -72,7 +72,7 @@ async function startServer() {
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: "Zu viele Passwort-Anfragen. Bitte in 15 Minuten erneut versuchen." },
-    skip: (req) => process.env.NODE_ENV === "test",
+    skip: (_req: import("express").Request) => process.env.NODE_ENV === "test",
   });
   // Allgemeines API-Limit: max. 300 Anfragen pro Minute pro IP (Schutz vor Massenanfragen)
   const apiLimiter = rateLimit({
@@ -81,7 +81,7 @@ async function startServer() {
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: "Zu viele Anfragen. Bitte kurz warten." },
-    skip: (req) => process.env.NODE_ENV === "test",
+    skip: (_req: import("express").Request) => process.env.NODE_ENV === "test",
   });
   // Login-Endpunkte absichern (tRPC batch-kompatibel: URL-Matching)
   app.use("/api/trpc/portal.login", loginLimiter);

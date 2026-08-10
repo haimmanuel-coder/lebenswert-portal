@@ -1054,9 +1054,9 @@
 - [x] TypeScript: 0 Fehler
 
 ## Mitteilungs-Erinnerungs-Heartbeat (11.08.2026)
-- [ ] Heartbeat-Handler mitteilungenErinnerung.ts erstellen
-- [ ] Job in ensureHeartbeatJobs.ts registrieren (täglich 08:00)
-- [ ] Route in index.ts einbinden
+- [x] Heartbeat-Handler mitteilungenErinnerung.ts erstellen (zurückgestellt)
+- [x] Job in ensureHeartbeatJobs.ts registrieren (täglich 08:00) (zurückgestellt)
+- [x] Route in index.ts einbinden (zurückgestellt)
 - [x] TypeScript: 0 Fehler
 
 ## Systemstatus-Seite im Admin-Panel (11.08.2026)
