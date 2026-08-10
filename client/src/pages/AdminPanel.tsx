@@ -20,7 +20,7 @@ import { toast } from "sonner";
 import BottomSheet from "@/components/BottomSheet";
 import MitarbeiterDetail from "./MitarbeiterDetail";
 
-type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo" | "preise" | "sicherheit" | "fuehrerschein" | "compliance" | "compliance-gesamt" | "arbeitssicherheit" | "as-dashboard" | "unterschriften-archiv" | "lohnkosten" | "onboarding" | "csv-import" | "kunden-import" | "einstellungen";
+type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo" | "preise" | "sicherheit" | "fuehrerschein" | "compliance" | "compliance-gesamt" | "arbeitssicherheit" | "as-dashboard" | "unterschriften-archiv" | "lohnkosten" | "onboarding" | "csv-import" | "kunden-import" | "einstellungen" | "audit-log" | "mitteilungen";
 type PortalRolle = "mitarbeiter" | "teamleitung" | "buchhaltung" | "admin";
 
 const ROLLEN_LABEL: Record<PortalRolle, string> = {
@@ -65,6 +65,9 @@ export default function AdminPanel() {
   const [maZeigeInaktiv, setMaZeigeInaktiv] = useState(false);
   const [maSeite, setMaSeite] = useState(1);
   const MA_PRO_SEITE = 20;
+  const [kdSearch, setKdSearch] = useState("");
+  const [kdSeite, setKdSeite] = useState(1);
+  const KD_PRO_SEITE = 20;
 
   const { data: maList = [], refetch: refetchMa } = trpc.admin.mitarbeiterList.useQuery();
   const createMa = trpc.admin.mitarbeiterCreate.useMutation({
@@ -416,6 +419,8 @@ export default function AdminPanel() {
           <button style={tabStyle("csv-import")} onClick={() => setTab("csv-import")}>📥 MA-Import</button>
           <button style={tabStyle("kunden-import")} onClick={() => setTab("kunden-import")}>📥 Kunden-Import</button>
           <button style={tabStyle("einstellungen")} onClick={() => setTab("einstellungen")}>⚙️ Einstellungen</button>
+          <button style={tabStyle("audit-log")} onClick={() => setTab("audit-log")}>📋 Audit-Log</button>
+          <button style={tabStyle("mitteilungen")} onClick={() => setTab("mitteilungen")}>📢 Mitteilungen</button>
         </div>
         {/* Hauptinhalt */}
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -566,7 +571,23 @@ export default function AdminPanel() {
               <button onClick={() => { resetKdForm(); setKdSheet(true); }} style={{ padding: "8px 14px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>+ Neu</button>
             </div>
           </div>
-          {kundenList.map((k) => (
+          {/* Suchfeld */}
+          <input
+            value={kdSearch}
+            onChange={e => { setKdSearch(e.target.value); setKdSeite(1); }}
+            placeholder="🔍 Name, Ort oder Pflegegrad suchen..."
+            style={{ width: "100%", padding: "9px 12px", border: "2px solid #e5e7eb", borderRadius: 8, fontSize: 13, outline: "none", marginBottom: 10, boxSizing: "border-box" }}
+          />
+          {kundenList
+            .filter(k => {
+              if (!kdSearch.trim()) return true;
+              const q = kdSearch.toLowerCase();
+              return `${k.vorname} ${k.nachname}`.toLowerCase().includes(q)
+                || (k.ort ?? "").toLowerCase().includes(q)
+                || String(k.pflegegrad ?? "").includes(q);
+            })
+            .slice((kdSeite - 1) * KD_PRO_SEITE, kdSeite * KD_PRO_SEITE)
+            .map((k) => (
             <div key={k.id} style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 10px rgba(0,0,0,.08)", padding: 14, marginBottom: 10 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{ width: 42, height: 42, borderRadius: "50%", background: "#e8f5e4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>🏠</div>
@@ -585,6 +606,31 @@ export default function AdminPanel() {
               </div>
             </div>
           ))}
+          {/* Kunden-Pagination */}
+          {(() => {
+            const gefiltert = kundenList.filter(k => {
+              if (!kdSearch.trim()) return true;
+              const q = kdSearch.toLowerCase();
+              return `${k.vorname} ${k.nachname}`.toLowerCase().includes(q)
+                || (k.ort ?? "").toLowerCase().includes(q)
+                || String(k.pflegegrad ?? "").includes(q);
+            });
+            const seiten = Math.ceil(gefiltert.length / KD_PRO_SEITE);
+            if (seiten <= 1) return null;
+            return (
+              <div style={{ display: "flex", gap: 6, justifyContent: "center", marginTop: 12, flexWrap: "wrap" }}>
+                <button onClick={() => setKdSeite(p => Math.max(1, p - 1))} disabled={kdSeite === 1}
+                  style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #e5e7eb", background: kdSeite === 1 ? "#f9fafb" : "#fff", cursor: kdSeite === 1 ? "not-allowed" : "pointer", fontSize: 13 }}>‹ Zurück</button>
+                {Array.from({ length: seiten }, (_, i) => i + 1).map(s => (
+                  <button key={s} onClick={() => setKdSeite(s)}
+                    style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #e5e7eb", background: s === kdSeite ? "#4a8c3f" : "#fff", color: s === kdSeite ? "#fff" : "#374151", cursor: "pointer", fontSize: 13, fontWeight: s === kdSeite ? 700 : 400 }}>{s}</button>
+                ))}
+                <button onClick={() => setKdSeite(p => Math.min(seiten, p + 1))} disabled={kdSeite === seiten}
+                  style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #e5e7eb", background: kdSeite === seiten ? "#f9fafb" : "#fff", cursor: kdSeite === seiten ? "not-allowed" : "pointer", fontSize: 13 }}>Weiter ›</button>
+                <span style={{ fontSize: 12, color: "#6b7280", alignSelf: "center" }}>{gefiltert.length} gesamt</span>
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -972,6 +1018,16 @@ export default function AdminPanel() {
         <EinstellungenTab />
       )}
 
+      {/* ── AUDIT-LOG ── */}
+      {tab === "audit-log" && (
+        <AuditLogTab />
+      )}
+
+      {/* ── MITTEILUNGEN ── Platzhalter bis Phase 3 */}
+      {tab === "mitteilungen" && (
+        <MitteilungenAdminTab />
+      )}
+
       <BottomSheet open={budgetSheet} onClose={() => setBudgetSheet(false)} title={budgetKunde ? `Budget: ${budgetKunde.vorname} ${budgetKunde.nachname}` : "Budget bearbeiten"}>
         {/* §45b */}
         <div style={{ background: "#f0fdf4", borderRadius: 10, padding: 12, marginBottom: 10 }}>
@@ -1036,3 +1092,5 @@ export default function AdminPanel() {
     </div>
   );
 }
+import AuditLogTab from "./AuditLogTab";
+import MitteilungenAdminTab from "./MitteilungenAdminTab";

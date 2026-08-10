@@ -929,6 +929,104 @@ Wenn du etwas nicht weißt, sage es ehrlich.`;
     }),
 });
 
+// ══════════════════════════════════════════════════════════════════════════════
+//  MITTEILUNGEN-ROUTER
+// ══════════════════════════════════════════════════════════════════════════════
+const mitteilungenRouter = router({
+  /** Alle aktiven Mitteilungen für den eingeloggten Mitarbeiter */
+  list: portalProtected.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) return [];
+    const rows = await db.execute(sql`
+      SELECT m.id, m.titel, m.inhalt, m.prioritaet, m.lesebestaetigung_pflicht,
+             m.gueltigBis, m.createdAt,
+             (SELECT COUNT(*) FROM mitteilungen_lesebestaetigung lb
+              WHERE lb.mitteilungId = m.id AND lb.mitarbeiterId = ${ctx.mitarbeiterId}) as gelesen
+      FROM mitteilungen m
+      WHERE m.aktiv = 1 AND (m.gueltigBis IS NULL OR m.gueltigBis > NOW())
+      ORDER BY m.createdAt DESC
+    `);
+    return (rows as any).rows ?? rows;
+  }),
+
+  /** Lesebestätigung für eine Mitteilung setzen */
+  bestaetigen: portalProtected
+    .input(z.object({ mitteilungId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+      await db.execute(sql`
+        INSERT IGNORE INTO mitteilungen_lesebestaetigung (mitteilungId, mitarbeiterId)
+        VALUES (${input.mitteilungId}, ${ctx.mitarbeiterId})
+      `);
+      return { ok: true };
+    }),
+
+  /** Admin: Alle Mitteilungen mit Lesebestätigungs-Statistik */
+  adminList: adminProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return [];
+    const rows = await db.execute(sql`
+      SELECT m.*,
+             (SELECT COUNT(*) FROM mitteilungen_lesebestaetigung lb WHERE lb.mitteilungId = m.id) as anzahlBestaetigt,
+             (SELECT COUNT(*) FROM mitarbeiter ma WHERE ma.aktiv = 1) as gesamtMitarbeiter
+      FROM mitteilungen m
+      ORDER BY m.createdAt DESC
+    `);
+    return (rows as any).rows ?? rows;
+  }),
+
+  /** Admin: Neue Mitteilung erstellen */
+  erstellen: adminProcedure
+    .input(z.object({
+      titel: z.string().min(1).max(200),
+      inhalt: z.string().min(1),
+      prioritaet: z.enum(['normal','wichtig','dringend']).default('normal'),
+      lesebestaetigung_pflicht: z.boolean().default(true),
+      gueltigBis: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+      await db.execute(sql`
+        INSERT INTO mitteilungen (titel, inhalt, prioritaet, erstelltVon, lesebestaetigung_pflicht, gueltigBis)
+        VALUES (${input.titel}, ${input.inhalt}, ${input.prioritaet}, ${ctx.adminId},
+                ${input.lesebestaetigung_pflicht ? 1 : 0},
+                ${input.gueltigBis ? new Date(input.gueltigBis) : null})
+      `);
+      await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'CREATE', ressource: 'mitteilung', details: input.titel, status: 'success' });
+      return { ok: true };
+    }),
+
+  /** Admin: Mitteilung deaktivieren */
+  deaktivieren: adminProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+      await db.execute(sql`UPDATE mitteilungen SET aktiv = 0 WHERE id = ${input.id}`);
+      await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'DELETE', ressource: 'mitteilung', details: `id=${input.id}`, status: 'success' });
+      return { ok: true };
+    }),
+
+  /** Anzahl ungelesener Mitteilungen für den eingeloggten Mitarbeiter */
+  ungelesen: portalProtected.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) return { anzahl: 0 };
+    const rows = await db.execute(sql`
+      SELECT COUNT(*) as anzahl FROM mitteilungen m
+      WHERE m.aktiv = 1 AND (m.gueltigBis IS NULL OR m.gueltigBis > NOW())
+      AND NOT EXISTS (
+        SELECT 1 FROM mitteilungen_lesebestaetigung lb
+        WHERE lb.mitteilungId = m.id AND lb.mitarbeiterId = ${ctx.mitarbeiterId}
+      )
+    `);
+    const row = ((rows as any).rows ?? rows)[0];
+    return { anzahl: Number(row?.anzahl ?? 0) };
+  }),
+});
+
+
 export const appRouter = router({
   system: systemRouter,
   ki: kiRouter,
@@ -3736,6 +3834,7 @@ export const appRouter = router({
   sicherheitsunterweisung: sicherheitsunterweisungRouter,
   arbeitssicherheit: arbeitssicherheitRouter,
   unterweisungNachweis: unterweisungNachweisRouter,
+  mitteilungen: mitteilungenRouter,
 });
 
 export type AppRouter = typeof appRouter;

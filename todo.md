@@ -1066,3 +1066,12 @@
 - [x] Pagination Kundenliste (Suche + Limit 20)
 - [x] Aufbewahrungsfristen-Heartbeat (SGB XI, monatlich)
 - [x] TypeScript: 0 Fehler
+
+## 3 Features: Kunden-Pagination + Audit-Log + Mitteilungen (10.08.2026)
+- [x] Kunden-Pagination im Admin-Panel (20 pro Seite)
+- [x] Audit-Log-Tab im Admin-Panel (filterbar nach Aktion/Datum/Admin)
+- [x] DB-Tabelle mitteilungen + mitteilungen_lesebestaetigung
+- [x] Backend: mitteilungen.erstellen, mitteilungen.list, mitteilungen.bestaetigen
+- [x] Admin: Mitteilungs-Tab zum Erstellen und Verwalten
+- [x] MA: Mitteilungen in Benachrichtigungen mit Lesebestätigungs-Button
+- [x] TypeScript: 0 Fehler
