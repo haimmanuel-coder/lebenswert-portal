@@ -2174,6 +2174,16 @@ export const appRouter = router({
       };
     }),
     mitarbeiterList: adminProcedure.query(async () => getAllMitarbeiter()),
+    /** Nur E-Mails und Namen – für clientseitige Duplikat-Prüfung im CSV-Import */
+    mitarbeiterEmailListe: adminProcedure.query(async () => {
+      const alle = await getAllMitarbeiter();
+      return alle.map((m: any) => ({ id: m.id, email: m.email ?? "", name: `${m.vorname} ${m.nachname}` }));
+    }),
+    /** Nur Namen+Adressen der Kunden – für clientseitige Duplikat-Prüfung im Kunden-Import */
+    kundenNameListe: adminProcedure.query(async () => {
+      const alle = await getAllKunden();
+      return alle.map((k: any) => ({ id: k.id, vorname: k.vorname ?? "", nachname: k.nachname ?? "", ort: k.ort ?? "" }));
+    }),
 
     updateRolle: adminProcedure
       .input(z.object({

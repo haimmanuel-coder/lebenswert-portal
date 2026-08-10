@@ -1058,3 +1058,11 @@
 - [x] Export-Protokollierung: Audit-Log bei kundenExport und mitarbeiterExport
 - [x] Prüfbericht: 8 Bereiche strukturiert als Markdown-Datei
 - [x] TypeScript: 0 Fehler
+
+## 3 Features: Duplikat-CSV + Pagination + Aufbewahrungsfristen (10.08.2026)
+- [x] Duplikat-Erkennung im MA-CSV-Import (E-Mail-Vergleich)
+- [x] Duplikat-Erkennung im Kunden-CSV-Import (Name+Adresse)
+- [x] Pagination Mitarbeiterliste (Suche + Limit 20)
+- [x] Pagination Kundenliste (Suche + Limit 20)
+- [x] Aufbewahrungsfristen-Heartbeat (SGB XI, monatlich)
+- [x] TypeScript: 0 Fehler

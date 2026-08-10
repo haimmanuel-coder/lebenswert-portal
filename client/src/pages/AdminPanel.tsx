@@ -63,6 +63,8 @@ export default function AdminPanel() {
   const [maSearch, setMaSearch] = useState("");
   const [maBeschFilter, setMaBeschFilter] = useState<"alle" | "minijob" | "teilzeit" | "vollzeit">("alle");
   const [maZeigeInaktiv, setMaZeigeInaktiv] = useState(false);
+  const [maSeite, setMaSeite] = useState(1);
+  const MA_PRO_SEITE = 20;
 
   const { data: maList = [], refetch: refetchMa } = trpc.admin.mitarbeiterList.useQuery();
   const createMa = trpc.admin.mitarbeiterCreate.useMutation({
@@ -464,6 +466,7 @@ export default function AdminPanel() {
               const q = maSearch.toLowerCase();
               return `${ma.vorname} ${ma.nachname}`.toLowerCase().includes(q) || ma.email.toLowerCase().includes(q);
             })
+            .slice((maSeite - 1) * MA_PRO_SEITE, maSeite * MA_PRO_SEITE)
             .map((ma) => {
             const zert = (ma as any).zertifikatStatus as string ?? "nicht_angemeldet";
             const beschaeft = (ma as any).beschaeftigungsart as string ?? "minijob";
@@ -523,6 +526,33 @@ export default function AdminPanel() {
             </div>
                     );})
           }
+          {/* MA-Pagination */}
+          {(() => {
+            const gefiltert = maList
+              .filter(ma => maZeigeInaktiv || ma.aktiv)
+              .filter(ma => maBeschFilter === "alle" || (ma as any).beschaeftigungsart === maBeschFilter)
+              .filter(ma => {
+                if (!maSearch.trim()) return true;
+                const q = maSearch.toLowerCase();
+                return `${ma.vorname} ${ma.nachname}`.toLowerCase().includes(q) || ma.email.toLowerCase().includes(q);
+              });
+            const gesamt = gefiltert.length;
+            const seiten = Math.ceil(gesamt / MA_PRO_SEITE);
+            if (seiten <= 1) return null;
+            return (
+              <div style={{ display: "flex", gap: 6, justifyContent: "center", marginTop: 12, flexWrap: "wrap" }}>
+                <button onClick={() => setMaSeite(p => Math.max(1, p - 1))} disabled={maSeite === 1}
+                  style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #e5e7eb", background: maSeite === 1 ? "#f9fafb" : "#fff", cursor: maSeite === 1 ? "not-allowed" : "pointer", fontSize: 13 }}>‹ Zurück</button>
+                {Array.from({ length: seiten }, (_, i) => i + 1).map(s => (
+                  <button key={s} onClick={() => setMaSeite(s)}
+                    style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #e5e7eb", background: s === maSeite ? "#4a8c3f" : "#fff", color: s === maSeite ? "#fff" : "#374151", cursor: "pointer", fontSize: 13, fontWeight: s === maSeite ? 700 : 400 }}>{s}</button>
+                ))}
+                <button onClick={() => setMaSeite(p => Math.min(seiten, p + 1))} disabled={maSeite === seiten}
+                  style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #e5e7eb", background: maSeite === seiten ? "#f9fafb" : "#fff", cursor: maSeite === seiten ? "not-allowed" : "pointer", fontSize: 13 }}>Weiter ›</button>
+                <span style={{ fontSize: 12, color: "#6b7280", alignSelf: "center" }}>{gesamt} gesamt</span>
+              </div>
+            );
+          })()}
         </div>
       )}
       {/* ── KUNDEN ── */}
