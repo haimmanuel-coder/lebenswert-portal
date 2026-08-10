@@ -20,7 +20,7 @@ import { toast } from "sonner";
 import BottomSheet from "@/components/BottomSheet";
 import MitarbeiterDetail from "./MitarbeiterDetail";
 
-type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo" | "preise" | "sicherheit" | "fuehrerschein" | "compliance" | "compliance-gesamt" | "arbeitssicherheit" | "as-dashboard" | "unterschriften-archiv" | "lohnkosten" | "onboarding" | "csv-import" | "kunden-import" | "einstellungen";
+type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo" | "preise" | "sicherheit" | "fuehrerschein" | "compliance" | "compliance-gesamt" | "arbeitssicherheit" | "as-dashboard" | "unterschriften-archiv" | "lohnkosten" | "onboarding" | "csv-import" | "kunden-import" | "einstellungen" | "systemstatus";
 type PortalRolle = "mitarbeiter" | "teamleitung" | "buchhaltung" | "admin";
 
 const ROLLEN_LABEL: Record<PortalRolle, string> = {
@@ -386,6 +386,7 @@ export default function AdminPanel() {
           { key: "csv-import" as AdminTab, label: "📥 CSV-Import" },
           { key: "kunden-import" as AdminTab, label: "🏠 Kunden-Import" },
           { key: "einstellungen" as AdminTab, label: "⚙️ Einstellungen" },
+          { key: "systemstatus" as AdminTab, label: "🖥️ Systemstatus" },
         ].map((t) => (
           <button key={t.key} style={tabStyle(t.key)} onClick={() => setTab(t.key)}>{t.label}</button>
         ))}
@@ -886,6 +887,9 @@ export default function AdminPanel() {
       {tab === "einstellungen" && (
         <EinstellungenTab />
       )}
+      {tab === "systemstatus" && (
+        <SystemstatusTab />
+      )}
 
       <BottomSheet open={budgetSheet} onClose={() => setBudgetSheet(false)} title={budgetKunde ? `Budget: ${budgetKunde.vorname} ${budgetKunde.nachname}` : "Budget bearbeiten"}>
         {/* §45b */}
@@ -949,3 +953,4 @@ export default function AdminPanel() {
     </div>
   );
 }
+import SystemstatusTab from "./SystemstatusTab";

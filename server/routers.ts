@@ -929,12 +929,70 @@ Wenn du etwas nicht weißt, sage es ehrlich.`;
     }),
 });
 
+// ── SYSTEMSTATUS ─────────────────────────────────────────────────────────────
+const systemStatusRouter = router({
+  get: adminProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+
+    // Uptime
+    const uptimeSeconds = Math.floor(process.uptime());
+    const uptimeH = Math.floor(uptimeSeconds / 3600);
+    const uptimeM = Math.floor((uptimeSeconds % 3600) / 60);
+    const uptimeStr = `${uptimeH}h ${uptimeM}m`;
+
+    // Tabellen-Anzahl
+    const tabRows = await db.execute(sql`SELECT COUNT(*) as cnt FROM information_schema.tables WHERE table_schema = DATABASE()`);
+    const tabellenAnzahl = Number((tabRows as any)[0]?.[0]?.cnt ?? 0);
+
+    // Datensatz-Zählungen
+    const [maRows, kdRows, einsatzRows, lnwRows, notifRows] = await Promise.all([
+      db.execute(sql`SELECT COUNT(*) as cnt FROM mitarbeiter WHERE aktiv = 1`),
+      db.execute(sql`SELECT COUNT(*) as cnt FROM kunden WHERE aktiv = 1`),
+      db.execute(sql`SELECT COUNT(*) as cnt FROM einsaetze WHERE geloeschtAt IS NULL`),
+      db.execute(sql`SELECT COUNT(*) as cnt FROM leistungsnachweise`),
+      db.execute(sql`SELECT COUNT(*) as cnt FROM notifications WHERE gelesen = 0`),
+    ]);
+
+    // Letzte Backup-Läufe
+    let backups: any[] = [];
+    try {
+      const bRows = await db.execute(sql`SELECT typ, status, startedAt, beendetAt, dateiGroesse, fehler FROM backupLaeufe ORDER BY startedAt DESC LIMIT 5`);
+      backups = (bRows as any)[0] ?? [];
+    } catch { backups = []; }
+
+    // Letzte Audit-Log Einträge
+    let recentAudit: any[] = [];
+    try {
+      const aRows = await db.execute(sql`SELECT action, ressource, details, status, createdAt FROM auditLogs ORDER BY createdAt DESC LIMIT 10`);
+      recentAudit = (aRows as any)[0] ?? [];
+    } catch { recentAudit = []; }
+
+    return {
+      uptime: uptimeStr,
+      uptimeSeconds,
+      tabellenAnzahl,
+      mitarbeiterAktiv: Number((maRows as any)[0]?.[0]?.cnt ?? 0),
+      kundenAktiv: Number((kdRows as any)[0]?.[0]?.cnt ?? 0),
+      einsaetzeGesamt: Number((einsatzRows as any)[0]?.[0]?.cnt ?? 0),
+      leistungsnachweise: Number((lnwRows as any)[0]?.[0]?.cnt ?? 0),
+      ungeleseneNotifs: Number((notifRows as any)[0]?.[0]?.cnt ?? 0),
+      backups,
+      recentAudit,
+      serverZeit: new Date().toISOString(),
+      nodeVersion: process.version,
+    };
+  }),
+});
+
+
 export const appRouter = router({
   system: systemRouter,
   ki: kiRouter,
   onboarding: onboardingRouter,
   csvImport: csvImportRouter,
   einstellungen: einstellungenRouter,
+  systemStatus: systemStatusRouter,
   pflichtenheft: pflichtenheftRouter,
   /** Einsatzplanung: Termine, Budgetstunden, Lohnkosten, Warnungen, Touren */
   planung: planungRouter,

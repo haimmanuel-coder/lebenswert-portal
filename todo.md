@@ -1052,3 +1052,15 @@
 - [x] Backend: einstellungen.get/set Procedures
 - [x] AdminPanel Einstellungen-Tab: Steuerberater-E-Mail konfigurieren + Test-Mail senden
 - [x] TypeScript: 0 Fehler
+
+## Mitteilungs-Erinnerungs-Heartbeat (11.08.2026)
+- [ ] Heartbeat-Handler mitteilungenErinnerung.ts erstellen
+- [ ] Job in ensureHeartbeatJobs.ts registrieren (täglich 08:00)
+- [ ] Route in index.ts einbinden
+- [x] TypeScript: 0 Fehler
+
+## Systemstatus-Seite im Admin-Panel (11.08.2026)
+- [x] Backend: admin.systemStatus Procedure (DB-Tabellen, Uptime, Backup-Läufe, Zählungen)
+- [x] SystemstatusTab.tsx erstellen (KPI-Karten + Tabellen-Liste + Backup-Log)
+- [x] AdminPanel: Tab "⚙️ Systemstatus" in Einstellungen-Gruppe
+- [x] TypeScript: 0 Fehler
