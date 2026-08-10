@@ -2355,6 +2355,25 @@ export const appRouter = router({
         return { success: true };
       }),
     /** Mitarbeiterliste als strukturierte Daten für Export */
+    /** Temporäres Passwort generieren und setzen – gibt Klartext zurück */
+    mitarbeiterTempPasswort: adminProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(async ({ input, ctx }) => {
+        const ma = await getMitarbeiterById(input.id);
+        if (!ma) throw new TRPCError({ code: 'NOT_FOUND', message: 'Mitarbeiter nicht gefunden.' });
+        // Sicheres zufälliges Passwort: 3 Wörter + Zahl (leicht merkbar, sicher)
+        const adjektive = ["Grün", "Blau", "Stark", "Schnell", "Sicher", "Frisch", "Klar", "Warm"];
+        const nomen = ["Baum", "Berg", "Fluss", "Wald", "Stern", "Feld", "Haus", "Weg"];
+        const adj = adjektive[Math.floor(Math.random() * adjektive.length)];
+        const nom = nomen[Math.floor(Math.random() * nomen.length)];
+        const num = Math.floor(Math.random() * 900) + 100;
+        const tempPw = `${adj}${nom}${num}`;
+        const hash = await bcrypt.hash(tempPw, 10);
+        await updateMitarbeiter(input.id, { passwortHash: hash } as any);
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'ADMIN', ressource: 'mitarbeiter', details: `temp-passwort-generiert id=${input.id}`, status: 'success' });
+        return { tempPasswort: tempPw, vorname: ma.vorname, nachname: ma.nachname };
+      }),
+
     mitarbeiterExport: adminProcedure.query(async () => {
       const allMa = await getAllMitarbeiter();
       return allMa.map((ma: any) => ({

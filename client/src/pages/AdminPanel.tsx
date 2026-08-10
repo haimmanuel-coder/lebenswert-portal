@@ -178,6 +178,15 @@ export default function AdminPanel() {
     onSuccess: () => { toast.success("🔑 Passwort wurde zurückgesetzt"); setPwResetMa(null); setPwResetNeu(""); },
     onError: (e) => toast.error("❌ " + e.message),
   });
+  const [tempPwResult, setTempPwResult] = useState<string | null>(null);
+  const [tempPwCopied, setTempPwCopied] = useState(false);
+  const tempPasswort = trpc.admin.mitarbeiterTempPasswort.useMutation({
+    onSuccess: (data) => {
+      setTempPwResult(data.tempPasswort);
+      toast.success(`🔑 Temporäres Passwort für ${data.vorname} generiert`);
+    },
+    onError: (e) => toast.error("❌ " + e.message),
+  });
   const deleteMa = trpc.admin.mitarbeiterDelete.useMutation({
     onSuccess: () => { refetchMa(); toast.success("🗑️ Mitarbeiter gelöscht"); setDeleteDialogMa(null); setDeleteBestaetigung(""); },
     onError: (e) => toast.error("❌ " + e.message),
@@ -348,9 +357,16 @@ export default function AdminPanel() {
   }
 
   const tabStyle = (t: AdminTab) => ({
-    padding: "8px 16px", borderRadius: 20, fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer",
-    ...(tab === t ? { background: "#4a8c3f", color: "#fff" } : { background: "#f3f4f6", color: "#4b5563" }),
+    padding: "7px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer",
+    textAlign: "left" as const, width: "100%",
+    ...(tab === t
+      ? { background: "#4a8c3f", color: "#fff" }
+      : { background: "transparent", color: "#374151" }),
   });
+  const tabGroupStyle: React.CSSProperties = {
+    fontSize: 10, fontWeight: 800, textTransform: "uppercase" as const,
+    letterSpacing: 1, color: "#9ca3af", padding: "10px 12px 4px", marginTop: 4,
+  };
 
   const inputStyle: React.CSSProperties = { width: "100%", padding: "11px 12px", border: "2px solid #e5e7eb", borderRadius: 8, fontSize: 14, outline: "none", boxSizing: "border-box", background: "#fff" };
   const labelStyle: React.CSSProperties = { display: "block", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: "#6b7280", marginBottom: 4 };
@@ -364,32 +380,43 @@ export default function AdminPanel() {
         <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>Lebenswert Betreuung – Verwaltung</div>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-        {[
-          { key: "mitarbeiter" as AdminTab, label: "👥 Mitarbeiter" },
-          { key: "kunden" as AdminTab, label: "🏠 Kunden" },
-          { key: "zuordnung" as AdminTab, label: "🔗 Zuordnung" },
-          { key: "abschluss" as AdminTab, label: "📊 Abschluss" },
-          { key: "vorlagen" as AdminTab, label: "📋 Formularvorlagen" },
-          { key: "dsgvo" as AdminTab, label: "🔒 DSGVO-Dokumente" },
-          { key: "preise" as AdminTab, label: "💶 Leistungskosten" },
-          { key: "sicherheit" as AdminTab, label: "🦺 Sicherheitsunterweisungen" },
-          { key: "fuehrerschein" as AdminTab, label: "🪖 Führerschein-Checks" },
-          { key: "compliance" as AdminTab, label: "🚦 Compliance-Ampel" },
-          { key: "compliance-gesamt" as AdminTab, label: "📊 Compliance-Gesamt" },
-          { key: "arbeitssicherheit" as AdminTab, label: "⛑️ Arbeitssicherheit" },
-          { key: "as-dashboard" as AdminTab, label: "🚦 AS-Dashboard" },
-          { key: "unterschriften-archiv" as AdminTab, label: "📋 Unterschriften-Archiv" },
-          { key: "lohnkosten" as AdminTab, label: "💰 Lohnkosten" },
-          { key: "onboarding" as AdminTab, label: "🎯 Onboarding" },
-          { key: "csv-import" as AdminTab, label: "📥 CSV-Import" },
-          { key: "kunden-import" as AdminTab, label: "🏠 Kunden-Import" },
-          { key: "einstellungen" as AdminTab, label: "⚙️ Einstellungen" },
-        ].map((t) => (
-          <button key={t.key} style={tabStyle(t.key)} onClick={() => setTab(t.key)}>{t.label}</button>
-        ))}
-      </div>
+      {/* Tabs – Sidebar-Navigation */}
+      <div style={{ display: "flex", gap: 16, marginBottom: 16, alignItems: "flex-start" }}>
+        {/* Sidebar */}
+        <div style={{ minWidth: 200, maxWidth: 210, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "8px 0", flexShrink: 0 }}>
+          <div style={tabGroupStyle}>👥 Personal</div>
+          <button style={tabStyle("mitarbeiter")} onClick={() => setTab("mitarbeiter")}>👥 Mitarbeiter</button>
+          <button style={tabStyle("onboarding")} onClick={() => setTab("onboarding")}>🎯 Onboarding</button>
+          <button style={tabStyle("lohnkosten")} onClick={() => setTab("lohnkosten")}>💰 Lohnkosten</button>
+
+          <div style={tabGroupStyle}>🏠 Kunden</div>
+          <button style={tabStyle("kunden")} onClick={() => setTab("kunden")}>🏠 Kunden</button>
+          <button style={tabStyle("zuordnung")} onClick={() => setTab("zuordnung")}>🔗 Zuordnung</button>
+          <button style={tabStyle("preise")} onClick={() => setTab("preise")}>💶 Leistungskosten</button>
+
+          <div style={tabGroupStyle}>📋 Verwaltung</div>
+          <button style={tabStyle("abschluss")} onClick={() => setTab("abschluss")}>📊 Abschluss</button>
+          <button style={tabStyle("vorlagen")} onClick={() => setTab("vorlagen")}>📋 Formularvorlagen</button>
+          <button style={tabStyle("unterschriften-archiv")} onClick={() => setTab("unterschriften-archiv")}>✍️ Unterschriften</button>
+
+          <div style={tabGroupStyle}>✅ Compliance</div>
+          <button style={tabStyle("compliance")} onClick={() => setTab("compliance")}>🚦 Compliance-Ampel</button>
+          <button style={tabStyle("compliance-gesamt")} onClick={() => setTab("compliance-gesamt")}>📊 Compliance-Gesamt</button>
+          <button style={tabStyle("fuehrerschein")} onClick={() => setTab("fuehrerschein")}>🪖 Führerschein</button>
+          <button style={tabStyle("dsgvo")} onClick={() => setTab("dsgvo")}>🔒 DSGVO-Dokumente</button>
+
+          <div style={tabGroupStyle}>⛑️ Arbeitssicherheit</div>
+          <button style={tabStyle("arbeitssicherheit")} onClick={() => setTab("arbeitssicherheit")}>⛑️ Arbeitssicherheit</button>
+          <button style={tabStyle("as-dashboard")} onClick={() => setTab("as-dashboard")}>🚦 AS-Dashboard</button>
+          <button style={tabStyle("sicherheit")} onClick={() => setTab("sicherheit")}>🦺 Unterweisungen</button>
+
+          <div style={tabGroupStyle}>📥 Import & System</div>
+          <button style={tabStyle("csv-import")} onClick={() => setTab("csv-import")}>📥 MA-Import</button>
+          <button style={tabStyle("kunden-import")} onClick={() => setTab("kunden-import")}>📥 Kunden-Import</button>
+          <button style={tabStyle("einstellungen")} onClick={() => setTab("einstellungen")}>⚙️ Einstellungen</button>
+        </div>
+        {/* Hauptinhalt */}
+        <div style={{ flex: 1, minWidth: 0 }}>
 
       {/* ── MITARBEITER ── */}
       {tab === "mitarbeiter" && (
@@ -771,23 +798,51 @@ export default function AdminPanel() {
             <div style={{ fontSize: 14, color: "#6b7280", marginBottom: 16 }}>
               Neues Passwort für <strong>{pwResetMa.vorname} {pwResetMa.nachname}</strong> setzen:
             </div>
+            {/* Temporäres Passwort generieren */}
+            <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: 14, marginBottom: 14 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#166534", marginBottom: 8 }}>🎲 Temporäres Passwort automatisch generieren</div>
+              {tempPwResult ? (
+                <div>
+                  <div style={{ background: "#fff", border: "2px solid #4a8c3f", borderRadius: 8, padding: "10px 14px", fontFamily: "monospace", fontSize: 18, fontWeight: 800, color: "#1a5c38", letterSpacing: 2, marginBottom: 8, textAlign: "center" as const }}>
+                    {tempPwResult}
+                  </div>
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(tempPwResult!); setTempPwCopied(true); setTimeout(() => setTempPwCopied(false), 2000); }}
+                    style={{ width: "100%", padding: "8px 0", background: tempPwCopied ? "#4a8c3f" : "#1e3a5f", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+                  >
+                    {tempPwCopied ? "✅ Kopiert!" : "📋 In Zwischenablage kopieren"}
+                  </button>
+                  <div style={{ fontSize: 11, color: "#6b7280", marginTop: 6, textAlign: "center" as const }}>Passwort wurde bereits gesetzt. Bitte dem Mitarbeiter mitteilen.</div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => { setTempPwResult(null); tempPasswort.mutate({ id: pwResetMa.id }); }}
+                  disabled={tempPasswort.isPending}
+                  style={{ width: "100%", padding: "9px 0", background: tempPasswort.isPending ? "#9ca3af" : "#4a8c3f", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+                >
+                  {tempPasswort.isPending ? "⏳ Generiere…" : "🎲 Sicheres Passwort generieren & setzen"}
+                </button>
+              )}
+            </div>
+            {/* Manuelles Passwort */}
+            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6, fontWeight: 600 }}>– oder manuell eingeben –</div>
             <input
-              type="password"
-              placeholder="Neues Passwort (min. 6 Zeichen)"
+              type="text"
+              placeholder="Eigenes Passwort (min. 6 Zeichen)"
               value={pwResetNeu}
               onChange={(e) => setPwResetNeu(e.target.value)}
-              style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 14, marginBottom: 16, boxSizing: "border-box" as const }}
+              style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 14, marginBottom: 12, boxSizing: "border-box" as const }}
             />
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => { setPwResetMa(null); setPwResetNeu(""); }} style={{ flex: 1, padding: "10px 0", background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
-                Abbrechen
+              <button onClick={() => { setPwResetMa(null); setPwResetNeu(""); setTempPwResult(null); }} style={{ flex: 1, padding: "10px 0", background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+                Schließen
               </button>
               <button
                 onClick={() => passwortReset.mutate({ id: pwResetMa.id, neuesPasswort: pwResetNeu })}
                 disabled={pwResetNeu.length < 6 || passwortReset.isPending}
                 style={{ flex: 1, padding: "10px 0", background: pwResetNeu.length >= 6 ? "#1e3a5f" : "#d1d5db", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: pwResetNeu.length >= 6 ? "pointer" : "not-allowed" }}
               >
-                {passwortReset.isPending ? "Speichern…" : "🔑 Passwort setzen"}
+                {passwortReset.isPending ? "Speichern…" : "🔑 Manuell setzen"}
               </button>
             </div>
           </div>
@@ -946,6 +1001,8 @@ export default function AdminPanel() {
           {updateBudget.isPending ? "Speichern…" : "✅ Budget speichern"}
         </button>
       </BottomSheet>
+      </div>{/* Ende Hauptinhalt */}
+      </div>{/* Ende Sidebar-Flex-Wrapper */}
     </div>
   );
 }
