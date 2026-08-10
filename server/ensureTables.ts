@@ -1043,6 +1043,27 @@ const TABLE_DEFINITIONS: string[] = [
     \`createdAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (\`id\`)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS \`mitteilungen\` (
+    \`id\` int NOT NULL AUTO_INCREMENT,
+    \`titel\` varchar(255) NOT NULL,
+    \`inhalt\` text NOT NULL,
+    \`typ\` enum('normal','wichtig','dringend') NOT NULL DEFAULT 'normal',
+    \`erstelltVon\` int NOT NULL,
+    \`gueltigBis\` datetime DEFAULT NULL,
+    \`pflichtBestaetigung\` tinyint(1) NOT NULL DEFAULT 0,
+    \`aktiv\` tinyint(1) NOT NULL DEFAULT 1,
+    \`createdAt\` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    \`updatedAt\` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS \`mitteilungen_lesebestaetigung\` (
+    \`id\` int NOT NULL AUTO_INCREMENT,
+    \`mitteilungId\` int NOT NULL,
+    \`mitarbeiterId\` int NOT NULL,
+    \`bestaetigt_at\` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    UNIQUE KEY \`uq_mitteilung_ma\` (\`mitteilungId\`, \`mitarbeiterId\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ];
 
 let ensureTablesRan = false;
