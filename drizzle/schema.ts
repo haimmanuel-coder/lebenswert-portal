@@ -1236,3 +1236,25 @@ export const arbeitssicherheitAuditLog = mysqlTable("arbeitssicherheit_audit_log
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type ArbeitssicherheitAuditLog = typeof arbeitssicherheitAuditLog.$inferSelect;
+export const mitteilungen = mysqlTable("mitteilungen", {
+  id: int("id").autoincrement().primaryKey(),
+  titel: varchar("titel", { length: 255 }).notNull(),
+  inhalt: text("inhalt").notNull(),
+  typ: mysqlEnum("typ", ["normal", "wichtig", "dringend"]).default("normal").notNull(),
+  erstelltVon: int("erstelltVon").notNull(),
+  gueltigBis: timestamp("gueltigBis"),
+  pflichtBestaetigung: boolean("pflichtBestaetigung").default(false).notNull(),
+  aktiv: boolean("aktiv").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type Mitteilung = typeof mitteilungen.$inferSelect;
+export type InsertMitteilung = typeof mitteilungen.$inferInsert;
+
+export const mitteilungenLesebestaetigung = mysqlTable("mitteilungen_lesebestaetigung", {
+  id: int("id").autoincrement().primaryKey(),
+  mitteilungId: int("mitteilungId").notNull(),
+  mitarbeiterId: int("mitarbeiterId").notNull(),
+  gelesenAt: timestamp("gelesenAt").defaultNow().notNull(),
+});
+export type MitteilungLesebestaetigung = typeof mitteilungenLesebestaetigung.$inferSelect;

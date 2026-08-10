@@ -126,6 +126,7 @@ import { sicherheitsunterweisungRouter } from "./routers/sicherheitsunterweisung
 import { arbeitssicherheitRouter } from "./routers/arbeitssicherheitRouter";
 import { unterweisungNachweisRouter } from "./routers/unterweisungNachweisRouter";
 import { notifyOwner } from "./_core/notification";
+import { mitteilungen as mitteilungenTable, mitteilungenLesebestaetigung as lesebestaetigungTable } from "../drizzle/schema";
 import {
   savePushSubscription,
   deletePushSubscription,
@@ -985,6 +986,105 @@ const systemStatusRouter = router({
   }),
 });
 
+
+
+// ── MITTEILUNGEN ROUTER ──────────────────────────────────────────
+const mitteilungenRouter = router({
+  liste: portalProtected.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) return [];
+    const rows = await db.select().from(mitteilungenTable)
+      .where(eq(mitteilungenTable.aktiv, true))
+      .orderBy(desc(mitteilungenTable.createdAt));
+    const bestaetigungen = await db.select().from(lesebestaetigungTable)
+      .where(eq(lesebestaetigungTable.mitarbeiterId, ctx.mitarbeiterId));
+    const gelesenIds = new Set(bestaetigungen.map(b => b.mitteilungId));
+    return rows.map(m => ({ ...m, gelesen: gelesenIds.has(m.id) }));
+  }),
+  ungelesen: portalProtected.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) return { count: 0 };
+    const alle = await db.select().from(mitteilungenTable)
+      .where(eq(mitteilungenTable.aktiv, true));
+    const bestaetigungen = await db.select().from(lesebestaetigungTable)
+      .where(eq(lesebestaetigungTable.mitarbeiterId, ctx.mitarbeiterId));
+    const gelesenIds = new Set(bestaetigungen.map(b => b.mitteilungId));
+    return { count: alle.filter(m => !gelesenIds.has(m.id)).length };
+  }),
+  bestaetigen: portalProtected
+    .input(z.object({ mitteilungId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.insert(lesebestaetigungTable).ignore().values({
+        mitteilungId: input.mitteilungId,
+        mitarbeiterId: ctx.mitarbeiterId,
+      });
+      return { ok: true };
+    }),
+  adminListe: adminProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return [];
+    return db.select().from(mitteilungenTable).orderBy(desc(mitteilungenTable.createdAt));
+  }),
+  erstellen: adminProcedure
+    .input(z.object({
+      titel: z.string().min(1),
+      inhalt: z.string().min(1),
+      typ: z.enum(["normal", "wichtig", "dringend"]).default("normal"),
+      gueltigBis: z.string().optional(),
+      pflichtBestaetigung: z.boolean().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [result] = await db.insert(mitteilungenTable).values({
+        titel: input.titel,
+        inhalt: input.inhalt,
+        typ: input.typ,
+        erstelltVon: ctx.adminId,
+        gueltigBis: input.gueltigBis ? new Date(input.gueltigBis) : null,
+        pflichtBestaetigung: input.pflichtBestaetigung ?? false,
+      });
+      try {
+        const alleMA = await getAllMitarbeiter();
+        const aktiveMA = (alleMA as any[]).filter((m: any) => m.aktiv !== false);
+        for (const ma of aktiveMA) {
+          await createNotification({
+            empfaengerId: ma.id,
+            typ: input.typ === "dringend" ? "fehler" : input.typ === "wichtig" ? "warnung" : "info",
+            titel: `📢 Neue Mitteilung: ${input.titel}`,
+            nachricht: input.inhalt.substring(0, 200),
+            linkUrl: "/benachrichtigungen",
+          });
+        }
+        await notifyOwner({
+          title: `📢 Mitteilung versendet: ${input.titel}`,
+          content: `${aktiveMA.length} Mitarbeiter wurden benachrichtigt.`,
+        });
+      } catch {}
+      return { id: (result as any).insertId };
+    }),
+  loeschen: adminProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(mitteilungenTable).set({ aktiv: false }).where(eq(mitteilungenTable.id, input.id));
+      return { ok: true };
+    }),
+  lesefortschritt: adminProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return { gelesen: 0, gesamt: 0 };
+      const alleMA = await getAllMitarbeiter();
+      const aktiveMA = (alleMA as any[]).filter((m: any) => m.aktiv !== false);
+      const bestaetigungen = await db.select().from(lesebestaetigungTable)
+        .where(eq(lesebestaetigungTable.mitteilungId, input.id));
+      return { gelesen: bestaetigungen.length, gesamt: aktiveMA.length };
+    }),
+});
 
 export const appRouter = router({
   system: systemRouter,
@@ -3763,6 +3863,7 @@ export const appRouter = router({
   sicherheitsunterweisung: sicherheitsunterweisungRouter,
   arbeitssicherheit: arbeitssicherheitRouter,
   unterweisungNachweis: unterweisungNachweisRouter,
+  mitteilungen: mitteilungenRouter,
 });
 
 export type AppRouter = typeof appRouter;
