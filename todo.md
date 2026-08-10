@@ -1075,3 +1075,9 @@
 - [x] Admin: Mitteilungs-Tab zum Erstellen und Verwalten
 - [x] MA: Mitteilungen in Benachrichtigungen mit Lesebestätigungs-Button
 - [x] TypeScript: 0 Fehler
+
+## 3 Features: Mitteilungs-Badge + Archiv + Push (10.08.2026)
+- [x] Mitteilungs-Badge im Menü (ungelesene Zählung)
+- [x] Mitteilungs-Archiv: alle Mitteilungen anzeigbar (auch gelesen)
+- [x] Push-Benachrichtigung bei neuer Mitteilung
+- [x] TypeScript: 0 Fehler

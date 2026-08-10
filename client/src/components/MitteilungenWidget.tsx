@@ -1,4 +1,5 @@
 import { trpc } from "@/lib/trpc";
+import { useState } from "react";
 import { toast } from "sonner";
 
 const PRIO_STYLE: Record<string, { bg: string; border: string; color: string; icon: string }> = {
@@ -16,6 +17,9 @@ export default function MitteilungenWidget() {
 
   const ungelesen = (mitteilungen as any[]).filter((m: any) => !Number(m.gelesen));
 
+  const [zeigeAlle, setZeigeAlle] = useState(false);
+  const angezeigt = zeigeAlle ? (mitteilungen as any[]) : ungelesen;
+
   if ((mitteilungen as any[]).length === 0) return null;
 
   return (
@@ -25,7 +29,20 @@ export default function MitteilungenWidget() {
           📬 {ungelesen.length} ungelesene Mitteilung{ungelesen.length !== 1 ? "en" : ""}
         </div>
       )}
-      {(mitteilungen as any[]).map((m: any) => {
+      {/* Archiv-Toggle */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: "#374151" }}>📢 Mitteilungen</span>
+        {(mitteilungen as any[]).length > ungelesen.length && (
+          <button onClick={() => setZeigeAlle(v => !v)}
+            style={{ padding: "4px 10px", background: zeigeAlle ? "#e8f5e4" : "#f3f4f6", color: zeigeAlle ? "#4a8c3f" : "#6b7280", border: "none", borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+            {zeigeAlle ? "▲ Nur ungelesene" : `📂 Alle anzeigen (${(mitteilungen as any[]).length})`}
+          </button>
+        )}
+      </div>
+      {angezeigt.length === 0 && !zeigeAlle && (
+        <div style={{ textAlign: "center", padding: "12px 0", color: "#9ca3af", fontSize: 12 }}>✅ Alle Mitteilungen gelesen</div>
+      )}
+      {angezeigt.map((m: any) => {
         const prio = PRIO_STYLE[m.prioritaet] ?? PRIO_STYLE.normal;
         const gelesen = Number(m.gelesen) > 0;
         return (
@@ -61,4 +78,3 @@ export default function MitteilungenWidget() {
     </div>
   );
 }
-

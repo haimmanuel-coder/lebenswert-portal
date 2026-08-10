@@ -995,6 +995,26 @@ const mitteilungenRouter = router({
                 ${input.gueltigBis ? new Date(input.gueltigBis) : null})
       `);
       await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'CREATE', ressource: 'mitteilung', details: input.titel, status: 'success' });
+
+      // Push-Benachrichtigung an alle aktiven Mitarbeiter senden
+      try {
+        const alleMa = await getAllMitarbeiter();
+        const prioLabel = input.prioritaet === 'dringend' ? '🚨 DRINGEND: ' : input.prioritaet === 'wichtig' ? '⚠️ Wichtig: ' : '📢 ';
+        for (const ma of alleMa) {
+          if (!(ma as any).aktiv) continue;
+          await createNotification({
+            empfaengerId: (ma as any).id,
+            titel: `${prioLabel}${input.titel}`,
+            nachricht: input.inhalt.length > 200 ? input.inhalt.slice(0, 197) + '...' : input.inhalt,
+            typ: input.prioritaet === 'dringend' ? 'warnung' : input.prioritaet === 'wichtig' ? 'info' : 'info',
+          });
+        }
+        // Admin-Owner-Benachrichtigung
+        await notifyOwner({ title: `📢 Neue Mitteilung: ${input.titel}`, content: `An ${alleMa.filter((m: any) => m.aktiv).length} Mitarbeiter gesendet.\n\n${input.inhalt}` });
+      } catch (e) {
+        console.warn('[Mitteilung] Push-Benachrichtigung fehlgeschlagen:', e);
+      }
+
       return { ok: true };
     }),
 

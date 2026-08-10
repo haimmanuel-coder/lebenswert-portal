@@ -112,6 +112,11 @@ export default function PortalApp() {
   // Das Feld heisst in der Datenbank "gelesen" (boolean) – zuvor wurde ein
   // nicht vorhandenes Feld geprueft, wodurch der Badge alle Meldungen zaehlte.
   const unreadCount = (unreadNotifs as any[]).filter((n: any) => !n.gelesen).length;
+  const { data: mitteilungenUngelesen } = (trpc as any).mitteilungen.ungelesen.useQuery(
+    undefined, { refetchInterval: 60_000, enabled: !!mitarbeiter }
+  );
+  const mitteilungenBadge = Number((mitteilungenUngelesen as any)?.anzahl ?? 0);
+  const gesamtBadge = unreadCount + mitteilungenBadge;
   const neukundenPushCount = (neukundenPushOffen as any[]).length;
   const isAdmin = mitarbeiter?.rolle === "admin";
   const isTeamleitung = mitarbeiter?.rolle === "teamleitung";
@@ -189,7 +194,7 @@ export default function PortalApp() {
       items: [
         { id: "home", icon: "🏠", label: "Übersicht" },
         ...(isAdmin ? [{ id: "admindashboard" as PageId, icon: "🚦", label: "Ampel-Dashboard", adminOnly: true }] : []),
-        { id: "benachrichtigungen", icon: "🔔", label: "Benachrichtigungen", badge: unreadCount },
+        { id: "benachrichtigungen", icon: "🔔", label: "Benachrichtigungen", badge: gesamtBadge },
       ],
     },
     // ── 📅 PLANUNG ────────────────────────────────────────────────────────
@@ -250,7 +255,7 @@ export default function PortalApp() {
     {
       title: "🔔 Kommunikation",
       items: [
-        { id: "benachrichtigungen", icon: "🔔", label: "Benachrichtigungen", badge: unreadCount },
+        { id: "benachrichtigungen", icon: "🔔", label: "Benachrichtigungen", badge: gesamtBadge },
       ],
     },
     // ── ⚙️ EINSTELLUNGEN ──────────────────────────────────────────────────
@@ -590,9 +595,9 @@ export default function PortalApp() {
           {isMobile && (
             <button onClick={() => navTo("benachrichtigungen")} style={{ position: "relative", background: "none", border: "none", cursor: "pointer", fontSize: 20, padding: 4 }}>
               🔔
-              {unreadCount > 0 && (
+              {gesamtBadge > 0 && (
                 <span style={{ position: "absolute", top: 0, right: 0, background: "#dc2626", color: "#fff", fontSize: 8, fontWeight: 800, width: 14, height: 14, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {unreadCount > 9 ? "9+" : unreadCount}
+                  {gesamtBadge > 9 ? "9+" : gesamtBadge}
                 </span>
               )}
             </button>
