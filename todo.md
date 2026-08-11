@@ -1064,3 +1064,9 @@
 - [x] SystemstatusTab.tsx erstellen (KPI-Karten + Tabellen-Liste + Backup-Log)
 - [x] AdminPanel: Tab "⚙️ Systemstatus" in Einstellungen-Gruppe
 - [x] TypeScript: 0 Fehler
+
+## Budget-Sync + Kunden-Test (11.08.2026)
+- [x] Budget-Sync in kunden.update: bei Budget-Änderung budget_45b/budget_39 automatisch aktualisieren
+- [x] Budget-Sync in kunden.create: beim Anlegen eines Kunden budget_45b/budget_39 initialisieren
+- [x] Kunden-Übersicht testen: alle tRPC-Procedures auf Fehler prüfen
+- [x] TypeScript: 0 Fehler

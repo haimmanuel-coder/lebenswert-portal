@@ -1342,6 +1342,12 @@ export const appRouter = router({
         // P1: Neukunden-Push an alle Mitarbeiter senden
         if (newId) {
           try { await createNeukundenPushEintraege(newId); } catch (e) { console.warn('[P1] Neukunden-Push fehlgeschlagen:', e); }
+          // Budget-Sync: Initialisiere budget_45b und budget_39 für neuen Kunden
+          try {
+            const db = await getDb();
+            await db!.execute(sql`INSERT IGNORE INTO budget_45b (kundenId, jahresbudget, verbraucht) VALUES (${newId}, 0, 0)`);
+            await db!.execute(sql`INSERT IGNORE INTO budget_39 (kundenId, monatlicheStunden, verbraucht) VALUES (${newId}, 0, 0)`);
+          } catch (e) { console.warn('[Budget-Sync] Initialisierung fehlgeschlagen:', e); }
         }
         return { success: true };
       }),
@@ -1386,6 +1392,20 @@ export const appRouter = router({
         const { id, ...data } = input;
         await updateKundeBudget(id, data);
         await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "UPDATE", ressource: "budget", details: `kundenId=${id}`, status: "success" });
+        // Budget-Sync: budget_45b und budget_39 synchron halten
+        try {
+          const db = await getDb();
+          if (data.budget45b !== undefined || data.verbraucht45b !== undefined) {
+            const jb = parseFloat(data.budget45b ?? '0') || 0;
+            const vb = parseFloat(data.verbraucht45b ?? '0') || 0;
+            await db!.execute(sql`INSERT INTO budget_45b (kundenId, jahresbudget, verbraucht) VALUES (${id}, ${jb}, ${vb}) ON DUPLICATE KEY UPDATE jahresbudget = ${jb}, verbraucht = ${vb}`);
+          }
+          if (data.budget39 !== undefined || data.verbraucht39 !== undefined) {
+            const ms = parseFloat(data.budget39 ?? '0') || 0;
+            const vs = parseFloat(data.verbraucht39 ?? '0') || 0;
+            await db!.execute(sql`INSERT INTO budget_39 (kundenId, monatlicheStunden, verbraucht) VALUES (${id}, ${ms}, ${vs}) ON DUPLICATE KEY UPDATE monatlicheStunden = ${ms}, verbraucht = ${vs}`);
+          }
+        } catch (e) { console.warn('[Budget-Sync] Synchronisation fehlgeschlagen:', e); }
         return { success: true };
       }),
 
