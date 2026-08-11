@@ -701,7 +701,7 @@ const onboardingRouter = router({
       const db = await getDb();
       const mid = input.mitarbeiterId;
       const rows = await db!.execute(sql`SELECT * FROM onboarding_checklisten WHERE mitarbeiterId = ${mid} ORDER BY reihenfolge ASC, id ASC`);
-      return (rows as any).rows as Array<{
+      return (rows as any)[0] as Array<{
         id: number; mitarbeiterId: number; aufgabe: string; kategorie: string;
         erledigt: number; erledigtAm: string | null; notiz: string | null; reihenfolge: number;
       }>;
@@ -755,7 +755,7 @@ const onboardingRouter = router({
         FROM onboarding_checklisten
         GROUP BY mitarbeiterId
       `);
-      const data = (rows as any).rows as Array<{ mitarbeiterId: number; gesamt: number; erledigt: number }>;
+      const data = (rows as any)[0] as Array<{ mitarbeiterId: number; gesamt: number; erledigt: number }>;
       return data.map(r => ({ mitarbeiterId: Number(r.mitarbeiterId), gesamt: Number(r.gesamt), erledigt: Number(r.erledigt ?? 0) }));
     }),
 
@@ -793,7 +793,7 @@ const einstellungenRouter = router({
     .query(async () => {
       const db = await getDb();
       const rows = await db!.execute(sql`SELECT schluessel, wert, beschreibung FROM system_einstellungen ORDER BY schluessel ASC`);
-      return (rows as any).rows as Array<{ schluessel: string; wert: string | null; beschreibung: string | null }>;
+      return (rows as any)[0] as Array<{ schluessel: string; wert: string | null; beschreibung: string | null }>;
     }),
 
   set: adminProcedure
@@ -870,7 +870,7 @@ const csvImportRouter = router({
         ORDER BY p.createdAt DESC
         LIMIT 50
       `);
-      return (rows as any).rows as Array<{
+      return (rows as any)[0] as Array<{
         id: number; importiertVon: number; dateiname: string | null;
         gesamtZeilen: number; erfolgreich: number; fehlgeschlagen: number;
         fehlerDetails: string | null; createdAt: string;
@@ -1534,7 +1534,7 @@ export const appRouter = router({
           LEFT JOIN budget_39 b39 ON b39.kundenId = k.id
           ORDER BY k.nachname ASC, k.vorname ASC
         `);
-        return (rows as any).rows as Array<{
+        return (rows as any)[0] as Array<{
           id: number; vorname: string; nachname: string;
           strasse: string | null; plz: string | null; ort: string | null;
           telefon: string | null; pflegegrad: number | null; paragraph: string | null;
