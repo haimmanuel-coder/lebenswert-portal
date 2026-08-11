@@ -224,6 +224,9 @@ export default function AdminPanel() {
   const [kdParagraph, setKdParagraph] = useState<"45b" | "45a" | "39" | "privat">("45b");
 
   const { data: kundenList = [], refetch: refetchKd } = trpc.kunden.list.useQuery();
+  // Kunden-Filter
+  const [kdSearch, setKdSearch] = useState("");
+  const [kdParaFilter, setKdParaFilter] = useState<"alle" | "45b" | "45a" | "39" | "privat">("alle");
   const createKd = trpc.kunden.create.useMutation({
     onSuccess: () => { refetchKd(); toast.success("✅ Kunde angelegt"); resetKdForm(); setKdSheet(false); },
     onError: (e) => toast.error("❌ " + e.message),
@@ -509,26 +512,109 @@ export default function AdminPanel() {
         </div>
       )}
       {/* ── KUNDEN ── */}
-      {tab === "kunden" && (
+      {tab === "kunden" && (() => {
+        const kdFiltered = kundenList.filter((k) => {
+          const name = `${k.vorname} ${k.nachname}`.toLowerCase();
+          const matchSearch = kdSearch === "" || name.includes(kdSearch.toLowerCase());
+          const matchPara = kdParaFilter === "alle" || k.paragraph === kdParaFilter;
+          return matchSearch && matchPara;
+        });
+        const paraStats = {
+          "45b": kundenList.filter(k => k.paragraph === "45b").length,
+          "45a": kundenList.filter(k => k.paragraph === "45a").length,
+          "39":  kundenList.filter(k => k.paragraph === "39").length,
+          "privat": kundenList.filter(k => k.paragraph === "privat").length,
+        };
+        return (
         <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <span style={{ fontSize: 14, fontWeight: 600 }}>{kundenList.length} Kunden</span>
-            <div style={{ display: "flex", gap: 6 }}>
-              <button onClick={exportKundenExcel} style={{ padding: "8px 12px", background: "#166534", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>📥 Excel</button>
-              <button onClick={exportKundenCSV} style={{ padding: "8px 12px", background: "#1d4ed8", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>📥 CSV</button>
-              <button onClick={() => { resetKdForm(); setKdSheet(true); }} style={{ padding: "8px 14px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>+ Neu</button>
-            </div>
+          {/* KPI-Zeile: alle Paragraphen auf einen Blick */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 14 }}>
+            {([["45b","§45b","Entlastung","#e8f5e4","#4a8c3f"],["45a","§45a","Unterstützung","#dbeafe","#1d4ed8"],["39","§39","Verhinderung","#f3e8ff","#7c3aed"],["privat","Privat","Privatzahler","#fef3c7","#92400e"]] as const).map(([para, label, desc, bg, color]) => (
+              <div key={para} onClick={() => setKdParaFilter(kdParaFilter === para ? "alle" : para)}
+                style={{ background: kdParaFilter === para ? color : bg, color: kdParaFilter === para ? "#fff" : color, borderRadius: 10, padding: "10px 8px", textAlign: "center", cursor: "pointer", border: `2px solid ${kdParaFilter === para ? color : "transparent"}`, transition: "all 0.15s" }}>
+                <div style={{ fontSize: 16, fontWeight: 800 }}>{paraStats[para]}</div>
+                <div style={{ fontSize: 12, fontWeight: 700 }}>{label}</div>
+                <div style={{ fontSize: 10, opacity: 0.8 }}>{desc}</div>
+              </div>
+            ))}
           </div>
-          {kundenList.map((k) => (
-            <div key={k.id} style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 10px rgba(0,0,0,.08)", padding: 14, marginBottom: 10 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ width: 42, height: 42, borderRadius: "50%", background: "#e8f5e4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>🏠</div>
+          {/* Suchfeld + Aktionen */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+            <input
+              value={kdSearch} onChange={e => setKdSearch(e.target.value)}
+              placeholder="🔍 Kunde suchen..."
+              style={{ flex: 1, minWidth: 140, padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 13 }}
+            />
+            <button onClick={exportKundenExcel} style={{ padding: "8px 12px", background: "#166534", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>📥 Excel</button>
+            <button onClick={exportKundenCSV} style={{ padding: "8px 12px", background: "#1d4ed8", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>📥 CSV</button>
+            <button onClick={() => { resetKdForm(); setKdSheet(true); }} style={{ padding: "8px 14px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>+ Neu</button>
+          </div>
+          <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 10 }}>{kdFiltered.length} von {kundenList.length} Kunden{kdParaFilter !== "alle" ? ` (Filter: §${kdParaFilter})` : ""}</div>
+          {/* Kundenliste */}
+          {kdFiltered.map((k) => {
+            const paraColors: Record<string, {bg: string; color: string}> = {
+              "45b": {bg: "#e8f5e4", color: "#4a8c3f"},
+              "45a": {bg: "#dbeafe", color: "#1d4ed8"},
+              "39":  {bg: "#f3e8ff", color: "#7c3aed"},
+              "privat": {bg: "#fef3c7", color: "#92400e"},
+            };
+            const pc = paraColors[k.paragraph ?? "45b"] ?? paraColors["45b"];
+            const b45b = parseFloat(String(k.budget45b ?? 0));
+            const v45b = parseFloat(String(k.verbraucht45b ?? 0));
+            const r45b = Math.max(0, b45b - v45b);
+            const b45a = parseFloat(String(k.budget45a ?? 0));
+            const v45a = parseFloat(String(k.verbraucht45a ?? 0));
+            const r45a = Math.max(0, b45a - v45a);
+            const b39  = parseFloat(String(k.budget39 ?? 0));
+            const v39  = parseFloat(String(k.verbraucht39 ?? 0));
+            const r39  = Math.max(0, b39 - v39);
+            const budgetWarn = (k.paragraph === "45b" && b45b > 0 && v45b / b45b > 0.8) ||
+                               (k.paragraph === "45a" && b45a > 0 && v45a / b45a > 0.8) ||
+                               (k.paragraph === "39"  && b39  > 0 && v39  / b39  > 0.8);
+            return (
+            <div key={k.id} style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 10px rgba(0,0,0,.08)", padding: 14, marginBottom: 10, borderLeft: budgetWarn ? "4px solid #ef4444" : "4px solid transparent" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                <div style={{ width: 42, height: 42, borderRadius: "50%", background: pc.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>🏠</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700 }}>{k.vorname} {k.nachname}</div>
-                  {(k.strasse || k.ort) && <div style={{ fontSize: 12, color: "#6b7280", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>📍 {[k.strasse, k.plz, k.ort].filter(Boolean).join(', ')}</div>}
-                  <div style={{ fontSize: 12, color: "#6b7280", display: "flex", gap: 6, flexWrap: "wrap", marginTop: 2 }}>
-                    {k.pflegegrad && <span style={{ padding: "1px 6px", borderRadius: 10, background: "#e0f2f0", color: "#2a9d8f", fontWeight: 700 }}>PG {k.pflegegrad}</span>}
-                    {k.paragraph && <span style={{ padding: "1px 6px", borderRadius: 10, background: "#e8f5e4", color: "#4a8c3f", fontWeight: 700 }}>§{k.paragraph}</span>}
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 14, fontWeight: 700 }}>{k.vorname} {k.nachname}</span>
+                    {k.pflegegrad && <span style={{ padding: "1px 6px", borderRadius: 10, background: "#e0f2f0", color: "#2a9d8f", fontWeight: 700, fontSize: 11 }}>PG {k.pflegegrad}</span>}
+                    {k.paragraph && <span style={{ padding: "1px 6px", borderRadius: 10, background: pc.bg, color: pc.color, fontWeight: 700, fontSize: 11 }}>§{k.paragraph}</span>}
+                    {budgetWarn && <span style={{ padding: "1px 6px", borderRadius: 10, background: "#fee2e2", color: "#dc2626", fontWeight: 700, fontSize: 11 }}>⚠️ Budget &gt;80%</span>}
+                  </div>
+                  {(k.strasse || k.ort) && <div style={{ fontSize: 12, color: "#6b7280", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: 2 }}>📍 {[k.strasse, k.plz, k.ort].filter(Boolean).join(', ')}</div>}
+                  {/* Budget-Zeile: alle abrechenbaren Paragraphen */}
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
+                    {b45b > 0 && (
+                      <div style={{ background: "#f0fdf4", borderRadius: 8, padding: "4px 8px", fontSize: 11 }}>
+                        <span style={{ color: "#4a8c3f", fontWeight: 700 }}>§45b</span>
+                        <span style={{ color: "#6b7280", marginLeft: 4 }}>{r45b.toFixed(0)}€ / {b45b.toFixed(0)}€</span>
+                        <div style={{ width: 60, height: 4, background: "#d1fae5", borderRadius: 4, marginTop: 2 }}>
+                          <div style={{ width: `${Math.min(100, b45b > 0 ? (v45b/b45b)*100 : 0)}%`, height: "100%", background: v45b/b45b > 0.8 ? "#ef4444" : "#4a8c3f", borderRadius: 4 }} />
+                        </div>
+                      </div>
+                    )}
+                    {b45a > 0 && (
+                      <div style={{ background: "#eff6ff", borderRadius: 8, padding: "4px 8px", fontSize: 11 }}>
+                        <span style={{ color: "#1d4ed8", fontWeight: 700 }}>§45a</span>
+                        <span style={{ color: "#6b7280", marginLeft: 4 }}>{r45a.toFixed(0)}€ / {b45a.toFixed(0)}€</span>
+                        <div style={{ width: 60, height: 4, background: "#bfdbfe", borderRadius: 4, marginTop: 2 }}>
+                          <div style={{ width: `${Math.min(100, b45a > 0 ? (v45a/b45a)*100 : 0)}%`, height: "100%", background: v45a/b45a > 0.8 ? "#ef4444" : "#1d4ed8", borderRadius: 4 }} />
+                        </div>
+                      </div>
+                    )}
+                    {b39 > 0 && (
+                      <div style={{ background: "#fdf4ff", borderRadius: 8, padding: "4px 8px", fontSize: 11 }}>
+                        <span style={{ color: "#7c3aed", fontWeight: 700 }}>§39</span>
+                        <span style={{ color: "#6b7280", marginLeft: 4 }}>{r39.toFixed(0)}€ / {b39.toFixed(0)}€</span>
+                        <div style={{ width: 60, height: 4, background: "#e9d5ff", borderRadius: 4, marginTop: 2 }}>
+                          <div style={{ width: `${Math.min(100, b39 > 0 ? (v39/b39)*100 : 0)}%`, height: "100%", background: v39/b39 > 0.8 ? "#ef4444" : "#7c3aed", borderRadius: 4 }} />
+                        </div>
+                      </div>
+                    )}
+                    {b45b === 0 && b45a === 0 && b39 === 0 && (
+                      <span style={{ fontSize: 11, color: "#9ca3af" }}>Kein Budget hinterlegt</span>
+                    )}
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
@@ -537,9 +623,11 @@ export default function AdminPanel() {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
-      )}
+        );
+      })()}
 
       {/* ── ZUORDNUNG (Kunden-basiert, max. 3 Mitarbeiter) ── */}
       {tab === "zuordnung" && (
