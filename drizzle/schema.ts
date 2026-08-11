@@ -178,6 +178,7 @@ export const kunden = mysqlTable("kunden", {
   geloeschtAt: timestamp("geloeschtAt"),
   geloeschtVon: int("geloeschtVon"),
   loeschgrund: text("loeschgrund"),
+  notizen: text("notizen"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

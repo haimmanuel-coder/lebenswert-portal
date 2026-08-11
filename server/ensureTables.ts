@@ -113,6 +113,7 @@ const TABLE_DEFINITIONS: string[] = [
     \`geloeschtAt\` timestamp NULL,
     \`geloeschtVon\` int,
     \`loeschgrund\` text,
+    \`notizen\` text,
     \`createdAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (\`id\`)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
@@ -1122,6 +1123,17 @@ const TABLE_DEFINITIONS: string[] = [
     \`updatedAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (\`id\`),
     UNIQUE KEY \`kundenId\` (\`kundenId\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  // ── kunden_zuordnung ──────────────────────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS \`kunden_zuordnung\` (
+    \`id\` int NOT NULL AUTO_INCREMENT,
+    \`kundenId\` int NOT NULL,
+    \`mitarbeiterId\` int NOT NULL,
+    \`aktiv\` tinyint(1) NOT NULL DEFAULT 1,
+    \`createdAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    KEY \`idx_kz_kunde\` (\`kundenId\`),
+    KEY \`idx_kz_ma\` (\`mitarbeiterId\`)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ];
 
