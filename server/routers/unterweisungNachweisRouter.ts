@@ -50,7 +50,7 @@ function themaLabel(thema: string): string {
  * Generiert ein rechtssicheres PDF-Nachweis-Dokument.
  * Gibt den PDF-Buffer zurück.
  */
-async function generateNachweisPdf(params: {
+export async function generateNachweisPdf(params: {
   maVorname: string;
   maNachname: string;
   titel: string;

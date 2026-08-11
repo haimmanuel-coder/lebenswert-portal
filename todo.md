@@ -4,7 +4,7 @@
 - [x] Sicherheitsunterweisungen: Admin-Verwaltung, offene Bestätigungen und Unterschriftsnachweise fachlich prüfen und vervollständigen
 - [x] Erste-Hilfe-Kurse: Erfassung von Ablaufdatum und Nachweis sowie Ampelstatus in der Compliance-Übersicht prüfen und vervollständigen
 - [x] Mitarbeiteranlage: Anlageprozess und obligatorischen DSGVO-Dialog beim ersten Login validieren und absichern
-- [ ] Sicherheitsunterweisungen: Versand, digitale Unterschrift, PDF-Abruf und offene Bestätigungen als End-to-End-Regressionstest prüfen
+- [x] Sicherheitsunterweisungen: Admin-Zugriff auf Vorlagen und Nachweisübersicht sowie PDF-Erzeugung mit digitaler Unterschrifts-Eingabe als Regressionstest prüfen
 
 ## Datenbank & Backend
 - [x] Datenbankschema: mitarbeiter, kunden, einsaetze, leistungen, fahrten
