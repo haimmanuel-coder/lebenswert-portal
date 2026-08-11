@@ -6,6 +6,17 @@ import UnterschriftDialog from "@/components/UnterschriftDialog";
 
 // ─── Ampel-Hilfsfunktionen ────────────────────────────────────────────────────
 
+
+function fmtD(v: Date | string | null | undefined): string {
+  if (!v) return "–";
+  if (v instanceof Date) return v.toLocaleDateString("de-DE");
+  if (typeof v === "string" && v.length >= 10) {
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? v : d.toLocaleDateString("de-DE");
+  }
+  return String(v);
+}
+
 function unterweisungAmpel(bestaetigt: boolean, naechste: string | null) {
   if (!bestaetigt) return { bg: "#fee2e2", color: "#dc2626", label: "🔴 Bestätigung ausstehend" };
   if (!naechste) return { bg: "#dcfce7", color: "#16a34a", label: "✅ Bestätigt" };
@@ -172,7 +183,7 @@ export default function MeineArbeitssicherheit() {
                     </div>
                     <div style={{ fontSize: 12, color: "#9ca3af" }}>
                       Datum: {u.unterweisungsDatum}
-                      {u.naechsteFaelligkeit ? ` · Wiederholung fällig: ${u.naechsteFaelligkeit}` : ""}
+                      {u.naechsteFaelligkeit ? ` · Wiederholung fällig: ${fmtD(u.naechsteFaelligkeit)}` : ""}
                     </div>
                     {u.inhalt && <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4, fontStyle: "italic" }}>{u.inhalt}</div>}
                     {u.bestaetigt && u.bestaetigtAm && (

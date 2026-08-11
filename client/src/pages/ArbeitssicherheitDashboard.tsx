@@ -18,6 +18,17 @@ import { toast } from "sonner";
 import { generateUnterweisungsNachweis } from "@/lib/unterweisungPdfGenerator";
 
 // ─── Hilfsfunktionen ─────────────────────────────────────────────────────────
+
+function fmtD(v: Date | string | null | undefined): string {
+  if (!v) return "–";
+  if (v instanceof Date) return v.toLocaleDateString("de-DE");
+  if (typeof v === "string" && v.length >= 10) {
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? v : d.toLocaleDateString("de-DE");
+  }
+  return String(v);
+}
+
 const THEMEN_LABELS: Record<string, string> = {
   notfall_erste_hilfe: "Notfall & Erste Hilfe",
   hygiene_desinfektion: "Hygiene & Desinfektion",

@@ -10,6 +10,17 @@ import { toast } from "sonner";
 
 // ─── Hilfsfunktionen ────────────────────────────────────────────────────────
 
+
+function fmtD(v: Date | string | null | undefined): string {
+  if (!v) return "–";
+  if (v instanceof Date) return v.toLocaleDateString("de-DE");
+  if (typeof v === "string" && v.length >= 10) {
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? v : d.toLocaleDateString("de-DE");
+  }
+  return String(v);
+}
+
 function risikoAmpel(stufe: string) {
   if (stufe === "hoch") return { bg: "#fee2e2", color: "#dc2626", label: "🔴 Hoch" };
   if (stufe === "mittel") return { bg: "#fef9c3", color: "#ca8a04", label: "🟡 Mittel" };
@@ -349,7 +360,7 @@ function VorsorgeTab() {
                   <span style={{ background: ampel.bg, color: ampel.color, borderRadius: 20, padding: "2px 8px", fontSize: 11, fontWeight: 600 }}>{ampel.label}</span>
                 </div>
                 <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{r.anlass} {r.arzt ? `· ${r.arzt}` : ""}</div>
-                <div style={{ fontSize: 11, color: "#9ca3af" }}>Fällig: {r.faelligkeit} {r.naechsteFaelligkeit ? `· Nächste: ${r.naechsteFaelligkeit}` : ""}</div>
+                <div style={{ fontSize: 11, color: "#9ca3af" }}>Fällig: {fmtD(r.faelligkeit)} {r.naechsteFaelligkeit ? `· Nächste: ${fmtD(r.naechsteFaelligkeit)}` : ""}</div>
               </div>
               <div style={{ display: "flex", gap: 6 }}>
                 {!r.durchgefuehrtAm && <button onClick={() => setAbschlussId(r.id)} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #d1d5db", background: "#f9fafb", fontSize: 11, cursor: "pointer" }}>Abschließen</button>}
@@ -429,7 +440,7 @@ function UnterweisungenTab() {
                   <span style={{ background: "#f3f4f6", color: "#374151", borderRadius: 20, padding: "2px 8px", fontSize: 11 }}>{THEMEN_LABELS[r.thema] ?? r.thema}</span>
                   <span style={{ background: ampel.bg, color: ampel.color, borderRadius: 20, padding: "2px 8px", fontSize: 11, fontWeight: 600 }}>{ampel.label}</span>
                 </div>
-                <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>Datum: {r.unterweisungsDatum} {r.naechsteFaelligkeit ? `· Wiederholung: ${r.naechsteFaelligkeit}` : ""}</div>
+                <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>Datum: {fmtD(r.unterweisungsDatum)} {r.naechsteFaelligkeit ? `· Wiederholung: ${fmtD(r.naechsteFaelligkeit)}` : ""}</div>
                 {r.inhalt && <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{r.inhalt}</div>}
               </div>
               <button onClick={() => { if (confirm("Eintrag löschen?")) del.mutate({ id: r.id }); }} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #fee2e2", background: "#fff5f5", color: "#dc2626", fontSize: 11, cursor: "pointer" }}>🗑</button>
