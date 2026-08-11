@@ -1083,6 +1083,24 @@ const TABLE_DEFINITIONS: string[] = [
     \`updatedAt\` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (\`id\`)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS \`leistungsnachweise\` (
+    \`id\` int NOT NULL AUTO_INCREMENT,
+    \`mitarbeiterId\` int NOT NULL,
+    \`kundenId\` int NOT NULL,
+    \`monat\` varchar(7) NOT NULL,
+    \`paragraph\` varchar(10),
+    \`stunden\` decimal(8,2) DEFAULT 0,
+    \`betrag\` decimal(10,2) DEFAULT 0,
+    \`status\` enum('entwurf','eingereicht','freigegeben','abgelehnt') NOT NULL DEFAULT 'entwurf',
+    \`unterschriftMitarbeiter\` text,
+    \`unterschriftKunde\` text,
+    \`pdfUrl\` varchar(500),
+    \`geloeschtAt\` timestamp NULL,
+    \`geloeschtVon\` int,
+    \`createdAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    \`updatedAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ];
 
 let ensureTablesRan = false;
