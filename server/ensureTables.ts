@@ -600,7 +600,8 @@ const TABLE_DEFINITIONS: string[] = [
     \`zugestimmtAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     \`ipAdresse\` varchar(50),
     \`widerrufenAt\` timestamp NULL,
-    PRIMARY KEY (\`id\`)
+    PRIMARY KEY (\`id\`),
+    UNIQUE KEY \`uq_datenschutz_mitarbeiter_dokument\` (\`mitarbeiterId\`, \`dokumentId\`)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
   // ── 41. einsatzAenderungen ────────────────────────────────────────────────
@@ -895,6 +896,8 @@ const TABLE_DEFINITIONS: string[] = [
     \`kursDatum\` date NOT NULL,
     \`ablaufDatum\` date,
     \`status\` enum('bestanden','angemeldet','abgelaufen') NOT NULL DEFAULT 'bestanden',
+    \`fotoKey\` varchar(500),
+    \`fotoUrl\` varchar(500),
     \`fotoBase64\` text,
     \`fotoMimeType\` varchar(100),
     \`bemerkung\` text,

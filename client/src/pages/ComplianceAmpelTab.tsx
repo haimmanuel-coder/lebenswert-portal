@@ -25,6 +25,8 @@ interface ComplianceEintrag {
   baldAblaufendAnzahl: number;
   hatVertrag: boolean;
   hatErsteHilfe: boolean;
+  ersteHilfeAmpel?: AmpelStatus;
+  ersteHilfeAblauf?: Date | string | null;
   zertStatus: string;
   probleme: string[];
 }
@@ -176,6 +178,11 @@ export default function ComplianceAmpelTab() {
                         Kein EH-Kurs
                       </span>
                     )}
+                    {ma.ersteHilfeAmpel === "gelb" && ma.hatErsteHilfe && (
+                      <span style={{ background: "#ca8a04", color: "#fff", fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 10 }}>
+                        EH-Kurs läuft ab
+                      </span>
+                    )}
                   </div>
                   <span style={{ fontSize: 12, color: "#9ca3af", marginLeft: 8 }}>{offen ? "▲" : "▼"}</span>
                 </button>
@@ -196,7 +203,7 @@ export default function ComplianceAmpelTab() {
                     )}
                     <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
                       <span style={{ fontSize: 11, color: "#6b7280" }}>
-                        Vertrag: {ma.hatVertrag ? "✅" : "❌"} · Erste Hilfe: {ma.hatErsteHilfe ? "✅" : "❌"} · Zertifikat: {ma.zertStatus}
+                        Vertrag: {ma.hatVertrag ? "✅" : "❌"} · Erste Hilfe: {ma.ersteHilfeAmpel === "gruen" ? "🟢 gültig" : ma.ersteHilfeAmpel === "gelb" ? "🟡 prüfen" : "🔴 fehlt"}{ma.ersteHilfeAblauf ? ` · Ablauf: ${new Date(ma.ersteHilfeAblauf).toLocaleDateString("de-DE")}` : ""} · Zertifikat: {ma.zertStatus}
                       </span>
                     </div>
                   </div>

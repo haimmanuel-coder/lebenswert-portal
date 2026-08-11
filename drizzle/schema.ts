@@ -9,6 +9,7 @@ import {
   date,
   time,
   boolean,
+  uniqueIndex,
 } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
@@ -467,6 +468,10 @@ export const ersteHilfeKurse = mysqlTable("erste_hilfe_kurse", {
   kursDatum: date("kursDatum").notNull(),
   ablaufDatum: date("ablaufDatum"),
   status: mysqlEnum("status", ["bestanden", "angemeldet", "abgelaufen"]).default("bestanden").notNull(),
+  /** Zertifikatsnachweis sicher in S3 – keine Bilddaten in der Datenbank speichern. */
+  fotoKey: varchar("fotoKey", { length: 500 }),
+  fotoUrl: varchar("fotoUrl", { length: 500 }),
+  /** Rückwärtskompatibel für historische Einträge; neue Uploads verwenden fotoKey/fotoUrl. */
   fotoBase64: text("fotoBase64"),
   fotoMimeType: varchar("fotoMimeType", { length: 100 }),
   bemerkung: text("bemerkung"),
@@ -839,7 +844,9 @@ export const datenschutzZustimmungen = mysqlTable("datenschutzZustimmungen", {
   dokumentVersion: varchar("dokumentVersion", { length: 20 }).notNull(),
   ipHash: varchar("ipHash", { length: 64 }), // SHA-256 der IP
   zugestimmtAt: timestamp("zugestimmtAt").defaultNow().notNull(),
-});
+}, (table) => [
+  uniqueIndex("uq_datenschutz_mitarbeiter_dokument").on(table.mitarbeiterId, table.dokumentId),
+]);
 export type DatenschutzZustimmung = typeof datenschutzZustimmungen.$inferSelect;
 export type InsertDatenschutzZustimmung = typeof datenschutzZustimmungen.$inferInsert;
 

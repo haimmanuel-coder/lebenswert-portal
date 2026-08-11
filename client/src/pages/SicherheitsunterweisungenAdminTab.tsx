@@ -15,6 +15,7 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import BottomSheet from "@/components/BottomSheet";
+import UnterweisungNachweisAdminTab from "./UnterweisungNachweisAdminTab";
 
 // ── Typen ──────────────────────────────────────────────────────────────────
 type Kategorie = "brandschutz" | "erstehilfe" | "hygiene" | "arbeitsschutz" | "datenschutz" | "sonstiges";
@@ -91,6 +92,8 @@ export function SicherheitsunterweisungenAdminTab() {
   const { data: unterweisungen = [], refetch } = trpc.sicherheitsunterweisung.listAdmin.useQuery();
 
   // UI-State
+  // Neue Unterweisungen werden ausschließlich über den signierten Nachweis-Workflow angelegt.
+  const [bereich, setBereich] = useState<"uebersicht" | "nachweise">("nachweise");
   const [view, setView] = useState<"list" | "detail">("list");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [createSheet, setCreateSheet] = useState(false);
@@ -161,6 +164,17 @@ export function SicherheitsunterweisungenAdminTab() {
   const nichtBestaetigt = detailRows.filter((r) => !r.bestaetigtAm);
   const bestaetigt = detailRows.filter((r) => !!r.bestaetigtAm);
 
+  if (bereich === "nachweise") {
+    return (
+      <div style={{ padding: "0 0 40px" }}>
+        <button onClick={() => setBereich("uebersicht")} style={{ ...btnGray, marginBottom: 16 }}>
+          ← Statusübersicht öffnen
+        </button>
+        <UnterweisungNachweisAdminTab />
+      </div>
+    );
+  }
+
   // ── RENDER ─────────────────────────────────────────────────────────────────
   return (
     <div style={{ padding: "0 0 40px" }}>
@@ -184,9 +198,14 @@ export function SicherheitsunterweisungenAdminTab() {
           )}
         </div>
         {view === "list" && (
-          <button onClick={() => { resetForm(); setCreateSheet(true); }} style={btnGreen}>
-            + Neue Unterweisung
-          </button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <button onClick={() => setBereich("nachweise")} style={btnGray}>
+              📜 Nachweise & Unterschriften
+            </button>
+            <button onClick={() => { resetForm(); setCreateSheet(true); }} style={btnGreen}>
+              + Neue Unterweisung
+            </button>
+          </div>
         )}
       </div>
 

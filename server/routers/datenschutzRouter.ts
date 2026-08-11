@@ -10,7 +10,7 @@ import {
   mitarbeiter as mitarbeiterTable,
   arbeitssicherheitUnterweisungen,
 } from "../../drizzle/schema";
-import { eq, desc, and, lte, isNull, or } from "drizzle-orm";
+import { eq, desc, and, lte, isNull, or, sql } from "drizzle-orm";
 import { sendEmail } from "../emailService";
 import { notifyOwner } from "../_core/notification";
 
@@ -147,6 +147,15 @@ export const datenschutzRouter = router({
         .limit(1);
       if (dokRows.length === 0) throw new TRPCError({ code: "NOT_FOUND" });
       const dok = dokRows[0];
+      const bereitsZugestimmt = await db
+        .select({ id: datenschutzZustimmungen.id })
+        .from(datenschutzZustimmungen)
+        .where(and(
+          eq(datenschutzZustimmungen.mitarbeiterId, ctx.mitarbeiterId),
+          eq(datenschutzZustimmungen.dokumentId, dok.id),
+        ))
+        .limit(1);
+      if (bereitsZugestimmt.length > 0) return { success: true, alreadyRecorded: true };
       await db.insert(datenschutzZustimmungen).values({
         mitarbeiterId: ctx.mitarbeiterId,
         dokumentId: dok.id,
@@ -159,7 +168,22 @@ export const datenschutzRouter = router({
         adminId: ctx.mitarbeiterId,
         details: { version: dok.version },
       });
-      return { success: true };
+      const [aktiveDokumente, meineZustimmungen] = await Promise.all([
+        db.select({ id: datenschutzDokumente.id }).from(datenschutzDokumente).where(eq(datenschutzDokumente.aktiv, true)),
+        db.select({ dokumentId: datenschutzZustimmungen.dokumentId })
+          .from(datenschutzZustimmungen)
+          .where(eq(datenschutzZustimmungen.mitarbeiterId, ctx.mitarbeiterId)),
+      ]);
+      const allePflichtenErfuellt = aktiveDokumente.length > 0 && aktiveDokumente.every((d) => meineZustimmungen.some((z) => z.dokumentId === d.id));
+      if (allePflichtenErfuellt) {
+        await db.execute(sql`
+          UPDATE onboarding_checklisten
+          SET erledigt = 1, erledigtAm = NOW(), notiz = 'Automatisch nach vollständiger DSGVO-Bestätigung abgeschlossen'
+          WHERE mitarbeiterId = ${ctx.mitarbeiterId}
+            AND aufgabe = 'DSGVO-Verpflichtungserklärung unterschrieben'
+        `);
+      }
+      return { success: true, onboardingAktualisiert: allePflichtenErfuellt };
     }),
 
   /** Meine Zustimmungen abrufen (Frontend-kompatibel) */

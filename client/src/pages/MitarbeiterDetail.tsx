@@ -1611,8 +1611,8 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
                         {diffDays !== null && diffDays > 0 && <span className="text-amber-600">({diffDays} Tage verbleibend)</span>}
                       </div>
                       {k.bemerkung && <p className="text-xs text-muted-foreground mt-1 italic">{k.bemerkung}</p>}
-                      {k.fotoBase64 && (
-                        <button onClick={() => window.open(k.fotoBase64, '_blank')}
+                      {(k.fotoUrl || k.fotoBase64) && (
+                        <button onClick={() => window.open(k.fotoUrl || k.fotoBase64, '_blank')}
                           className="mt-1 text-xs text-blue-600 hover:underline">📷 Zertifikat anzeigen</button>
                       )}
                     </div>

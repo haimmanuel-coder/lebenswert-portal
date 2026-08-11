@@ -20,6 +20,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { sql, eq, desc, and, isNotNull, lte, isNull } from "drizzle-orm";
 import { getDb } from "./db";
+import { ermittleErsteHilfeStatus } from "./complianceUtils";
 import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, einsatzAenderungen, kunden as kundenTable, notifications as notificationsTable, ersteHilfeKurse, mitarbeiterBerechtigungen as mbTable } from "../drizzle/schema";
 import {
   getMitarbeiterByEmail,
@@ -713,7 +714,7 @@ const onboardingRouter = router({
       const db = await getDb();
       const mid = input.mitarbeiterId;
       const existing = await db!.execute(sql`SELECT COUNT(*) as cnt FROM onboarding_checklisten WHERE mitarbeiterId = ${mid}`);
-      const cnt = Number((existing as any).rows[0]?.cnt ?? 0);
+      const cnt = Number((existing as any)[0]?.[0]?.cnt ?? 0);
       if (cnt > 0) return { created: 0 };
       for (const a of ONBOARDING_STANDARD_AUFGABEN) {
         const aufgabe = a.aufgabe; const kat = a.kategorie; const reihe = a.reihenfolge;
@@ -741,7 +742,7 @@ const onboardingRouter = router({
       const db = await getDb();
       const mid = input.mitarbeiterId;
       const rows = await db!.execute(sql`SELECT COUNT(*) as gesamt, SUM(erledigt) as erledigt FROM onboarding_checklisten WHERE mitarbeiterId = ${mid}`);
-      const row = (rows as any).rows[0];
+      const row = (rows as any)[0]?.[0];
       return { gesamt: Number(row?.gesamt ?? 0), erledigt: Number(row?.erledigt ?? 0) };
     }),
 
@@ -2417,7 +2418,7 @@ export const appRouter = router({
           // Neue mitarbeiterId aus DB holen
           const emailVal = input.email;
           const idRows = await db!.execute(sql`SELECT id FROM mitarbeiter WHERE email = ${emailVal} ORDER BY id DESC LIMIT 1`);
-          const newId = (idRows as any).rows?.[0]?.id;
+          const newId = (idRows as any)[0]?.[0]?.id;
           if (newId) {
             for (const a of AUFGABEN) {
               const aufgabe = a.aufgabe; const kat = a.kategorie; const reihe = a.reihenfolge;
@@ -2430,7 +2431,7 @@ export const appRouter = router({
           const dbInst = await getDb();
           const stRows = await dbInst!.execute(sql`SELECT schluessel, wert FROM system_einstellungen WHERE schluessel IN ('steuerberater_email','steuerberater_name','firma_name')`);
           const settings: Record<string, string> = {};
-          for (const r of (stRows as any).rows ?? []) settings[r.schluessel] = r.wert ?? "";
+          for (const r of (stRows as any)[0] ?? []) settings[r.schluessel] = r.wert ?? "";
           const stEmail = settings["steuerberater_email"] ?? "";
           if (stEmail && stEmail.includes("@")) {
             const html = buildSteuerberaterEmail({
@@ -3599,6 +3600,20 @@ export const appRouter = router({
           d.setFullYear(d.getFullYear() + 2);
           ablauf = d.toISOString().split('T')[0];
         }
+        let fotoKey: string | null = null;
+        let fotoUrl: string | null = null;
+        let fotoMimeType: string | null = input.fotoMimeType ?? null;
+        if (input.fotoBase64) {
+          const dataUrl = input.fotoBase64.match(/^data:([^;]+);base64,(.+)$/);
+          const base64Payload = dataUrl?.[2] ?? input.fotoBase64;
+          fotoMimeType = input.fotoMimeType ?? dataUrl?.[1] ?? "image/jpeg";
+          const extension = fotoMimeType === "image/png" ? "png" : fotoMimeType === "image/webp" ? "webp" : "jpg";
+          const key = `erste-hilfe/${input.mitarbeiterId}/${Date.now()}-${nanoid(10)}.${extension}`;
+          const { storagePut } = await import("./storage.js");
+          const upload = await storagePut(key, Buffer.from(base64Payload, "base64"), fotoMimeType);
+          fotoKey = upload.key;
+          fotoUrl = upload.url;
+        }
         const insertVal: any = {
           mitarbeiterId: input.mitarbeiterId,
           kursName: input.kursName,
@@ -3606,8 +3621,10 @@ export const appRouter = router({
           kursDatum: input.kursDatum,
           ablaufDatum: ablauf ?? null,
           status: input.status,
-          fotoBase64: input.fotoBase64 ?? null,
-          fotoMimeType: input.fotoMimeType ?? null,
+          fotoKey,
+          fotoUrl,
+          fotoBase64: null,
+          fotoMimeType,
           bemerkung: input.bemerkung ?? null,
         };
         await db.insert(ersteHilfeKurse).values(insertVal);
@@ -3631,22 +3648,21 @@ export const appRouter = router({
       const result = await Promise.all(alle.map(async (ma) => {
         const kurse = await db!.select().from(ersteHilfeKurse)
           .where(eq(ersteHilfeKurse.mitarbeiterId, ma.id))
-          .orderBy(desc(ersteHilfeKurse.kursDatum))
-          .limit(1);
-        const letzter = kurse[0];
-        let ampel: 'gruen' | 'gelb' | 'rot' = 'rot';
-        let ablaufDatum: string | null = null;
-        if (letzter) {
-          const rawAblauf = letzter.ablaufDatum;
-          ablaufDatum = rawAblauf ? (rawAblauf instanceof Date ? rawAblauf.toISOString().split('T')[0] : String(rawAblauf)) : null;
-          if (ablaufDatum) {
-            const diffDays = Math.ceil((new Date(ablaufDatum).getTime() - heute.getTime()) / 86400000);
-            ampel = diffDays > 60 ? 'gruen' : diffDays > 0 ? 'gelb' : 'rot';
-          } else { ampel = 'gelb'; }
-        }
+          .orderBy(desc(ersteHilfeKurse.kursDatum));
+        const ersteHilfeStatus = ermittleErsteHilfeStatus(kurse, heute);
+        const letzter = ersteHilfeStatus.letzterKurs as typeof kurse[number] | null;
+        const ablaufDatum = ersteHilfeStatus.ablaufDatum?.toISOString().split('T')[0] ?? null;
         const rawKurs = letzter?.kursDatum;
         const letzterKursStr = rawKurs ? (rawKurs instanceof Date ? rawKurs.toISOString().split('T')[0] : String(rawKurs)) : null;
-        return { mitarbeiterId: ma.id, name: `${ma.vorname} ${ma.nachname}`, ampel, letzterKurs: letzterKursStr, ablaufDatum, kursName: letzter?.kursName ?? null };
+        return {
+          mitarbeiterId: ma.id,
+          name: `${ma.vorname} ${ma.nachname}`,
+          ampel: ersteHilfeStatus.ampel,
+          letzterKurs: letzterKursStr,
+          ablaufDatum,
+          kursName: letzter?.kursName ?? null,
+          nachweisVorhanden: Boolean(letzter?.fotoUrl || letzter?.fotoBase64),
+        };
       }));
       return result;
     }),
@@ -3703,28 +3719,28 @@ export const appRouter = router({
         const baldAblaufend = maDoks.filter(d => d.ablaufdatum && new Date(d.ablaufdatum) >= jetzt && new Date(d.ablaufdatum) <= in30);
         const hatVertrag = maDoks.some(d => d.typ === 'arbeitsvertrag');
         // Erste-Hilfe: aus Dokumenten ODER aus erste_hilfe_kurse Tabelle (bestanden + nicht abgelaufen)
-        const hatEHDok = maDoks.some(d => d.typ === 'erstehilfe');
-        const hatEHKurs = alleEHKurse.some(k => {
-          if (k.mitarbeiterId !== ma.id || k.status !== 'bestanden') return false;
-          if (!k.ablaufDatum) return true;
-          const ablauf = k.ablaufDatum instanceof Date ? k.ablaufDatum : new Date(k.ablaufDatum as string);
-          return ablauf >= jetzt;
-        });
-        const hatErsteHilfe = hatEHDok || hatEHKurs;
+        const hatEHDok = maDoks.some(d => d.typ === 'erstehilfe' && (!d.ablaufdatum || new Date(d.ablaufdatum) >= jetzt));
+        const ersteHilfeKurseDesMitarbeiters = alleEHKurse.filter(k => k.mitarbeiterId === ma.id);
+        const ersteHilfeKursStatus = ermittleErsteHilfeStatus(ersteHilfeKurseDesMitarbeiters, jetzt);
+        const ersteHilfeAmpel: 'gruen' | 'gelb' | 'rot' = hatEHDok ? 'gruen' : ersteHilfeKursStatus.ampel;
+        const ehAblauf = hatEHDok ? null : ersteHilfeKursStatus.ablaufDatum;
+        const hatErsteHilfe = ersteHilfeAmpel !== 'rot';
         const zertStatus = (ma as any).zertifikatStatus ?? 'nicht_angemeldet';
         let ampel: 'gruen' | 'gelb' | 'rot' = 'gruen';
         if (abgelaufen.length > 0 || !hatVertrag || zertStatus === 'nicht_angemeldet') ampel = 'rot';
-        else if (baldAblaufend.length > 0 || !hatErsteHilfe || zertStatus === 'angemeldet') ampel = 'gelb';
+        else if (baldAblaufend.length > 0 || ersteHilfeAmpel !== 'gruen' || zertStatus === 'angemeldet') ampel = 'gelb';
         return {
           id: ma.id, vorname: ma.vorname, nachname: ma.nachname, rolle: ma.rolle,
           beschaeftigungsart: (ma as any).beschaeftigungsart ?? 'minijob',
           ampel, abgelaufenAnzahl: abgelaufen.length, baldAblaufendAnzahl: baldAblaufend.length,
-          hatVertrag, hatErsteHilfe, zertStatus,
+          hatVertrag, hatErsteHilfe, ersteHilfeAmpel, ersteHilfeAblauf: ehAblauf ?? null, zertStatus,
           probleme: [
             ...abgelaufen.map(d => `❌ ${d.bezeichnung} abgelaufen`),
             ...baldAblaufend.map(d => `⚠️ ${d.bezeichnung} läuft bald ab`),
             ...(!hatVertrag ? ['❌ Kein Arbeitsvertrag hinterlegt'] : []),
-            ...(!hatErsteHilfe ? ['⚠️ Kein Erste-Hilfe-Kurs hinterlegt'] : []),
+            ...(ersteHilfeAmpel === 'rot' ? ['❌ Kein gültiger Erste-Hilfe-Kurs hinterlegt'] : []),
+            ...(ersteHilfeAmpel === 'gelb' && hatErsteHilfe ? ['⚠️ Erste-Hilfe-Kurs läuft in Kürze ab'] : []),
+            ...(ersteHilfeAmpel === 'gelb' && !hatErsteHilfe ? ['⚠️ Erste-Hilfe-Kurs angemeldet – Nachweis steht noch aus'] : []),
             ...(zertStatus === 'nicht_angemeldet' ? ['❌ Kein Zertifikat / nicht angemeldet'] : []),
             ...(zertStatus === 'angemeldet' ? ['⚠️ Zertifikat: Schulung noch nicht abgeschlossen'] : []),
           ],
