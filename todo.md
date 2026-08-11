@@ -84,7 +84,7 @@
 - [x] Frontend: Zertifikats-Status-Badge in Mitarbeiterliste
 - [x] Frontend: Beschäftigungsart-Badge (Minijob/Teilzeit/Vollzeit)
 
-## Phase 8 – Anduril.Care Integration (6 Features)
+## Phase 8 – Leistungserfassung & Systemintegration (6 Features)
 
 ### Feature 1: Kostenträger-System mit IK-Nummern
 - [x] DB: kostentraeger-Tabelle (id, name, ikNummer, typ, strasse, plz, ort, telefon, email)
