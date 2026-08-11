@@ -1101,6 +1101,28 @@ const TABLE_DEFINITIONS: string[] = [
     \`updatedAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (\`id\`)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS \`budget_45b\` (
+    \`id\` int NOT NULL AUTO_INCREMENT,
+    \`kundenId\` int NOT NULL,
+    \`jahresbudget\` decimal(10,2) NOT NULL DEFAULT 0,
+    \`verbraucht\` decimal(10,2) NOT NULL DEFAULT 0,
+    \`letzteAbrechnung\` date DEFAULT NULL,
+    \`createdAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    \`updatedAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    UNIQUE KEY \`kundenId\` (\`kundenId\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS \`budget_39\` (
+    \`id\` int NOT NULL AUTO_INCREMENT,
+    \`kundenId\` int NOT NULL,
+    \`monatlicheStunden\` decimal(8,2) NOT NULL DEFAULT 0,
+    \`verbraucht\` decimal(8,2) NOT NULL DEFAULT 0,
+    \`letzteAbrechnung\` date DEFAULT NULL,
+    \`createdAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    \`updatedAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    UNIQUE KEY \`kundenId\` (\`kundenId\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ];
 
 let ensureTablesRan = false;
