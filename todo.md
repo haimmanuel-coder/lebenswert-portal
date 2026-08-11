@@ -1070,3 +1070,10 @@
 - [x] Budget-Sync in kunden.create: beim Anlegen eines Kunden budget_45b/budget_39 initialisieren
 - [x] Kunden-Übersicht testen: alle tRPC-Procedures auf Fehler prüfen
 - [x] TypeScript: 0 Fehler
+
+## Backup-Heartbeat + MA-Buttons-Test (11.08.2026)
+- [x] Backup-Heartbeat: wöchentlicher Job (Montag 03:00) mit CSV-Export in S3
+- [x] ensureHeartbeatJobs: backup-wochentlich Job registrieren
+- [x] Mitarbeiter-Buttons testen: Aktiv/Deaktivieren, Details, Bearbeiten, Passwort, Löschen
+- [x] Alle Mutations und Procedures auf korrekte Funktion prüfen
+- [x] TypeScript: 0 Fehler

@@ -53,6 +53,13 @@ const JOBS = [
     method: "POST" as const,
     description: "Aufbewahrungsfristen: monatliche Prüfung nach SGB XI (10-Jahres-Frist)",
   },
+  {
+    name: "backup-woechentlich",
+    cron: "0 0 3 * * 1",            // jeden Montag 03:00 UTC
+    path: "/api/scheduled/backup-woechentlich",
+    method: "POST" as const,
+    description: "Wöchentlicher Datenbank-Backup: Mitarbeiter + Kunden als CSV nach S3",
+  },
 ];
 
 export async function ensureHeartbeatJobs(): Promise<void> {

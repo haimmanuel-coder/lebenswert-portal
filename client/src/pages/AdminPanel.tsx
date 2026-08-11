@@ -174,8 +174,17 @@ export default function AdminPanel() {
   // ── Passwort-Reset ───────────────────────────────────
   const [pwResetMa, setPwResetMa] = useState<{ id: number; vorname: string; nachname: string } | null>(null);
   const [pwResetNeu, setPwResetNeu] = useState("");
+  const [pwResetSichtbar, setPwResetSichtbar] = useState(false);
+  const [pwResetKopiert, setPwResetKopiert] = useState(false);
+  const generierePasswort = () => {
+    const adj = ["Grün","Blau","Rot","Gold","Silber","Stark","Schnell","Klar"];
+    const noun = ["Baum","Berg","Fluss","Stern","Mond","Wind","Feld","Haus"];
+    const num = Math.floor(100 + Math.random() * 900);
+    const pw = adj[Math.floor(Math.random()*adj.length)] + noun[Math.floor(Math.random()*noun.length)] + num;
+    setPwResetNeu(pw); setPwResetSichtbar(true); setPwResetKopiert(false);
+  };
   const passwortReset = trpc.admin.mitarbeiterPasswortReset.useMutation({
-    onSuccess: () => { toast.success("🔑 Passwort wurde zurückgesetzt"); setPwResetMa(null); setPwResetNeu(""); },
+    onSuccess: () => { toast.success("🔑 Passwort wurde zurückgesetzt"); setPwResetMa(null); setPwResetNeu(""); setPwResetSichtbar(false); },
     onError: (e) => toast.error("❌ " + e.message),
   });
   const deleteMa = trpc.admin.mitarbeiterDelete.useMutation({
@@ -772,15 +781,28 @@ export default function AdminPanel() {
             <div style={{ fontSize: 14, color: "#6b7280", marginBottom: 16 }}>
               Neues Passwort für <strong>{pwResetMa.vorname} {pwResetMa.nachname}</strong> setzen:
             </div>
-            <input
-              type="password"
-              placeholder="Neues Passwort (min. 6 Zeichen)"
-              value={pwResetNeu}
-              onChange={(e) => setPwResetNeu(e.target.value)}
-              style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 14, marginBottom: 16, boxSizing: "border-box" as const }}
-            />
+            <button onClick={generierePasswort} style={{ width: "100%", padding: "9px 0", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", marginBottom: 10 }}>
+              🎲 Sicheres Passwort generieren
+            </button>
+            <div style={{ position: "relative", marginBottom: 16 }}>
+              <input
+                type={pwResetSichtbar ? "text" : "password"}
+                placeholder="Neues Passwort (min. 6 Zeichen)"
+                value={pwResetNeu}
+                onChange={(e) => { setPwResetNeu(e.target.value); setPwResetKopiert(false); }}
+                style={{ width: "100%", padding: "10px 40px 10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const }}
+              />
+              <button onClick={() => setPwResetSichtbar(v => !v)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 16 }}>
+                {pwResetSichtbar ? "🙈" : "👁️"}
+              </button>
+            </div>
+            {pwResetNeu.length >= 6 && (
+              <button onClick={() => { navigator.clipboard.writeText(pwResetNeu); setPwResetKopiert(true); toast.success("📋 Passwort kopiert!"); }} style={{ width: "100%", padding: "8px 0", background: pwResetKopiert ? "#e8f5e4" : "#eff6ff", color: pwResetKopiert ? "#4a8c3f" : "#1d4ed8", border: `1px solid ${pwResetKopiert ? "#4a8c3f" : "#93c5fd"}`, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 12 }}>
+                {pwResetKopiert ? "✅ Kopiert!" : "📋 Passwort kopieren"}
+              </button>
+            )}
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => { setPwResetMa(null); setPwResetNeu(""); }} style={{ flex: 1, padding: "10px 0", background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+              <button onClick={() => { setPwResetMa(null); setPwResetNeu(""); setPwResetSichtbar(false); }} style={{ flex: 1, padding: "10px 0", background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
                 Abbrechen
               </button>
               <button
