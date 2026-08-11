@@ -1064,6 +1064,25 @@ const TABLE_DEFINITIONS: string[] = [
     PRIMARY KEY (\`id\`),
     UNIQUE KEY \`uq_mitteilung_ma\` (\`mitteilungId\`, \`mitarbeiterId\`)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS \`kassenanfragen\` (
+    \`id\` int NOT NULL AUTO_INCREMENT,
+    \`mitarbeiterId\` int NOT NULL,
+    \`kundenId\` int NOT NULL,
+    \`kostentraegerId\` int DEFAULT NULL,
+    \`anfrageTyp\` varchar(100) NOT NULL,
+    \`vollmachtText\` text,
+    \`unterschriftKunde\` text,
+    \`unterschriftMitarbeiter\` text,
+    \`notizen\` text,
+    \`status\` enum('offen','gesendet','beantwortet','abgelehnt') NOT NULL DEFAULT 'offen',
+    \`antwort\` text,
+    \`antwortDatum\` datetime DEFAULT NULL,
+    \`geloeschtAt\` datetime DEFAULT NULL,
+    \`geloeschtVon\` int DEFAULT NULL,
+    \`createdAt\` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    \`updatedAt\` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ];
 
 let ensureTablesRan = false;
