@@ -6,6 +6,11 @@
 - [x] Mitarbeiteranlage: Anlageprozess und obligatorischen DSGVO-Dialog beim ersten Login validieren und absichern
 - [x] Sicherheitsunterweisungen: Admin-Zugriff auf Vorlagen und Nachweisübersicht sowie PDF-Erzeugung mit digitaler Unterschrifts-Eingabe als Regressionstest prüfen
 
+## Aktuelle Umsetzung – Begleitfahrten
+- [x] Begleitfahrten zu Arztterminen und Einkäufen im Mitarbeiterbereich prüfen und eindeutig über Fahrtenbuch sowie Einsatzdokumentation erreichbar machen
+- [x] Bestehende Sonderfahrt-Erfassung für Arzt- und Einkaufsbegleitungen im Mitarbeiter-Fahrtenbuch wiederherstellen und der Kundenabrechnung zuordnen
+- [x] Schnellzugriff aus der Besuchsdokumentation zum Fahrtenbuch für Begleitfahrten ergänzen
+
 ## Datenbank & Backend
 - [x] Datenbankschema: mitarbeiter, kunden, einsaetze, leistungen, fahrten
 - [x] Drizzle-Migration generieren und ausführen

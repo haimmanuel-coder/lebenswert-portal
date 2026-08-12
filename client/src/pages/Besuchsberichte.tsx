@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import React from "react";
 import { trpc } from "@/lib/trpc";
 import { usePortalAuth } from "@/contexts/PortalAuthContext";
+import { useNavigation } from "@/contexts/NavigationContext";
 import { toast } from "sonner";
 
 const STATUS_FARBEN: Record<string, { bg: string; color: string; border: string }> = {
@@ -20,6 +21,7 @@ const STIMMUNG_LABELS: Record<string, string> = {
 
 export default function Besuchsberichte() {
   const { mitarbeiter } = usePortalAuth() as any;
+  const { navigiere } = useNavigation();
   const isAdmin = mitarbeiter?.rolle === "admin";
   const [tab, setTab] = useState<"meine" | "alle">(isAdmin ? "alle" : "meine");
   const [showCreate, setShowCreate] = useState(false);
@@ -149,12 +151,20 @@ export default function Besuchsberichte() {
           <h1 style={{ fontSize: 22, fontWeight: 800, color: "#111827", margin: 0 }}>📋 Besuchsberichte</h1>
           <p style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>Dokumentation aller Kundenbesuche</p>
         </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          style={{ background: "#0d9488", color: "#fff", border: "none", borderRadius: 12, padding: "10px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
-        >
-          ➕ Neuer Bericht
-        </button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <button
+            onClick={() => navigiere("fahrt")}
+            style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe", borderRadius: 12, padding: "10px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+          >
+            Begleitfahrt erfassen
+          </button>
+          <button
+            onClick={() => setShowCreate(true)}
+            style={{ background: "#0d9488", color: "#fff", border: "none", borderRadius: 12, padding: "10px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+          >
+            Neuer Bericht
+          </button>
+        </div>
       </div>
 
       {/* Tab-Navigation */}

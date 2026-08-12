@@ -36,6 +36,16 @@ export default function Fahrtenbuch() {
   const [km, setKm] = useState("");
   const [kundenId, setKundenId] = useState("");
   const [zweck, setZweck] = useState("");
+  const [sonderSheetOpen, setSonderSheetOpen] = useState(false);
+  const [sonderArt, setSonderArt] = useState<"arzt" | "einkauf">("arzt");
+  const [sonderForm, setSonderForm] = useState({
+    datum: new Date().toISOString().split("T")[0],
+    kundenId: "",
+    startAdresse: "",
+    zielAdresse: "",
+    kilometer: "",
+    bemerkung: "",
+  });
   // Löschen-Dialog State
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; label: string } | null>(null);
 
@@ -47,6 +57,7 @@ export default function Fahrtenbuch() {
 
   const { data: kunden = [] } = trpc.kunden.list.useQuery();
   const { data: fahrten = [], refetch } = trpc.fahrten.list.useQuery();
+  const { data: sonderfahrten = [], refetch: refetchSonderfahrten } = (trpc as any).sonderfahrt.list.useQuery({});
 
   const createFahrt = trpc.fahrten.create.useMutation({
     onSuccess: () => {
@@ -61,6 +72,16 @@ export default function Fahrtenbuch() {
   const deleteFahrt = trpc.fahrten.delete.useMutation({
     onSuccess: () => { refetch(); toast.success("🗑️ Fahrt gelöscht"); },
     onError: (e) => toast.error("❌ " + e.message),
+  });
+
+  const createSonderfahrt = (trpc as any).sonderfahrt.create.useMutation({
+    onSuccess: () => {
+      refetchSonderfahrten();
+      toast.success("✅ Begleitfahrt gespeichert");
+      setSonderSheetOpen(false);
+      setSonderForm({ datum: today, kundenId: "", startAdresse: "", zielAdresse: "", kilometer: "", bemerkung: "" });
+    },
+    onError: (e: Error) => toast.error("❌ " + e.message),
   });
 
   const handleDeleteFahrt = (id: number, label: string) => {
@@ -101,6 +122,27 @@ export default function Fahrtenbuch() {
     setAutoLoading(true);
     fahrtkostenMut.mutate({ vonAdresse: vonOrt, nachAdresse: nachOrt });
   }
+
+  const openBegleitfahrt = (art: "arzt" | "einkauf") => {
+    setSonderArt(art);
+    setSonderSheetOpen(true);
+  };
+
+  const saveBegleitfahrt = () => {
+    if (!sonderForm.kundenId || !sonderForm.datum || !sonderForm.kilometer) {
+      toast.error("Bitte Kunde, Datum und Kilometer eintragen.");
+      return;
+    }
+    const artLabel = sonderArt === "arzt" ? "Arztbegleitung" : "Einkaufsbegleitung";
+    createSonderfahrt.mutate({
+      kundenId: Number(sonderForm.kundenId),
+      datum: sonderForm.datum,
+      startAdresse: sonderForm.startAdresse || undefined,
+      zielAdresse: sonderForm.zielAdresse || undefined,
+      kilometer: Number(sonderForm.kilometer),
+      beschreibung: `${artLabel}${sonderForm.bemerkung.trim() ? ` – ${sonderForm.bemerkung.trim()}` : ""}`,
+    });
+  };
 
   const saveFahrt = () => {
     if (!datum || !vonOrt || !nachOrt || !km) { toast.error("Bitte alle Pflichtfelder ausfüllen!"); return; }
@@ -184,7 +226,7 @@ export default function Fahrtenbuch() {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
         <div>
           <div style={{ fontSize: 18, fontWeight: 800 }}>Fahrtenbuch</div>
-          <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>{monatStr}</div>
+          <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>Dienstfahrten und Kundenbegleitungen · {monatStr}</div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button
@@ -200,6 +242,21 @@ export default function Fahrtenbuch() {
             + Fahrt
           </button>
         </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8, marginBottom: 12 }}>
+        <button
+          onClick={() => openBegleitfahrt("arzt")}
+          style={{ padding: "11px 12px", background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer", textAlign: "left" }}
+        >
+          Arztbegleitung erfassen
+        </button>
+        <button
+          onClick={() => openBegleitfahrt("einkauf")}
+          style={{ padding: "11px 12px", background: "#f0fdf4", color: "#166534", border: "1px solid #bbf7d0", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer", textAlign: "left" }}
+        >
+          Einkaufsbegleitung erfassen
+        </button>
       </div>
 
       {/* Filter-Leiste */}
@@ -399,6 +456,49 @@ export default function Fahrtenbuch() {
           <button onClick={saveFahrt} disabled={createFahrt.isPending} style={{ flex: 1, padding: 13, background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
             {createFahrt.isPending ? "Speichern…" : "Fahrt speichern"}
           </button>
+        </div>
+      </BottomSheet>
+
+      <BottomSheet open={sonderSheetOpen} onClose={() => setSonderSheetOpen(false)} title={sonderArt === "arzt" ? "Arztbegleitung erfassen" : "Einkaufsbegleitung erfassen"}>
+        <div style={{ marginBottom: 14, padding: "10px 12px", background: sonderArt === "arzt" ? "#eff6ff" : "#f0fdf4", color: sonderArt === "arzt" ? "#1e40af" : "#166534", borderRadius: 10, fontSize: 13, fontWeight: 700 }}>
+          {sonderArt === "arzt" ? "Die Begleitfahrt wird separat für die Kundenabrechnung gespeichert." : "Die Einkaufsbegleitung wird separat für die Kundenabrechnung gespeichert."}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#6b7280", marginBottom: 5 }}>Datum</label>
+            <input type="date" value={sonderForm.datum} onChange={e => setSonderForm(f => ({ ...f, datum: e.target.value }))} style={{ width: "100%", padding: "12px", border: "2px solid #e5e7eb", borderRadius: 10, boxSizing: "border-box" }} />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#6b7280", marginBottom: 5 }}>Kunde *</label>
+            <select value={sonderForm.kundenId} onChange={e => setSonderForm(f => ({ ...f, kundenId: e.target.value }))} style={{ width: "100%", padding: "12px", border: "2px solid #e5e7eb", borderRadius: 10, background: "#fff", boxSizing: "border-box" }}>
+              <option value="">Kunde auswählen</option>
+              {kunden.map(k => <option key={k.id} value={k.id}>{k.vorname} {k.nachname}</option>)}
+            </select>
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#6b7280", marginBottom: 5 }}>Startort</label>
+            <input value={sonderForm.startAdresse} onChange={e => setSonderForm(f => ({ ...f, startAdresse: e.target.value }))} placeholder="z.B. Wohnung des Kunden" style={{ width: "100%", padding: "12px", border: "2px solid #e5e7eb", borderRadius: 10, boxSizing: "border-box" }} />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#6b7280", marginBottom: 5 }}>{sonderArt === "arzt" ? "Praxis oder Klinik" : "Geschäft oder Markt"}</label>
+            <input value={sonderForm.zielAdresse} onChange={e => setSonderForm(f => ({ ...f, zielAdresse: e.target.value }))} placeholder={sonderArt === "arzt" ? "z.B. Praxis Dr. Muster" : "z.B. Supermarkt"} style={{ width: "100%", padding: "12px", border: "2px solid #e5e7eb", borderRadius: 10, boxSizing: "border-box" }} />
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#6b7280", marginBottom: 5 }}>Kilometer *</label>
+            <input type="number" min="0" step="0.1" value={sonderForm.kilometer} onChange={e => setSonderForm(f => ({ ...f, kilometer: e.target.value }))} placeholder="0,0" style={{ width: "100%", padding: "12px", border: "2px solid #e5e7eb", borderRadius: 10, boxSizing: "border-box" }} />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#6b7280", marginBottom: 5 }}>Hinweis</label>
+            <input value={sonderForm.bemerkung} onChange={e => setSonderForm(f => ({ ...f, bemerkung: e.target.value }))} placeholder="optional" style={{ width: "100%", padding: "12px", border: "2px solid #e5e7eb", borderRadius: 10, boxSizing: "border-box" }} />
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 10, marginTop: 20, paddingTop: 16, borderTop: "1px solid #e5e7eb" }}>
+          <button onClick={() => setSonderSheetOpen(false)} style={{ flex: 1, padding: 13, background: "#f4f6f3", color: "#6b7280", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>Abbrechen</button>
+          <button onClick={saveBegleitfahrt} disabled={createSonderfahrt.isPending} style={{ flex: 1, padding: 13, background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>{createSonderfahrt.isPending ? "Speichern…" : "Begleitfahrt speichern"}</button>
         </div>
       </BottomSheet>
 
