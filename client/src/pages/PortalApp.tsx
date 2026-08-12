@@ -239,6 +239,7 @@ export default function PortalApp() {
       title: "📈 Controlling",
       items: [
         { id: "controllingpage" as PageId, icon: "📈", label: "Controlling", adminOnly: true },
+        { id: "privatrechnung" as PageId, icon: "🩺", label: "Kundenbegleitungen", adminOnly: true },
       ],
     }] : []),
     // ── ✅ QUALITÄT & COMPLIANCE ──────────────────────────────────────────

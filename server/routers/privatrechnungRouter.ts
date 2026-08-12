@@ -10,7 +10,7 @@
 import { z } from "zod";
 import { router } from "../_core/trpc";
 import { adminProcedure, portalProtected } from "../portalAuth";
-import { getDb } from "../db";
+import { getDb, getMitarbeiterById } from "../db";
 import { sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
@@ -93,8 +93,9 @@ export const sonderfahrtRouter = router({
             ORDER BY sf.datum DESC`
       );
       let list = (rows as any).rows ?? (rows as any[]);
-      const maId = input.mitarbeiterId ?? ctx.mitarbeiterId;
-      list = list.filter((r: any) => r.mitarbeiterId === maId);
+      const aktuellerMitarbeiter = await getMitarbeiterById(ctx.mitarbeiterId);
+      const maId = input.mitarbeiterId ?? (aktuellerMitarbeiter?.rolle === "admin" ? undefined : ctx.mitarbeiterId);
+      if (maId) list = list.filter((r: any) => r.mitarbeiterId === maId);
       if (input.kundenId) list = list.filter((r: any) => r.kundenId === input.kundenId);
       if (input.monat) list = list.filter((r: any) => r.monat === input.monat);
       return list;

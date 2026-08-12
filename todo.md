@@ -10,6 +10,7 @@
 - [x] Begleitfahrten zu Arztterminen und Einkäufen im Mitarbeiterbereich prüfen und eindeutig über Fahrtenbuch sowie Einsatzdokumentation erreichbar machen
 - [x] Bestehende Sonderfahrt-Erfassung für Arzt- und Einkaufsbegleitungen im Mitarbeiter-Fahrtenbuch wiederherstellen und der Kundenabrechnung zuordnen
 - [x] Schnellzugriff aus der Besuchsdokumentation zum Fahrtenbuch für Begleitfahrten ergänzen
+- [x] Monatsansicht je Kunde für Arzt- und Einkaufsbegleitungen mit Datum, Ziel, Kilometern und Summen erstellen
 
 ## Datenbank & Backend
 - [x] Datenbankschema: mitarbeiter, kunden, einsaetze, leistungen, fahrten

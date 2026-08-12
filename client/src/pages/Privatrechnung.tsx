@@ -73,22 +73,84 @@ export default function Privatrechnung() {
   const sfSumme = (sonderfahrten as any[] ?? []).reduce((s: number, r: any) => s + parseFloat(String(r.kilometer ?? 0)) * 0.35, 0);
   const posSumme = (positionen as any[] ?? []).reduce((s: number, r: any) => s + parseFloat(String(r.menge ?? 1)) * parseFloat(String(r.einzelpreis ?? 0)), 0);
   const gesamtVorschau = Math.round((sfSumme + posSumme) * 100) / 100;
+  const begleitungen = (sonderfahrten as any[] ?? []).filter((sf: any) => /arzt|einkauf/i.test(String(sf.beschreibung ?? "")));
+  const arztBegleitungen = begleitungen.filter((sf: any) => /arzt/i.test(String(sf.beschreibung ?? "")));
+  const einkaufsBegleitungen = begleitungen.filter((sf: any) => /einkauf/i.test(String(sf.beschreibung ?? "")));
+  const begleitKm = begleitungen.reduce((sum: number, sf: any) => sum + parseFloat(String(sf.kilometer ?? 0)), 0);
 
   return (
     <div className="p-4 space-y-4 max-w-4xl mx-auto">
       <div className="flex items-center gap-3 mb-2">
         <span className="text-2xl">🧾</span>
         <div>
-          <h1 className="text-xl font-bold text-green-800">Privatrechnung</h1>
-          <p className="text-sm text-gray-500">Sonderfahrten, Zusatzleistungen und Monatsrechnungen</p>
+          <h1 className="text-xl font-bold text-green-800">Kundenbegleitungen & Monatsabrechnung</h1>
+          <p className="text-sm text-gray-500">Arzt- und Einkaufsbegleitungen je Kunde sowie Sonderfahrten und Monatsrechnungen</p>
         </div>
       </div>
 
-      <Tabs defaultValue="erfassen">
+      <Tabs defaultValue="begleitungen">
         <TabsList className="w-full">
+          <TabsTrigger value="begleitungen" className="flex-1">Kundenbegleitungen</TabsTrigger>
           <TabsTrigger value="erfassen" className="flex-1">✏️ Erfassen</TabsTrigger>
           <TabsTrigger value="rechnungen" className="flex-1">📄 Rechnungen</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="begleitungen" className="space-y-4">
+          <Card>
+            <CardHeader><CardTitle className="text-base">Monatsansicht je Kunde</CardTitle></CardHeader>
+            <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <Label>Kunde</Label>
+                <Select value={selectedKundenId ? String(selectedKundenId) : undefined} onValueChange={(v) => setSelectedKundenId(Number(v))}>
+                  <SelectTrigger><SelectValue placeholder="Kunde wählen..." /></SelectTrigger>
+                  <SelectContent>
+                    {(kunden as any[] ?? []).map((k: any) => (
+                      <SelectItem key={k.id} value={String(k.id)}>{k.vorname} {k.nachname}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Monat</Label>
+                <Input type="month" value={monat} onChange={(e) => setMonat(e.target.value)} />
+              </div>
+            </CardContent>
+          </Card>
+
+          {!selectedKundenId ? (
+            <Card><CardContent className="py-10 text-center text-sm text-gray-500">Bitte einen Kunden und Monat auswählen.</CardContent></Card>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <Card><CardContent className="pt-4"><p className="text-xs text-gray-500">Arztbegleitungen</p><p className="text-2xl font-bold text-blue-700">{arztBegleitungen.length}</p></CardContent></Card>
+                <Card><CardContent className="pt-4"><p className="text-xs text-gray-500">Einkaufsbegleitungen</p><p className="text-2xl font-bold text-green-700">{einkaufsBegleitungen.length}</p></CardContent></Card>
+                <Card><CardContent className="pt-4"><p className="text-xs text-gray-500">Kilometer</p><p className="text-2xl font-bold text-gray-800">{begleitKm.toFixed(1)}</p></CardContent></Card>
+                <Card><CardContent className="pt-4"><p className="text-xs text-gray-500">Abrechenbar</p><p className="text-2xl font-bold text-orange-600">{(begleitKm * 0.35).toFixed(2)} €</p></CardContent></Card>
+              </div>
+
+              <Card>
+                <CardHeader><CardTitle className="text-base">Begleitungen im ausgewählten Monat</CardTitle></CardHeader>
+                <CardContent>
+                  {begleitungen.length === 0 ? (
+                    <p className="py-6 text-center text-sm text-gray-500">Für diesen Kunden sind in diesem Monat keine Arzt- oder Einkaufsbegleitungen erfasst.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="border-b text-left text-xs text-gray-500"><tr><th className="pb-2 pr-3">Datum</th><th className="pb-2 pr-3">Art</th><th className="pb-2 pr-3">Start → Ziel</th><th className="pb-2 pr-3 text-right">km</th><th className="pb-2 text-right">Betrag</th></tr></thead>
+                        <tbody>
+                          {begleitungen.map((sf: any) => {
+                            const istArzt = /arzt/i.test(String(sf.beschreibung ?? ""));
+                            return <tr key={sf.id} className="border-b last:border-0"><td className="py-3 pr-3 whitespace-nowrap">{new Date(sf.datum).toLocaleDateString("de-DE")}</td><td className="py-3 pr-3"><Badge className={istArzt ? "bg-blue-600" : "bg-green-600"}>{istArzt ? "Arztbegleitung" : "Einkaufsbegleitung"}</Badge></td><td className="py-3 pr-3 text-gray-600">{sf.startAdresse || "–"} → {sf.zielAdresse || "–"}</td><td className="py-3 pr-3 text-right">{parseFloat(String(sf.kilometer ?? 0)).toFixed(1)}</td><td className="py-3 text-right font-semibold text-orange-600">{(parseFloat(String(sf.kilometer ?? 0)) * 0.35).toFixed(2)} €</td></tr>;
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </TabsContent>
 
         {/* ── Erfassen-Tab ── */}
         <TabsContent value="erfassen" className="space-y-4">
