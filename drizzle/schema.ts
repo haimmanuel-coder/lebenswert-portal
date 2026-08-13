@@ -34,6 +34,8 @@ export const mitarbeiter = mysqlTable("mitarbeiter", {
   nachname: varchar("nachname", { length: 100 }).notNull(),
   email: varchar("email", { length: 320 }).notNull().unique(),
   passwortHash: varchar("passwortHash", { length: 255 }).notNull(),
+  passwortWechselErforderlich: boolean("passwortWechselErforderlich").default(false).notNull(),
+  startPasswortErstelltAt: timestamp("startPasswortErstelltAt"),
   rolle: mysqlEnum("rolle", ["mitarbeiter", "teamleitung", "buchhaltung", "admin"]).default("mitarbeiter").notNull(),
   berechtigungen: text("berechtigungen"), // optionales JSON-Array für zusätzliche Einzelrechte
   zweiFaktorAktiv: boolean("zweiFaktorAktiv").default(false).notNull(),

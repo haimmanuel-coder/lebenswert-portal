@@ -19,6 +19,7 @@ interface MitarbeiterInfo {
   nachname: string;
   email: string;
   rolle: string;
+  passwortWechselErforderlich?: boolean;
 }
 
 interface PortalAuthContextType {

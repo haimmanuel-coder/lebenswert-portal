@@ -22,6 +22,7 @@ import MitarbeiterDetail from "./MitarbeiterDetail";
 
 type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo" | "preise" | "sicherheit" | "fuehrerschein" | "compliance" | "compliance-gesamt" | "arbeitssicherheit" | "as-dashboard" | "unterschriften-archiv" | "lohnkosten" | "onboarding" | "csv-import" | "kunden-import" | "einstellungen" | "systemstatus";
 type PortalRolle = "mitarbeiter" | "teamleitung" | "buchhaltung" | "admin";
+type Zugangskarte = { id?: number; vorname: string; nachname: string; email: string; rolle?: string; startpasswort: string };
 
 const ROLLEN_LABEL: Record<PortalRolle, string> = {
   mitarbeiter: "Mitarbeiter",
@@ -66,7 +67,7 @@ export default function AdminPanel() {
 
   const { data: maList = [], refetch: refetchMa } = trpc.admin.mitarbeiterList.useQuery();
   const createMa = trpc.admin.mitarbeiterCreate.useMutation({
-    onSuccess: () => { refetchMa(); toast.success("✅ Mitarbeiter angelegt"); resetMaForm(); setMaSheet(false); },
+    onSuccess: (_data, variables) => { setZugangskarten([{ vorname: variables.vorname, nachname: variables.nachname, email: variables.email, rolle: variables.rolle, startpasswort: variables.passwort }]); setZugangskartenDialog(true); refetchMa(); toast.success("✅ Mitarbeiter angelegt – Zugangskarte jetzt ausgeben."); resetMaForm(); setMaSheet(false); },
     onError: (e) => toast.error("❌ " + e.message),
   });
   const updateMa = trpc.admin.mitarbeiterUpdate.useMutation({
@@ -172,21 +173,33 @@ export default function AdminPanel() {
   const [deleteDialogMa, setDeleteDialogMa] = useState<{ id: number; vorname: string; nachname: string } | null>(null);
   const [deleteBestaetigung, setDeleteBestaetigung] = useState("");
   // ── Passwort-Reset ───────────────────────────────────
-  const [pwResetMa, setPwResetMa] = useState<{ id: number; vorname: string; nachname: string } | null>(null);
+  const [pwResetMa, setPwResetMa] = useState<{ id: number; vorname: string; nachname: string; email: string } | null>(null);
   const [pwResetNeu, setPwResetNeu] = useState("");
   const [pwResetSichtbar, setPwResetSichtbar] = useState(false);
   const [pwResetKopiert, setPwResetKopiert] = useState(false);
+  const [zugangskarten, setZugangskarten] = useState<Zugangskarte[]>([]);
+  const [zugangskartenDialog, setZugangskartenDialog] = useState(false);
   const generierePasswort = () => {
-    const adj = ["Grün","Blau","Rot","Gold","Silber","Stark","Schnell","Klar"];
-    const noun = ["Baum","Berg","Fluss","Stern","Mond","Wind","Feld","Haus"];
-    const num = Math.floor(100 + Math.random() * 900);
-    const pw = adj[Math.floor(Math.random()*adj.length)] + noun[Math.floor(Math.random()*noun.length)] + num;
+    const bytes = new Uint8Array(12); window.crypto.getRandomValues(bytes);
+    const pw = `Lb!${Array.from(bytes, value => value.toString(16).padStart(2, "0")).join("")}`;
     setPwResetNeu(pw); setPwResetSichtbar(true); setPwResetKopiert(false);
   };
   const passwortReset = trpc.admin.mitarbeiterPasswortReset.useMutation({
-    onSuccess: () => { toast.success("🔑 Passwort wurde zurückgesetzt"); setPwResetMa(null); setPwResetNeu(""); setPwResetSichtbar(false); },
+    onSuccess: (_data, variables) => { if (pwResetMa) { setZugangskarten([{ ...pwResetMa, startpasswort: variables.neuesPasswort }]); setZugangskartenDialog(true); } toast.success("🔑 Passwort wurde zurückgesetzt – Zugangskarte jetzt ausgeben."); setPwResetMa(null); setPwResetNeu(""); setPwResetSichtbar(false); },
     onError: (e) => toast.error("❌ " + e.message),
   });
+  const startpasswoerterErstellen = (trpc as any).admin.zugangskartenStartpasswoerter.useMutation({
+    onSuccess: (data: any) => { setZugangskarten(data.karten ?? []); setZugangskartenDialog(true); refetchMa(); toast.success(`${data.anzahl ?? 0} Zugangskarten wurden erstellt.`); },
+    onError: (e: any) => toast.error("❌ Zugangskarten konnten nicht erstellt werden: " + e.message),
+  });
+  const druckeZugangskarten = () => {
+    const esc = (wert: string) => wert.replace(/[&<>'"]/g, zeichen => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[zeichen] ?? zeichen));
+    const kartenHtml = zugangskarten.map((karte) => `<section class="karte"><div class="logo">Lebenswert Betreuung</div><h1>Ihre Zugangsdaten</h1><p><b>Name:</b> ${esc(`${karte.vorname} ${karte.nachname}`)}</p><p><b>E-Mail:</b> ${esc(karte.email)}</p><p><b>Startpasswort:</b> <code>${esc(karte.startpasswort)}</code></p><hr><p class="hinweis">Bitte melden Sie sich unter <b>portal.lebenswert-betreuung.de</b> an. Beim ersten Login müssen Sie dieses Startpasswort sofort durch Ihr persönliches Passwort ersetzen.</p></section>`).join("");
+    const druckfenster = window.open("", "_blank", "noopener,noreferrer");
+    if (!druckfenster) { toast.error("Druckfenster konnte nicht geöffnet werden."); return; }
+    druckfenster.document.write(`<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Zugangskarten</title><style>@page{size:A4;margin:12mm}body{font-family:Arial,sans-serif;color:#173a1a}.karte{border:2px solid #4a8c3f;border-radius:12px;padding:16mm;margin:0 0 10mm;break-inside:avoid}.logo{font-size:18px;font-weight:800;color:#4a8c3f}h1{font-size:21px;margin:8px 0 16px}p{font-size:14px;line-height:1.5}code{font-size:16px;background:#eff6eb;padding:6px 8px;border-radius:5px;letter-spacing:.4px}.hinweis{font-size:12px;color:#374151}@media print{.karte{page-break-inside:avoid}}</style></head><body>${kartenHtml}</body></html>`);
+    druckfenster.document.close(); druckfenster.focus(); window.setTimeout(() => druckfenster.print(), 250);
+  };
   const deleteMa = trpc.admin.mitarbeiterDelete.useMutation({
     onSuccess: () => { refetchMa(); toast.success("🗑️ Mitarbeiter gelöscht"); setDeleteDialogMa(null); setDeleteBestaetigung(""); },
     onError: (e) => toast.error("❌ " + e.message),
@@ -207,7 +220,7 @@ export default function AdminPanel() {
     if (editMa) {
       updateMa.mutate({ id: editMa.id, vorname: maVorname, nachname: maNachname, email: maEmail, rolle: maRolle, telefon: maTelefon, beschaeftigungsart: maBeschaeftigung, urlaubstageJahr: maUrlaubstage, wochenstunden: maWochenstunden, monatslohn: maMonatslohn, stundenlohn: maStundenlohn, ...(maPasswort ? { neuesPasswort: maPasswort } : {}) });
     } else {
-      if (!maPasswort) { toast.error("Passwort eingeben!"); return; }
+      if (maPasswort.length < 10) { toast.error("Das Startpasswort muss mindestens 10 Zeichen haben."); return; }
       createMa.mutate({ vorname: maVorname, nachname: maNachname, email: maEmail, passwort: maPasswort, rolle: maRolle, telefon: maTelefon, beschaeftigungsart: maBeschaeftigung, urlaubstageJahr: maUrlaubstage, wochenstunden: maWochenstunden, monatslohn: maMonatslohn, stundenlohn: maStundenlohn });
     }
   };
@@ -415,6 +428,7 @@ export default function AdminPanel() {
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               <button onClick={exportExcel} title="Als Excel-Datei herunterladen" style={{ padding: "8px 12px", background: "#1d6f42", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>📥 Excel</button>
               <button onClick={exportCSV} title="Als CSV-Datei herunterladen (DATEV-kompatibel)" style={{ padding: "8px 12px", background: "#1e40af", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>📥 CSV</button>
+              <button onClick={() => { if (window.confirm("Für alle aktiven Mitarbeiter außer Admins werden neue Startpasswörter erstellt. Die bisherigen Passwörter verlieren danach ihre Gültigkeit. Fortfahren?")) startpasswoerterErstellen.mutate(); }} disabled={startpasswoerterErstellen.isPending} title="Neue Startpasswörter erzeugen und Zugangskarten drucken" style={{ padding: "8px 12px", background: "#7c3aed", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: startpasswoerterErstellen.isPending ? .7 : 1 }}>{startpasswoerterErstellen.isPending ? "Erstelle …" : "🔐 Zugangskarten"}</button>
               <button onClick={() => { resetMaForm(); setMaSheet(true); }} style={{ padding: "8px 14px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>+ Neu anlegen</button>
             </div>
           </div>
@@ -498,7 +512,7 @@ export default function AdminPanel() {
                   <button onClick={() => { updateMa.mutate({ id: ma.id, aktiv: ma.aktiv ? 0 : 1 }); }} style={{ padding: "4px 10px", background: ma.aktiv ? "#fee2e2" : "#e8f5e4", color: ma.aktiv ? "#991b1b" : "#4a8c3f", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                     {ma.aktiv ? "Deaktivieren" : "Aktivieren"}
                   </button>
-                  <button onClick={() => { setPwResetMa({ id: ma.id, vorname: ma.vorname, nachname: ma.nachname }); setPwResetNeu(""); }} style={{ padding: "4px 10px", background: "#1e3a5f", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                  <button onClick={() => { setPwResetMa({ id: ma.id, vorname: ma.vorname, nachname: ma.nachname, email: ma.email }); setPwResetNeu(""); }} style={{ padding: "4px 10px", background: "#1e3a5f", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                     🔑 Passwort
                   </button>
                   <button onClick={() => { setDeleteDialogMa({ id: ma.id, vorname: ma.vorname, nachname: ma.nachname }); setDeleteBestaetigung(""); }} style={{ padding: "4px 10px", background: "#7f1d1d", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
@@ -770,8 +784,8 @@ export default function AdminPanel() {
           <input type="email" value={maEmail} onChange={(e) => setMaEmail(e.target.value)} style={inputStyle} placeholder="max@lebenswert.de" />
         </div>
         <div style={{ marginBottom: 12 }}>
-          <label style={labelStyle}>{editMa ? "Neues Passwort (leer = unverändert)" : "Passwort *"}</label>
-          <input type="password" value={maPasswort} onChange={(e) => setMaPasswort(e.target.value)} style={inputStyle} placeholder="••••••••" />
+          <label style={labelStyle}>{editMa ? "Neues Passwort (mind. 10 Zeichen, leer = unverändert)" : "Startpasswort * (mind. 10 Zeichen)"}</label>
+          <input type="password" value={maPasswort} onChange={(e) => setMaPasswort(e.target.value)} style={inputStyle} placeholder="••••••••••" />
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
           <div>
@@ -875,7 +889,7 @@ export default function AdminPanel() {
             <div style={{ position: "relative", marginBottom: 16 }}>
               <input
                 type={pwResetSichtbar ? "text" : "password"}
-                placeholder="Neues Passwort (min. 6 Zeichen)"
+                placeholder="Neues Passwort (mind. 10 Zeichen)"
                 value={pwResetNeu}
                 onChange={(e) => { setPwResetNeu(e.target.value); setPwResetKopiert(false); }}
                 style={{ width: "100%", padding: "10px 40px 10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const }}
@@ -884,7 +898,7 @@ export default function AdminPanel() {
                 {pwResetSichtbar ? "🙈" : "👁️"}
               </button>
             </div>
-            {pwResetNeu.length >= 6 && (
+            {pwResetNeu.length >= 10 && (
               <button onClick={() => { navigator.clipboard.writeText(pwResetNeu); setPwResetKopiert(true); toast.success("📋 Passwort kopiert!"); }} style={{ width: "100%", padding: "8px 0", background: pwResetKopiert ? "#e8f5e4" : "#eff6ff", color: pwResetKopiert ? "#4a8c3f" : "#1d4ed8", border: `1px solid ${pwResetKopiert ? "#4a8c3f" : "#93c5fd"}`, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 12 }}>
                 {pwResetKopiert ? "✅ Kopiert!" : "📋 Passwort kopieren"}
               </button>
@@ -895,11 +909,34 @@ export default function AdminPanel() {
               </button>
               <button
                 onClick={() => passwortReset.mutate({ id: pwResetMa.id, neuesPasswort: pwResetNeu })}
-                disabled={pwResetNeu.length < 6 || passwortReset.isPending}
-                style={{ flex: 1, padding: "10px 0", background: pwResetNeu.length >= 6 ? "#1e3a5f" : "#d1d5db", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: pwResetNeu.length >= 6 ? "pointer" : "not-allowed" }}
+                disabled={pwResetNeu.length < 10 || passwortReset.isPending}
+                style={{ flex: 1, padding: "10px 0", background: pwResetNeu.length >= 10 ? "#1e3a5f" : "#d1d5db", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: pwResetNeu.length >= 10 ? "pointer" : "not-allowed" }}
               >
                 {passwortReset.isPending ? "Speichern…" : "🔑 Passwort setzen"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Zugangskarten: Klartext-Passwörter sind nur in diesem Dialog verfügbar ── */}
+      {zugangskartenDialog && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 10001, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: 24, maxWidth: 560, width: "100%", boxShadow: "0 8px 40px rgba(0,0,0,.25)" }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: "#173a1a", marginBottom: 8 }}>🔐 Zugangskarten ausgeben</div>
+            <p style={{ color: "#4b5563", fontSize: 13, lineHeight: 1.5, margin: "0 0 14px" }}>Die Startpasswörter werden aus Sicherheitsgründen nicht dauerhaft gespeichert. Bitte drucke die Karten jetzt aus und übergib sie persönlich.</p>
+            <div style={{ maxHeight: 260, overflowY: "auto", border: "1px solid #e5e7eb", borderRadius: 10, marginBottom: 16 }}>
+              {zugangskarten.map((karte, index) => (
+                <div key={`${karte.email}-${index}`} style={{ padding: "11px 12px", borderBottom: index < zugangskarten.length - 1 ? "1px solid #f3f4f6" : "none" }}>
+                  <div style={{ fontWeight: 800, fontSize: 14 }}>{karte.vorname} {karte.nachname}</div>
+                  <div style={{ color: "#6b7280", fontSize: 12 }}>{karte.email}</div>
+                  <code style={{ display: "inline-block", marginTop: 6, background: "#eff6eb", color: "#173a1a", padding: "4px 7px", borderRadius: 5, fontSize: 13, fontWeight: 700 }}>{karte.startpasswort}</code>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => druckeZugangskarten()} style={{ flex: 1, padding: "11px 0", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 800, cursor: "pointer" }}>🖨️ Zugangskarten drucken</button>
+              <button onClick={() => { setZugangskartenDialog(false); setZugangskarten([]); }} style={{ padding: "11px 16px", background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>Schließen</button>
             </div>
           </div>
         </div>

@@ -14,6 +14,7 @@ function entferneGesundheitsdaten<T extends Record<string, any>>(einsatz: T): T 
   const { bericht, gesundheit, bemerkung, unterschriftMitarbeiter, unterschriftKunde, ...rest } = einsatz as any;
   return rest as T;
 }
+
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
@@ -22,6 +23,7 @@ import { sql, eq, desc, and, isNotNull, lte, isNull } from "drizzle-orm";
 import { getDb } from "./db";
 import { ermittleErsteHilfeStatus } from "./complianceUtils";
 import { bereiteEinsatzUebernahmeVor } from "./mitarbeiterAblauf";
+import { generiereEinmaligesStartpasswort } from "./accessCredentials";
 import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, einsatzAenderungen, kunden as kundenTable, notifications as notificationsTable, ersteHilfeKurse, mitarbeiterBerechtigungen as mbTable, besuchsberichte, fahrten } from "../drizzle/schema";
 import {
   getMitarbeiterByEmail,
@@ -1144,7 +1146,7 @@ export const appRouter = router({
           maxAge: 30 * 24 * 60 * 60 * 1000,
         });
         await createAuditLog({ mitarbeiterId: ma.id, action: ma.zweiFaktorAktiv ? "LOGIN_2FA" : "LOGIN", ressource: "portal", status: "success" });
-        return { requiresTwoFactor: false as const, id: ma.id, vorname: ma.vorname, nachname: ma.nachname, email: ma.email, rolle: ma.rolle, token };
+        return { requiresTwoFactor: false as const, id: ma.id, vorname: ma.vorname, nachname: ma.nachname, email: ma.email, rolle: ma.rolle, passwortWechselErforderlich: Boolean((ma as any).passwortWechselErforderlich), token };
       }),
 
     logout: publicProcedure.mutation(async ({ ctx }) => {
@@ -1161,7 +1163,7 @@ export const appRouter = router({
       if (!ctx.mitarbeiterId) return null;
       const ma = await getMitarbeiterById(ctx.mitarbeiterId);
       if (!ma) return null;
-      return { id: ma.id, vorname: ma.vorname, nachname: ma.nachname, email: ma.email, rolle: ma.rolle, zweiFaktorAktiv: ma.zweiFaktorAktiv, dienstwagen: !!(ma as any).dienstwagen };
+      return { id: ma.id, vorname: ma.vorname, nachname: ma.nachname, email: ma.email, rolle: ma.rolle, zweiFaktorAktiv: ma.zweiFaktorAktiv, dienstwagen: !!(ma as any).dienstwagen, passwortWechselErforderlich: Boolean((ma as any).passwortWechselErforderlich) };
     }),
 
     requestPasswordReset: publicProcedure
@@ -1192,13 +1194,13 @@ export const appRouter = router({
     resetPassword: publicProcedure
       .input(z.object({
         token: z.string().min(1),
-        neuesPasswort: z.string().min(6, "Passwort muss mindestens 6 Zeichen haben"),
+        neuesPasswort: z.string().min(10, "Passwort muss mindestens 10 Zeichen haben"),
       }))
       .mutation(async ({ input }) => {
         const reset = await getValidPasswordResetToken(input.token);
         if (!reset) throw new Error("Ungültiger oder abgelaufener Reset-Link.");
         const hash = await bcrypt.hash(input.neuesPasswort, 10);
-        await updateMitarbeiterPasswort(reset.mitarbeiterId, hash);
+        await updateMitarbeiter(reset.mitarbeiterId, { passwortHash: hash, passwortWechselErforderlich: false } as any);
         await markPasswordResetTokenUsed(input.token);
         await createAuditLog({ mitarbeiterId: reset.mitarbeiterId, action: "PASSWORD_RESET_DONE", ressource: "portal", status: "success" });
         return { success: true };
@@ -1236,7 +1238,7 @@ export const appRouter = router({
     changePassword: portalProtected
       .input(z.object({
         altesPasswort: z.string().min(1),
-        neuesPasswort: z.string().min(6, "Neues Passwort muss mindestens 6 Zeichen haben"),
+        neuesPasswort: z.string().min(10, "Neues Passwort muss mindestens 10 Zeichen haben"),
       }))
       .mutation(async ({ ctx, input }) => {
         const ma = await getMitarbeiterById(ctx.mitarbeiterId);
@@ -1244,7 +1246,7 @@ export const appRouter = router({
         const valid = await bcrypt.compare(input.altesPasswort, ma.passwortHash);
         if (!valid) throw new Error("Das aktuelle Passwort ist falsch.");
         const hash = await bcrypt.hash(input.neuesPasswort, 10);
-        await updateMitarbeiterPasswort(ctx.mitarbeiterId, hash);
+        await updateMitarbeiter(ctx.mitarbeiterId, { passwortHash: hash, passwortWechselErforderlich: false } as any);
         await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "PASSWORD_CHANGE", ressource: "portal", status: "success" });
         return { success: true };
       }),
@@ -2472,6 +2474,8 @@ export const appRouter = router({
         await createMitarbeiter({
           ...restInput,
           passwortHash: hash,
+          passwortWechselErforderlich: true,
+          startPasswortErstelltAt: new Date(),
           aktiv: 1,
           // Urlaubskonto automatisch initialisieren
           urlaubstageJahr: restInput.urlaubstageJahr ?? 24,
@@ -2563,7 +2567,11 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         const { id, neuesPasswort, ...data } = input;
         const updateData: Record<string, unknown> = { ...data };
-        if (neuesPasswort) updateData.passwortHash = await bcrypt.hash(neuesPasswort, 10);
+        if (neuesPasswort) {
+          updateData.passwortHash = await bcrypt.hash(neuesPasswort, 10);
+          updateData.passwortWechselErforderlich = true;
+          updateData.startPasswortErstelltAt = new Date();
+        }
         await updateMitarbeiter(id, updateData as any);
         await createAuditLog({ mitarbeiterId: ctx.adminId, action: "ADMIN", ressource: "mitarbeiter", details: `update id=${id}`, status: "success" });
         return { success: true };
@@ -2612,10 +2620,25 @@ export const appRouter = router({
         const ma = await getMitarbeiterById(input.id);
         if (!ma) throw new TRPCError({ code: 'NOT_FOUND', message: 'Mitarbeiter nicht gefunden.' });
         const hash = await bcrypt.hash(input.neuesPasswort, 10);
-        await updateMitarbeiter(input.id, { passwortHash: hash } as any);
+        await updateMitarbeiter(input.id, { passwortHash: hash, passwortWechselErforderlich: true, startPasswortErstelltAt: new Date() } as any);
         await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'ADMIN', ressource: 'mitarbeiter', details: `passwort-reset id=${input.id}`, status: 'success' });
         return { success: true };
       }),
+
+    /** Startpasswörter für aktive Nicht-Admin-Mitarbeiter – Klartext nur einmal in der Antwort. */
+    zugangskartenStartpasswoerter: adminProcedure.mutation(async ({ ctx }) => {
+      const alle = await getAllMitarbeiter();
+      const zielgruppe = alle.filter((ma: any) => Boolean(ma.aktiv) && ma.rolle !== "admin");
+      const karten: Array<{ id: number; vorname: string; nachname: string; email: string; rolle: string; startpasswort: string }> = [];
+      for (const ma of zielgruppe as any[]) {
+        const startpasswort = generiereEinmaligesStartpasswort();
+        const passwortHash = await bcrypt.hash(startpasswort, 10);
+        await updateMitarbeiter(ma.id, { passwortHash, passwortWechselErforderlich: true, startPasswortErstelltAt: new Date() } as any);
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "ADMIN", ressource: "mitarbeiter", details: `startpasswort-erstellt id=${ma.id}`, status: "success" });
+        karten.push({ id: ma.id, vorname: ma.vorname, nachname: ma.nachname, email: ma.email, rolle: ma.rolle, startpasswort });
+      }
+      return { karten, anzahl: karten.length };
+    }),
     /** Mitarbeiterliste als strukturierte Daten für Export */
     mitarbeiterExport: adminProcedure.query(async () => {
       const allMa = await getAllMitarbeiter();

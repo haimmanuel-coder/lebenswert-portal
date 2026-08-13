@@ -47,6 +47,7 @@ import { useSSENotifications } from "@/hooks/useSSENotifications";
 import { useSessionTimeout } from "@/hooks/useSessionTimeout";
 import DsgvoErstDialog from "@/components/DsgvoErstDialog";
 import { DsgvoPflichtModal } from "@/components/DsgvoPflichtModal";
+import { PasswortwechselPflichtModal } from "@/components/PasswortwechselPflichtModal";
 import Einsatzplanung from "./Einsatzplanung";
 import ImportAssistent from "./ImportAssistent";
 import BudgetVerwaltung from "./BudgetVerwaltung";
@@ -614,6 +615,7 @@ export default function PortalApp() {
       </div>
 
       <OnboardingTour forceShow={showTour} onClose={closeTour} />
+      <PasswortwechselPflichtModal />
       {showDsgvoDialog && <DsgvoErstDialog onClose={() => setDsgvoDialogGeschlossen(true)} />}
       {showPflichtModal && (
         <DsgvoPflichtModal

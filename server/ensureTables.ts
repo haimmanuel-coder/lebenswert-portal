@@ -30,6 +30,8 @@ const TABLE_DEFINITIONS: string[] = [
     \`nachname\` varchar(100) NOT NULL,
     \`email\` varchar(255) NOT NULL,
     \`passwortHash\` varchar(255),
+    \`passwortWechselErforderlich\` tinyint(1) NOT NULL DEFAULT 0,
+    \`startPasswortErstelltAt\` timestamp NULL,
     \`rolle\` enum('mitarbeiter','teamleitung','buchhaltung','admin') NOT NULL DEFAULT 'mitarbeiter',
     \`aktiv\` tinyint(1) NOT NULL DEFAULT 1,
     \`telefon\` varchar(50),

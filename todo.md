@@ -25,6 +25,11 @@
 - [x] Integrationstest für die automatische Erstellung beziehungsweise Aktualisierung von Besuchsbericht, Einsatzfahrt und Leistungsmonat ergänzen
 - [x] Admin- und Teamleitungsworkflow für offene Besuchsbericht-Korrekturen mit Bearbeitung und Rückmeldung sichtbar machen
 
+## Aktuelle Umsetzung – Sichere Mitarbeiterzugänge
+- [x] Einmalige Startpasswörter für alle bestehenden Mitarbeiter sicher generieren und nur für die einmalige Ausgabe bereitstellen
+- [x] Passwortwechsel beim ersten Login verpflichtend machen, ohne die bestehende Admin-Passwortrücksetzung zu entfernen
+- [x] Druckbare Zugangskarten mit Name, E-Mail, Startpasswort und Anmeldehinweisen für die erstmalige Ausgabe erstellen
+
 ## Datenbank & Backend
 - [x] Datenbankschema: mitarbeiter, kunden, einsaetze, leistungen, fahrten
 - [x] Drizzle-Migration generieren und ausführen
