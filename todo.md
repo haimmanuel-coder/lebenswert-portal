@@ -36,6 +36,7 @@
 - [x] Einzelkarte nach Neu-Erstellung automatisch drucken und die Aktion eindeutig benennen
 - [x] Inaktive Mitarbeiter von der druckbaren Zugangskarten-Auswahl ausschließen und Status verständlich kennzeichnen
 - [x] Auswahlregeln für Einzel- und Sammeldruck automatisiert gegen inaktive Mitarbeiter absichern
+- [x] Druckvorschau für Zugangskarten mit popup-freier Fallback-Ansicht zuverlässig öffnen
 
 ## Datenbank & Backend
 - [x] Datenbankschema: mitarbeiter, kunden, einsaetze, leistungen, fahrten

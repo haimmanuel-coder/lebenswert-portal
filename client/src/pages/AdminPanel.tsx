@@ -187,7 +187,10 @@ export default function AdminPanel() {
   const [zugangskarten, setZugangskarten] = useState<Zugangskarte[]>([]);
   const [zugangskartenDialog, setZugangskartenDialog] = useState(false);
   const [autoDruckKarten, setAutoDruckKarten] = useState<Zugangskarte[] | null>(null);
-  const direktDruckFenster = useRef<Window | null>(null);
+  const [druckVorschauHtml, setDruckVorschauHtml] = useState("");
+  const [druckVorschauOffen, setDruckVorschauOffen] = useState(false);
+  const direktDruckAngefordert = useRef(false);
+  const druckVorschauFrame = useRef<HTMLIFrameElement | null>(null);
   const generierePasswort = () => {
     const bytes = new Uint8Array(12); window.crypto.getRandomValues(bytes);
     const pw = `Lb!${Array.from(bytes, value => value.toString(16).padStart(2, "0")).join("")}`;
@@ -198,32 +201,26 @@ export default function AdminPanel() {
     onError: (e) => toast.error("❌ " + e.message),
   });
   const startpasswoerterErstellen = (trpc as any).admin.zugangskartenStartpasswoerter.useMutation({
-    onSuccess: (data: any) => { const karten = data.karten ?? []; setZugangskarten(karten); refetchMa(); if (direktDruckFenster.current) { setAutoDruckKarten(karten); } else { setZugangskartenDialog(true); } toast.success(`${data.anzahl ?? 0} Zugangskarten wurden erstellt.`); },
-    onError: (e: any) => toast.error("❌ Zugangskarten konnten nicht erstellt werden: " + e.message),
+    onSuccess: (data: any) => { const karten = data.karten ?? []; setZugangskarten(karten); refetchMa(); if (direktDruckAngefordert.current) { direktDruckAngefordert.current = false; setAutoDruckKarten(karten); } else { setZugangskartenDialog(true); } toast.success(`${data.anzahl ?? 0} Zugangskarten wurden erstellt.`); },
+    onError: (e: any) => { direktDruckAngefordert.current = false; toast.error("❌ Zugangskarten konnten nicht erstellt werden: " + e.message); },
   });
-  const druckeZugangskarten = (kartenZumDruck = zugangskarten, zielFenster?: Window) => {
+  const druckeZugangskarten = (kartenZumDruck = zugangskarten) => {
     if (kartenZumDruck.length === 0) { toast.error("Es liegen keine druckbereiten Zugangskarten vor."); return; }
     const esc = (wert: string) => wert.replace(/[&<>'"]/g, zeichen => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[zeichen] ?? zeichen));
     const einzelneKarte = (karte: Zugangskarte) => `<article class="karte"><div class="schnitt">✂ Entlang der gestrichelten Linie ausschneiden</div><div class="logo">Lebenswert Betreuung</div><h1>Ihre Zugangsdaten</h1><p><b>Name</b><br>${esc(`${karte.vorname} ${karte.nachname}`)}</p><p><b>E-Mail</b><br>${esc(karte.email)}</p><p><b>Einmaliges Startpasswort</b><br><code>${esc(karte.startpasswort)}</code></p><div class="hinweis"><b>1.</b> portal.lebenswert-betreuung.de öffnen<br><b>2.</b> Mit E-Mail und Startpasswort anmelden<br><b>3.</b> Persönliches Passwort festlegen</div></article>`;
     const seiten = Array.from({ length: Math.ceil(kartenZumDruck.length / 4) }, (_, index) => `<section class="druckseite">${kartenZumDruck.slice(index * 4, index * 4 + 4).map(einzelneKarte).join("")}</section>`).join("");
-    const druckfenster = zielFenster ?? window.open("", "_blank", "noopener,noreferrer");
-    if (!druckfenster) { toast.error("Druckfenster konnte nicht geöffnet werden."); return; }
-    druckfenster.document.write(`<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Zugangskarten zum Ausschneiden</title><style>@page{size:A4;margin:10mm}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:#173a1a}.druckseite{height:277mm;display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(2,1fr)}.druckseite:not(:last-child){break-after:page}.karte{border:1.5px dashed #64748b;padding:8mm;min-width:0;overflow:hidden}.schnitt{font-size:8px;color:#64748b;text-align:right;margin-bottom:4mm}.logo{font-size:15px;font-weight:800;color:#4a8c3f;letter-spacing:.2px}h1{font-size:18px;margin:4mm 0 6mm;color:#173a1a}p{font-size:12px;line-height:1.4;margin:0 0 4mm}code{display:inline-block;margin-top:1mm;font-size:13px;background:#eff6eb;padding:4px 6px;border-radius:4px;letter-spacing:.25px;word-break:break-all}.hinweis{border-top:1px solid #d1d5db;padding-top:4mm;font-size:10px;line-height:1.55;color:#374151}@media print{.druckseite{break-inside:avoid}.karte{break-inside:avoid}}</style></head><body>${seiten}</body></html>`);
-    druckfenster.document.close(); druckfenster.focus(); window.setTimeout(() => druckfenster.print(), 250);
+    setDruckVorschauHtml(`<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Zugangskarten zum Ausschneiden</title><style>@page{size:A4;margin:10mm}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:#173a1a}.druckseite{height:277mm;display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(2,1fr)}.druckseite:not(:last-child){break-after:page}.karte{border:1.5px dashed #64748b;padding:8mm;min-width:0;overflow:hidden}.schnitt{font-size:8px;color:#64748b;text-align:right;margin-bottom:4mm}.logo{font-size:15px;font-weight:800;color:#4a8c3f;letter-spacing:.2px}h1{font-size:18px;margin:4mm 0 6mm;color:#173a1a}p{font-size:12px;line-height:1.4;margin:0 0 4mm}code{display:inline-block;margin-top:1mm;font-size:13px;background:#eff6eb;padding:4px 6px;border-radius:4px;letter-spacing:.25px;word-break:break-all}.hinweis{border-top:1px solid #d1d5db;padding-top:4mm;font-size:10px;line-height:1.55;color:#374151}@media print{.druckseite{break-inside:avoid}.karte{break-inside:avoid}}</style></head><body>${seiten}</body></html>`);
+    setDruckVorschauOffen(true);
   };
   const starteDirektdruck = (mitarbeiterIds: number[], bezeichnung: string) => {
     if (!window.confirm(`Für ${bezeichnung} werden neue Startpasswörter erstellt und sofort als ausschneidbare Karten gedruckt. Die bisherigen Passwörter verlieren ihre Gültigkeit. Fortfahren?`)) return;
-    const fenster = window.open("", "_blank", "noopener,noreferrer");
-    if (!fenster) { toast.error("Druckfenster konnte nicht geöffnet werden."); return; }
-    direktDruckFenster.current = fenster;
+    direktDruckAngefordert.current = true;
     startpasswoerterErstellen.mutate({ mitarbeiterIds });
   };
   useEffect(() => {
-    if (!autoDruckKarten || !direktDruckFenster.current) return;
-    const fenster = direktDruckFenster.current;
-    direktDruckFenster.current = null;
+    if (!autoDruckKarten) return;
     setAutoDruckKarten(null);
-    druckeZugangskarten(autoDruckKarten, fenster);
+    druckeZugangskarten(autoDruckKarten);
   }, [autoDruckKarten]);
   const deleteMa = trpc.admin.mitarbeiterDelete.useMutation({
     onSuccess: () => { refetchMa(); toast.success("🗑️ Mitarbeiter gelöscht"); setDeleteDialogMa(null); setDeleteBestaetigung(""); },
@@ -989,6 +986,20 @@ export default function AdminPanel() {
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={() => druckeZugangskarten()} style={{ flex: 1, padding: "11px 0", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 800, cursor: "pointer" }}>🖨️ Zugangskarten drucken</button>
               <button onClick={() => { setZugangskartenDialog(false); setZugangskarten([]); }} style={{ padding: "11px 16px", background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>Schließen</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {druckVorschauOffen && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.72)", zIndex: 10002, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: 18, width: "min(1040px, 100%)", height: "min(860px, 94vh)", display: "flex", flexDirection: "column", boxShadow: "0 12px 48px rgba(0,0,0,.35)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 12 }}>
+              <div><div style={{ fontSize: 19, fontWeight: 800, color: "#173a1a" }}>🖨️ Druckvorschau: Zugangskarten</div><div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>Vier Karten pro A4-Seite. Kontrolliere die Angaben und drucke anschließend direkt aus dieser Vorschau.</div></div>
+              <button onClick={() => { setDruckVorschauOffen(false); setDruckVorschauHtml(""); }} style={{ padding: "7px 10px", background: "#f1f5f9", color: "#334155", border: "none", borderRadius: 7, fontWeight: 700, cursor: "pointer" }}>Schließen</button>
+            </div>
+            <iframe ref={druckVorschauFrame} title="Druckvorschau Zugangskarten" srcDoc={druckVorschauHtml} style={{ width: "100%", flex: 1, minHeight: 0, border: "1px solid #cbd5e1", borderRadius: 8, background: "#f8fafc" }} />
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 12 }}>
+              <button onClick={() => { const frame = druckVorschauFrame.current?.contentWindow; if (!frame) { toast.error("Druckvorschau ist noch nicht bereit."); return; } frame.focus(); frame.print(); }} style={{ padding: "10px 16px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 800, cursor: "pointer" }}>🖨️ Jetzt drucken</button>
             </div>
           </div>
         </div>
