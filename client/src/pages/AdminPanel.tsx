@@ -13,7 +13,7 @@ import OnboardingTab from "./OnboardingTab";
 import CsvImportTab from "./CsvImportTab";
 import KundenCsvImportTab from "./KundenCsvImportTab";
 import EinstellungenTab from "./EinstellungenTab";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -67,6 +67,12 @@ export default function AdminPanel() {
   const [zeigeZugangskartenTabelle, setZeigeZugangskartenTabelle] = useState(true);
 
   const { data: maList = [], refetch: refetchMa } = trpc.admin.mitarbeiterList.useQuery();
+  const sichtbareZugangskartenMitarbeiter = maList
+    .filter(ma => ma.rolle !== "admin")
+    .filter(ma => maZeigeInaktiv || ma.aktiv)
+    .filter(ma => maBeschFilter === "alle" || (ma as any).beschaeftigungsart === maBeschFilter)
+    .filter(ma => !maSearch.trim() || `${ma.vorname} ${ma.nachname} ${ma.email}`.toLowerCase().includes(maSearch.toLowerCase()));
+  const druckbareZugangskartenMitarbeiter = sichtbareZugangskartenMitarbeiter.filter(ma => Boolean(ma.aktiv));
   const createMa = trpc.admin.mitarbeiterCreate.useMutation({
     onSuccess: (_data, variables) => { setZugangskarten([{ vorname: variables.vorname, nachname: variables.nachname, email: variables.email, rolle: variables.rolle, startpasswort: variables.passwort }]); setZugangskartenDialog(true); refetchMa(); toast.success("✅ Mitarbeiter angelegt – Zugangskarte jetzt ausgeben."); resetMaForm(); setMaSheet(false); },
     onError: (e) => toast.error("❌ " + e.message),
@@ -180,6 +186,8 @@ export default function AdminPanel() {
   const [pwResetKopiert, setPwResetKopiert] = useState(false);
   const [zugangskarten, setZugangskarten] = useState<Zugangskarte[]>([]);
   const [zugangskartenDialog, setZugangskartenDialog] = useState(false);
+  const [autoDruckKarten, setAutoDruckKarten] = useState<Zugangskarte[] | null>(null);
+  const direktDruckFenster = useRef<Window | null>(null);
   const generierePasswort = () => {
     const bytes = new Uint8Array(12); window.crypto.getRandomValues(bytes);
     const pw = `Lb!${Array.from(bytes, value => value.toString(16).padStart(2, "0")).join("")}`;
@@ -190,17 +198,33 @@ export default function AdminPanel() {
     onError: (e) => toast.error("❌ " + e.message),
   });
   const startpasswoerterErstellen = (trpc as any).admin.zugangskartenStartpasswoerter.useMutation({
-    onSuccess: (data: any) => { setZugangskarten(data.karten ?? []); setZugangskartenDialog(true); refetchMa(); toast.success(`${data.anzahl ?? 0} Zugangskarten wurden erstellt.`); },
+    onSuccess: (data: any) => { const karten = data.karten ?? []; setZugangskarten(karten); refetchMa(); if (direktDruckFenster.current) { setAutoDruckKarten(karten); } else { setZugangskartenDialog(true); } toast.success(`${data.anzahl ?? 0} Zugangskarten wurden erstellt.`); },
     onError: (e: any) => toast.error("❌ Zugangskarten konnten nicht erstellt werden: " + e.message),
   });
-  const druckeZugangskarten = () => {
+  const druckeZugangskarten = (kartenZumDruck = zugangskarten, zielFenster?: Window) => {
+    if (kartenZumDruck.length === 0) { toast.error("Es liegen keine druckbereiten Zugangskarten vor."); return; }
     const esc = (wert: string) => wert.replace(/[&<>'"]/g, zeichen => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[zeichen] ?? zeichen));
-    const kartenHtml = zugangskarten.map((karte) => `<section class="karte"><div class="logo">Lebenswert Betreuung</div><h1>Ihre Zugangsdaten</h1><p><b>Name:</b> ${esc(`${karte.vorname} ${karte.nachname}`)}</p><p><b>E-Mail:</b> ${esc(karte.email)}</p><p><b>Startpasswort:</b> <code>${esc(karte.startpasswort)}</code></p><hr><p class="hinweis">Bitte melden Sie sich unter <b>portal.lebenswert-betreuung.de</b> an. Beim ersten Login müssen Sie dieses Startpasswort sofort durch Ihr persönliches Passwort ersetzen.</p></section>`).join("");
-    const druckfenster = window.open("", "_blank", "noopener,noreferrer");
+    const einzelneKarte = (karte: Zugangskarte) => `<article class="karte"><div class="schnitt">✂ Entlang der gestrichelten Linie ausschneiden</div><div class="logo">Lebenswert Betreuung</div><h1>Ihre Zugangsdaten</h1><p><b>Name</b><br>${esc(`${karte.vorname} ${karte.nachname}`)}</p><p><b>E-Mail</b><br>${esc(karte.email)}</p><p><b>Einmaliges Startpasswort</b><br><code>${esc(karte.startpasswort)}</code></p><div class="hinweis"><b>1.</b> portal.lebenswert-betreuung.de öffnen<br><b>2.</b> Mit E-Mail und Startpasswort anmelden<br><b>3.</b> Persönliches Passwort festlegen</div></article>`;
+    const seiten = Array.from({ length: Math.ceil(kartenZumDruck.length / 4) }, (_, index) => `<section class="druckseite">${kartenZumDruck.slice(index * 4, index * 4 + 4).map(einzelneKarte).join("")}</section>`).join("");
+    const druckfenster = zielFenster ?? window.open("", "_blank", "noopener,noreferrer");
     if (!druckfenster) { toast.error("Druckfenster konnte nicht geöffnet werden."); return; }
-    druckfenster.document.write(`<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Zugangskarten</title><style>@page{size:A4;margin:12mm}body{font-family:Arial,sans-serif;color:#173a1a}.karte{border:2px solid #4a8c3f;border-radius:12px;padding:16mm;margin:0 0 10mm;break-inside:avoid}.logo{font-size:18px;font-weight:800;color:#4a8c3f}h1{font-size:21px;margin:8px 0 16px}p{font-size:14px;line-height:1.5}code{font-size:16px;background:#eff6eb;padding:6px 8px;border-radius:5px;letter-spacing:.4px}.hinweis{font-size:12px;color:#374151}@media print{.karte{page-break-inside:avoid}}</style></head><body>${kartenHtml}</body></html>`);
+    druckfenster.document.write(`<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Zugangskarten zum Ausschneiden</title><style>@page{size:A4;margin:10mm}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:#173a1a}.druckseite{height:277mm;display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(2,1fr)}.druckseite:not(:last-child){break-after:page}.karte{border:1.5px dashed #64748b;padding:8mm;min-width:0;overflow:hidden}.schnitt{font-size:8px;color:#64748b;text-align:right;margin-bottom:4mm}.logo{font-size:15px;font-weight:800;color:#4a8c3f;letter-spacing:.2px}h1{font-size:18px;margin:4mm 0 6mm;color:#173a1a}p{font-size:12px;line-height:1.4;margin:0 0 4mm}code{display:inline-block;margin-top:1mm;font-size:13px;background:#eff6eb;padding:4px 6px;border-radius:4px;letter-spacing:.25px;word-break:break-all}.hinweis{border-top:1px solid #d1d5db;padding-top:4mm;font-size:10px;line-height:1.55;color:#374151}@media print{.druckseite{break-inside:avoid}.karte{break-inside:avoid}}</style></head><body>${seiten}</body></html>`);
     druckfenster.document.close(); druckfenster.focus(); window.setTimeout(() => druckfenster.print(), 250);
   };
+  const starteDirektdruck = (mitarbeiterIds: number[], bezeichnung: string) => {
+    if (!window.confirm(`Für ${bezeichnung} werden neue Startpasswörter erstellt und sofort als ausschneidbare Karten gedruckt. Die bisherigen Passwörter verlieren ihre Gültigkeit. Fortfahren?`)) return;
+    const fenster = window.open("", "_blank", "noopener,noreferrer");
+    if (!fenster) { toast.error("Druckfenster konnte nicht geöffnet werden."); return; }
+    direktDruckFenster.current = fenster;
+    startpasswoerterErstellen.mutate({ mitarbeiterIds });
+  };
+  useEffect(() => {
+    if (!autoDruckKarten || !direktDruckFenster.current) return;
+    const fenster = direktDruckFenster.current;
+    direktDruckFenster.current = null;
+    setAutoDruckKarten(null);
+    druckeZugangskarten(autoDruckKarten, fenster);
+  }, [autoDruckKarten]);
   const deleteMa = trpc.admin.mitarbeiterDelete.useMutation({
     onSuccess: () => { refetchMa(); toast.success("🗑️ Mitarbeiter gelöscht"); setDeleteDialogMa(null); setDeleteBestaetigung(""); },
     onError: (e) => toast.error("❌ " + e.message),
@@ -429,7 +453,7 @@ export default function AdminPanel() {
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               <button onClick={exportExcel} title="Als Excel-Datei herunterladen" style={{ padding: "8px 12px", background: "#1d6f42", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>📥 Excel</button>
               <button onClick={exportCSV} title="Als CSV-Datei herunterladen (DATEV-kompatibel)" style={{ padding: "8px 12px", background: "#1e40af", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>📥 CSV</button>
-              <button onClick={() => { if (window.confirm("Für alle aktiven Mitarbeiter außer Admins werden neue Startpasswörter erstellt. Die bisherigen Passwörter verlieren danach ihre Gültigkeit. Fortfahren?")) startpasswoerterErstellen.mutate(); }} disabled={startpasswoerterErstellen.isPending} title="Neue Startpasswörter erzeugen und Zugangskarten drucken" style={{ padding: "8px 12px", background: "#7c3aed", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: startpasswoerterErstellen.isPending ? .7 : 1 }}>{startpasswoerterErstellen.isPending ? "Erstelle …" : "🔐 Startzugänge erstellen"}</button>
+              <button onClick={() => { if (window.confirm("Für alle aktiven Mitarbeiter außer Admins werden neue Startpasswörter erstellt. Die bisherigen Passwörter verlieren danach ihre Gültigkeit. Fortfahren?")) startpasswoerterErstellen.mutate({}); }} disabled={startpasswoerterErstellen.isPending} title="Neue Startpasswörter erzeugen und Zugangskarten drucken" style={{ padding: "8px 12px", background: "#7c3aed", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: startpasswoerterErstellen.isPending ? .7 : 1 }}>{startpasswoerterErstellen.isPending ? "Erstelle …" : "🔐 Startzugänge erstellen"}</button>
               <button onClick={() => { resetMaForm(); setMaSheet(true); }} style={{ padding: "8px 14px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>+ Neu anlegen</button>
             </div>
           </div>
@@ -439,17 +463,22 @@ export default function AdminPanel() {
                 <div style={{ fontSize: 14, fontWeight: 800, color: "#173a1a" }}>🔐 Zugangskarten-Übersicht</div>
                 <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Passwörter werden aus Sicherheitsgründen nicht angezeigt oder dauerhaft gespeichert.</div>
               </div>
-              <button onClick={() => setZeigeZugangskartenTabelle(v => !v)} style={{ padding: "6px 10px", background: "#fff", color: "#334155", border: "1px solid #cbd5e1", borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{zeigeZugangskartenTabelle ? "Ausblenden" : "Anzeigen"}</button>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                <button onClick={() => { if (druckbareZugangskartenMitarbeiter.length === 0) { toast.error("Keine aktiven Mitarbeiter in der aktuellen Auswahl."); return; } starteDirektdruck(druckbareZugangskartenMitarbeiter.map(ma => ma.id), `${druckbareZugangskartenMitarbeiter.length} aktive sichtbare Mitarbeiter`); }} disabled={startpasswoerterErstellen.isPending} style={{ padding: "6px 10px", background: "#7c3aed", color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 800, cursor: "pointer", opacity: startpasswoerterErstellen.isPending ? .7 : 1 }}>🖨️ Sichtbare Karten direkt drucken</button>
+                {zugangskarten.length > 0 && <button onClick={() => druckeZugangskarten()} title="Aktuell erzeugte Zugangskarten im A4-Ausschneideformat drucken" style={{ padding: "6px 10px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>🖨️ {zugangskarten.length} Karten drucken</button>}
+                <button onClick={() => setZeigeZugangskartenTabelle(v => !v)} style={{ padding: "6px 10px", background: "#fff", color: "#334155", border: "1px solid #cbd5e1", borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{zeigeZugangskartenTabelle ? "Ausblenden" : "Anzeigen"}</button>
+              </div>
             </div>
             {zeigeZugangskartenTabelle && (
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", minWidth: 720, borderCollapse: "collapse", fontSize: 12 }}>
                   <thead><tr style={{ color: "#475569", textAlign: "left", borderBottom: "1px solid #cbd5e1" }}><th style={{ padding: "8px 6px" }}>Mitarbeiter</th><th style={{ padding: "8px 6px" }}>E-Mail</th><th style={{ padding: "8px 6px" }}>Zugangskarten-Status</th><th style={{ padding: "8px 6px" }}>Erstellt am</th><th style={{ padding: "8px 6px", textAlign: "right" }}>Aktion</th></tr></thead>
-                  <tbody>{maList.filter(ma => ma.rolle !== "admin").map(ma => {
+                  <tbody>{sichtbareZugangskartenMitarbeiter.map(ma => {
                     const wechselOffen = Boolean((ma as any).passwortWechselErforderlich);
                     const erstelltAm = (ma as any).startPasswortErstelltAt;
                     const status = wechselOffen ? { label: "Passwortwechsel offen", bg: "#fef3c7", color: "#92400e" } : erstelltAm ? { label: "Startzugang abgeschlossen", bg: "#e8f5e4", color: "#166534" } : { label: "Noch keine Karte erstellt", bg: "#f1f5f9", color: "#475569" };
-                    return <tr key={`zugang-${ma.id}`} style={{ borderBottom: "1px solid #e2e8f0" }}><td style={{ padding: "9px 6px", fontWeight: 700 }}>{ma.vorname} {ma.nachname}</td><td style={{ padding: "9px 6px", color: "#475569" }}>{ma.email}</td><td style={{ padding: "9px 6px" }}><span style={{ display: "inline-block", borderRadius: 20, padding: "3px 8px", background: status.bg, color: status.color, fontWeight: 700, whiteSpace: "nowrap" }}>{status.label}</span></td><td style={{ padding: "9px 6px", color: "#475569" }}>{erstelltAm ? new Date(erstelltAm).toLocaleDateString("de-DE") : "—"}</td><td style={{ padding: "9px 6px", textAlign: "right" }}><button onClick={() => { setPwResetMa({ id: ma.id, vorname: ma.vorname, nachname: ma.nachname, email: ma.email }); setPwResetNeu(""); setPwResetSichtbar(false); }} style={{ padding: "6px 9px", background: "#1e3a5f", color: "#fff", border: "none", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Neue Karte</button></td></tr>;
+                    const istAktiv = Boolean(ma.aktiv);
+                    return <tr key={`zugang-${ma.id}`} style={{ borderBottom: "1px solid #e2e8f0", opacity: istAktiv ? 1 : .65 }}><td style={{ padding: "9px 6px", fontWeight: 700 }}>{ma.vorname} {ma.nachname}</td><td style={{ padding: "9px 6px", color: "#475569" }}>{ma.email}</td><td style={{ padding: "9px 6px" }}><span style={{ display: "inline-block", borderRadius: 20, padding: "3px 8px", background: status.bg, color: status.color, fontWeight: 700, whiteSpace: "nowrap" }}>{status.label}</span></td><td style={{ padding: "9px 6px", color: "#475569" }}>{erstelltAm ? new Date(erstelltAm).toLocaleDateString("de-DE") : "—"}</td><td style={{ padding: "9px 6px", textAlign: "right" }}><button disabled={!istAktiv || startpasswoerterErstellen.isPending} onClick={() => starteDirektdruck([ma.id], `${ma.vorname} ${ma.nachname}`)} style={{ padding: "6px 9px", background: istAktiv ? "#1e3a5f" : "#cbd5e1", color: "#fff", border: "none", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: istAktiv ? "pointer" : "not-allowed" }}>{istAktiv ? "🖨️ Direkt drucken" : "Inaktiv"}</button></td></tr>;
                   })}</tbody>
                 </table>
               </div>

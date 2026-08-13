@@ -30,6 +30,12 @@
 - [x] Passwortwechsel beim ersten Login verpflichtend machen, ohne die bestehende Admin-Passwortrücksetzung zu entfernen
 - [x] Druckbare Zugangskarten mit Name, E-Mail, Startpasswort und Anmeldehinweisen für die erstmalige Ausgabe erstellen
 - [x] Zugangskarten-Tabelle mit Mitarbeitername, E-Mail, Erstellungsdatum und Passwortwechselstatus im Admin-Bereich erstellen
+- [x] Direktdruck für einzelne und alle sichtbaren Zugangskarten im A4-Ausschneideformat aus der Übersicht ergänzen
+- [x] Direktdruck pro Mitarbeiterkarte aus der Zugangskarten-Übersicht ergänzen
+- [x] Sammeldruck für alle aktuell sichtbaren Mitarbeiter der Zugangskarten-Übersicht eindeutig und sicher umsetzen
+- [x] Einzelkarte nach Neu-Erstellung automatisch drucken und die Aktion eindeutig benennen
+- [x] Inaktive Mitarbeiter von der druckbaren Zugangskarten-Auswahl ausschließen und Status verständlich kennzeichnen
+- [x] Auswahlregeln für Einzel- und Sammeldruck automatisiert gegen inaktive Mitarbeiter absichern
 
 ## Datenbank & Backend
 - [x] Datenbankschema: mitarbeiter, kunden, einsaetze, leistungen, fahrten

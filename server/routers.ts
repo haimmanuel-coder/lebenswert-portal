@@ -23,7 +23,7 @@ import { sql, eq, desc, and, isNotNull, lte, isNull } from "drizzle-orm";
 import { getDb } from "./db";
 import { ermittleErsteHilfeStatus } from "./complianceUtils";
 import { bereiteEinsatzUebernahmeVor } from "./mitarbeiterAblauf";
-import { generiereEinmaligesStartpasswort } from "./accessCredentials";
+import { generiereEinmaligesStartpasswort, waehleDruckbareMitarbeiter } from "./accessCredentials";
 import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, einsatzAenderungen, kunden as kundenTable, notifications as notificationsTable, ersteHilfeKurse, mitarbeiterBerechtigungen as mbTable, besuchsberichte, fahrten } from "../drizzle/schema";
 import {
   getMitarbeiterByEmail,
@@ -2614,7 +2614,7 @@ export const appRouter = router({
     mitarbeiterPasswortReset: adminProcedure
       .input(z.object({
         id: z.number().int().positive(),
-        neuesPasswort: z.string().min(6, "Passwort muss mindestens 6 Zeichen haben"),
+        neuesPasswort: z.string().min(10, "Passwort muss mindestens 10 Zeichen haben"),
       }))
       .mutation(async ({ input, ctx }) => {
         const ma = await getMitarbeiterById(input.id);
@@ -2626,9 +2626,14 @@ export const appRouter = router({
       }),
 
     /** Startpasswörter für aktive Nicht-Admin-Mitarbeiter – Klartext nur einmal in der Antwort. */
-    zugangskartenStartpasswoerter: adminProcedure.mutation(async ({ ctx }) => {
+    zugangskartenStartpasswoerter: adminProcedure.input(z.object({
+      mitarbeiterIds: z.array(z.number().int().positive()).min(1).max(200).optional(),
+    }).optional()).mutation(async ({ ctx, input }) => {
       const alle = await getAllMitarbeiter();
-      const zielgruppe = alle.filter((ma: any) => Boolean(ma.aktiv) && ma.rolle !== "admin");
+      const zielgruppe = waehleDruckbareMitarbeiter(alle as any[], input?.mitarbeiterIds);
+      if (input?.mitarbeiterIds && zielgruppe.length !== new Set(input.mitarbeiterIds).size) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Mindestens ein ausgewählter Mitarbeiter ist nicht aktiv oder darf keine Zugangskarte erhalten." });
+      }
       const karten: Array<{ id: number; vorname: string; nachname: string; email: string; rolle: string; startpasswort: string }> = [];
       for (const ma of zielgruppe as any[]) {
         const startpasswort = generiereEinmaligesStartpasswort();
