@@ -29,6 +29,7 @@
 - [x] Einmalige Startpasswörter für alle bestehenden Mitarbeiter sicher generieren und nur für die einmalige Ausgabe bereitstellen
 - [x] Passwortwechsel beim ersten Login verpflichtend machen, ohne die bestehende Admin-Passwortrücksetzung zu entfernen
 - [x] Druckbare Zugangskarten mit Name, E-Mail, Startpasswort und Anmeldehinweisen für die erstmalige Ausgabe erstellen
+- [x] Zugangskarten-Tabelle mit Mitarbeitername, E-Mail, Erstellungsdatum und Passwortwechselstatus im Admin-Bereich erstellen
 
 ## Datenbank & Backend
 - [x] Datenbankschema: mitarbeiter, kunden, einsaetze, leistungen, fahrten

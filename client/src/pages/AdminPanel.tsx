@@ -64,6 +64,7 @@ export default function AdminPanel() {
   const [maSearch, setMaSearch] = useState("");
   const [maBeschFilter, setMaBeschFilter] = useState<"alle" | "minijob" | "teilzeit" | "vollzeit">("alle");
   const [maZeigeInaktiv, setMaZeigeInaktiv] = useState(false);
+  const [zeigeZugangskartenTabelle, setZeigeZugangskartenTabelle] = useState(true);
 
   const { data: maList = [], refetch: refetchMa } = trpc.admin.mitarbeiterList.useQuery();
   const createMa = trpc.admin.mitarbeiterCreate.useMutation({
@@ -428,10 +429,32 @@ export default function AdminPanel() {
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               <button onClick={exportExcel} title="Als Excel-Datei herunterladen" style={{ padding: "8px 12px", background: "#1d6f42", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>📥 Excel</button>
               <button onClick={exportCSV} title="Als CSV-Datei herunterladen (DATEV-kompatibel)" style={{ padding: "8px 12px", background: "#1e40af", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>📥 CSV</button>
-              <button onClick={() => { if (window.confirm("Für alle aktiven Mitarbeiter außer Admins werden neue Startpasswörter erstellt. Die bisherigen Passwörter verlieren danach ihre Gültigkeit. Fortfahren?")) startpasswoerterErstellen.mutate(); }} disabled={startpasswoerterErstellen.isPending} title="Neue Startpasswörter erzeugen und Zugangskarten drucken" style={{ padding: "8px 12px", background: "#7c3aed", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: startpasswoerterErstellen.isPending ? .7 : 1 }}>{startpasswoerterErstellen.isPending ? "Erstelle …" : "🔐 Zugangskarten"}</button>
+              <button onClick={() => { if (window.confirm("Für alle aktiven Mitarbeiter außer Admins werden neue Startpasswörter erstellt. Die bisherigen Passwörter verlieren danach ihre Gültigkeit. Fortfahren?")) startpasswoerterErstellen.mutate(); }} disabled={startpasswoerterErstellen.isPending} title="Neue Startpasswörter erzeugen und Zugangskarten drucken" style={{ padding: "8px 12px", background: "#7c3aed", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: startpasswoerterErstellen.isPending ? .7 : 1 }}>{startpasswoerterErstellen.isPending ? "Erstelle …" : "🔐 Startzugänge erstellen"}</button>
               <button onClick={() => { resetMaForm(); setMaSheet(true); }} style={{ padding: "8px 14px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>+ Neu anlegen</button>
             </div>
           </div>
+          <section style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: 14, marginBottom: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: zeigeZugangskartenTabelle ? 12 : 0 }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: "#173a1a" }}>🔐 Zugangskarten-Übersicht</div>
+                <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Passwörter werden aus Sicherheitsgründen nicht angezeigt oder dauerhaft gespeichert.</div>
+              </div>
+              <button onClick={() => setZeigeZugangskartenTabelle(v => !v)} style={{ padding: "6px 10px", background: "#fff", color: "#334155", border: "1px solid #cbd5e1", borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{zeigeZugangskartenTabelle ? "Ausblenden" : "Anzeigen"}</button>
+            </div>
+            {zeigeZugangskartenTabelle && (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", minWidth: 720, borderCollapse: "collapse", fontSize: 12 }}>
+                  <thead><tr style={{ color: "#475569", textAlign: "left", borderBottom: "1px solid #cbd5e1" }}><th style={{ padding: "8px 6px" }}>Mitarbeiter</th><th style={{ padding: "8px 6px" }}>E-Mail</th><th style={{ padding: "8px 6px" }}>Zugangskarten-Status</th><th style={{ padding: "8px 6px" }}>Erstellt am</th><th style={{ padding: "8px 6px", textAlign: "right" }}>Aktion</th></tr></thead>
+                  <tbody>{maList.filter(ma => ma.rolle !== "admin").map(ma => {
+                    const wechselOffen = Boolean((ma as any).passwortWechselErforderlich);
+                    const erstelltAm = (ma as any).startPasswortErstelltAt;
+                    const status = wechselOffen ? { label: "Passwortwechsel offen", bg: "#fef3c7", color: "#92400e" } : erstelltAm ? { label: "Startzugang abgeschlossen", bg: "#e8f5e4", color: "#166534" } : { label: "Noch keine Karte erstellt", bg: "#f1f5f9", color: "#475569" };
+                    return <tr key={`zugang-${ma.id}`} style={{ borderBottom: "1px solid #e2e8f0" }}><td style={{ padding: "9px 6px", fontWeight: 700 }}>{ma.vorname} {ma.nachname}</td><td style={{ padding: "9px 6px", color: "#475569" }}>{ma.email}</td><td style={{ padding: "9px 6px" }}><span style={{ display: "inline-block", borderRadius: 20, padding: "3px 8px", background: status.bg, color: status.color, fontWeight: 700, whiteSpace: "nowrap" }}>{status.label}</span></td><td style={{ padding: "9px 6px", color: "#475569" }}>{erstelltAm ? new Date(erstelltAm).toLocaleDateString("de-DE") : "—"}</td><td style={{ padding: "9px 6px", textAlign: "right" }}><button onClick={() => { setPwResetMa({ id: ma.id, vorname: ma.vorname, nachname: ma.nachname, email: ma.email }); setPwResetNeu(""); setPwResetSichtbar(false); }} style={{ padding: "6px 9px", background: "#1e3a5f", color: "#fff", border: "none", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Neue Karte</button></td></tr>;
+                  })}</tbody>
+                </table>
+              </div>
+            )}
+          </section>
           {/* Suchfeld */}
           <input
             value={maSearch}

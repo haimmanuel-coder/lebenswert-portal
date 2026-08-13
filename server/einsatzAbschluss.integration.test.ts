@@ -18,6 +18,11 @@ const mocks = vi.hoisted(() => ({
   } as any,
 }));
 
+vi.mock("./webpush", () => ({
+  VAPID_PUBLIC: "",
+  sendBudgetWarnungPush: vi.fn(async () => false),
+}));
+
 vi.mock("./db", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./db")>();
   const db: any = {
