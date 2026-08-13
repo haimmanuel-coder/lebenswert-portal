@@ -27,6 +27,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router } from "./_core/trpc";
 import { portalProtected, roleProcedure } from "./portalAuth";
+import { liegtImPlanungsfenster } from "./mitarbeiterAblauf";
 import {
   createAuditLog,
   createNotification,
@@ -534,9 +535,9 @@ export const planungRouter = router({
         auslastung,
         konfiguration: { ...konfiguration, minijobGrenze: MINIJOB_GRENZE },
         rechte: {
-          // Alle Mitarbeiter dürfen Termine planen (eigene Einsätze).
-          // Nur Admin und Teamleitung dürfen Termine für andere MA planen.
-          darfPlanen: true,
+          // Mitarbeiter dürfen ausschließlich ihre eigenen Termine in den
+          // kommenden 14 Tagen planen. Buchhaltung hat reinen Lesezugriff.
+          darfPlanen: rolle !== "buchhaltung",
           darfLoeschen: rolle === "admin" || rolle === "teamleitung",
           darfAlleSehen: alleSehen,
         },
@@ -817,7 +818,17 @@ export const planungRouter = router({
   // ── Termine anlegen / ändern / löschen ───────────────────────────────────
 
   /** Legt einen geplanten Termin an und bucht das Budget. */
-  erstelle: planungSchreiben.input(terminEingabeSchema).mutation(async ({ input, ctx }) => {
+  erstelle: planungLesen.input(terminEingabeSchema).mutation(async ({ input, ctx }) => {
+    const darfAllePlanen = darfAllesSehen(ctx.portalMitarbeiter.rolle);
+    if (!darfAllePlanen) {
+      if (input.mitarbeiterId !== ctx.mitarbeiterId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Mitarbeiter dürfen nur eigene Termine planen." });
+      }
+      const heute = zuDatumsString(new Date());
+      if (!liegtImPlanungsfenster(input.datum, heute)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Eigene Termine können nur für die kommenden 14 Tage geplant werden." });
+      }
+    }
     const istAdmin = ctx.portalMitarbeiter.rolle === "admin";
     const pruefung = await pruefeTermin(input, { istAdmin });
     if (!pruefung.speicherbar || !pruefung.kosten) {
@@ -917,12 +928,22 @@ export const planungRouter = router({
   }),
 
   /** Ändert einen bestehenden Termin und korrigiert die Budgetbuchung. */
-  aktualisiere: planungSchreiben
+  aktualisiere: planungLesen
     .input(terminEingabeSchema.extend({ id: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {
       const { id, ...eingabe } = input;
       const alt = await getEinsatzById(id);
       if (!alt) throw new TRPCError({ code: "NOT_FOUND", message: "Termin nicht gefunden." });
+      const darfAllePlanen = darfAllesSehen(ctx.portalMitarbeiter.rolle);
+      if (!darfAllePlanen) {
+        const heute = zuDatumsString(new Date());
+        if (alt.mitarbeiterId !== ctx.mitarbeiterId || eingabe.mitarbeiterId !== ctx.mitarbeiterId) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Mitarbeiter dürfen nur eigene Termine ändern." });
+        }
+        if (!liegtImPlanungsfenster(eingabe.datum, heute)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Eigene Termine können nur innerhalb der kommenden 14 Tage geändert werden." });
+        }
+      }
       if (alt.status === "abgeschlossen" && ctx.portalMitarbeiter.rolle !== "admin") {
         throw new TRPCError({
           code: "FORBIDDEN",

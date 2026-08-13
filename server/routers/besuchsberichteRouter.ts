@@ -69,6 +69,9 @@ export const besuchsberichteRouter = router({
       const status = input.einreichen ? "eingereicht" : "entwurf";
 
       if (existing.length > 0) {
+        if (ctx.portalMitarbeiter.rolle === "mitarbeiter" && existing[0].status !== "entwurf") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Automatisch erzeugte Besuchsberichte sind schreibgeschützt. Bitte stattdessen eine Korrektur anfragen." });
+        }
         await db
           .update(besuchsberichte)
           .set({
@@ -94,6 +97,48 @@ export const besuchsberichteRouter = router({
         });
         return { id: (result as any).insertId, success: true };
       }
+    }),
+
+  /** Mitarbeiter beantragt eine Korrektur; Admin/Teamleitung prüft sie im Archiv. */
+  anfrageKorrektur: portalProtected
+    .input(z.object({ id: z.number().int().positive(), begruendung: z.string().trim().min(5).max(1000) }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const rows = await db.select().from(besuchsberichte).where(eq(besuchsberichte.id, input.id)).limit(1);
+      const bericht = rows[0];
+      if (!bericht || (ctx.portalMitarbeiter.rolle === "mitarbeiter" && bericht.mitarbeiterId !== ctx.mitarbeiterId)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Für diesen Besuchsbericht kann keine Korrektur angefragt werden." });
+      }
+      const vermerk = `[Korrekturanfrage ${new Date().toLocaleDateString("de-DE")}]: ${input.begruendung}`;
+      await db.update(besuchsberichte).set({
+        status: "korrektur",
+        besonderheiten: [bericht.besonderheiten, vermerk].filter(Boolean).join("\n"),
+      } as any).where(eq(besuchsberichte.id, input.id));
+      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "UPDATE", ressource: "besuchsbericht", details: `Korrekturanfrage id=${input.id}`, status: "success" });
+      return { success: true };
+    }),
+
+  /** Admin oder Teamleitung bearbeitet die angefragte Korrektur und gibt die Fassung frei. */
+  bearbeiteKorrektur: portalProtected
+    .input(z.object({ id: z.number().int().positive(), taetigkeiten: z.string().trim().min(1).max(10000).optional(), freigeben: z.boolean().default(true) }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.portalMitarbeiter.rolle !== "admin" && ctx.portalMitarbeiter.rolle !== "teamleitung") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Nur Admin oder Teamleitung dürfen Korrekturen bearbeiten." });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const rows = await db.select().from(besuchsberichte).where(eq(besuchsberichte.id, input.id)).limit(1);
+      const bericht = rows[0];
+      if (!bericht) throw new TRPCError({ code: "NOT_FOUND", message: "Besuchsbericht nicht gefunden." });
+      await db.update(besuchsberichte).set({
+        ...(input.taetigkeiten ? { taetigkeiten: input.taetigkeiten } : {}),
+        status: input.freigeben ? "genehmigt" : "eingereicht",
+        freigegebenVon: ctx.mitarbeiterId,
+        freigegebenAt: new Date(),
+      } as any).where(eq(besuchsberichte.id, input.id));
+      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "UPDATE", ressource: "besuchsbericht", details: `Korrektur bearbeitet id=${input.id}`, status: "success" });
+      return { success: true };
     }),
 
   /** Bericht freigeben (Admin/Teamleitung) */

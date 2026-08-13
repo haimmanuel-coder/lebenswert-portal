@@ -149,7 +149,9 @@ export default function PortalApp() {
       if (mitarbeiter.rolle === "admin" || mitarbeiter.rolle === "teamleitung") {
         setActivePage("controllingpage");
       } else {
-        setActivePage("planung");
+        // Mitarbeiter starten bewusst mit ihren offenen Informationen. Erst danach
+        // führt der sichtbare Primärbutton logisch in die Zwei-Wochen-Planung.
+        setActivePage("home");
       }
     }
   }, [mitarbeiter, startPageSet]);

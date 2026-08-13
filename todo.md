@@ -12,6 +12,19 @@
 - [x] Schnellzugriff aus der Besuchsdokumentation zum Fahrtenbuch für Begleitfahrten ergänzen
 - [x] Monatsansicht je Kunde für Arzt- und Einkaufsbegleitungen mit Datum, Ziel, Kilometern und Summen erstellen
 
+## Aktuelle Umsetzung – Intuitiver Mitarbeiterablauf
+- [x] Mitarbeiter-Startseite: aktuelle Meldungen klar priorisiert vor der Einsatzplanung anzeigen
+- [x] Einsatzplanung: zweiwöchige, kundenbezogene Terminübersicht für Mitarbeiter bereitstellen
+- [x] Besuchsbericht: Kunde, Pflegegrad, Zeiten, Kilometer und Leistungsdaten als Pflichtangaben vorsehen
+- [x] Besuchsdaten automatisch in Leistungsnachweis und Fahrtenbuch übernehmen, damit keine Doppeleingabe nötig ist
+- [x] Separaten manuellen Besuchsbericht-Ablauf für Mitarbeiter in einen reinen Archiv- und Korrekturzugang überführen
+- [x] Fahrtenbuch- und Leistungsnachweis-Ansicht für Mitarbeiter auf automatisch übernommene Einsatzdaten ausrichten und manuelle Doppelanlage ausblenden
+- [x] Abschlussdaten für Besuchsbericht, Fahrt und Leistungsmonat über einen Regressionstest nachweisen
+- [x] Drizzle-Schemamigration für die neuen Besuchsbericht- und Fahrtenfelder ohne Altmigrationsumbenennung sauber erzeugen und anwenden
+- [x] Besuchsarchiv für Mitarbeiter ausdrücklich schreibgeschützt machen und einen Korrekturworkflow über Admin oder Teamleitung ausweisen
+- [x] Integrationstest für die automatische Erstellung beziehungsweise Aktualisierung von Besuchsbericht, Einsatzfahrt und Leistungsmonat ergänzen
+- [x] Admin- und Teamleitungsworkflow für offene Besuchsbericht-Korrekturen mit Bearbeitung und Rückmeldung sichtbar machen
+
 ## Datenbank & Backend
 - [x] Datenbankschema: mitarbeiter, kunden, einsaetze, leistungen, fahrten
 - [x] Drizzle-Migration generieren und ausführen

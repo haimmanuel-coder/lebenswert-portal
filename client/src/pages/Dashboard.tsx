@@ -2,6 +2,7 @@ import { usePortalAuth } from "@/contexts/PortalAuthContext";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useState, useRef } from "react";
+import MitteilungenWidget from "@/components/MitteilungenWidget";
 
 /** A5: Prioritäts-Mitteilungen-Bereich */
 function MitteilungenBereich() {
@@ -251,6 +252,10 @@ export default function Dashboard() {
         </div>
         <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>{todayStr}</div>
       </div>
+
+      {/* Arbeitslogik für Mitarbeiter: zuerst alle neuen Informationen, dann planen. */}
+      <MitteilungenWidget />
+      <MitteilungenBereich />
 
       {/* KPI */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
@@ -529,9 +534,6 @@ export default function Dashboard() {
         </>
       )}
 
-      {/* A5: Prioritäts-Mitteilungen-Bereich */}
-      <MitteilungenBereich />
-
       {/* Push-Benachrichtigungen Opt-In */}
       {push.isSupported && !push.isSubscribed && push.permission !== "denied" && (
         <div style={{ background: "linear-gradient(135deg, #4a8c3f, #2d6a27)", borderRadius: 12, padding: "14px 16px", marginBottom: 12, display: "flex", alignItems: "center", gap: 12, color: "#fff" }}>
@@ -584,7 +586,7 @@ export default function Dashboard() {
           onMouseUp={e => ((e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)")}
         >
           <span style={{ fontSize: 20 }}>📅</span>
-          <span>Termine planen</span>
+          <span>Einsatzplanung öffnen</span>
           <span style={{ marginLeft: "auto", opacity: 0.8, fontSize: 18 }}>›</span>
         </button>
       </div>
@@ -627,13 +629,13 @@ export default function Dashboard() {
                   {e.status === "geplant" && (
                     <div>
                       <button
-                        onClick={() => handleAbschluss(e.id, getKundeName(e.kundenId), fmtDate(datum))}
+                        onClick={() => navigiere("einsaetze")}
                         style={{
                           marginTop: 6, padding: "7px 12px", background: "#4a8c3f", color: "#fff",
                           border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer",
                         }}
                       >
-                        Abschließen
+                        Besuch dokumentieren
                       </button>
                     </div>
                   )}

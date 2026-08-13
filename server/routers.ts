@@ -21,7 +21,8 @@ import { TRPCError } from "@trpc/server";
 import { sql, eq, desc, and, isNotNull, lte, isNull } from "drizzle-orm";
 import { getDb } from "./db";
 import { ermittleErsteHilfeStatus } from "./complianceUtils";
-import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, einsatzAenderungen, kunden as kundenTable, notifications as notificationsTable, ersteHilfeKurse, mitarbeiterBerechtigungen as mbTable } from "../drizzle/schema";
+import { bereiteEinsatzUebernahmeVor } from "./mitarbeiterAblauf";
+import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, einsatzAenderungen, kunden as kundenTable, notifications as notificationsTable, ersteHilfeKurse, mitarbeiterBerechtigungen as mbTable, besuchsberichte, fahrten } from "../drizzle/schema";
 import {
   getMitarbeiterByEmail,
   getMitarbeiterById,
@@ -1705,9 +1706,29 @@ export const appRouter = router({
         unterschriftErsatzTyp: z.enum(["keine", "vollmacht", "mitarbeiter_vermerk"]).optional(),
         unterschriftErsatzName: z.string().optional(),
         unterschriftBegruendung: z.string().optional(),
+        tatsaechlicherStart: z.string().datetime().optional(),
+        tatsaechlichesEnde: z.string().datetime().optional(),
+        fahrtKilometer: z.number().min(0).max(1000).optional(),
+        fahrtVonOrt: z.string().trim().max(200).optional(),
+        fahrtNachOrt: z.string().trim().max(200).optional(),
       }))
       .mutation(async ({ input, ctx }) => {
-        const updateData: any = { ...input };
+        const einsatzVorher = await getEinsatzById(input.id);
+        if (!einsatzVorher) throw new TRPCError({ code: "NOT_FOUND", message: "Einsatz nicht gefunden." });
+        const warBereitsAbgeschlossen = einsatzVorher.status === "abgeschlossen";
+        const {
+          fahrtKilometer,
+          fahrtVonOrt,
+          fahrtNachOrt,
+          tatsaechlicherStart,
+          tatsaechlichesEnde,
+          ...einsatzUpdate
+        } = input;
+        const updateData: any = {
+          ...einsatzUpdate,
+          ...(tatsaechlicherStart ? { tatsaechlicherStart: new Date(tatsaechlicherStart) } : {}),
+          ...(tatsaechlichesEnde ? { tatsaechlichesEnde: new Date(tatsaechlichesEnde) } : {}),
+        };
         // Primär: Ersatzunterschrift durch bevollmächtigte Person — setzt eine
         // hinterlegte Vollmacht des Kunden voraus (kunden.vollmachtErteilt).
         if (input.unterschriftErsatzTyp === "vollmacht") {
@@ -1749,7 +1770,7 @@ export const appRouter = router({
         }
 
         // Automatischer Push bei Budget-Warnung nach Einsatz-Abschluss
-        if (input.status === "abgeschlossen") {
+        if (input.status === "abgeschlossen" && !warBereitsAbgeschlossen) {
           // A4: Automatischen Leistungsnachweis pro Paragraph erstellen
           try {
             const dbA4 = await getDb();
@@ -1760,9 +1781,71 @@ export const appRouter = router({
                 const paragraphenLN: Array<"45b" | "45a" | "39"> = [];
                 if (e.paragraph && ["45b","45a","39"].includes(e.paragraph)) paragraphenLN.push(e.paragraph as "45b" | "45a" | "39");
                 if (e.paragraph2 && ["45b","45a","39"].includes(e.paragraph2)) paragraphenLN.push(e.paragraph2 as "45b" | "45a" | "39");
-                const monatLN = e.datum ? String(e.datum).slice(0, 7) : new Date().toISOString().slice(0, 7);
+                const monatLN = e.datum instanceof Date
+                  ? e.datum.toISOString().slice(0, 7)
+                  : e.datum ? String(e.datum).slice(0, 7) : new Date().toISOString().slice(0, 7);
                 const stunden1 = parseFloat(String(e.dauerStunden ?? 0));
                 const stunden2 = parseFloat(String(e.stunden2 ?? 0));
+                const kundeSnapshot = await getKundeById(e.kundenId);
+                const uebernahme = bereiteEinsatzUebernahmeVor({
+                  einsatzDatum: e.datum,
+                  tatsaechlicherStart,
+                  tatsaechlichesEnde,
+                  geplanteStunden: parseFloat(String(e.dauerStunden ?? 0)),
+                });
+                const besuchsberichtDaten: any = {
+                  einsatzId: e.id,
+                  kundenId: e.kundenId,
+                  mitarbeiterId: e.mitarbeiterId,
+                  datum: new Date(`${uebernahme.datum}T12:00:00`),
+                  dauerMinuten: uebernahme.dauerMinuten,
+                  taetigkeiten: input.bericht?.trim() || "Besuch dokumentiert",
+                  beobachtungen: input.bemerkung?.trim() || null,
+                  besonderheiten: input.gesundheit ? `Gesundheitszustand: ${input.gesundheit}` : null,
+                  status: "eingereicht",
+                  pflegegradSnapshot: String((kundeSnapshot as any)?.pflegegrad ?? "nicht hinterlegt"),
+                  fahrtKilometer: fahrtKilometer === undefined ? null : String(fahrtKilometer),
+                  fahrtVonOrt: fahrtVonOrt || null,
+                  fahrtNachOrt: fahrtNachOrt || null,
+                };
+                const vorhandenerBericht = await dbA4
+                  .select({ id: besuchsberichte.id })
+                  .from(besuchsberichte)
+                  .where(eq(besuchsberichte.einsatzId, e.id))
+                  .limit(1);
+                if (vorhandenerBericht.length > 0) {
+                  await dbA4.update(besuchsberichte).set(besuchsberichtDaten).where(eq(besuchsberichte.id, vorhandenerBericht[0].id));
+                } else {
+                  await dbA4.insert(besuchsberichte).values(besuchsberichtDaten);
+                }
+
+                // Fahrt entsteht exakt einmal über einsatzId. Wiederholtes Speichern
+                // aktualisiert den Eintrag statt eine doppelte Fahrt anzulegen.
+                if (fahrtKilometer !== undefined && fahrtVonOrt && fahrtNachOrt) {
+                  const vorhandeneFahrt = await dbA4
+                    .select({ id: fahrten.id })
+                    .from(fahrten)
+                    .where(eq(fahrten.einsatzId, e.id))
+                    .limit(1);
+                  const fahrtDaten = {
+                    kundenId: e.kundenId,
+                    datum: new Date(`${uebernahme.datum}T12:00:00`),
+                    vonOrt: fahrtVonOrt,
+                    nachOrt: fahrtNachOrt,
+                    kilometer: String(fahrtKilometer),
+                    typ: "normal" as const,
+                    zweck: `Automatisch aus Besuchsbericht: ${kundeSnapshot?.vorname ?? ""} ${kundeSnapshot?.nachname ?? ""}`.trim(),
+                    monat: uebernahme.monat,
+                    einsatzId: e.id,
+                  };
+                  if (vorhandeneFahrt.length > 0) {
+                    await dbA4.update(fahrten).set(fahrtDaten).where(eq(fahrten.id, vorhandeneFahrt[0].id));
+                  } else {
+                    const ma = await getMitarbeiterById(e.mitarbeiterId);
+                    await createFahrt({ ...fahrtDaten, mitarbeiterId: e.mitarbeiterId, hatDienstwagen: Boolean((ma as any)?.hatDienstwagen) } as any);
+                  }
+                }
+
                 const { leistungen } = await import('../drizzle/schema');
                 for (let i = 0; i < paragraphenLN.length; i++) {
                   const para = paragraphenLN[i];

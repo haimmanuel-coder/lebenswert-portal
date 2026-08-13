@@ -363,8 +363,9 @@ export default function Einsatzplanung() {
         <div>
           <div style={{ fontSize: 19, fontWeight: 800 }}>Einsatzplanung</div>
           <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 2 }}>
-            {planung?.von} bis {planung?.bis} · {kennzahlen.anzahl} Termine ·{" "}
-            {formatStunden(kennzahlen.stunden)}
+            {darfAlleSehen
+              ? `${planung?.von} bis ${planung?.bis} · ${kennzahlen.anzahl} Termine · ${formatStunden(kennzahlen.stunden)}`
+              : `Deine nächsten 14 Tage · ${planung?.von} bis ${planung?.bis} · ${kennzahlen.anzahl} Termine`}
           </div>
         </div>
         {darfPlanen && (
@@ -381,7 +382,7 @@ export default function Einsatzplanung() {
               cursor: "pointer",
             }}
           >
-            + Termin planen
+            + Meinen Termin planen
           </button>
         )}
       </div>

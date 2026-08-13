@@ -10,6 +10,7 @@ const STATUS_FARBEN: Record<string, { bg: string; color: string; border: string 
   eingereicht: { bg: "#eff6ff", color: "#1e40af", border: "#93c5fd" },
   genehmigt: { bg: "#f0fdf4", color: "#166534", border: "#86efac" },
   abgelehnt: { bg: "#fef2f2", color: "#991b1b", border: "#fca5a5" },
+  korrektur: { bg: "#fff7ed", color: "#9a3412", border: "#fdba74" },
 };
 
 const STIMMUNG_LABELS: Record<string, string> = {
@@ -22,11 +23,11 @@ const STIMMUNG_LABELS: Record<string, string> = {
 export default function Besuchsberichte() {
   const { mitarbeiter } = usePortalAuth() as any;
   const { navigiere } = useNavigation();
-  const isAdmin = mitarbeiter?.rolle === "admin";
+  const isAdmin = mitarbeiter?.rolle === "admin" || mitarbeiter?.rolle === "teamleitung";
   const [tab, setTab] = useState<"meine" | "alle">(isAdmin ? "alle" : "meine");
   const [showCreate, setShowCreate] = useState(false);
   const [filterKunde, setFilterKunde] = useState("");
-  const [filterStatus, setFilterStatus] = useState<"alle" | "entwurf" | "eingereicht" | "genehmigt" | "abgelehnt">("alle");
+  const [filterStatus, setFilterStatus] = useState<"alle" | "entwurf" | "eingereicht" | "genehmigt" | "abgelehnt" | "korrektur">("alle");
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -121,6 +122,14 @@ export default function Besuchsberichte() {
     onSuccess: () => { toast.success("Status aktualisiert"); refetchAlle(); },
     onError: (e: any) => toast.error("❌ " + e.message),
   });
+  const korrekturAnfrage = (trpc.besuchsberichte as any).anfrageKorrektur.useMutation({
+    onSuccess: () => { toast.success("Korrekturanfrage wurde an die Teamleitung übergeben."); refetchMeine(); },
+    onError: (e: any) => toast.error("Korrekturanfrage fehlgeschlagen: " + e.message),
+  });
+  const korrekturBearbeiten = (trpc.besuchsberichte as any).bearbeiteKorrektur.useMutation({
+    onSuccess: () => { toast.success("Korrigierter Besuchsbericht wurde freigegeben."); refetchAlle(); },
+    onError: (e: any) => toast.error("Korrektur konnte nicht bearbeitet werden: " + e.message),
+  });
   const generatePdf = (trpc.besuchsberichte as any).generatePdf.useMutation({
     onSuccess: (data: any) => { window.open(data.url, "_blank"); toast.success("📄 PDF geöffnet"); },
     onError: (e: any) => toast.error("❌ PDF-Fehler: " + e.message),
@@ -148,22 +157,35 @@ export default function Besuchsberichte() {
     <div style={{ padding: "20px 16px 100px", maxWidth: 900, margin: "0 auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: "#111827", margin: 0 }}>📋 Besuchsberichte</h1>
-          <p style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>Dokumentation aller Kundenbesuche</p>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: "#111827", margin: 0 }}>{isAdmin ? "📋 Besuchsberichte" : "📋 Besuchsarchiv"}</h1>
+          <p style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>
+            {isAdmin ? "Dokumentation aller Kundenbesuche" : "Deine abgeschlossenen Einsätze werden hier automatisch gespeichert."}
+          </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          <button
-            onClick={() => navigiere("fahrt")}
-            style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe", borderRadius: 12, padding: "10px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
-          >
-            Begleitfahrt erfassen
-          </button>
-          <button
-            onClick={() => setShowCreate(true)}
-            style={{ background: "#0d9488", color: "#fff", border: "none", borderRadius: 12, padding: "10px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
-          >
-            Neuer Bericht
-          </button>
+          {isAdmin ? (
+            <>
+              <button
+                onClick={() => navigiere("fahrt")}
+                style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe", borderRadius: 12, padding: "10px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+              >
+                Begleitfahrt erfassen
+              </button>
+              <button
+                onClick={() => setShowCreate(true)}
+                style={{ background: "#0d9488", color: "#fff", border: "none", borderRadius: 12, padding: "10px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+              >
+                Neuer Bericht
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => navigiere("einsaetze")}
+              style={{ background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 12, padding: "10px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+            >
+              Besuch dokumentieren
+            </button>
+          )}
         </div>
       </div>
 
@@ -209,6 +231,7 @@ export default function Besuchsberichte() {
           <option value="eingereicht">Eingereicht</option>
           <option value="genehmigt">Genehmigt</option>
           <option value="abgelehnt">Abgelehnt</option>
+          <option value="korrektur">Korrektur angefragt</option>
         </select>
         <button
           onClick={() => setSortDir(d => d === "desc" ? "asc" : "desc")}
@@ -268,7 +291,7 @@ export default function Besuchsberichte() {
                       border: `1px solid ${statusFarbe.border}`,
                       borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 700,
                     }}>
-                      {b.status === "entwurf" ? "📝 Entwurf" : b.status === "eingereicht" ? "📤 Eingereicht" : b.status === "genehmigt" ? "✅ Genehmigt" : "❌ Abgelehnt"}
+                      {b.status === "entwurf" ? "📝 Entwurf" : b.status === "eingereicht" ? "📤 Eingereicht" : b.status === "genehmigt" ? "✅ Genehmigt" : b.status === "korrektur" ? "🛠️ Korrektur angefragt" : "❌ Abgelehnt"}
                     </span>
                   </div>
                 </div>
@@ -298,12 +321,39 @@ export default function Besuchsberichte() {
                       </button>
                     </div>
                   )}
-                  {b.status === "entwurf" && (
+                  {isAdmin && b.status === "entwurf" && (
                     <button
                       onClick={() => updateStatus.mutate({ id: b.id, status: "eingereicht" })}
                       style={{ marginTop: 10, background: "#eff6ff", color: "#1e40af", border: "1px solid #93c5fd", borderRadius: 8, padding: "6px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer" }}
                     >
                       📤 Einreichen
+                    </button>
+                  )}
+                  {isAdmin && b.status === "korrektur" && (
+                    <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 12, color: "#9a3412", fontWeight: 700 }}>Mitarbeiter hat eine Korrektur angefragt.</span>
+                      <button
+                        onClick={() => {
+                          const text = window.prompt("Korrigierte Fassung des Besuchsberichts:", b.taetigkeiten ?? b.inhalt ?? "");
+                          if (text?.trim()) korrekturBearbeiten.mutate({ id: b.id, taetigkeiten: text.trim(), freigeben: true });
+                        }}
+                        disabled={korrekturBearbeiten.isPending}
+                        style={{ background: "#f0fdf4", color: "#166534", border: "1px solid #86efac", borderRadius: 8, padding: "6px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer" }}
+                      >
+                        ✅ Korrektur bearbeiten & freigeben
+                      </button>
+                    </div>
+                  )}
+                  {!isAdmin && b.status !== "korrektur" && (
+                    <button
+                      onClick={() => {
+                        const begruendung = window.prompt("Welche Korrektur wird benötigt?");
+                        if (begruendung?.trim()) korrekturAnfrage.mutate({ id: b.id, begruendung: begruendung.trim() });
+                      }}
+                      disabled={korrekturAnfrage.isPending}
+                      style={{ marginTop: 10, background: "#fff7ed", color: "#9a3412", border: "1px solid #fdba74", borderRadius: 8, padding: "6px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer" }}
+                    >
+                      🛠️ Korrektur anfragen
                     </button>
                   )}
                   {/* PDF & E-Mail Aktionen */}

@@ -35,6 +35,11 @@ export default function Einsaetze() {
   const [bericht, setBericht] = useState("");
   const [gesundheit, setGesundheit] = useState<"gut" | "stabil" | "auffaellig" | "kritisch">("gut");
   const [bemerkung, setBemerkung] = useState("");
+  const [tatsaechlicherStart, setTatsaechlicherStart] = useState("");
+  const [tatsaechlichesEnde, setTatsaechlichesEnde] = useState("");
+  const [fahrtKilometer, setFahrtKilometer] = useState("");
+  const [fahrtVonOrt, setFahrtVonOrt] = useState("");
+  const [fahrtNachOrt, setFahrtNachOrt] = useState("");
   const sigRef = useRef<import("@/components/SignatureCanvas").SignatureCanvasRef>(null);
   const sigKundeRef = useRef<import("@/components/SignatureCanvas").SignatureCanvasRef>(null);
   const [previewMitarbeiter, setPreviewMitarbeiter] = useState<string | null>(null);
@@ -122,6 +127,10 @@ export default function Einsaetze() {
   const [begruendung, setBegruendung] = useState("");
 
   const handleAbschluss = (id: number, kundenId: number, name: string, datum: string, dauerStunden?: number | null) => {
+    const einsatz = (einsaetze as any[]).find((e: any) => e.id === id);
+    const kunde = (kunden as any[]).find((k: any) => k.id === kundenId);
+    const startzeit = (einsatz?.startzeit ?? "09:00").slice(0, 5);
+    const endzeit = (einsatz?.endzeit ?? "11:00").slice(0, 5);
     setActiveEinsatz({ id, kundenId, name, datum, dauerStunden });
     setBericht(""); setBemerkung(""); setGesundheit("gut");
     setSignaturMitarbeiter(null);
@@ -131,6 +140,11 @@ export default function Einsaetze() {
     setKundeNichtUnterschriftsfaehig(false);
     setErsatzName("");
     setBegruendung("");
+    setTatsaechlicherStart(`${datum}T${startzeit}`);
+    setTatsaechlichesEnde(`${datum}T${endzeit}`);
+    setFahrtKilometer("");
+    setFahrtVonOrt("Eigener Standort");
+    setFahrtNachOrt([kunde?.strasse, kunde?.plz, kunde?.ort].filter(Boolean).join(", ") || name);
     setAbschlussOpen(true);
   };
 
@@ -138,6 +152,19 @@ export default function Einsaetze() {
 
   const saveAbschluss = () => {
     if (!activeEinsatz) return;
+    if (!bericht.trim() || !tatsaechlicherStart || !tatsaechlichesEnde || fahrtKilometer.trim() === "" || !fahrtVonOrt.trim() || !fahrtNachOrt.trim()) {
+      toast.error("Bitte Besuchsbericht, tatsächliche Zeiten sowie vollständige Fahrtdaten ausfüllen.");
+      return;
+    }
+    const kilometer = Number(fahrtKilometer.replace(",", "."));
+    if (!Number.isFinite(kilometer) || kilometer < 0) {
+      toast.error("Bitte gültige Kilometer eintragen.");
+      return;
+    }
+    if (new Date(tatsaechlichesEnde) <= new Date(tatsaechlicherStart)) {
+      toast.error("Die tatsächliche Endzeit muss nach der Startzeit liegen.");
+      return;
+    }
     const unterschriftMitarbeiter = signaturMitarbeiter ?? undefined;
     // Entscheidung 15: Bei fehlender Unterschriftsfähigkeit entweder Ersatz-
     // unterschrift durch bevollmächtigte Person (Kundenunterschrift-Canvas
@@ -163,6 +190,11 @@ export default function Einsaetze() {
       unterschriftErsatzTyp: !kundeNichtUnterschriftsfaehig ? "keine" : selectedKundeVollmacht ? "vollmacht" : "mitarbeiter_vermerk",
       unterschriftErsatzName: kundeNichtUnterschriftsfaehig && selectedKundeVollmacht ? ersatzName.trim() : undefined,
       unterschriftBegruendung: kundeNichtUnterschriftsfaehig && !selectedKundeVollmacht ? begruendung.trim() : undefined,
+      tatsaechlicherStart: new Date(tatsaechlicherStart).toISOString(),
+      tatsaechlichesEnde: new Date(tatsaechlichesEnde).toISOString(),
+      fahrtKilometer: kilometer,
+      fahrtVonOrt: fahrtVonOrt.trim(),
+      fahrtNachOrt: fahrtNachOrt.trim(),
     });
   };
 
@@ -283,6 +315,32 @@ export default function Einsaetze() {
             Einsatz bei {activeEinsatz.name} am {activeEinsatz.datum}
           </div>
         )}
+        {activeEinsatz && (() => {
+          const kunde = (kunden as any[]).find((k: any) => k.id === activeEinsatz.kundenId);
+          const einsatz = (einsaetze as any[]).find((e: any) => e.id === activeEinsatz.id);
+          return (
+            <div style={{ background: "#eff6ff", border: "1.5px solid #93c5fd", color: "#1e40af", borderRadius: 10, padding: "11px 13px", marginBottom: 14, fontSize: 12.5 }}>
+              <div style={{ fontWeight: 800, marginBottom: 4 }}>Kundendaten werden automatisch übernommen</div>
+              <div><strong>{kunde ? `${kunde.vorname} ${kunde.nachname}` : activeEinsatz.name}</strong> · Pflegegrad: <strong>{kunde?.pflegegrad ?? "nicht hinterlegt"}</strong></div>
+              <div style={{ marginTop: 3 }}>Geplante Leistung: {(einsatz?.startzeit ?? "–").slice(0, 5)}–{(einsatz?.endzeit ?? "–").slice(0, 5)} Uhr · §{einsatz?.paragraph ?? "45b"}</div>
+            </div>
+          );
+        })()}
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>Tatsächliche Einsatzzeit *</label>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <input type="datetime-local" value={tatsaechlicherStart} onChange={(e) => setTatsaechlicherStart(e.target.value)} style={{ width: "100%", padding: "11px", border: "2px solid #e5e7eb", borderRadius: 10, boxSizing: "border-box" }} aria-label="Tatsächlicher Start" />
+            <input type="datetime-local" value={tatsaechlichesEnde} onChange={(e) => setTatsaechlichesEnde(e.target.value)} style={{ width: "100%", padding: "11px", border: "2px solid #e5e7eb", borderRadius: 10, boxSizing: "border-box" }} aria-label="Tatsächliches Ende" />
+          </div>
+        </div>
+        <div style={{ marginBottom: 14, background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 10, padding: 12 }}>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 8 }}>Fahrt zum Kunden – wird automatisch ins Fahrtenbuch übertragen *</label>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+            <input value={fahrtVonOrt} onChange={(e) => setFahrtVonOrt(e.target.value)} placeholder="Startort" style={{ width: "100%", padding: "11px", border: "2px solid #e5e7eb", borderRadius: 10, boxSizing: "border-box" }} />
+            <input value={fahrtNachOrt} onChange={(e) => setFahrtNachOrt(e.target.value)} placeholder="Zielort" style={{ width: "100%", padding: "11px", border: "2px solid #e5e7eb", borderRadius: 10, boxSizing: "border-box" }} />
+          </div>
+          <input type="number" min="0" step="0.1" value={fahrtKilometer} onChange={(e) => setFahrtKilometer(e.target.value)} placeholder="Gefahrene Kilometer, z. B. 8,5" style={{ width: "100%", padding: "11px", border: "2px solid #e5e7eb", borderRadius: 10, boxSizing: "border-box" }} />
+        </div>
         {/* P3: Mindestzeit-Warnung im Abschluss-Modal */}
         {activeEinsatz?.dauerStunden != null && activeEinsatz.dauerStunden < 1.5 && (
           <div style={{ background: "#fef9c3", border: "1.5px solid #fde047", color: "#854d0e", padding: "10px 13px", borderRadius: 10, fontSize: 13, marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
@@ -294,7 +352,7 @@ export default function Einsaetze() {
           </div>
         )}
         <div style={{ marginBottom: 14 }}>
-          <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>Besuchsbericht</label>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 5 }}>Besuchsbericht *</label>
           <textarea value={bericht} onChange={(e) => setBericht(e.target.value)} placeholder="Was wurde gemacht? Besonderheiten?" style={{ width: "100%", padding: "12px 13px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 15, outline: "none", resize: "none", minHeight: 80, fontFamily: "inherit", boxSizing: "border-box" }} />
         </div>
         <div style={{ marginBottom: 14 }}>
@@ -415,7 +473,7 @@ export default function Einsaetze() {
         <div style={{ display: "flex", gap: 10, marginTop: 20, paddingTop: 16, borderTop: "1px solid #e5e7eb" }}>
           <button onClick={() => setAbschlussOpen(false)} style={{ flex: 1, padding: 13, background: "#f4f6f3", color: "#6b7280", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>Abbrechen</button>
           <button onClick={saveAbschluss} disabled={updateStatus.isPending} style={{ flex: 1, padding: 13, background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
-            {updateStatus.isPending ? "Speichern…" : "✓ Abschließen"}
+            {updateStatus.isPending ? "Übertrage…" : "✓ Abschließen & übertragen"}
           </button>
         </div>
       </BottomSheet>

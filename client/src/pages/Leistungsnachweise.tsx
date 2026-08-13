@@ -42,11 +42,13 @@ export default function Leistungsnachweise() {
   // Feature 2: PDF-Vorschau-Modal
   const [vorschauUrl, setVorschauUrl] = useState<string | null>(null);
   const [vorschauLnw, setVorschauLnw] = useState<(typeof leistungen)[0] | null>(null);
+  const { mitarbeiter } = usePortalAuth();
 
   const { data: kunden = [] } = trpc.kunden.list.useQuery();
   const getKundeName = (id: number) => { const k = kunden.find((c) => c.id === id); return k ? `${k.vorname} ${k.nachname}` : `Kunde #${id}`; };
   const { data: leistungen = [], refetch } = trpc.leistungen.list.useQuery();
   const { data: alleEinsaetze = [] } = trpc.einsaetze.listWithKunden.useQuery();
+  const { data: fahrten = [] } = trpc.fahrten.list.useQuery();
 
   // Entscheidung 9 (Teil 1): Der Leistungsnachweis übernimmt automatisch alle im
   // Einsatz erfassten, abgeschlossenen Positionen für den gewählten Kunden/Monat/
@@ -173,11 +175,10 @@ export default function Leistungsnachweise() {
     });
   };
 
-  const { mitarbeiter } = usePortalAuth();
-
   const buildPdfData = (l: typeof leistungen[0]) => {
     const kunde = kunden.find((k) => k.id === l.kundenId);
     if (!kunde) return null;
+    const kmJeEinsatz = new Map((fahrten as any[]).filter((f: any) => f.einsatzId).map((f: any) => [f.einsatzId, f.kilometer]));
     const lnwEinsaetze = (alleEinsaetze as any[]).filter(
       (e) =>
         e.kundenId === l.kundenId &&
@@ -186,10 +187,14 @@ export default function Leistungsnachweise() {
         e.paragraph === l.paragraph
     ).map((e) => ({
       datum: e.datum,
-      startzeit: e.startzeit ?? null,
-      dauerStunden: e.dauerStunden ?? null,
+      startzeit: e.tatsaechlicherStart
+        ? new Date(e.tatsaechlicherStart).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
+        : e.startzeit ?? null,
+      dauerStunden: e.tatsaechlicherStart && e.tatsaechlichesEnde
+        ? Math.round(((new Date(e.tatsaechlichesEnde).getTime() - new Date(e.tatsaechlicherStart).getTime()) / 3_600_000) * 100) / 100
+        : e.dauerStunden ?? null,
       anfahrtPauschale: e.anfahrtPauschale ?? 6,
-      km: null,
+      km: kmJeEinsatz.get(e.id) ?? null,
     }));
     return {
       kundeVorname: kunde.vorname,
@@ -241,12 +246,18 @@ export default function Leistungsnachweise() {
           <div style={{ fontSize: 18, fontWeight: 800 }}>Leistungsnachweise</div>
           <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>§§ 39, 45a, 45b SGB XI</div>
         </div>
-        <button
-          onClick={() => setSheetOpen(true)}
-          style={{ padding: "9px 16px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer" }}
-        >
-          + Neu
-        </button>
+        {mitarbeiter?.rolle === "admin" || mitarbeiter?.rolle === "teamleitung" ? (
+          <button
+            onClick={() => setSheetOpen(true)}
+            style={{ padding: "9px 16px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+          >
+            + Manuell
+          </button>
+        ) : (
+          <div style={{ maxWidth: 180, padding: "7px 10px", borderRadius: 9, background: "#eff6ff", color: "#1d4ed8", fontSize: 11, fontWeight: 700, textAlign: "right" }}>
+            Automatisch aus Besuchsabschlüssen
+          </div>
+        )}
       </div>
 
       {sorted.length === 0 ? (

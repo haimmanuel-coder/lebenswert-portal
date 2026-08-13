@@ -226,7 +226,7 @@ export default function Fahrtenbuch() {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
         <div>
           <div style={{ fontSize: 18, fontWeight: 800 }}>Fahrtenbuch</div>
-          <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>Dienstfahrten und Kundenbegleitungen · {monatStr}</div>
+          <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>Einsatzfahrten werden beim Besuchsabschluss automatisch übernommen · {monatStr}</div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button
@@ -235,12 +235,14 @@ export default function Fahrtenbuch() {
           >
             📥 CSV
           </button>
-          <button
-            onClick={() => setSheetOpen(true)}
-            style={{ padding: "9px 16px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer" }}
-          >
-            + Fahrt
-          </button>
+          {(mitarbeiter?.rolle === "admin" || mitarbeiter?.rolle === "teamleitung") && (
+            <button
+              onClick={() => setSheetOpen(true)}
+              style={{ padding: "9px 16px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+            >
+              + Fahrt
+            </button>
+          )}
         </div>
       </div>
 
@@ -258,6 +260,11 @@ export default function Fahrtenbuch() {
           Einkaufsbegleitung erfassen
         </button>
       </div>
+      {mitarbeiter?.rolle !== "admin" && mitarbeiter?.rolle !== "teamleitung" && (
+        <div style={{ marginBottom: 12, padding: "10px 12px", borderRadius: 10, background: "#eff6ff", color: "#1d4ed8", fontSize: 12.5, fontWeight: 600 }}>
+          Normale Einsatzfahrten bitte nicht erneut anlegen. Sie werden beim Abschluss des Kundenbesuchs automatisch in diese Liste übertragen.
+        </div>
+      )}
 
       {/* Filter-Leiste */}
       <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 12, padding: "10px 12px", marginBottom: 12, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>

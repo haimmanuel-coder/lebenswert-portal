@@ -688,6 +688,12 @@ export const besuchsberichte = mysqlTable("besuchsberichte", {
   mitarbeiterId: int("mitarbeiterId").notNull(),
   datum: date("datum").notNull(),
   dauerMinuten: int("dauerMinuten"),
+  // Unveränderliche Fach- und Fahrtschnappschüsse aus dem Einsatzabschluss.
+  // Damit bleiben spätere Änderungen in der Kundenakte nachvollziehbar.
+  pflegegradSnapshot: varchar("pflegegradSnapshot", { length: 20 }),
+  fahrtKilometer: decimal("fahrtKilometer", { precision: 6, scale: 1 }),
+  fahrtVonOrt: varchar("fahrtVonOrt", { length: 200 }),
+  fahrtNachOrt: varchar("fahrtNachOrt", { length: 200 }),
   taetigkeiten: text("taetigkeiten").notNull(),
   beobachtungen: text("beobachtungen"),
   besonderheiten: text("besonderheiten"),

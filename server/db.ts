@@ -370,6 +370,8 @@ export async function updateEinsatzStatus(
     unterschriftErsatzName?: string;
     unterschriftBegruendung?: string;
     unterschriftFreigabeStatus?: "nicht_erforderlich" | "ausstehend" | "freigegeben";
+    tatsaechlicherStart?: Date;
+    tatsaechlichesEnde?: Date;
   }
 ) {
   const db = await getDb();
@@ -678,6 +680,7 @@ export async function createFahrt(data: InsertFahrt & { mitarbeiterId: number; h
     verguetung,
     abrechnungsStatus: "offen",
     monat,
+    einsatzId: data.einsatzId ?? null,
   });
 }
 
