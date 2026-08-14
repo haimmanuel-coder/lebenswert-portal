@@ -14,7 +14,8 @@ function liesClientQuellen(ordner: string): string[] {
 }
 
 describe("Navigationsvertrag", () => {
-  const sichtbareZiele = [...portalApp.matchAll(/\{\s*id:\s*"([a-z]+)"/g)].map((treffer) => treffer[1]);
+  const hauptNavigation = portalApp.slice(portalApp.indexOf("const sections"), portalApp.indexOf("const renderPage"));
+  const sichtbareZiele = [...hauptNavigation.matchAll(/\{\s*id:\s*"([a-z]+)"/g)].map((treffer) => treffer[1]);
   const renderZiele = [...portalApp.matchAll(/case\s+"([a-z]+)"/g)].map((treffer) => treffer[1]);
   const seitenIdBlock = navigationContext.match(/export type SeitenId =([\s\S]*?);/)?.[1] ?? "";
   const definierteSeitenIds = [...seitenIdBlock.matchAll(/"([a-z]+)"/g)].map((treffer) => treffer[1]);

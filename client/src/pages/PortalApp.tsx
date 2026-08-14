@@ -600,6 +600,22 @@ export default function PortalApp() {
         <main style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
           {renderPage()}
         </main>
+
+        {/* Smartphone-Kurzmenü: häufigste Wege immer direkt erreichbar. */}
+        {isMobile && (
+          <nav aria-label="Kurz-Navigation" style={{ height: 62, flexShrink: 0, background: "#fff", borderTop: "1px solid #e5e7eb", display: "grid", gridTemplateColumns: "repeat(5, 1fr)", padding: "4px 4px calc(4px + env(safe-area-inset-bottom))", boxShadow: "0 -3px 12px rgba(15,23,42,0.07)", zIndex: 180 }}>
+            {[
+              { id: (isAdmin || isTeamleitung ? "admindashboard" : "home") as PageId, icon: "⌂", label: "Übersicht" },
+              { id: "planung" as PageId, icon: "◫", label: "Planung" },
+              { id: "einsaetze" as PageId, icon: "✓", label: "Einsätze" },
+              { id: "fahrt" as PageId, icon: "⌁", label: "Mobilität" },
+            ].map((item) => {
+              const aktiv = activePage === item.id && kundenDetailId === null;
+              return <button key={item.id} onClick={() => navTo(item.id)} aria-current={aktiv ? "page" : undefined} style={{ border: "none", borderRadius: 8, background: aktiv ? "#edf7ea" : "transparent", color: aktiv ? "#2f6d29" : "#64748b", cursor: "pointer", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 2, fontSize: 10, fontWeight: aktiv ? 800 : 650, minWidth: 0 }}><span style={{ fontSize: 20, lineHeight: 1 }}>{item.icon}</span><span style={{ whiteSpace: "nowrap" }}>{item.label}</span></button>;
+            })}
+            <button onClick={() => setSidebarOpen(true)} aria-label="Weiteres Menü öffnen" style={{ border: "none", borderRadius: 8, background: sidebarOpen ? "#edf7ea" : "transparent", color: sidebarOpen ? "#2f6d29" : "#64748b", cursor: "pointer", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 2, fontSize: 10, fontWeight: 650 }}><span style={{ fontSize: 20, lineHeight: 1 }}>☰</span><span>Mehr</span></button>
+          </nav>
+        )}
       </div>
 
       <OnboardingTour forceShow={showTour} onClose={closeTour} />

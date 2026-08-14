@@ -52,6 +52,8 @@
 - [x] Verbindliches Namensschema „Admin-Dashboard · Bereich“ in Navigation, Seitenüberschriften und Schnellzugriffen vollständig anwenden
 - [x] Gesamte Navigation mit Codebezug für alle Schnellzugriffe, Seitenkennungen und Rollenpfade vollständig inventarisieren und bereinigen
 - [x] Dashboard-Namensschema „Admin-Dashboard · Bereich“ über alle aktiven Admin-Pfade, Überschriften und Schnellzugriffe vollständig validieren
+- [x] Mobile Kurz-Navigation mit den wichtigsten Arbeitswegen für Smartphones bereitstellen
+- [x] Einmalige Startpasswort-Erstellung und druckbare Zugangskarten für bestehende Mitarbeiter im aktuellen Admin-Menü reparieren
 
 ## Datenbank & Backend
 - [x] Datenbankschema: mitarbeiter, kunden, einsaetze, leistungen, fahrten

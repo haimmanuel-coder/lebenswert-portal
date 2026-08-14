@@ -2639,6 +2639,9 @@ export const appRouter = router({
       if (input?.mitarbeiterIds && zielgruppe.length !== new Set(input.mitarbeiterIds).size) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Mindestens ein ausgewählter Mitarbeiter ist nicht aktiv oder darf keine Zugangskarte erhalten." });
       }
+      if (zielgruppe.length === 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Es gibt keine aktiven Mitarbeiter ohne Admin-Rolle für die Zugangskarten-Erstellung." });
+      }
       const karten: Array<{ id: number; vorname: string; nachname: string; email: string; rolle: string; startpasswort: string }> = [];
       for (const ma of zielgruppe as any[]) {
         const startpasswort = generiereEinmaligesStartpasswort();

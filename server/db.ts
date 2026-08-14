@@ -82,6 +82,8 @@ export async function getAllMitarbeiter() {
     email: mitarbeiter.email,
     rolle: mitarbeiter.rolle,
     aktiv: mitarbeiter.aktiv,
+    passwortWechselErforderlich: (mitarbeiter as any).passwortWechselErforderlich,
+    startPasswortErstelltAt: (mitarbeiter as any).startPasswortErstelltAt,
     telefon: mitarbeiter.telefon,
     mobil: mitarbeiter.mobil,
     strasse: mitarbeiter.strasse,
