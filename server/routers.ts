@@ -24,6 +24,7 @@ import { getDb } from "./db";
 import { ermittleErsteHilfeStatus } from "./complianceUtils";
 import { bereiteEinsatzUebernahmeVor } from "./mitarbeiterAblauf";
 import { generiereEinmaligesStartpasswort, waehleDruckbareMitarbeiter } from "./accessCredentials";
+import { pruefeSicheresPasswort, SICHERES_PASSWORT_HINWEIS } from "../shared/passwordPolicy";
 import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, einsatzAenderungen, kunden as kundenTable, notifications as notificationsTable, ersteHilfeKurse, mitarbeiterBerechtigungen as mbTable, besuchsberichte, fahrten } from "../drizzle/schema";
 import {
   getMitarbeiterByEmail,
@@ -1238,13 +1239,14 @@ export const appRouter = router({
     changePassword: portalProtected
       .input(z.object({
         altesPasswort: z.string().min(1),
-        neuesPasswort: z.string().min(10, "Neues Passwort muss mindestens 10 Zeichen haben"),
+        neuesPasswort: z.string().min(1),
       }))
       .mutation(async ({ ctx, input }) => {
         const ma = await getMitarbeiterById(ctx.mitarbeiterId);
         if (!ma) throw new Error("Mitarbeiter nicht gefunden.");
         const valid = await bcrypt.compare(input.altesPasswort, ma.passwortHash);
         if (!valid) throw new Error("Das aktuelle Passwort ist falsch.");
+        if (!pruefeSicheresPasswort(input.neuesPasswort).gueltig) throw new Error(`Das neue Passwort ist nicht sicher genug. ${SICHERES_PASSWORT_HINWEIS}`);
         const hash = await bcrypt.hash(input.neuesPasswort, 10);
         await updateMitarbeiter(ctx.mitarbeiterId, { passwortHash: hash, passwortWechselErforderlich: false } as any);
         await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "PASSWORD_CHANGE", ressource: "portal", status: "success" });

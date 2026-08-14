@@ -38,6 +38,7 @@
 - [x] Auswahlregeln für Einzel- und Sammeldruck automatisiert gegen inaktive Mitarbeiter absichern
 - [x] Druckvorschau für Zugangskarten mit popup-freier Fallback-Ansicht zuverlässig öffnen
 - [x] Sicherheitshinweis zum sofortigen Passwortwechsel nach dem ersten Login auf jede Zugangskarte ergänzen
+- [x] Nicht umgehbaren Erstlogin-Dialog mit sicherer Passwortprüfung und verpflichtendem Passwortwechsel für Mitarbeiter absichern
 
 ## Datenbank & Backend
 - [x] Datenbankschema: mitarbeiter, kunden, einsaetze, leistungen, fahrten
