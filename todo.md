@@ -68,6 +68,9 @@
 - [x] Zugangskarten-Batchlauf ohne Hintergrundprozess sauber beenden
 - [x] Auditdaten aus den realen Mitarbeiterdaten dynamisch berechnen und den erfolgreichen Batchlauf nachweisen
 - [x] Menüpunkt „Verfügbarkeiten" vollständig aus der Navigation entfernen
+- [x] Datei Verfuegbarkeiten.tsx komplett löschen
+- [x] Schnellübersicht heutiger Einsätze direkt im Dashboard nach dem Login anzeigen
+- [x] Kalender um eine übersichtliche Wochenansicht für Mitarbeiter erweitern
 
 ## Datenbank & Backend
 - [x] Datenbankschema: mitarbeiter, kunden, einsaetze, leistungen, fahrten

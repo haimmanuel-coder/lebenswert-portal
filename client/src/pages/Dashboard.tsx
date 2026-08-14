@@ -597,23 +597,34 @@ export default function Dashboard() {
       </div>
 
       {/* Smartphone: klare Tagesroute mit direktem Abschluss statt Navigation über mehrere Seiten. */}
-      {isMobile && (
-        <section style={{ background: "linear-gradient(145deg,#f0f9ee,#ffffff)", border: "1px solid #cce4c7", borderRadius: 14, padding: 14, marginBottom: 12, boxShadow: "0 2px 10px rgba(45,106,39,.08)" }}>
+      {/* Schnellübersicht heutiger Einsätze – auf allen Geräten direkt nach dem Login sichtbar */}
+      <section style={{ background: "linear-gradient(145deg,#f0f9ee,#ffffff)", border: "1px solid #cce4c7", borderRadius: 14, padding: 14, marginBottom: 12, boxShadow: "0 2px 10px rgba(45,106,39,.08)" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
-            <div><div style={{ fontSize: 15, fontWeight: 850, color: "#173a1a" }}>Ihre Tagesroute</div><div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Heute · {offeneHeute.length} offen</div></div>
+            <div><div style={{ fontSize: 15, fontWeight: 850, color: "#173a1a" }}>📋 Heutige Einsätze</div><div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Heute · {offeneHeute.length} offen von {todayE.length} gesamt</div></div>
             {offeneHeute.length > 0 && <span style={{ minWidth: 22, height: 22, borderRadius: 11, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "#dc2626", color: "#fff", fontSize: 11, fontWeight: 850 }}>{offeneHeute.length}</span>}
           </div>
           {offeneHeute.length === 0 ? (
-            <div style={{ padding: "10px 0", color: "#2f6d29", fontSize: 13, fontWeight: 650 }}>✓ Alle heutigen Einsätze sind abgeschlossen.</div>
-          ) : offeneHeute.map((e, index) => (
-            <div key={e.id} style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 0", borderTop: index ? "1px solid #dcebd8" : "none" }}>
-              <div style={{ width: 25, height: 25, borderRadius: "50%", display: "grid", placeItems: "center", flexShrink: 0, background: "#4a8c3f", color: "#fff", fontSize: 11, fontWeight: 850 }}>{index + 1}</div>
-              <div style={{ minWidth: 0, flex: 1 }}><div style={{ fontSize: 13, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{getKundeName(e.kundenId)}</div><div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>{String(e.startzeit ?? "").slice(0, 5)} Uhr · {e.dauerStunden} Std. <span style={{ marginLeft: 4, display: "inline-block", padding: "1px 5px", borderRadius: 8, background: "#fee2e2", color: "#b91c1c", fontWeight: 800 }}>Offen</span></div></div>
-              <button onClick={() => handleAbschluss(e.id, getKundeName(e.kundenId), today)} style={{ flexShrink: 0, background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 8, padding: "8px 9px", fontSize: 11, fontWeight: 800, cursor: "pointer" }}>Abschließen</button>
+            <div style={{ padding: "10px 0", color: "#2f6d29", fontSize: 13, fontWeight: 650 }}>✓ Alle heutigen Einsätze sind abgeschlossen – gut gemacht!</div>
+          ) : todayE.sort((a, b) => String(a.startzeit ?? "").localeCompare(String(b.startzeit ?? ""))).map((e, index) => {
+            const istOffen = e.status === "geplant";
+            return (
+            <div key={e.id} style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 0", borderTop: index ? "1px solid #dcebd8" : "none", opacity: istOffen ? 1 : 0.7 }}>
+              <div style={{ width: 25, height: 25, borderRadius: "50%", display: "grid", placeItems: "center", flexShrink: 0, background: istOffen ? "#4a8c3f" : "#9ca3af", color: "#fff", fontSize: 11, fontWeight: 850 }}>{index + 1}</div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{getKundeName(e.kundenId)}</div>
+                <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
+                  {String(e.startzeit ?? "").slice(0, 5)} Uhr · {e.dauerStunden} Std.
+                  {istOffen ? (
+                    <span style={{ marginLeft: 4, display: "inline-block", padding: "1px 5px", borderRadius: 8, background: "#fee2e2", color: "#b91c1c", fontWeight: 800 }}>Offen</span>
+                  ) : (
+                    <span style={{ marginLeft: 4, display: "inline-block", padding: "1px 5px", borderRadius: 8, background: "#d1fae5", color: "#166534", fontWeight: 800 }}>✓ Erledigt</span>
+                  )}
+                </div>
+              </div>
+              {istOffen && <button onClick={() => handleAbschluss(e.id, getKundeName(e.kundenId), today)} style={{ flexShrink: 0, background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 8, padding: "8px 9px", fontSize: 11, fontWeight: 800, cursor: "pointer" }}>Abschließen</button>}
             </div>
-          ))}
-        </section>
-      )}
+          );})}
+      </section>
 
       {/* Heute */}
       <div className="card" style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 10px rgba(0,0,0,.08)", padding: 16, marginBottom: 12 }}>

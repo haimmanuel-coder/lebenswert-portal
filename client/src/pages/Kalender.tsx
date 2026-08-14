@@ -61,6 +61,28 @@ export default function Kalender() {
   const [monat, setMonat] = useState(jetzt.getMonth());
   const [gewaehlterTag, setGewaehlterTag] = useState<string | null>(null);
   const [filterMitarbeiterId, setFilterMitarbeiterId] = useState<number | null>(null);
+  const [ansicht, setAnsicht] = useState<"monat" | "woche">("monat");
+  const [wochenOffset, setWochenOffset] = useState(0);
+
+  // Wochenberechnung
+  const wochenStart = useMemo(() => {
+    const d = new Date();
+    const tag = d.getDay();
+    const diff = tag === 0 ? -6 : 1 - tag;
+    d.setDate(d.getDate() + diff + wochenOffset * 7);
+    return zuDatumsString(d);
+  }, [wochenOffset]);
+
+  const wochenTage = useMemo(() => {
+    const tage: string[] = [];
+    const start = new Date(wochenStart + "T00:00:00");
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      tage.push(zuDatumsString(d));
+    }
+    return tage;
+  }, [wochenStart]);
 
   const heute = zuDatumsString(jetzt);
   const monatsSchluessel = `${jahr}-${String(monat + 1).padStart(2, "0")}`;
@@ -76,8 +98,8 @@ export default function Kalender() {
     isError,
     refetch,
   } = (trpc as any).planung.uebersicht.useQuery({
-    ansicht: "monat",
-    startDatum: ersterTag,
+    ansicht: ansicht === "woche" ? "woche" : "monat",
+    startDatum: ansicht === "woche" ? wochenStart : ersterTag,
     mitarbeiterId: filterMitarbeiterId,
   });
 
@@ -101,6 +123,8 @@ export default function Kalender() {
 
   const abwesenheitenAmTag = (datum: string) =>
     ((planung?.abwesenheiten ?? []) as any[]).filter((a) => liegtImZeitraum(datum, a.von, a.bis));
+
+  const abwesenheiten = useMemo(() => (planung?.abwesenheiten ?? []) as any[], [planung]);
 
   const anzahlTage = tageImMonat(jahr, monat);
   const startSpalte = ersterWochentag(jahr, monat);
@@ -230,15 +254,89 @@ export default function Kalender() {
       )}
 
       {/* Navigation */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-        <button onClick={vorherigerMonat} style={monatsButtonStil}>‹</button>
-        <span style={{ fontSize: 17, fontWeight: 800, color: "#1a2e1a" }}>
-          {MONATE[monat]} {jahr}
-        </span>
-        <button onClick={naechsterMonat} style={monatsButtonStil}>›</button>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+        <div style={{ display: "flex", gap: 4 }}>
+          <button onClick={() => setAnsicht("woche")} style={{ ...monatsButtonStil, background: ansicht === "woche" ? "#4a8c3f" : "#f3f4f6", color: ansicht === "woche" ? "#fff" : "#374151", fontWeight: 700, fontSize: 12, padding: "6px 12px" }}>Woche</button>
+          <button onClick={() => setAnsicht("monat")} style={{ ...monatsButtonStil, background: ansicht === "monat" ? "#4a8c3f" : "#f3f4f6", color: ansicht === "monat" ? "#fff" : "#374151", fontWeight: 700, fontSize: 12, padding: "6px 12px" }}>Monat</button>
+        </div>
+        {ansicht === "monat" ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button onClick={vorherigerMonat} style={monatsButtonStil}>‹</button>
+            <span style={{ fontSize: 17, fontWeight: 800, color: "#1a2e1a" }}>{MONATE[monat]} {jahr}</span>
+            <button onClick={naechsterMonat} style={monatsButtonStil}>›</button>
+          </div>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button onClick={() => setWochenOffset(o => o - 1)} style={monatsButtonStil}>‹</button>
+            <span style={{ fontSize: 14, fontWeight: 800, color: "#1a2e1a" }}>
+              {new Date(wochenTage[0] + "T00:00:00").toLocaleDateString("de-DE", { day: "2-digit", month: "short" })} – {new Date(wochenTage[6] + "T00:00:00").toLocaleDateString("de-DE", { day: "2-digit", month: "short", year: "numeric" })}
+            </span>
+            <button onClick={() => setWochenOffset(o => o + 1)} style={monatsButtonStil}>›</button>
+            {wochenOffset !== 0 && <button onClick={() => setWochenOffset(0)} style={{ ...monatsButtonStil, fontSize: 11, padding: "4px 10px" }}>Heute</button>}
+          </div>
+        )}
       </div>
 
-      {/* Kalenderraster */}
+      {/* Wochenansicht */}
+      {ansicht === "woche" && !isLoading && !isError && (
+        <div style={{ background: "#fff", border: "1.5px solid #e5e7eb", borderRadius: 14, overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.06)", marginBottom: 16 }}>
+          {/* Wochentage-Header */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", background: "#4a8c3f" }}>
+            {wochenTage.map((tag, idx) => {
+              const tagNr = new Date(tag + "T00:00:00").getDate();
+              const istHeute = tag === heute;
+              return (
+                <div key={tag} style={{ textAlign: "center", padding: "8px 4px" }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: istHeute ? "#bbf7d0" : "rgba(255,255,255,0.75)", textTransform: "uppercase" }}>{WOCHENTAGE[idx]}</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: "#fff", marginTop: 2, background: istHeute ? "rgba(255,255,255,0.25)" : "transparent", borderRadius: 6, display: "inline-block", padding: "1px 6px" }}>{tagNr}</div>
+                </div>
+              );
+            })}
+          </div>
+          {/* Tagesspalten-Grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
+            {wochenTage.map((tag, idx) => {
+              const termine = (termineNachTag[tag] ?? []);
+              const istHeute = tag === heute;
+              const feiertag = getFeiertag(tag);
+              const abwesenheit = abwesenheiten.find((a: any) => liegtImZeitraum(tag, a.von, a.bis));
+              return (
+                <div
+                  key={tag}
+                  onClick={() => setGewaehlterTag(tag)}
+                  style={{
+                    minHeight: 120,
+                    padding: "8px 5px",
+                    borderRight: idx < 6 ? "1px solid #f3f4f6" : "none",
+                    background: istHeute ? "#f0fdf4" : "transparent",
+                    cursor: "pointer",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 3,
+                  }}
+                >
+                  {feiertag && <div style={{ fontSize: 9, background: "#fef9c3", color: "#854d0e", padding: "2px 4px", borderRadius: 4, fontWeight: 700, textAlign: "center", marginBottom: 2 }}>{feiertag}</div>}
+                  {abwesenheit && <div style={{ fontSize: 9, background: abwesenheit.typ === "urlaub" ? "#dbeafe" : "#fee2e2", color: abwesenheit.typ === "urlaub" ? "#1e40af" : "#b91c1c", padding: "2px 4px", borderRadius: 4, fontWeight: 700, textAlign: "center", marginBottom: 2 }}>{abwesenheit.typ === "urlaub" ? "Urlaub" : "Krank"}</div>}
+                  {termine.length === 0 && !feiertag && !abwesenheit && <div style={{ fontSize: 10, color: "#d1d5db", textAlign: "center", marginTop: 8 }}>—</div>}
+                  {termine.slice(0, 5).map((t: any) => {
+                    const stil = STATUS_STIL[t.status] ?? STATUS_STIL.geplant;
+                    return (
+                      <div key={t.id} style={{ background: stil.hintergrund, borderLeft: `3px solid ${stil.punkt}`, borderRadius: 4, padding: "3px 5px", overflow: "hidden" }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: stil.farbe }}>{String(t.startzeit ?? "").slice(0, 5)}</div>
+                        <div style={{ fontSize: 9.5, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#374151" }}>{t.kundenName ?? `#${t.kundenId}`}</div>
+                      </div>
+                    );
+                  })}
+                  {termine.length > 5 && <div style={{ fontSize: 9, color: "#6b7280", textAlign: "center" }}>+{termine.length - 5}</div>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Monats-Kalenderraster */}
+      {ansicht === "monat" && (
       <div
         style={{
           background: "#fff",
@@ -383,9 +481,10 @@ export default function Kalender() {
                 )}
               </div>
             );
-          })}
+         })}
         </div>
       </div>
+      )}
 
       {/* Legende */}
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 12, fontSize: 11, color: "#6b7280" }}>
