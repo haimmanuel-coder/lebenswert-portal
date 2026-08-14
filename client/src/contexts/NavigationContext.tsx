@@ -28,12 +28,12 @@ export type SeitenId =
   | "urlaub" | "krank" | "benachrichtigungen"
   | "profil" | "leistungsfreigabe" | "buchhaltung"
   | "mitarbeiterakte" | "logbuch" | "vertretungen"
-  | "admindashboard" | "rollenverwaltung" | "kundenzuteilung" | "rbacverwaltung"
+  | "admindashboard" | "rollenverwaltung" | "kundenzuteilung"
   | "besuchsberichte" | "datenschutz" | "integrationen" | "arbeitszentrum"
   | "zweifaktor" | "verfuegbarkeiten" | "analysen" | "backupstatus"
   | "import" | "privatrechnung" | "budget" | "fahrtenabrechnung"
   | "sicherheitsunterweisung" | "meinearbeitssicherheit"
-  | "mobilitaetpage" | "pflegekassen";
+  | "pflegekassen";
 
 type NavigationWert = {
   /** Wechselt zur angegebenen Seite. */

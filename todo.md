@@ -43,6 +43,15 @@
 - [x] Startpasswörter nach einer festgelegten Frist automatisch ungültig machen
 - [x] Admin-Übersicht für offene und abgelaufene Passwortwechsel mit gezielten Folgeaktionen ergänzen
 - [x] Doppelten Controlling-Menüpunkt im Admin-Bereich entfernen und das Dashboard als zentralen Zugang beibehalten
+- [x] Gesamte Navigation auf redundante Menüpunkte prüfen und bereinigen
+- [x] Alle Admin-Dashboards mit einer einheitlichen, eindeutigen Bezeichnung versehen
+- [x] Gesamte Navigation einschließlich Schnellzugriffen und versteckten Seitenkennungen inventarisieren und verbleibende Redundanzen dokumentiert entfernen
+- [x] Einheitliches Namensschema für alle Admin-Dashboards in Navigation, Seitenüberschriften und Schnellzugriffen vollständig anwenden
+- [x] Navigationsvalidierung ergänzen: alle Menüziele erreichbar, keine toten Seitenkennungen und keine doppelt sichtbaren Ziele
+- [x] Gesamte Navigation einschließlich Schnellzugriffen und versteckten Seitenkennungen in einer nachvollziehbaren Inventur dokumentieren und verbleibende Redundanzen bereinigen
+- [x] Verbindliches Namensschema „Admin-Dashboard · Bereich“ in Navigation, Seitenüberschriften und Schnellzugriffen vollständig anwenden
+- [x] Gesamte Navigation mit Codebezug für alle Schnellzugriffe, Seitenkennungen und Rollenpfade vollständig inventarisieren und bereinigen
+- [x] Dashboard-Namensschema „Admin-Dashboard · Bereich“ über alle aktiven Admin-Pfade, Überschriften und Schnellzugriffe vollständig validieren
 
 ## Datenbank & Backend
 - [x] Datenbankschema: mitarbeiter, kunden, einsaetze, leistungen, fahrten

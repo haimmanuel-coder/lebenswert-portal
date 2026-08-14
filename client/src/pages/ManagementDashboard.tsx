@@ -98,7 +98,7 @@ export default function ManagementDashboard() {
     <div className="page-enter">
       {/* Header */}
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 18, fontWeight: 800 }}>Management-Dashboard</div>
+        <div style={{ fontSize: 18, fontWeight: 800 }}>Admin-Dashboard · Management</div>
         <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>Lebenswert Betreuung – Übersicht</div>
       </div>
 

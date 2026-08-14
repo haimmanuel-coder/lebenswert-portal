@@ -104,7 +104,7 @@ export default function AdminDashboard() {
       <div className="lw-page">
         <div className="lw-page-header">
           <div>
-            <div className="lw-page-title">Admin-Dashboard</div>
+            <div className="lw-page-title">Admin-Dashboard · Gesamtübersicht</div>
             <div className="lw-page-subtitle">Lade Daten…</div>
           </div>
         </div>
@@ -142,7 +142,7 @@ export default function AdminDashboard() {
       {/* Header */}
       <div className="lw-page-header">
         <div>
-          <div className="lw-page-title">Admin-Dashboard</div>
+          <div className="lw-page-title">Admin-Dashboard · Gesamtübersicht</div>
           <div className="lw-page-subtitle">{heute}</div>
         </div>
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>

@@ -1,0 +1,35 @@
+client/src/pages/AdminDashboard.tsx:107:            <div className="lw-page-title">Admin-Dashboard</div>
+client/src/pages/AdminDashboard.tsx:145:          <div className="lw-page-title">Admin-Dashboard</div>
+client/src/pages/AdminPanel.tsx:9:import ArbeitssicherheitDashboard from "./ArbeitssicherheitDashboard";
+client/src/pages/AdminPanel.tsx:24:type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo" | "preise" | "sicherheit" | "fuehrerschein" | "compliance" | "compliance-gesamt" | "arbeitssicherheit" | "as-dashboard" | "unterschriften-archiv" | "lohnkosten" | "onboarding" | "csv-import" | "kunden-import" | "einstellungen" | "systemstatus";
+client/src/pages/AdminPanel.tsx:441:          { key: "compliance" as AdminTab, label: "🚦 Compliance-Dashboard" },
+client/src/pages/AdminPanel.tsx:444:          { key: "as-dashboard" as AdminTab, label: "⛑️ Arbeitssicherheits-Dashboard" },
+client/src/pages/AdminPanel.tsx:1099:      {tab === "as-dashboard" && (
+client/src/pages/AnalyseDashboard.tsx:97:          <h1 style={{ fontSize: 22, fontWeight: 800, color: "#1f2937", margin: 0 }}>📊 Analyse-Dashboard</h1>
+client/src/pages/ArbeitssicherheitAdminTab.tsx:83:type SubTab = "dashboard" | "gefaehrdung" | "psa" | "vorsorge" | "unterweisungen" | "nachweise" | "alleinarbeit";
+client/src/pages/ArbeitssicherheitAdminTab.tsx:115:  const create = trpc.arbeitssicherheit.gefaehrdung.create.useMutation({ onSuccess: () => { utils.arbeitssicherheit.gefaehrdung.list.invalidate(); utils.arbeitssicherheit.dashboard.invalidate(); toast.success("Gefährdung erfasst"); }});
+client/src/pages/ArbeitssicherheitAdminTab.tsx:116:  const update = trpc.arbeitssicherheit.gefaehrdung.update.useMutation({ onSuccess: () => { utils.arbeitssicherheit.gefaehrdung.list.invalidate(); utils.arbeitssicherheit.dashboard.invalidate(); }});
+client/src/pages/ArbeitssicherheitAdminTab.tsx:117:  const del = trpc.arbeitssicherheit.gefaehrdung.delete.useMutation({ onSuccess: () => { utils.arbeitssicherheit.gefaehrdung.list.invalidate(); utils.arbeitssicherheit.dashboard.invalidate(); toast.success("Gelöscht"); }});
+client/src/pages/ArbeitssicherheitAdminTab.tsx:289:  const create = trpc.arbeitssicherheit.vorsorge.create.useMutation({ onSuccess: () => { utils.arbeitssicherheit.vorsorge.listAll.invalidate(); utils.arbeitssicherheit.dashboard.invalidate(); toast.success("Vorsorge erfasst"); }});
+client/src/pages/ArbeitssicherheitAdminTab.tsx:290:  const abschliessen = trpc.arbeitssicherheit.vorsorge.abschliessen.useMutation({ onSuccess: () => { utils.arbeitssicherheit.vorsorge.listAll.invalidate(); utils.arbeitssicherheit.dashboard.invalidate(); toast.success("Vorsorge abgeschlossen"); }});
+client/src/pages/ArbeitssicherheitAdminTab.tsx:384:  const create = trpc.arbeitssicherheit.unterweisung.adminCreate.useMutation({ onSuccess: () => { utils.arbeitssicherheit.unterweisung.listAll.invalidate(); utils.arbeitssicherheit.dashboard.invalidate(); toast.success("Unterweisung erfasst"); }});
+client/src/pages/ArbeitssicherheitAdminTab.tsx:512:  const [subTab, setSubTab] = useState<SubTab>("dashboard");
+client/src/pages/ArbeitssicherheitAdminTab.tsx:516:    { key: "dashboard", label: "📊 Übersicht" },
+client/src/pages/ArbeitssicherheitAdminTab.tsx:544:      {subTab === "dashboard" && <DashboardTab />}
+client/src/pages/ArbeitssicherheitDashboard.tsx:313:          <h1 className="text-2xl font-bold text-gray-900">🦺 Arbeitssicherheits-Dashboard</h1>
+client/src/pages/BudgetDashboard.tsx:104:        <h2 style={{ fontSize: 20, fontWeight: 800, color: "#1f2937", margin: 0 }}>📊 Budget-Dashboard</h2>
+client/src/pages/ControllingDashboard.tsx:85:          <h1 className="text-2xl font-bold">Controlling-Dashboard</h1>
+client/src/pages/ControllingPage.tsx:2:import ManagementDashboard from "./ManagementDashboard";
+client/src/pages/ControllingPage.tsx:3:import AnalyseDashboard from "./AnalyseDashboard";
+client/src/pages/ControllingPage.tsx:4:import ControllingDashboard from "./ControllingDashboard";
+client/src/pages/ManagementDashboard.tsx:101:        <div style={{ fontSize: 18, fontWeight: 800 }}>Admin-Dashboard · Management</div>
+client/src/pages/PortalApp.tsx:5:import Dashboard from "./Dashboard";
+client/src/pages/PortalApp.tsx:11:import ManagementDashboard from "./ManagementDashboard";
+client/src/pages/PortalApp.tsx:33:import AdminDashboard from "./AdminDashboard";
+client/src/pages/PortalApp.tsx:42:import AnalyseDashboard from "./AnalyseDashboard";
+client/src/pages/PortalApp.tsx:149:        setActivePage("admindashboard");
+client/src/pages/PortalApp.tsx:194:      title: "🏠 Dashboard",
+client/src/pages/PortalApp.tsx:197:        ...(isAdmin ? [{ id: "admindashboard" as PageId, icon: "🚦", label: "Admin-Dashboard", adminOnly: true }] : []),
+client/src/pages/PortalApp.tsx:306:      case "admindashboard": return <AdminDashboard />;
+client/src/pages/PortalApp.tsx:325:  const currentPageLabel = sections.flatMap(s => s.items).find(i => i.id === activePage)?.label ?? "Dashboard";
+client/src/components/KiAssistent.tsx:142:        aktiveSeite: aktiveSeite ?? "Dashboard",

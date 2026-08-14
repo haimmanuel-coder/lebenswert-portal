@@ -94,7 +94,7 @@ export default function AnalyseDashboard() {
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: "#1f2937", margin: 0 }}>📊 Analyse-Dashboard</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: "#1f2937", margin: 0 }}>📊 Admin-Dashboard · Analysen</h1>
           <p style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>Auswertungen und Kennzahlen für Lebenswert Betreuung</p>
         </div>
         <button onClick={exportCSV} style={{ background: "#f3f4f6", color: "#374151", border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>

@@ -310,7 +310,7 @@ export default function ArbeitssicherheitDashboard() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">🦺 Arbeitssicherheits-Dashboard</h1>
+          <h1 className="text-2xl font-bold text-gray-900">🦺 Admin-Dashboard · Arbeitssicherheit</h1>
           <p className="text-sm text-gray-500 mt-0.5">Fälligkeiten, Ampelstatus und Gefährdungsbeurteilungen im Überblick</p>
         </div>
         <div className="flex gap-2">

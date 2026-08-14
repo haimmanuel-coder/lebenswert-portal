@@ -194,8 +194,7 @@ export default function PortalApp() {
       title: "🏠 Dashboard",
       items: [
         { id: "home", icon: "🏠", label: "Übersicht" },
-        ...(isAdmin ? [{ id: "admindashboard" as PageId, icon: "🚦", label: "Ampel-Dashboard", adminOnly: true }] : []),
-        { id: "benachrichtigungen", icon: "🔔", label: "Benachrichtigungen", badge: gesamtBadge },
+        ...(isAdmin || isTeamleitung ? [{ id: "admindashboard" as PageId, icon: "🚦", label: "Admin-Dashboard · Gesamtübersicht", adminOnly: true }] : []),
       ],
     },
     // ── 📅 PLANUNG ────────────────────────────────────────────────────────

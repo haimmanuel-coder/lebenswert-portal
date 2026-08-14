@@ -71,7 +71,7 @@ export default function ComplianceAmpelTab() {
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, color: "#111", margin: 0 }}>
-          🚦 Compliance-Ampel
+          🚦 Admin-Dashboard · Compliance
         </h2>
         <p style={{ color: "#6b7280", fontSize: 13, marginTop: 4 }}>
           Übersicht aller aktiven Mitarbeiter – Dokumente, Zertifikate, Verträge auf einen Blick.
