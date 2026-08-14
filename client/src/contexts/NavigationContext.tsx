@@ -30,7 +30,7 @@ export type SeitenId =
   | "mitarbeiterakte" | "logbuch" | "vertretungen"
   | "admindashboard" | "rollenverwaltung" | "kundenzuteilung"
   | "besuchsberichte" | "datenschutz" | "integrationen" | "arbeitszentrum"
-  | "zweifaktor" | "verfuegbarkeiten" | "analysen" | "backupstatus"
+  | "zweifaktor" | "analysen" | "backupstatus"
   | "import" | "privatrechnung" | "budget" | "fahrtenabrechnung"
   | "sicherheitsunterweisung" | "meinearbeitssicherheit"
   | "pflegekassen";

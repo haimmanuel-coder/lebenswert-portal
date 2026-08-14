@@ -38,7 +38,6 @@ import Datenschutz from "./Datenschutz";
 import Integrationen from "./Integrationen";
 import PflichtenheftCenter from "./PflichtenheftCenter";
 import ZweiFaktor from "./ZweiFaktor";
-import Verfuegbarkeiten from "./Verfuegbarkeiten";
 import AnalyseDashboard from "./AnalyseDashboard";
 import BackupStatus from "./BackupStatus";
 import OnboardingTour, { useOnboardingTour } from "@/components/OnboardingTour";
@@ -204,7 +203,6 @@ export default function PortalApp() {
       items: [
         { id: "planung", icon: "📅", label: "Einsatzplanung", badge: planungsBadge },
         { id: "kalender", icon: "📆", label: "Kalender" },
-        { id: "verfuegbarkeiten" as PageId, icon: "🕐", label: "Verfügbarkeiten" },
         ...(isAdmin || isTeamleitung ? [{ id: "kundenzuteilung" as PageId, icon: "📌", label: "Kundenzuteilung", adminOnly: true }] : []),
       ],
     },
@@ -312,7 +310,6 @@ export default function PortalApp() {
       case "integrationen": return <Integrationen />;
       case "arbeitszentrum": return <PflichtenheftCenter />;
       case "zweifaktor": return <ZweiFaktor />;
-      case "verfuegbarkeiten": return <Verfuegbarkeiten />;
       case "analysen": return <AnalyseDashboard />;
       case "backupstatus": return <BackupStatus />;
       case "import": return <ImportAssistent />;

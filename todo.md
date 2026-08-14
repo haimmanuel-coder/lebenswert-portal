@@ -67,6 +67,7 @@
 - [x] Batch-Protokoll technisch aus dem tatsächlichen Lauf ohne Klartextpasswörter erzeugen
 - [x] Zugangskarten-Batchlauf ohne Hintergrundprozess sauber beenden
 - [x] Auditdaten aus den realen Mitarbeiterdaten dynamisch berechnen und den erfolgreichen Batchlauf nachweisen
+- [x] Menüpunkt „Verfügbarkeiten" vollständig aus der Navigation entfernen
 
 ## Datenbank & Backend
 - [x] Datenbankschema: mitarbeiter, kunden, einsaetze, leistungen, fahrten
