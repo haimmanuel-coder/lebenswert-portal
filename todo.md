@@ -42,6 +42,7 @@
 - [x] Passwortstärke im Erstlogin-Dialog als verständliche visuelle Anzeige darstellen
 - [x] Startpasswörter nach einer festgelegten Frist automatisch ungültig machen
 - [x] Admin-Übersicht für offene und abgelaufene Passwortwechsel mit gezielten Folgeaktionen ergänzen
+- [x] Doppelten Controlling-Menüpunkt im Admin-Bereich entfernen und das Dashboard als zentralen Zugang beibehalten
 
 ## Datenbank & Backend
 - [x] Datenbankschema: mitarbeiter, kunden, einsaetze, leistungen, fahrten

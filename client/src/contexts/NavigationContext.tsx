@@ -31,9 +31,9 @@ export type SeitenId =
   | "admindashboard" | "rollenverwaltung" | "kundenzuteilung" | "rbacverwaltung"
   | "besuchsberichte" | "datenschutz" | "integrationen" | "arbeitszentrum"
   | "zweifaktor" | "verfuegbarkeiten" | "analysen" | "backupstatus"
-  | "import" | "privatrechnung" | "budget" | "controlling" | "fahrtenabrechnung"
+  | "import" | "privatrechnung" | "budget" | "fahrtenabrechnung"
   | "sicherheitsunterweisung" | "meinearbeitssicherheit"
-  | "controllingpage" | "mobilitaetpage" | "pflegekassen";
+  | "mobilitaetpage" | "pflegekassen";
 
 type NavigationWert = {
   /** Wechselt zur angegebenen Seite. */

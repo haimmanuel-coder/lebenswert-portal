@@ -51,8 +51,6 @@ import { PasswortwechselPflichtModal } from "@/components/PasswortwechselPflicht
 import Einsatzplanung from "./Einsatzplanung";
 import ImportAssistent from "./ImportAssistent";
 import BudgetVerwaltung from "./BudgetVerwaltung";
-import ControllingDashboard from "./ControllingDashboard";
-import ControllingPage from "./ControllingPage";
 import FahrtenAbrechnung from "./FahrtenAbrechnung";
 import Privatrechnung from "./Privatrechnung";
 import { NavigationProvider, type SeitenId } from "@/contexts/NavigationContext";
@@ -148,7 +146,7 @@ export default function PortalApp() {
     if (mitarbeiter && !startPageSet) {
       setStartPageSet(true);
       if (mitarbeiter.rolle === "admin" || mitarbeiter.rolle === "teamleitung") {
-        setActivePage("controllingpage");
+        setActivePage("admindashboard");
       } else {
         // Mitarbeiter starten bewusst mit ihren offenen Informationen. Erst danach
         // führt der sichtbare Primärbutton logisch in die Zwei-Wochen-Planung.
@@ -220,6 +218,7 @@ export default function PortalApp() {
           { id: "pflegekassen" as PageId, icon: "🏥", label: "Pflegekassen", adminOnly: true },
           { id: "budget" as PageId, icon: "💰", label: "Budgetverwaltung", adminOnly: true },
         ] : []),
+        ...(isAdmin || isTeamleitung ? [{ id: "privatrechnung" as PageId, icon: "🩺", label: "Kundenbegleitungen", adminOnly: true }] : []),
         { id: "besuchsberichte" as PageId, icon: "📋", label: "Dokumentation" },
         { id: "lnw", icon: "📝", label: "Leistungsnachweise", badge: offenCount > 0 ? offenCount : undefined },
       ],
@@ -237,14 +236,6 @@ export default function PortalApp() {
         { id: "zweifaktor" as PageId, icon: "🔒", label: "2FA-Sicherheit" },
       ],
     },
-    // ── 📈 CONTROLLING ────────────────────────────────────────────────────
-    ...(isAdmin || isTeamleitung ? [{
-      title: "📈 Controlling",
-      items: [
-        { id: "controllingpage" as PageId, icon: "📈", label: "Controlling", adminOnly: true },
-        { id: "privatrechnung" as PageId, icon: "🩺", label: "Kundenbegleitungen", adminOnly: true },
-      ],
-    }] : []),
     // ── ✅ QUALITÄT & COMPLIANCE ──────────────────────────────────────────
     {
       title: "✅ Qualität",
@@ -326,8 +317,6 @@ export default function PortalApp() {
       case "backupstatus": return <BackupStatus />;
       case "import": return <ImportAssistent />;
       case "budget": return <BudgetVerwaltung />;
-      case "controlling": return <ControllingDashboard />;
-      case "controllingpage": return <ControllingPage />;
       case "fahrtenabrechnung": return <FahrtenAbrechnung />;
       case "privatrechnung": return <Privatrechnung />;
       default: return <Dashboard />;
