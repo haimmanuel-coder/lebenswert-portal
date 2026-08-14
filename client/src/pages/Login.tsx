@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { usePortalAuth, setStoredToken } from "@/contexts/PortalAuthContext";
 
@@ -13,6 +13,17 @@ export default function Login() {
   const [error, setError] = useState("");
   const [resetResult, setResetResult] = useState<{ token?: string; name?: string } | null>(null);
   const { refetch } = usePortalAuth();
+
+  // Der QR-Code der Zugangskarte enthält nur den Portal-Link und die E-Mail.
+  // Das Passwort bleibt ausschließlich auf der gedruckten Karte.
+  useEffect(() => {
+    const emailAusQr = new URLSearchParams(window.location.search).get("email")?.trim().toLowerCase() ?? "";
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailAusQr)) {
+      setEmail(emailAusQr);
+      setResetEmail(emailAusQr);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
 
   // ── Login ──────────────────────────────────────────
   const loginMutation = trpc.portal.login.useMutation({

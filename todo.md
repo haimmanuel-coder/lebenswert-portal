@@ -54,6 +54,11 @@
 - [x] Dashboard-Namensschema „Admin-Dashboard · Bereich“ über alle aktiven Admin-Pfade, Überschriften und Schnellzugriffe vollständig validieren
 - [x] Mobile Kurz-Navigation mit den wichtigsten Arbeitswegen für Smartphones bereitstellen
 - [x] Einmalige Startpasswort-Erstellung und druckbare Zugangskarten für bestehende Mitarbeiter im aktuellen Admin-Menü reparieren
+- [x] Mobile Tagesroutenansicht mit Kunden, Uhrzeiten und offenem Einsatzstatus bereitstellen
+- [x] Schnellbutton „Besuch abschließen“ direkt in der mobilen Tagesroute ergänzen
+- [x] Rote Erinnerungszahl für offene Einsätze im mobilen Kurzmenü anzeigen
+- [x] Zugangskarten um sicheren QR-Code für Portal-Link und E-Mail-Vorbefüllung ohne Passwort ergänzen
+- [x] Mobile Tagesroute um einen klar sichtbaren Einsatzstatus ergänzen
 
 ## Datenbank & Backend
 - [x] Datenbankschema: mitarbeiter, kunden, einsaetze, leistungen, fahrten

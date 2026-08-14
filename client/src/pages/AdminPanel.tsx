@@ -15,7 +15,9 @@ import KundenCsvImportTab from "./KundenCsvImportTab";
 import EinstellungenTab from "./EinstellungenTab";
 import { useState, useEffect, useRef } from "react";
 import { startPasswortGueltigBis, startPasswortLaeuftAb } from "@shared/passwordPolicy";
+import { erstelleZugangskartenQrZiel } from "@shared/zugangskartenQr";
 import * as XLSX from "xlsx";
+import QRCode from "qrcode";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import BottomSheet from "@/components/BottomSheet";
@@ -219,12 +221,16 @@ export default function AdminPanel() {
     onSuccess: (data: any) => { const karten = data.karten ?? []; if (karten.length === 0) { direktDruckAngefordert.current = false; toast.error("Es wurden keine Zugangskarten erstellt."); return; } setZugangskarten(karten); refetchMa(); if (direktDruckAngefordert.current) { direktDruckAngefordert.current = false; setAutoDruckKarten(karten); } else { setZugangskartenDialog(true); } toast.success(`${karten.length} Zugangskarten wurden erstellt. Bitte jetzt anzeigen oder drucken.`); },
     onError: (e: any) => { direktDruckAngefordert.current = false; toast.error("❌ Zugangskarten konnten nicht erstellt werden: " + e.message); },
   });
-  const druckeZugangskarten = (kartenZumDruck = zugangskarten) => {
+  const druckeZugangskarten = async (kartenZumDruck = zugangskarten) => {
     if (kartenZumDruck.length === 0) { toast.error("Es liegen keine druckbereiten Zugangskarten vor."); return; }
     const esc = (wert: string) => wert.replace(/[&<>'"]/g, zeichen => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[zeichen] ?? zeichen));
-    const einzelneKarte = (karte: Zugangskarte) => `<article class="karte"><div class="schnitt">✂ Entlang der gestrichelten Linie ausschneiden</div><div class="logo">Lebenswert Betreuung</div><h1>Ihre Zugangsdaten</h1><p><b>Name</b><br>${esc(`${karte.vorname} ${karte.nachname}`)}</p><p><b>E-Mail</b><br>${esc(karte.email)}</p><p><b>Einmaliges Startpasswort</b><br><code>${esc(karte.startpasswort)}</code></p><div class="hinweis"><b>1.</b> portal.lebenswert-betreuung.de öffnen<br><b>2.</b> Mit E-Mail und Startpasswort anmelden<br><b>3.</b> Persönliches Passwort festlegen</div><div class="sicherheit"><b>🔒 Sicherheitshinweis</b><br>Dieses Startpasswort ist nur einmal gültig. Bitte ändern Sie es direkt nach dem ersten Login in ein persönliches Passwort und geben Sie Ihre Zugangsdaten niemals weiter.</div></article>`;
-    const seiten = Array.from({ length: Math.ceil(kartenZumDruck.length / 4) }, (_, index) => `<section class="druckseite">${kartenZumDruck.slice(index * 4, index * 4 + 4).map(einzelneKarte).join("")}</section>`).join("");
-    setDruckVorschauHtml(`<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Zugangskarten zum Ausschneiden</title><style>@page{size:A4;margin:10mm}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:#173a1a}.druckseite{height:277mm;display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(2,1fr)}.druckseite:not(:last-child){break-after:page}.karte{border:1.5px dashed #64748b;padding:8mm;min-width:0;overflow:hidden}.schnitt{font-size:8px;color:#64748b;text-align:right;margin-bottom:4mm}.logo{font-size:15px;font-weight:800;color:#4a8c3f;letter-spacing:.2px}h1{font-size:18px;margin:4mm 0 6mm;color:#173a1a}p{font-size:12px;line-height:1.4;margin:0 0 4mm}code{display:inline-block;margin-top:1mm;font-size:13px;background:#eff6eb;padding:4px 6px;border-radius:4px;letter-spacing:.25px;word-break:break-all}.hinweis{border-top:1px solid #d1d5db;padding-top:4mm;font-size:10px;line-height:1.55;color:#374151}.sicherheit{margin-top:4mm;padding:3mm 4mm;background:#fff7ed;border:1px solid #fdba74;border-radius:4px;font-size:9px;line-height:1.4;color:#7c2d12}@media print{.druckseite{break-inside:avoid}.karte{break-inside:avoid}}</style></head><body>${seiten}</body></html>`);
+    const einzelneKarte = async (karte: Zugangskarte) => {
+      const qrZiel = erstelleZugangskartenQrZiel(karte.email);
+      const qrCode = await QRCode.toDataURL(qrZiel, { errorCorrectionLevel: "M", margin: 0, width: 132, color: { dark: "#173a1a", light: "#ffffff" } });
+      return `<article class="karte"><div class="schnitt">✂ Entlang der gestrichelten Linie ausschneiden</div><div class="logo">Lebenswert Betreuung</div><h1>Ihre Zugangsdaten</h1><p><b>Name</b><br>${esc(`${karte.vorname} ${karte.nachname}`)}</p><p><b>E-Mail</b><br>${esc(karte.email)}</p><p><b>Einmaliges Startpasswort</b><br><code>${esc(karte.startpasswort)}</code></p><div class="qr"><img src="${qrCode}" alt="QR-Code zum Mitarbeiter-Portal"><span>Mit dem Smartphone scannen.<br>Die E-Mail wird sicher vorbefüllt.</span></div><div class="hinweis"><b>1.</b> QR-Code scannen oder portal.lebenswert-betreuung.de öffnen<br><b>2.</b> Mit E-Mail und Startpasswort anmelden<br><b>3.</b> Persönliches Passwort festlegen</div><div class="sicherheit"><b>🔒 Sicherheitshinweis</b><br>Dieses Startpasswort ist nur einmal gültig. Bitte ändern Sie es direkt nach dem ersten Login in ein persönliches Passwort und geben Sie Ihre Zugangsdaten niemals weiter.</div></article>`;
+    };
+    const seiten = (await Promise.all(Array.from({ length: Math.ceil(kartenZumDruck.length / 4) }, async (_, index) => `<section class="druckseite">${(await Promise.all(kartenZumDruck.slice(index * 4, index * 4 + 4).map(einzelneKarte))).join("")}</section>`))).join("");
+    setDruckVorschauHtml(`<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Zugangskarten zum Ausschneiden</title><style>@page{size:A4;margin:10mm}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:#173a1a}.druckseite{height:277mm;display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(2,1fr)}.druckseite:not(:last-child){break-after:page}.karte{border:1.5px dashed #64748b;padding:8mm;min-width:0;overflow:hidden}.schnitt{font-size:8px;color:#64748b;text-align:right;margin-bottom:4mm}.logo{font-size:15px;font-weight:800;color:#4a8c3f;letter-spacing:.2px}h1{font-size:18px;margin:4mm 0 6mm;color:#173a1a}p{font-size:12px;line-height:1.4;margin:0 0 4mm}code{display:inline-block;margin-top:1mm;font-size:13px;background:#eff6eb;padding:4px 6px;border-radius:4px;letter-spacing:.25px;word-break:break-all}.qr{display:flex;align-items:center;gap:7px;margin:3mm 0 4mm;padding:3mm;background:#f8fafc;border:1px solid #dbe4ee;border-radius:4px}.qr img{width:27mm;height:27mm;image-rendering:pixelated}.qr span{font-size:9px;line-height:1.4;color:#475569}.hinweis{border-top:1px solid #d1d5db;padding-top:4mm;font-size:10px;line-height:1.55;color:#374151}.sicherheit{margin-top:4mm;padding:3mm 4mm;background:#fff7ed;border:1px solid #fdba74;border-radius:4px;font-size:9px;line-height:1.4;color:#7c2d12}@media print{.druckseite{break-inside:avoid}.karte{break-inside:avoid}}</style></head><body>${seiten}</body></html>`);
     setDruckVorschauOffen(true);
   };
   const starteDirektdruck = (mitarbeiterIds: number[], bezeichnung: string) => {
@@ -235,7 +241,7 @@ export default function AdminPanel() {
   useEffect(() => {
     if (!autoDruckKarten) return;
     setAutoDruckKarten(null);
-    druckeZugangskarten(autoDruckKarten);
+    void druckeZugangskarten(autoDruckKarten);
   }, [autoDruckKarten]);
   const deleteMa = trpc.admin.mitarbeiterDelete.useMutation({
     onSuccess: () => { refetchMa(); toast.success("🗑️ Mitarbeiter gelöscht"); setDeleteDialogMa(null); setDeleteBestaetigung(""); },

@@ -138,6 +138,7 @@ export default function PortalApp() {
   const planungsBadge = (isAdmin || isTeamleitung)
     ? (planungsWarnungen.length > 0 ? planungsWarnungen.length : undefined)
     : (heutigeEinsaetze.length > 0 ? heutigeEinsaetze.length : undefined);
+  const offeneEinsatzBadge = heutigeEinsaetze.length > 0 ? heutigeEinsaetze.length : undefined;
   // Offene Pflicht-Sicherheitsunterweisungen für Badge
   const { data: sicherheitOffen } = (trpc as any).sicherheitsunterweisung.countOffen.useQuery();
   const sicherheitBadge = (sicherheitOffen as any)?.count > 0 ? (sicherheitOffen as any).count : undefined;
@@ -607,11 +608,11 @@ export default function PortalApp() {
             {[
               { id: (isAdmin || isTeamleitung ? "admindashboard" : "home") as PageId, icon: "⌂", label: "Übersicht" },
               { id: "planung" as PageId, icon: "◫", label: "Planung" },
-              { id: "einsaetze" as PageId, icon: "✓", label: "Einsätze" },
+              { id: "einsaetze" as PageId, icon: "✓", label: "Einsätze", badge: offeneEinsatzBadge },
               { id: "fahrt" as PageId, icon: "⌁", label: "Mobilität" },
             ].map((item) => {
               const aktiv = activePage === item.id && kundenDetailId === null;
-              return <button key={item.id} onClick={() => navTo(item.id)} aria-current={aktiv ? "page" : undefined} style={{ border: "none", borderRadius: 8, background: aktiv ? "#edf7ea" : "transparent", color: aktiv ? "#2f6d29" : "#64748b", cursor: "pointer", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 2, fontSize: 10, fontWeight: aktiv ? 800 : 650, minWidth: 0 }}><span style={{ fontSize: 20, lineHeight: 1 }}>{item.icon}</span><span style={{ whiteSpace: "nowrap" }}>{item.label}</span></button>;
+              return <button key={item.id} onClick={() => navTo(item.id)} aria-current={aktiv ? "page" : undefined} style={{ border: "none", borderRadius: 8, background: aktiv ? "#edf7ea" : "transparent", color: aktiv ? "#2f6d29" : "#64748b", cursor: "pointer", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 2, fontSize: 10, fontWeight: aktiv ? 800 : 650, minWidth: 0, position: "relative" }}><span style={{ fontSize: 20, lineHeight: 1 }}>{item.icon}</span>{item.badge ? <span style={{ position: "absolute", top: 1, right: "calc(50% - 17px)", minWidth: 16, height: 16, padding: "0 4px", borderRadius: 9, background: "#dc2626", color: "#fff", fontSize: 9, fontWeight: 850, display: "grid", placeItems: "center", border: "2px solid #fff" }}>{item.badge > 99 ? "99+" : item.badge}</span> : null}<span style={{ whiteSpace: "nowrap" }}>{item.label}</span></button>;
             })}
             <button onClick={() => setSidebarOpen(true)} aria-label="Weiteres Menü öffnen" style={{ border: "none", borderRadius: 8, background: sidebarOpen ? "#edf7ea" : "transparent", color: sidebarOpen ? "#2f6d29" : "#64748b", cursor: "pointer", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 2, fontSize: 10, fontWeight: 650 }}><span style={{ fontSize: 20, lineHeight: 1 }}>☰</span><span>Mehr</span></button>
           </nav>

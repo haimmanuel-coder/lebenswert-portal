@@ -36,6 +36,7 @@ import BottomSheet from "@/components/BottomSheet";
 import SignatureCanvas from "@/components/SignatureCanvas";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useNavigation, type SeitenId } from "@/contexts/NavigationContext";
+import { useIsMobile } from "@/hooks/useMobile";
 import { formatEuro, formatStunden } from "@shared/planungsLogik";
 
 function fmtDate(d: string | Date | null) {
@@ -157,6 +158,7 @@ function WarnungsListe() {
 export default function Dashboard() {
   const { mitarbeiter } = usePortalAuth();
   const { navigiere } = useNavigation();
+  const isMobile = useIsMobile();
   const [abschlussOpen, setAbschlussOpen] = useState(false);
   const [activeEinsatz, setActiveEinsatz] = useState<{ id: number; name: string; datum: string } | null>(null);
   const [bericht, setBericht] = useState("");
@@ -220,6 +222,9 @@ export default function Dashboard() {
       return da.localeCompare(db2);
     })
     .slice(0, 4);
+  const offeneHeute = todayE
+    .filter((e) => e.status === "geplant")
+    .sort((a, b) => String(a.startzeit ?? "").localeCompare(String(b.startzeit ?? "")));
 
   const h = new Date().getHours();
   const greet = h < 12 ? "Guten Morgen" : h < 18 ? "Guten Tag" : "Guten Abend";
@@ -591,6 +596,25 @@ export default function Dashboard() {
         </button>
       </div>
 
+      {/* Smartphone: klare Tagesroute mit direktem Abschluss statt Navigation über mehrere Seiten. */}
+      {isMobile && (
+        <section style={{ background: "linear-gradient(145deg,#f0f9ee,#ffffff)", border: "1px solid #cce4c7", borderRadius: 14, padding: 14, marginBottom: 12, boxShadow: "0 2px 10px rgba(45,106,39,.08)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
+            <div><div style={{ fontSize: 15, fontWeight: 850, color: "#173a1a" }}>Ihre Tagesroute</div><div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Heute · {offeneHeute.length} offen</div></div>
+            {offeneHeute.length > 0 && <span style={{ minWidth: 22, height: 22, borderRadius: 11, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "#dc2626", color: "#fff", fontSize: 11, fontWeight: 850 }}>{offeneHeute.length}</span>}
+          </div>
+          {offeneHeute.length === 0 ? (
+            <div style={{ padding: "10px 0", color: "#2f6d29", fontSize: 13, fontWeight: 650 }}>✓ Alle heutigen Einsätze sind abgeschlossen.</div>
+          ) : offeneHeute.map((e, index) => (
+            <div key={e.id} style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 0", borderTop: index ? "1px solid #dcebd8" : "none" }}>
+              <div style={{ width: 25, height: 25, borderRadius: "50%", display: "grid", placeItems: "center", flexShrink: 0, background: "#4a8c3f", color: "#fff", fontSize: 11, fontWeight: 850 }}>{index + 1}</div>
+              <div style={{ minWidth: 0, flex: 1 }}><div style={{ fontSize: 13, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{getKundeName(e.kundenId)}</div><div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>{String(e.startzeit ?? "").slice(0, 5)} Uhr · {e.dauerStunden} Std. <span style={{ marginLeft: 4, display: "inline-block", padding: "1px 5px", borderRadius: 8, background: "#fee2e2", color: "#b91c1c", fontWeight: 800 }}>Offen</span></div></div>
+              <button onClick={() => handleAbschluss(e.id, getKundeName(e.kundenId), today)} style={{ flexShrink: 0, background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 8, padding: "8px 9px", fontSize: 11, fontWeight: 800, cursor: "pointer" }}>Abschließen</button>
+            </div>
+          ))}
+        </section>
+      )}
+
       {/* Heute */}
       <div className="card" style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 10px rgba(0,0,0,.08)", padding: 16, marginBottom: 12 }}>
         <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -629,13 +653,13 @@ export default function Dashboard() {
                   {e.status === "geplant" && (
                     <div>
                       <button
-                        onClick={() => navigiere("einsaetze")}
+                        onClick={() => handleAbschluss(e.id, getKundeName(e.kundenId), datum)}
                         style={{
                           marginTop: 6, padding: "7px 12px", background: "#4a8c3f", color: "#fff",
                           border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer",
                         }}
                       >
-                        Besuch dokumentieren
+                        Besuch abschließen
                       </button>
                     </div>
                   )}
