@@ -59,6 +59,14 @@
 - [x] Rote Erinnerungszahl für offene Einsätze im mobilen Kurzmenü anzeigen
 - [x] Zugangskarten um sicheren QR-Code für Portal-Link und E-Mail-Vorbefüllung ohne Passwort ergänzen
 - [x] Mobile Tagesroute um einen klar sichtbaren Einsatzstatus ergänzen
+- [x] Für alle aktiven Mitarbeiter neue einmalige Startpasswörter setzen und Wechselpflicht aktivieren
+- [x] Ausschneidbares PDF mit Zugangskarten, QR-Code, E-Mail, Startpasswort und Sicherheitshinweis sicher erzeugen
+- [x] Umfang der Zugangskarten-Ausgabe für aktive Mitarbeiter, fehlende E-Mails und bewusst ausgeschlossene Admins nachvollziehbar validieren
+- [x] Einmalige Zugangskarten-Ausgabe ohne Klartextpasswörter im Batch-Protokoll dokumentieren
+- [x] Zugangskarten-Batchlauf ohne temporäre Klartextpasswort-Dateien auf dem Dateisystem absichern
+- [x] Batch-Protokoll technisch aus dem tatsächlichen Lauf ohne Klartextpasswörter erzeugen
+- [x] Zugangskarten-Batchlauf ohne Hintergrundprozess sauber beenden
+- [x] Auditdaten aus den realen Mitarbeiterdaten dynamisch berechnen und den erfolgreichen Batchlauf nachweisen
 
 ## Datenbank & Backend
 - [x] Datenbankschema: mitarbeiter, kunden, einsaetze, leistungen, fahrten
