@@ -2,7 +2,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { usePortalAuth } from "@/contexts/PortalAuthContext";
 import { trpc } from "@/lib/trpc";
-import { pruefeSicheresPasswort, SICHERES_PASSWORT_HINWEIS } from "@shared/passwordPolicy";
+import { bewertePasswortStaerke, pruefeSicheresPasswort, SICHERES_PASSWORT_HINWEIS } from "@shared/passwordPolicy";
 
 export function PasswortwechselPflichtModal() {
   const { mitarbeiter, refetch, logout } = usePortalAuth();
@@ -20,6 +20,7 @@ export function PasswortwechselPflichtModal() {
 
   if (!mitarbeiter?.passwortWechselErforderlich) return null;
   const pruefung = pruefeSicheresPasswort(neuesPasswort);
+  const staerke = bewertePasswortStaerke(neuesPasswort);
   const istGueltig = pruefung.gueltig && neuesPasswort === wiederholung && altesPasswort.length > 0;
 
   return (
@@ -33,6 +34,7 @@ export function PasswortwechselPflichtModal() {
         <label style={labelStyle}>Neues persönliches Passwort</label>
         <input autoComplete="new-password" type="password" value={neuesPasswort} onChange={(event) => setNeuesPasswort(event.target.value)} style={inputStyle} />
         <div style={{ fontSize: 12, color: "#6b7280", margin: "-6px 0 10px" }}>{SICHERES_PASSWORT_HINWEIS}</div>
+        <div aria-label={`Passwortstärke: ${staerke.label}`} style={{ margin: "0 0 10px" }}><div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#64748b", marginBottom: 4 }}><span>Passwortstärke</span><strong style={{ color: neuesPasswort ? staerke.farbe : "#64748b" }}>{neuesPasswort ? staerke.label : "Noch nicht bewertet"}</strong></div><div style={{ height: 6, background: "#e5e7eb", borderRadius: 999, overflow: "hidden" }}><div style={{ width: `${staerke.punkte * 20}%`, height: "100%", background: staerke.farbe, transition: "width 160ms ease-out" }} /></div></div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "5px 10px", margin: "0 0 12px", fontSize: 11 }}>
           {[[pruefung.mindestlaenge, "Mindestens 12 Zeichen"], [pruefung.grossbuchstabe, "Großbuchstabe"], [pruefung.kleinbuchstabe, "Kleinbuchstabe"], [pruefung.ziffer, "Zahl"], [pruefung.sonderzeichen, "Sonderzeichen"]].map(([erfuellt, text]) => <span key={String(text)} style={{ color: erfuellt ? "#15803d" : "#64748b", fontWeight: erfuellt ? 700 : 500 }}>{erfuellt ? "✓" : "○"} {text}</span>)}
         </div>

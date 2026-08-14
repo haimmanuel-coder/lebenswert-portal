@@ -14,6 +14,7 @@ import CsvImportTab from "./CsvImportTab";
 import KundenCsvImportTab from "./KundenCsvImportTab";
 import EinstellungenTab from "./EinstellungenTab";
 import { useState, useEffect, useRef } from "react";
+import { startPasswortGueltigBis, startPasswortLaeuftAb } from "@shared/passwordPolicy";
 import * as XLSX from "xlsx";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -65,14 +66,28 @@ export default function AdminPanel() {
   const [maBeschFilter, setMaBeschFilter] = useState<"alle" | "minijob" | "teilzeit" | "vollzeit">("alle");
   const [maZeigeInaktiv, setMaZeigeInaktiv] = useState(false);
   const [zeigeZugangskartenTabelle, setZeigeZugangskartenTabelle] = useState(true);
+  const [zugangskartenStatusFilter, setZugangskartenStatusFilter] = useState<"alle" | "offen" | "abgelaufen">("alle");
 
   const { data: maList = [], refetch: refetchMa } = trpc.admin.mitarbeiterList.useQuery();
   const sichtbareZugangskartenMitarbeiter = maList
     .filter(ma => ma.rolle !== "admin")
     .filter(ma => maZeigeInaktiv || ma.aktiv)
     .filter(ma => maBeschFilter === "alle" || (ma as any).beschaeftigungsart === maBeschFilter)
-    .filter(ma => !maSearch.trim() || `${ma.vorname} ${ma.nachname} ${ma.email}`.toLowerCase().includes(maSearch.toLowerCase()));
+    .filter(ma => !maSearch.trim() || `${ma.vorname} ${ma.nachname} ${ma.email}`.toLowerCase().includes(maSearch.toLowerCase()))
+    .filter(ma => {
+      const offen = Boolean((ma as any).passwortWechselErforderlich);
+      const abgelaufen = offen && startPasswortLaeuftAb((ma as any).startPasswortErstelltAt);
+      return zugangskartenStatusFilter === "alle" || (zugangskartenStatusFilter === "offen" && offen && !abgelaufen) || (zugangskartenStatusFilter === "abgelaufen" && abgelaufen);
+    });
   const druckbareZugangskartenMitarbeiter = sichtbareZugangskartenMitarbeiter.filter(ma => Boolean(ma.aktiv));
+  const zugangskartenKpis = maList.filter(ma => Boolean(ma.aktiv) && ma.rolle !== "admin").reduce((werte, ma) => {
+    const offen = Boolean((ma as any).passwortWechselErforderlich);
+    const abgelaufen = offen && startPasswortLaeuftAb((ma as any).startPasswortErstelltAt);
+    if (abgelaufen) werte.abgelaufen += 1;
+    else if (offen) werte.offen += 1;
+    else if ((ma as any).startPasswortErstelltAt) werte.abgeschlossen += 1;
+    return werte;
+  }, { offen: 0, abgelaufen: 0, abgeschlossen: 0 });
   const createMa = trpc.admin.mitarbeiterCreate.useMutation({
     onSuccess: (_data, variables) => { setZugangskarten([{ vorname: variables.vorname, nachname: variables.nachname, email: variables.email, rolle: variables.rolle, startpasswort: variables.passwort }]); setZugangskartenDialog(true); refetchMa(); toast.success("✅ Mitarbeiter angelegt – Zugangskarte jetzt ausgeben."); resetMaForm(); setMaSheet(false); },
     onError: (e) => toast.error("❌ " + e.message),
@@ -467,18 +482,25 @@ export default function AdminPanel() {
               </div>
             </div>
             {zeigeZugangskartenTabelle && (
+              <>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+                  {([['alle', `Alle (${zugangskartenKpis.offen + zugangskartenKpis.abgelaufen + zugangskartenKpis.abgeschlossen})`, '#475569', '#f1f5f9'], ['offen', `Wechsel offen (${zugangskartenKpis.offen})`, '#92400e', '#fef3c7'], ['abgelaufen', `Abgelaufen (${zugangskartenKpis.abgelaufen})`, '#b91c1c', '#fee2e2']] as const).map(([wert, label, farbe, bg]) => <button key={wert} onClick={() => setZugangskartenStatusFilter(wert)} style={{ padding: '5px 9px', borderRadius: 20, border: zugangskartenStatusFilter === wert ? `2px solid ${farbe}` : '1px solid #e2e8f0', background: bg, color: farbe, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>{label}</button>)}
+                </div>
               <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", minWidth: 720, borderCollapse: "collapse", fontSize: 12 }}>
-                  <thead><tr style={{ color: "#475569", textAlign: "left", borderBottom: "1px solid #cbd5e1" }}><th style={{ padding: "8px 6px" }}>Mitarbeiter</th><th style={{ padding: "8px 6px" }}>E-Mail</th><th style={{ padding: "8px 6px" }}>Zugangskarten-Status</th><th style={{ padding: "8px 6px" }}>Erstellt am</th><th style={{ padding: "8px 6px", textAlign: "right" }}>Aktion</th></tr></thead>
+                <table style={{ width: "100%", minWidth: 810, borderCollapse: "collapse", fontSize: 12 }}>
+                  <thead><tr style={{ color: "#475569", textAlign: "left", borderBottom: "1px solid #cbd5e1" }}><th style={{ padding: "8px 6px" }}>Mitarbeiter</th><th style={{ padding: "8px 6px" }}>E-Mail</th><th style={{ padding: "8px 6px" }}>Zugangskarten-Status</th><th style={{ padding: "8px 6px" }}>Erstellt am</th><th style={{ padding: "8px 6px" }}>Gültig bis</th><th style={{ padding: "8px 6px", textAlign: "right" }}>Aktion</th></tr></thead>
                   <tbody>{sichtbareZugangskartenMitarbeiter.map(ma => {
                     const wechselOffen = Boolean((ma as any).passwortWechselErforderlich);
                     const erstelltAm = (ma as any).startPasswortErstelltAt;
-                    const status = wechselOffen ? { label: "Passwortwechsel offen", bg: "#fef3c7", color: "#92400e" } : erstelltAm ? { label: "Startzugang abgeschlossen", bg: "#e8f5e4", color: "#166534" } : { label: "Noch keine Karte erstellt", bg: "#f1f5f9", color: "#475569" };
+                    const abgelaufen = wechselOffen && startPasswortLaeuftAb(erstelltAm);
+                    const gueltigBis = startPasswortGueltigBis(erstelltAm);
+                    const status = abgelaufen ? { label: "Startpasswort abgelaufen", bg: "#fee2e2", color: "#b91c1c" } : wechselOffen ? { label: "Passwortwechsel offen", bg: "#fef3c7", color: "#92400e" } : erstelltAm ? { label: "Startzugang abgeschlossen", bg: "#e8f5e4", color: "#166534" } : { label: "Noch keine Karte erstellt", bg: "#f1f5f9", color: "#475569" };
                     const istAktiv = Boolean(ma.aktiv);
-                    return <tr key={`zugang-${ma.id}`} style={{ borderBottom: "1px solid #e2e8f0", opacity: istAktiv ? 1 : .65 }}><td style={{ padding: "9px 6px", fontWeight: 700 }}>{ma.vorname} {ma.nachname}</td><td style={{ padding: "9px 6px", color: "#475569" }}>{ma.email}</td><td style={{ padding: "9px 6px" }}><span style={{ display: "inline-block", borderRadius: 20, padding: "3px 8px", background: status.bg, color: status.color, fontWeight: 700, whiteSpace: "nowrap" }}>{status.label}</span></td><td style={{ padding: "9px 6px", color: "#475569" }}>{erstelltAm ? new Date(erstelltAm).toLocaleDateString("de-DE") : "—"}</td><td style={{ padding: "9px 6px", textAlign: "right" }}><button disabled={!istAktiv || startpasswoerterErstellen.isPending} onClick={() => starteDirektdruck([ma.id], `${ma.vorname} ${ma.nachname}`)} style={{ padding: "6px 9px", background: istAktiv ? "#1e3a5f" : "#cbd5e1", color: "#fff", border: "none", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: istAktiv ? "pointer" : "not-allowed" }}>{istAktiv ? "🖨️ Direkt drucken" : "Inaktiv"}</button></td></tr>;
+                    return <tr key={`zugang-${ma.id}`} style={{ borderBottom: "1px solid #e2e8f0", opacity: istAktiv ? 1 : .65 }}><td style={{ padding: "9px 6px", fontWeight: 700 }}>{ma.vorname} {ma.nachname}</td><td style={{ padding: "9px 6px", color: "#475569" }}>{ma.email}</td><td style={{ padding: "9px 6px" }}><span style={{ display: "inline-block", borderRadius: 20, padding: "3px 8px", background: status.bg, color: status.color, fontWeight: 700, whiteSpace: "nowrap" }}>{status.label}</span></td><td style={{ padding: "9px 6px", color: "#475569" }}>{erstelltAm ? new Date(erstelltAm).toLocaleDateString("de-DE") : "—"}</td><td style={{ padding: "9px 6px", color: abgelaufen ? "#b91c1c" : "#475569", fontWeight: abgelaufen ? 800 : 500 }}>{gueltigBis ? new Date(gueltigBis).toLocaleDateString("de-DE") : "—"}</td><td style={{ padding: "9px 6px", textAlign: "right" }}><button disabled={!istAktiv || startpasswoerterErstellen.isPending} onClick={() => starteDirektdruck([ma.id], `${ma.vorname} ${ma.nachname}`)} style={{ padding: "6px 9px", background: istAktiv ? "#1e3a5f" : "#cbd5e1", color: "#fff", border: "none", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: istAktiv ? "pointer" : "not-allowed" }}>{istAktiv ? (abgelaufen ? "🔄 Neu ausstellen" : "🖨️ Direkt drucken") : "Inaktiv"}</button></td></tr>;
                   })}</tbody>
                 </table>
               </div>
+              </>
             )}
           </section>
           {/* Suchfeld */}

@@ -39,6 +39,9 @@
 - [x] Druckvorschau für Zugangskarten mit popup-freier Fallback-Ansicht zuverlässig öffnen
 - [x] Sicherheitshinweis zum sofortigen Passwortwechsel nach dem ersten Login auf jede Zugangskarte ergänzen
 - [x] Nicht umgehbaren Erstlogin-Dialog mit sicherer Passwortprüfung und verpflichtendem Passwortwechsel für Mitarbeiter absichern
+- [x] Passwortstärke im Erstlogin-Dialog als verständliche visuelle Anzeige darstellen
+- [x] Startpasswörter nach einer festgelegten Frist automatisch ungültig machen
+- [x] Admin-Übersicht für offene und abgelaufene Passwortwechsel mit gezielten Folgeaktionen ergänzen
 
 ## Datenbank & Backend
 - [x] Datenbankschema: mitarbeiter, kunden, einsaetze, leistungen, fahrten

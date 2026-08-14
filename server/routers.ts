@@ -24,7 +24,7 @@ import { getDb } from "./db";
 import { ermittleErsteHilfeStatus } from "./complianceUtils";
 import { bereiteEinsatzUebernahmeVor } from "./mitarbeiterAblauf";
 import { generiereEinmaligesStartpasswort, waehleDruckbareMitarbeiter } from "./accessCredentials";
-import { pruefeSicheresPasswort, SICHERES_PASSWORT_HINWEIS } from "../shared/passwordPolicy";
+import { pruefeSicheresPasswort, SICHERES_PASSWORT_HINWEIS, startPasswortLaeuftAb } from "../shared/passwordPolicy";
 import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, einsatzAenderungen, kunden as kundenTable, notifications as notificationsTable, ersteHilfeKurse, mitarbeiterBerechtigungen as mbTable, besuchsberichte, fahrten } from "../drizzle/schema";
 import {
   getMitarbeiterByEmail,
@@ -1126,6 +1126,9 @@ export const appRouter = router({
         if (!valid) {
           await createAuditLog({ mitarbeiterId: ma.id, action: "LOGIN", ressource: "portal", status: "failure", details: "Passwortprüfung fehlgeschlagen" });
           throw new Error("E-Mail oder Passwort ungültig.");
+        }
+        if (Boolean((ma as any).passwortWechselErforderlich) && startPasswortLaeuftAb((ma as any).startPasswortErstelltAt)) {
+          throw new Error("Das Startpasswort ist abgelaufen. Bitte fordere bei der Verwaltung eine neue Zugangskarte an.");
         }
         if (ma.zweiFaktorAktiv) {
           if (!input.otp) return { requiresTwoFactor: true as const, token: null, id: ma.id, vorname: ma.vorname, nachname: ma.nachname, email: ma.email, rolle: ma.rolle };
