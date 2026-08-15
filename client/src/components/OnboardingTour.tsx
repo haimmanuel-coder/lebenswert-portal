@@ -149,7 +149,7 @@ export default function OnboardingTour({ onClose, forceShow }: OnboardingTourPro
   const progress = ((step + 1) / SCHRITTE.length) * 100;
 
   return (
-    <div style={{
+    <div className="lw-onboarding-overlay" style={{
       position: "fixed", inset: 0, zIndex: 9999,
       display: "flex", alignItems: "flex-end", justifyContent: "center",
       background: "rgba(0,0,0,0.75)",
@@ -159,7 +159,7 @@ export default function OnboardingTour({ onClose, forceShow }: OnboardingTourPro
       <div style={{ position: "absolute", inset: 0 }} onClick={handleClose} />
 
       {/* Tour-Karte */}
-      <div style={{
+      <div className="lw-onboarding-card" style={{
         position: "relative",
         width: "100%", maxWidth: 480,
         background: "#fff",
