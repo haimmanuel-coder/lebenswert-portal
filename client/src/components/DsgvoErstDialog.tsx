@@ -88,7 +88,7 @@ export default function DsgvoErstDialog({ onClose }: Props) {
         "───────────────────────────────────────",
         `Datum: ${datum}`,
         "Dieses Dokument wurde automatisch aus dem Mitarbeiter-Portal generiert.",
-        "Lebenswert Betreuung · DSGVO-konform",
+        "Seniorenassistenz Bernhardt · DSGVO-konform",
       ].join("\n");
       const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
       const url = URL.createObjectURL(blob);

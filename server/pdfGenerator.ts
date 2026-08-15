@@ -23,7 +23,7 @@ export function generateBesuchsberichtPdf(data: BesuchsberichtPdfData): Promise<
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    doc.fontSize(18).fillColor("#1a5c38").text("Lebenswert Betreuung", { align: "center" });
+    doc.fontSize(18).fillColor("#1a5c38").text("Seniorenassistenz Bernhardt", { align: "center" });
     doc.fontSize(12).fillColor("#555").text("Besuchsbericht", { align: "center" });
     doc.moveDown(0.5);
     doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor("#1a5c38").lineWidth(2).stroke();
@@ -71,7 +71,7 @@ export function generateBesuchsberichtPdf(data: BesuchsberichtPdfData): Promise<
     doc.text("Unterschrift Kunde", 350, yLine + 5);
 
     doc.fontSize(8).fillColor("#999").text(
-      "Erstellt am " + new Date().toLocaleDateString("de-DE") + " | Lebenswert Betreuung GmbH | DSGVO-konform",
+      "Erstellt am " + new Date().toLocaleDateString("de-DE") + " | Seniorenassistenz Bernhardt | DSGVO-konform",
       50, 780, { align: "center", width: 495 }
     );
     doc.end();

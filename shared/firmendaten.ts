@@ -1,11 +1,11 @@
 /**
  * Firmendaten aus dem offiziellen Briefpapier.
  * Hinweis: Im Briefpapier steht "Seniorenassistenz Bernhardt",
- * aber der Betrieb firmiert als "Lebenswert Betreuung".
+ * aber der Betrieb firmiert als "Seniorenassistenz Bernhardt".
  * IK-Nummer und Anschrift bleiben identisch.
  */
 export const FIRMENDATEN = {
-  name: "Lebenswert Betreuung",
+  name: "Seniorenassistenz Bernhardt",
   inhaberin: "Bernhardt",
   ikNummer: "460 547 168",
   strasse: "Am Hedtberg 16",

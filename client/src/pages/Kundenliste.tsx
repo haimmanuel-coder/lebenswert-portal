@@ -808,7 +808,7 @@ export default function Kundenliste({ onKundeSelect }: { onKundeSelect?: (id: nu
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <div>
           <div style={{ fontSize: 18, fontWeight: 800 }}>Kundenliste</div>
-          <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>Lebenswert Betreuung – {kunden.length} Kunden</div>
+          <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>Seniorenassistenz Bernhardt – {kunden.length} Kunden</div>
         </div>
         {isAdmin && (
           <button

@@ -46,7 +46,7 @@ function generiereVollmachtText(
   return `VOLLMACHT ZUR BUDGET-ABFRAGE
 
 Ich, ${kundenName}, Versicherungsnummer: ${versicherungsnummer},
-erteile hiermit der Lebenswert Betreuung GmbH, vertreten durch
+erteile hiermit der Seniorenassistenz Bernhardt, vertreten durch
 ${mitarbeiterName}, die Vollmacht, bei meiner Krankenkasse
 ${kasseName} folgende Informationen abzufragen:
 
@@ -184,7 +184,7 @@ function erstellePDF(anfrage: any) {
   // Footer
   doc.setFontSize(8);
   doc.setTextColor(120, 120, 120);
-  doc.text("Lebenswert Betreuung GmbH | Dieses Dokument wurde elektronisch erstellt.", margin, 285);
+  doc.text("Seniorenassistenz Bernhardt | Dieses Dokument wurde elektronisch erstellt.", margin, 285);
 
   const dateiname = `Vollmacht_${anfrage.nachname}_${anfrage.vorname}_${new Date(anfrage.createdAt).toISOString().slice(0, 10)}.pdf`;
   doc.save(dateiname);
@@ -438,7 +438,7 @@ export default function Kassenanfrage() {
           <div className="space-y-4 pb-8">
             {/* Hinweis */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
-              <strong>Hinweis:</strong> Diese Vollmacht berechtigt Lebenswert Betreuung, im Namen des Kunden
+              <strong>Hinweis:</strong> Diese Vollmacht berechtigt Seniorenassistenz Bernhardt, im Namen des Kunden
               Budget-Informationen bei der Krankenkasse abzufragen. Bitte Kunden-Unterschrift einholen.
             </div>
 

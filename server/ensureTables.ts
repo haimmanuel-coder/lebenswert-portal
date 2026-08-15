@@ -231,6 +231,17 @@ const TABLE_DEFINITIONS: string[] = [
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
   // ── 11. auditLogs ─────────────────────────────────────────────────────────
+  // ── feedback ──────────────────────────────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS \`feedback\` (
+    \`id\` int NOT NULL AUTO_INCREMENT,
+    \`mitarbeiterId\` int NOT NULL,
+    \`kategorie\` enum('fehler','verbesserung','frage','lob') NOT NULL DEFAULT 'verbesserung',
+    \`nachricht\` text NOT NULL,
+    \`seite\` varchar(100),
+    \`createdAt\` datetime DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
   `CREATE TABLE IF NOT EXISTS \`auditLogs\` (
     \`id\` int NOT NULL AUTO_INCREMENT,
     \`mitarbeiterId\` int,

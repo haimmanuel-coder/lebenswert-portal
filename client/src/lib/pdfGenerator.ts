@@ -97,7 +97,7 @@ function _buildPdf(data: LeistungsnachweisPdfData): any {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(14);
   doc.setFont("helvetica", "bold");
-  doc.text("Lebenswert Betreuung", margin + 20, 12);
+  doc.text("Seniorenassistenz Bernhardt", margin + 20, 12);
   doc.setFontSize(7.5);
   doc.setFont("helvetica", "normal");
   doc.text("Leistungsnachweis gemäß SGB XI", margin + 20, 18);
@@ -270,7 +270,7 @@ function _buildPdf(data: LeistungsnachweisPdfData): any {
   doc.setFont("helvetica", "normal");
   doc.setTextColor(DARK);
   const abtText = doc.splitTextToSize(
-    "Mit der Unterschrift werden die vorweg aufgelisteten, erbrachten Dienstleistungen und die Erstattung der Zahlung an, die von der Lebenswert Betreuung beauftragte \u201eOptadata Gruppe\u201c nach dem jeweiligen, oben genannten Paragrafen bewilligt und abgetreten.",
+    "Mit der Unterschrift werden die vorweg aufgelisteten, erbrachten Dienstleistungen und die Erstattung der Zahlung an, die von der Seniorenassistenz Bernhardt beauftragte \u201eOptadata Gruppe\u201c nach dem jeweiligen, oben genannten Paragrafen bewilligt und abgetreten.",
     tableW
   );
   doc.text(abtText, margin, y);
@@ -278,7 +278,7 @@ function _buildPdf(data: LeistungsnachweisPdfData): any {
 
   // ── SCHWEIGEPFLICHTENTBINDUNG ─────────────────────────────────────────────
   const schweigText = doc.splitTextToSize(
-    "Weiterhin entbinde ich hiermit die Pflegekasse von ihrer Schweigepflicht und erlaube ausdr\u00fccklich, alle relevanten Daten meiner Gesundheit und die damit verbundene Finanzierung betreffend, an die Lebenswert Betreuung mitzuteilen.",
+    "Weiterhin entbinde ich hiermit die Pflegekasse von ihrer Schweigepflicht und erlaube ausdr\u00fccklich, alle relevanten Daten meiner Gesundheit und die damit verbundene Finanzierung betreffend, an die Seniorenassistenz Bernhardt mitzuteilen.",
     tableW
   );
   doc.text(schweigText, margin, y);
@@ -372,7 +372,7 @@ function _buildPdf(data: LeistungsnachweisPdfData): any {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(7);
   doc.setFont("helvetica", "bold");
-  doc.text("Lebenswert Betreuung", margin, footerY + 5);
+  doc.text("Seniorenassistenz Bernhardt", margin, footerY + 5);
   doc.setFont("helvetica", "normal");
   doc.text("Am Hedtberg 16 · 42389 Wuppertal", margin, footerY + 10);
   doc.text("IK Nr.: 460 547 168", margin, footerY + 15);

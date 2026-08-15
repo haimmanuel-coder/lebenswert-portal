@@ -19,6 +19,7 @@ import Sicherheitsunterweisungen from "./Sicherheitsunterweisungen";
 import MeineArbeitssicherheit from "./MeineArbeitssicherheit";
 import NeukundenAufnahme from "./NeukundenAufnahme";
 import Kalender from "./Kalender";
+import FeedbackFormular from "./FeedbackFormular";
 import Kassenanfrage from "./Kassenanfrage";
 import PflegekassenPage from "./PflegekassenPage";
 import Urlaubsverwaltung from "./Urlaubsverwaltung";
@@ -249,6 +250,7 @@ export default function PortalApp() {
       title: "🔔 Kommunikation",
       items: [
         { id: "benachrichtigungen", icon: "🔔", label: "Benachrichtigungen", badge: gesamtBadge },
+        { id: "feedback", icon: "💬", label: "Feedback (Testphase)" },
       ],
     },
     // ── ⚙️ EINSTELLUNGEN ──────────────────────────────────────────────────
@@ -292,6 +294,7 @@ export default function PortalApp() {
       case "neukundenaufnahme": return <NeukundenAufnahme />;
       case "kalender": return <Kalender />;
       case "kassenanfrage": return <Kassenanfrage />;
+      case "feedback": return <FeedbackFormular />;
       case "pflegekassen": return <PflegekassenPage />;
       case "urlaub": return <Urlaubsverwaltung />;
       case "krank": return <Krankmeldung />;
@@ -569,7 +572,7 @@ export default function PortalApp() {
             }}>☰</button>
           )}
           <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
-            {!isMobile && <span style={{ fontSize: 12, color: "#9ca3af" }}>Lebenswert Betreuung /</span>}
+            {!isMobile && <span style={{ fontSize: 12, color: "#9ca3af" }}>Seniorenassistenz Bernhardt /</span>}
             <span style={{ fontSize: 14, fontWeight: 700, color: "#1f2937" }}>{currentPageLabel}</span>
           </div>
           {!isOnline && (

@@ -99,6 +99,10 @@ export default function AdminDashboard() {
   const { data, isLoading } = trpc.admin.dashboardStats.useQuery();
   const { navigiere } = useNavigation();
 
+  // LNW-Status für aktuellen Monat
+  const aktuellerMonat = new Date().toISOString().slice(0, 7);
+  const { data: lnwStatus } = (trpc as any).fahrtenAbrechnung.leistungsnachweisStatus.useQuery({ monat: aktuellerMonat });
+
   if (isLoading) {
     return (
       <div className="lw-page">
@@ -143,6 +147,7 @@ export default function AdminDashboard() {
       <div className="lw-page-header">
         <div>
           <div className="lw-page-title">Admin-Dashboard · Gesamtübersicht</div>
+          <div style={{ fontSize: "0.75rem", color: "var(--lw-gray-400)", marginTop: 2 }}>Seniorenassistenz Bernhardt</div>
           <div className="lw-page-subtitle">{heute}</div>
         </div>
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
@@ -163,6 +168,38 @@ export default function AdminDashboard() {
         <KpiCard icon="🤒" value={kpis?.aktivKrank ?? "–"} label="Aktive Krankmeldungen" color="var(--lw-red)" sublabel="Aktuell krank gemeldet" />
         <KpiCard icon="🚨" value={kpis?.rotKunden ?? "–"} label="Budget-Alarme" color="var(--lw-red)" sublabel="≥ 90% verbraucht" />
       </div>
+
+      {/* LNW-Status-Widget */}
+      {lnwStatus && lnwStatus.gesamt > 0 && (
+        <div className="lw-card" style={{ marginBottom: "1.25rem", border: lnwStatus.offen > 0 ? "2px solid #f59e0b" : "2px solid #10b981" }}>
+          <div className="lw-card-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.75rem" }}>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: "1rem", color: "var(--lw-gray-900)" }}>
+                📋 Leistungsnachweise {aktuellerMonat}
+              </div>
+              <div style={{ fontSize: "0.8125rem", color: "var(--lw-gray-500)", marginTop: 2 }}>
+                {lnwStatus.offen > 0
+                  ? `⚠️ ${lnwStatus.offen} von ${lnwStatus.gesamt} noch nicht freigegeben`
+                  : `✅ Alle ${lnwStatus.gesamt} Nachweise freigegeben – Export bereit`}
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: "1.5rem", fontWeight: 800, color: lnwStatus.offen > 0 ? "#f59e0b" : "#10b981" }}>{lnwStatus.offen}</div>
+                <div style={{ fontSize: "0.6875rem", color: "var(--lw-gray-500)" }}>Offen</div>
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#10b981" }}>{lnwStatus.abgeschlossen}</div>
+                <div style={{ fontSize: "0.6875rem", color: "var(--lw-gray-500)" }}>Freigegeben</div>
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--lw-gray-700)" }}>{lnwStatus.gesamtStunden?.toFixed(0)}h</div>
+                <div style={{ fontSize: "0.6875rem", color: "var(--lw-gray-500)" }}>Stunden</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Ampel-Legende */}
       <div className="lw-card" style={{ marginBottom: "1.25rem" }}>

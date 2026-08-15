@@ -18,7 +18,7 @@ const MAX_STORED = 40; // max Nachrichten im LocalStorage
 
 const INITIAL_MESSAGE: Message = {
   role: "assistant",
-  content: "Hallo! Ich bin **LENA**, deine KI-Assistentin im Lebenswert Betreuung Portal. 🌿\n\nIch helfe dir bei allen Fragen rund um das Portal, Pflegeprozesse und Dokumentation. Was kann ich für dich tun?",
+  content: "Hallo! Ich bin **LENA**, deine KI-Assistentin im Seniorenassistenz Bernhardt Portal. 🌿\n\nIch helfe dir bei allen Fragen rund um das Portal, Pflegeprozesse und Dokumentation. Was kann ich für dich tun?",
   ts: Date.now(),
 };
 

@@ -74,7 +74,7 @@ export async function sendBudgetWarnungPush(
   let sent = 0;
   for (const sub of subscriptions) {
     const ok = await sendPushNotification(sub, {
-      title: "⚠️ Budget-Warnung – Lebenswert Betreuung",
+      title: "⚠️ Budget-Warnung – Seniorenassistenz Bernhardt",
       body: `${kundenName}: §${paragraph} SGB XI – Restbudget ${restBudget.toFixed(2)} € (< 10%)`,
       url: "/",
     });

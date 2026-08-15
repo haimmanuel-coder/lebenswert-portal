@@ -66,6 +66,13 @@ export default function FahrtenAbrechnung() {
     onError: (e: { message: string }) => toast.error(e.message),
   });
 
+  const csvVersand = trpc.fahrtenAbrechnung.csvAnSteuerberaterinSenden.useMutation({
+    onSuccess: (data: any) => {
+      toast.success(`✅ CSV-Dateien erfolgreich an ${data.empfaenger} gesendet (${data.anzahl} Nachweise)`);
+    },
+    onError: (e: { message: string }) => toast.error(e.message),
+  });
+
   // Einstellungs-State
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -199,13 +206,20 @@ export default function FahrtenAbrechnung() {
 
                   {/* Export-Buttons */}
                   {lnwStatus.kannAbschliessen && (
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 flex-wrap">
                       <Button
                         onClick={() => pflegekassenExport.mutate({ monat: aktuellerMonat })}
                         disabled={pflegekassenExport.isPending}
-                        className="bg-green-600 hover:bg-green-700 text-white flex-1"
+                        className="bg-green-600 hover:bg-green-700 text-white"
                       >
                         {pflegekassenExport.isPending ? "Exportiert…" : "📥 Pflegekassen- & Stundenexport"}
+                      </Button>
+                      <Button
+                        onClick={() => csvVersand.mutate({ monat: aktuellerMonat })}
+                        disabled={csvVersand.isPending}
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        {csvVersand.isPending ? "Sendet…" : "📧 An Steuerberaterin senden"}
                       </Button>
                     </div>
                   )}

@@ -10,7 +10,7 @@ import { getDb } from "./db";
 import { mitarbeiterZweiFaktor, zweiFaktorCodes } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 
-const ISSUER = "Lebensnah Betreuung Portal";
+const ISSUER = "Seniorenassistenz Bernhardt Portal";
 
 /** Neues TOTP-Secret generieren und QR-Code-URL zurückgeben */
 export async function generate2FASetup(mitarbeiterId: number, email: string) {

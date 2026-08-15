@@ -128,6 +128,7 @@ import { rbacRouter } from "./routers/rbacRouter";
 import { umwidmungRouter, sonderfahrtRouter, rechnungspositionRouter, privatrechnungRouter, importRouter } from "./routers/privatrechnungRouter";
 import { budgetRouter } from "./routers/budgetRouter";
 import { fahrtenAbrechnungRouter } from "./routers/fahrtenAbrechnungRouter";
+import { feedbackRouter } from "./routers/feedbackRouter";
 import { sicherheitsunterweisungRouter } from "./routers/sicherheitsunterweisungRouter";
 import { arbeitssicherheitRouter } from "./routers/arbeitssicherheitRouter";
 import { unterweisungNachweisRouter } from "./routers/unterweisungNachweisRouter";
@@ -832,7 +833,7 @@ const einstellungenRouter = router({
         monatslohn: ma.monatslohn ? Number(ma.monatslohn) : undefined,
         stundenlohn: ma.stundenlohn ? Number(ma.stundenlohn) : undefined,
         einstellungsdatum: ma.createdAt ? new Date(ma.createdAt).toLocaleDateString("de-DE") : new Date().toLocaleDateString("de-DE"),
-        firmaName: settings["firma_name"] || "Lebenswert Betreuung",
+        firmaName: settings["firma_name"] || "Seniorenassistenz Bernhardt",
       });
       const result = await sendEmail({
         to: stEmail,
@@ -865,7 +866,7 @@ const einstellungenRouter = router({
 
       const result = await sendEmail({
         to: empfaenger,
-        subject: "[TEST] SMTP-Verbindungstest – Lebenswert Betreuung Portal",
+        subject: "[TEST] SMTP-Verbindungstest – Seniorenassistenz Bernhardt Portal",
         html: `<div style="font-family:Arial,sans-serif;max-width:500px"><h2 style="color:#1a5c38">SMTP-Test erfolgreich</h2><p>Diese E-Mail bestätigt, dass der E-Mail-Versand aus dem Lebenswert-Portal korrekt funktioniert.</p><p style="color:#6b7280;font-size:12px">Gesendet am ${new Date().toLocaleString("de-DE")}</p></div>`,
       });
 
@@ -984,7 +985,7 @@ const kiRouter = router({
       const rolle = input.kontext?.rolle ?? "mitarbeiter";
       const rolleText = rolle === "admin" ? "Administrator" : rolle === "teamleitung" ? "Teamleitung" : "Mitarbeiter";
 
-      const systemPrompt = `Du bist LENA, die freundliche KI-Assistentin des Lebenswert Betreuung Mitarbeiter-Portals.
+      const systemPrompt = `Du bist LENA, die freundliche KI-Assistentin des Seniorenassistenz Bernhardt Mitarbeiter-Portals.
 
 AKTUELLER NUTZER: ${name} (${rolleText})
 AKTUELLE SEITE: ${seite}
@@ -1213,7 +1214,7 @@ export const appRouter = router({
           if (!input.otp) return { requiresTwoFactor: true as const, token: null, id: ma.id, vorname: ma.vorname, nachname: ma.nachname, email: ma.email, rolle: ma.rolle };
           if (!ma.zweiFaktorSecret) throw new Error("Zwei-Faktor-Anmeldung ist unvollständig eingerichtet. Bitte Admin kontaktieren.");
           const secret = decryptSecret(ma.zweiFaktorSecret);
-          const totp = new OTPAuth.TOTP({ issuer: "Lebenswert Betreuung", label: ma.email, algorithm: "SHA1", digits: 6, period: 30, secret: OTPAuth.Secret.fromBase32(secret) });
+          const totp = new OTPAuth.TOTP({ issuer: "Seniorenassistenz Bernhardt", label: ma.email, algorithm: "SHA1", digits: 6, period: 30, secret: OTPAuth.Secret.fromBase32(secret) });
           if (totp.validate({ token: input.otp, window: 1 }) === null) {
             await createAuditLog({ mitarbeiterId: ma.id, action: "LOGIN_2FA", ressource: "portal", status: "failure" });
             throw new Error("Der Sicherheitscode ist ungültig oder abgelaufen.");
@@ -1342,7 +1343,7 @@ export const appRouter = router({
 
     zweiFaktorStarten: portalProtected.mutation(async ({ ctx }) => {
       const secret = new OTPAuth.Secret({ size: 20 }).base32;
-      const totp = new OTPAuth.TOTP({ issuer: "Lebenswert Betreuung", label: ctx.portalMitarbeiter.email, algorithm: "SHA1", digits: 6, period: 30, secret: OTPAuth.Secret.fromBase32(secret) });
+      const totp = new OTPAuth.TOTP({ issuer: "Seniorenassistenz Bernhardt", label: ctx.portalMitarbeiter.email, algorithm: "SHA1", digits: 6, period: 30, secret: OTPAuth.Secret.fromBase32(secret) });
       const qrCodeDataUrl = await QRCode.toDataURL(totp.toString(), { width: 280, margin: 2, errorCorrectionLevel: "M" });
       const db = await getDb();
       await db!.update(mitarbeiter).set({ zweiFaktorSecret: encryptSecret(secret), zweiFaktorAktiv: false, zweiFaktorBestaetigtAt: null }).where(eq(mitarbeiter.id, ctx.mitarbeiterId));
@@ -1356,7 +1357,7 @@ export const appRouter = router({
         const ma = await getMitarbeiterById(ctx.mitarbeiterId);
         if (!ma?.zweiFaktorSecret) throw new Error("Bitte die Einrichtung zuerst starten.");
         const secret = decryptSecret(ma.zweiFaktorSecret);
-        const totp = new OTPAuth.TOTP({ issuer: "Lebenswert Betreuung", label: ma.email, algorithm: "SHA1", digits: 6, period: 30, secret: OTPAuth.Secret.fromBase32(secret) });
+        const totp = new OTPAuth.TOTP({ issuer: "Seniorenassistenz Bernhardt", label: ma.email, algorithm: "SHA1", digits: 6, period: 30, secret: OTPAuth.Secret.fromBase32(secret) });
         if (totp.validate({ token: input.code, window: 1 }) === null) throw new Error("Der Sicherheitscode ist ungültig.");
         const db = await getDb();
         await db!.update(mitarbeiter).set({ zweiFaktorAktiv: true, zweiFaktorBestaetigtAt: new Date() }).where(eq(mitarbeiter.id, ctx.mitarbeiterId));
@@ -1371,7 +1372,7 @@ export const appRouter = router({
         if (!ma?.zweiFaktorSecret || !ma.zweiFaktorAktiv) return { success: true };
         if (!(await bcrypt.compare(input.passwort, ma.passwortHash))) throw new Error("Das Passwort ist falsch.");
         const secret = decryptSecret(ma.zweiFaktorSecret);
-        const totp = new OTPAuth.TOTP({ issuer: "Lebenswert Betreuung", label: ma.email, algorithm: "SHA1", digits: 6, period: 30, secret: OTPAuth.Secret.fromBase32(secret) });
+        const totp = new OTPAuth.TOTP({ issuer: "Seniorenassistenz Bernhardt", label: ma.email, algorithm: "SHA1", digits: 6, period: 30, secret: OTPAuth.Secret.fromBase32(secret) });
         if (totp.validate({ token: input.code, window: 1 }) === null) throw new Error("Der Sicherheitscode ist ungültig.");
         const db = await getDb();
         await db!.update(mitarbeiter).set({ zweiFaktorAktiv: false, zweiFaktorSecret: null, zweiFaktorBestaetigtAt: null }).where(eq(mitarbeiter.id, ctx.mitarbeiterId));
@@ -2617,7 +2618,7 @@ export const appRouter = router({
               monatslohn: input.monatslohn,
               stundenlohn: input.stundenlohn,
               einstellungsdatum: new Date().toLocaleDateString("de-DE"),
-              firmaName: settings["firma_name"] || "Lebenswert Betreuung",
+              firmaName: settings["firma_name"] || "Seniorenassistenz Bernhardt",
             });
             await sendEmail({
               to: stEmail,
@@ -4107,6 +4108,7 @@ export const appRouter = router({
   arbeitssicherheit: arbeitssicherheitRouter,
   unterweisungNachweis: unterweisungNachweisRouter,
   mitteilungen: mitteilungenRouter,
+  feedback: feedbackRouter,
 });
 
 export type AppRouter = typeof appRouter;

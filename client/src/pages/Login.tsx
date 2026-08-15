@@ -131,7 +131,7 @@ export default function Login() {
         <div style={{ textAlign: "center", marginBottom: 24 }}>
           <span style={{ fontSize: 48, display: "block", marginBottom: 8 }}>🌿</span>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: "#4a8c3f", margin: 0 }}>
-            Lebenswert Betreuung
+            Seniorenassistenz Bernhardt
           </h1>
           <p style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>
             {view === "login" ? "Mitarbeiter-Portal" : view === "mfa" ? "Sicherheitsprüfung" : "Passwort zurücksetzen"}

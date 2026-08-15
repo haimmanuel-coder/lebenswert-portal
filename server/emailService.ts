@@ -72,7 +72,7 @@ export function buildBesuchsberichtEmail(data: {
   return `
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
       <div style="background:#1a5c38;color:#fff;padding:20px;border-radius:8px 8px 0 0">
-        <h2 style="margin:0">Lebenswert Betreuung</h2>
+        <h2 style="margin:0">Seniorenassistenz Bernhardt</h2>
         <p style="margin:4px 0 0">Besuchsbericht #${data.berichtId}</p>
       </div>
       <div style="background:#f9f9f9;padding:20px;border:1px solid #e0e0e0">
@@ -81,7 +81,7 @@ export function buildBesuchsberichtEmail(data: {
            für <strong>${data.kundeVorname} ${data.kundeNachname}</strong>,
            erstellt von <strong>${data.mitarbeiterVorname} ${data.mitarbeiterNachname}</strong>.</p>
         <p>Bei Fragen wenden Sie sich bitte an Ihr Lebenswert-Team.</p>
-        <p style="margin-top:24px">Mit freundlichen Grüßen<br><strong>Lebenswert Betreuung GmbH</strong></p>
+        <p style="margin-top:24px">Mit freundlichen Grüßen<br><strong>Seniorenassistenz Bernhardt</strong></p>
       </div>
       <div style="background:#e8f5e9;padding:10px;font-size:11px;color:#555;border-radius:0 0 8px 8px">
         Diese E-Mail wurde automatisch generiert. | DSGVO-konform verarbeitet.
@@ -98,7 +98,7 @@ export function buildSteuerberaterEmail(data: {
 }): string {
   const beschMap: Record<string, string> = { minijob: "Minijob (450€-Basis)", teilzeit: "Teilzeit", vollzeit: "Vollzeit" };
   const rolleMap: Record<string, string> = { mitarbeiter: "Mitarbeiter/in", teamleitung: "Teamleitung", admin: "Administrator", buchhaltung: "Buchhaltung" };
-  const firma = data.firmaName ?? "Lebenswert Betreuung";
+  const firma = data.firmaName ?? "Seniorenassistenz Bernhardt";
   const row = (label: string, value: string, bg = "#fff") =>
     `<tr style="background:${bg}"><td style="padding:8px 14px;color:#6b7280;width:42%;border-bottom:1px solid #f3f4f6">${label}</td><td style="padding:8px 14px;font-weight:600;border-bottom:1px solid #f3f4f6">${value}</td></tr>`;
   const header = (title: string) =>

@@ -19,7 +19,7 @@ function buildDsgvoUpdateEmail(data: { vorname: string; nachname: string; titel:
   return `
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
       <div style="background:#1a5c38;color:#fff;padding:20px;border-radius:8px 8px 0 0">
-        <h2 style="margin:0">Lebenswert Betreuung</h2>
+        <h2 style="margin:0">Seniorenassistenz Bernhardt</h2>
         <p style="margin:4px 0 0">Wichtige Datenschutz-Information</p>
       </div>
       <div style="background:#f9f9f9;padding:20px;border:1px solid #e0e0e0">
@@ -33,7 +33,7 @@ function buildDsgvoUpdateEmail(data: { vorname: string; nachname: string; titel:
           <a href="https://portal.lebenswert-betreuung.de" style="background:#4a8c3f;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">Zum Portal &rarr;</a>
         </div>
         <p style="color:#666;font-size:12px">Falls Sie Fragen haben, wenden Sie sich bitte an Ihre Teamleitung.</p>
-        <p style="margin-top:24px">Mit freundlichen Grüßen<br><strong>Lebenswert Betreuung GmbH</strong></p>
+        <p style="margin-top:24px">Mit freundlichen Grüßen<br><strong>Seniorenassistenz Bernhardt</strong></p>
       </div>
       <div style="background:#e8f5e9;padding:10px;font-size:11px;color:#555;border-radius:0 0 8px 8px">
         Diese E-Mail wurde automatisch generiert. | DSGVO-konform verarbeitet.

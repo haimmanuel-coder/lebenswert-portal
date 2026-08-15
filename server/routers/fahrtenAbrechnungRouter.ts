@@ -323,10 +323,10 @@ export const fahrtenAbrechnungRouter = router({
       // E-Mail senden
       await sendEmail({
         to: empfaengerEmail,
-        subject: `Fahrtennachweise ${abr.label} – Lebenswert Betreuung`,
+        subject: `Fahrtennachweise ${abr.label} – Seniorenassistenz Bernhardt`,
         html: `
           <div style="font-family:Arial,sans-serif;max-width:600px">
-            <h2 style="color:#2d6a2d">Fahrtennachweise – Lebenswert Betreuung</h2>
+            <h2 style="color:#2d6a2d">Fahrtennachweise – Seniorenassistenz Bernhardt</h2>
             <p>Sehr geehrte Damen und Herren,</p>
             <p>anbei erhalten Sie die Fahrtennachweise für den Abrechnungszeitraum:</p>
             <table style="border-collapse:collapse;width:100%;margin:16px 0">
@@ -348,7 +348,7 @@ export const fahrtenAbrechnungRouter = router({
               </tr>
             </table>
             <p>Die detaillierte Aufstellung finden Sie im beigefügten PDF.</p>
-            <p>Mit freundlichen Grüßen<br><strong>Lebenswert Betreuung</strong></p>
+            <p>Mit freundlichen Grüßen<br><strong>Seniorenassistenz Bernhardt</strong></p>
           </div>
         `,
         attachments: pdfBuffer ? [{
@@ -426,12 +426,6 @@ export const fahrtenAbrechnungRouter = router({
       if (!kontrolle.kannAbschliessen) {
         throw new Error(`${kontrolle.offen} Leistungsnachweise sind noch nicht abgeschlossen. Bitte zuerst alle freigeben.`);
       }
-      const zeilen = kontrolle.offeneZeilen.length === 0
-        ? (await pruefeLeistungsnachweisAbschluss(input.monat) as any) // re-fetch with all rows
-        : kontrolle;
-      // Re-fetch all rows for export
-      const voll = await pruefeLeistungsnachweisAbschluss(input.monat);
-      // Build CSV from all rows (abgeschlossen + offen = 0 means all are done)
       const db = await getDb();
       if (!db) throw new Error("DB nicht verfügbar");
       const result = await db.execute(sql`
@@ -456,5 +450,78 @@ export const fahrtenAbrechnungRouter = router({
         pflegekassenCsv: erstellePflegekassenCsv(input.monat, mapped),
         stundennachweisCsv: erstelleStundennachweisCsv(input.monat, mapped),
       };
+    }),
+
+  /** CSV-Export direkt per E-Mail an die Steuerberaterin senden */
+  csvAnSteuerberaterinSenden: adminProcedure
+    .input(z.object({ monat: z.string().regex(/^\d{4}-\d{2}$/) }))
+    .mutation(async ({ input }) => {
+      const kontrolle = await pruefeLeistungsnachweisAbschluss(input.monat);
+      if (!kontrolle.kannAbschliessen) {
+        throw new Error(`${kontrolle.offen} Leistungsnachweise sind noch offen. Bitte zuerst alle freigeben.`);
+      }
+      const db = await getDb();
+      if (!db) throw new Error("DB nicht verfügbar");
+
+      // Empfänger laden
+      const einstellRows = await db.execute(sql`
+        SELECT schluessel, wert FROM systemEinstellungen
+        WHERE schluessel IN ('steuerbuero_email', 'steuerbuero_name')
+      `);
+      const einstellArr: any[] = (einstellRows as any)[0] ?? einstellRows;
+      const einstellungen: Record<string, string> = {};
+      for (const r of einstellArr) einstellungen[r.schluessel] = r.wert ?? "";
+
+      // Auch aus system_einstellungen prüfen (Fallback)
+      if (!einstellungen.steuerbuero_email) {
+        const altRows = await db.execute(sql`
+          SELECT schluessel, wert FROM system_einstellungen WHERE schluessel = 'steuerbuero_email'
+        `);
+        const altArr: any[] = (altRows as any)[0] ?? altRows;
+        if (altArr[0]?.wert) einstellungen.steuerbuero_email = altArr[0].wert;
+      }
+
+      const empfaenger = einstellungen.steuerbuero_email;
+      if (!empfaenger) throw new Error("Keine Steuerberaterin-E-Mail hinterlegt. Bitte unter SMTP / E-Mail konfigurieren.");
+
+      // CSV erzeugen
+      const result = await db.execute(sql`
+        SELECT l.id, l.mitarbeiterId,
+          CONCAT(m.vorname, ' ', m.nachname) AS mitarbeiterName,
+          CONCAT(k.vorname, ' ', k.nachname) AS kundenName,
+          l.paragraph, l.stunden, l.betrag, l.status
+        FROM leistungen l
+        LEFT JOIN mitarbeiter m ON m.id = l.mitarbeiterId
+        LEFT JOIN kunden k ON k.id = l.kundenId
+        WHERE l.monat = ${input.monat} AND l.geloeschtAt IS NULL
+        ORDER BY m.nachname, k.nachname
+      `);
+      const rows: any[] = (result as any)[0] ?? result;
+      const mapped = rows.map((r: any) => ({
+        id: Number(r.id), mitarbeiterId: Number(r.mitarbeiterId),
+        mitarbeiterName: r.mitarbeiterName ?? "", kundenName: r.kundenName ?? "",
+        paragraph: r.paragraph ?? "", stunden: Number(r.stunden ?? 0),
+        betrag: Number(r.betrag ?? 0), status: r.status ?? "",
+      }));
+
+      const pflegekassenCsv = erstellePflegekassenCsv(input.monat, mapped);
+      const stundennachweisCsv = erstelleStundennachweisCsv(input.monat, mapped);
+
+      const gesamtStunden = mapped.reduce((s, z) => s + z.stunden, 0);
+      const gesamtBetrag = mapped.reduce((s, z) => s + z.betrag, 0);
+
+      const mailResult = await sendEmail({
+        to: empfaenger,
+        subject: `Leistungsnachweise & Stundenübersicht ${input.monat} – Seniorenassistenz Bernhardt`,
+        html: `<div style="font-family:Arial,sans-serif;max-width:600px"><h2 style="color:#2d6a2d">Monatsabschluss ${input.monat}</h2><p>Sehr geehrte Damen und Herren,</p><p>anbei erhalten Sie die Leistungsnachweise und Stundenübersicht für den Monat <strong>${input.monat}</strong>.</p><p>Mit freundlichen Grüßen<br><strong>Seniorenassistenz Bernhardt</strong></p></div>`,
+        attachments: [
+          { filename: `Pflegekassen_${input.monat}.csv`, content: Buffer.from(pflegekassenCsv, "utf-8"), contentType: "text/csv" },
+          { filename: `Stundennachweis_MA_${input.monat}.csv`, content: Buffer.from(stundennachweisCsv, "utf-8"), contentType: "text/csv" },
+        ],
+      });
+      if (!mailResult.success) {
+        throw new Error(mailResult.error ?? "E-Mail konnte nicht gesendet werden. Bitte SMTP-Daten prüfen.");
+      }
+      return { success: true, empfaenger, anzahl: mapped.length };
     }),
 });

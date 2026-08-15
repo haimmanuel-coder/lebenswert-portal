@@ -21,7 +21,7 @@ function generateVollmachtPdf(data: {
   doc.rect(0, 0, 210, 28, "F");
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(16); doc.setFont("helvetica", "bold");
-  doc.text("Lebensnah Betreuung", 15, 12);
+  doc.text("Seniorenassistenz Bernhardt", 15, 12);
   doc.setFontSize(10); doc.setFont("helvetica", "normal");
   doc.text("Neukundenaufnahme – Vollmacht & Stammdaten", 15, 20);
   doc.text(new Date().toLocaleDateString("de-DE"), 195, 20, { align: "right" });
@@ -56,7 +56,7 @@ function generateVollmachtPdf(data: {
   doc.text("Vollmacht", 15, 130);
   doc.setDrawColor(...green); doc.line(15, 132, 195, 132);
   doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.setTextColor(50, 50, 50);
-  const vollmachtText = `Ich, ${data.vorname} ${data.nachname}, bevollmächtige hiermit die Lebensnah Betreuung, mich gegenüber meiner Pflegekasse und dem zuständigen Kostenträger (${data.kostentraeger || "–"}) zu vertreten und in meinem Namen Budgetabfragen durchzuführen, Leistungsnachweise einzureichen sowie alle für die Betreuungsleistungen nach § ${data.paragraph} SGB XI notwendigen Korrespondenzen zu führen. Diese Vollmacht gilt bis auf Widerruf.`;
+  const vollmachtText = `Ich, ${data.vorname} ${data.nachname}, bevollmächtige hiermit die Seniorenassistenz Bernhardt, mich gegenüber meiner Pflegekasse und dem zuständigen Kostenträger (${data.kostentraeger || "–"}) zu vertreten und in meinem Namen Budgetabfragen durchzuführen, Leistungsnachweise einzureichen sowie alle für die Betreuungsleistungen nach § ${data.paragraph} SGB XI notwendigen Korrespondenzen zu führen. Diese Vollmacht gilt bis auf Widerruf.`;
   const lines = doc.splitTextToSize(vollmachtText, 180);
   doc.text(lines, 15, 140);
 
@@ -315,7 +315,7 @@ export default function NeukundenAufnahme() {
                 <div style={{ marginBottom: 12 }}><label style={labelStyle}>Kostenträger / Krankenkasse</label><input style={inputStyle} value={form.kostentraeger} onChange={e => f("kostentraeger", e.target.value)} placeholder="z.B. AOK Bayern" /></div>
                 <div style={{ marginBottom: 20 }}><label style={labelStyle}>Versicherungsnummer</label><input style={inputStyle} value={form.versicherungsnummer} onChange={e => f("versicherungsnummer", e.target.value)} placeholder="A123456789" /></div>
                 <div style={{ background: "#eff6ff", border: "1px solid #93c5fd", borderRadius: 10, padding: "12px 14px", marginBottom: 20, fontSize: 12, color: "#1e40af" }}>
-                  <strong>ℹ️ Dauervollmacht:</strong> Im nächsten Schritt unterschreiben Mitarbeiter und Kunde die Vollmacht. Diese berechtigt Lebensnah Betreuung, Budgetabfragen beim Kostenträger durchzuführen.
+                  <strong>ℹ️ Dauervollmacht:</strong> Im nächsten Schritt unterschreiben Mitarbeiter und Kunde die Vollmacht. Diese berechtigt Seniorenassistenz Bernhardt, Budgetabfragen beim Kostenträger durchzuführen.
                 </div>
                 <div style={{ display: "flex", gap: 10 }}>
                   <button onClick={() => setStep(2)} style={{ flex: 1, padding: 13, background: "#f4f6f3", color: "#6b7280", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>← Zurück</button>

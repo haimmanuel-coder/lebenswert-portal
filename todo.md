@@ -83,6 +83,12 @@
 - [x] Admin-Testmodus mit Reset-Funktion: alle Bewegungsdaten (Einsätze, Fahrten, LNW, Berichte) auf Knopfdruck löschen
 - [x] Testdaten für einen kompletten Monat generieren (5 MA, realistische Einsätze, Fahrten, LNW)
 
+## CSV-Versand, LNW-Widget, Feedback & Branding
+- [x] Button zum direkten E-Mail-Versand der CSV-Exporte an die Steuerberaterin
+- [x] LNW-Status-Widget auf dem Admin-Dashboard (offene/freigegebene Nachweise aktueller Monat)
+- [x] Feedback-Funktion für Mitarbeiterinnen während der Testphase
+- [x] Branding auf Seniorenassistenz Bernhardt umstellen (Logo, Texte, Layouts)
+
 ## Datenbank & Backend
 - [x] Datenbankschema: mitarbeiter, kunden, einsaetze, leistungen, fahrten
 - [x] Drizzle-Migration generieren und ausführen

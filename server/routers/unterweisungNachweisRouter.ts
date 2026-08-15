@@ -75,7 +75,7 @@ export async function generateNachweisPdf(params: {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(14);
   doc.setFont("helvetica", "bold");
-  doc.text("Lebenswert Betreuung GmbH", margin, 8);
+  doc.text("Seniorenassistenz Bernhardt", margin, 8);
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
   doc.text("Unterweisungsnachweis gemäß §12 ArbSchG", margin, 14);
@@ -198,7 +198,7 @@ export async function generateNachweisPdf(params: {
     doc.setFontSize(7);
     doc.setTextColor(120, 120, 120);
     doc.text(
-      `Lebenswert Betreuung GmbH · Unterweisungsnachweis · Seite ${i}/${pageCount} · Erstellt: ${new Date().toLocaleDateString("de-DE")}`,
+      `Seniorenassistenz Bernhardt · Unterweisungsnachweis · Seite ${i}/${pageCount} · Erstellt: ${new Date().toLocaleDateString("de-DE")}`,
       margin,
       290,
     );

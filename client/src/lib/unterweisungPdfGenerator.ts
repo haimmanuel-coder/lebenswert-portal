@@ -133,7 +133,7 @@ export function generateUnterweisungsNachweis(data: UnterweisungNachweisData): v
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(18);
   doc.setFont("helvetica", "bold");
-  doc.text("Lebenswert Betreuung", MARGIN, 12);
+  doc.text("Seniorenassistenz Bernhardt", MARGIN, 12);
 
   // Untertitel
   doc.setFontSize(9);
@@ -344,7 +344,7 @@ export function generateUnterweisungsNachweis(data: UnterweisungNachweisData): v
   doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(dr, dg, db);
-  doc.text("Lebenswert Betreuung", sig2X + 2, y + SIG_H - 9);
+  doc.text("Seniorenassistenz Bernhardt", sig2X + 2, y + SIG_H - 9);
 
   y += SIG_H + 8;
 
@@ -368,7 +368,7 @@ export function generateUnterweisungsNachweis(data: UnterweisungNachweisData): v
     doc.setFontSize(7);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(150, 150, 150);
-    doc.text("Lebenswert Betreuung · Ambulante Betreuung & Alltagsbegleitung", MARGIN, footerY);
+    doc.text("Seniorenassistenz Bernhardt · Ambulante Betreuung & Alltagsbegleitung", MARGIN, footerY);
     doc.text(`Seite ${p} / ${pageCount}`, W - MARGIN, footerY, { align: "right" });
     doc.text(`Erstellt: ${fmtDate(new Date().toISOString())}`, W / 2, footerY, { align: "center" });
   }

@@ -79,10 +79,10 @@ export async function handleFahrtenVersandCron(): Promise<{
         // E-Mail senden
         await sendEmail({
           to: empfaengerEmail,
-          subject: `Fahrtennachweise ${abr.label} – Lebenswert Betreuung`,
+          subject: `Fahrtennachweise ${abr.label} – Seniorenassistenz Bernhardt`,
           html: `
             <div style="font-family:Arial,sans-serif;max-width:600px">
-              <h2 style="color:#2d6a2d">Fahrtennachweise – Lebenswert Betreuung</h2>
+              <h2 style="color:#2d6a2d">Fahrtennachweise – Seniorenassistenz Bernhardt</h2>
               <p>Sehr geehrte Damen und Herren,</p>
               <p>anbei erhalten Sie die Fahrtennachweise für den Abrechnungszeitraum:</p>
               <table style="border-collapse:collapse;width:100%;margin:16px 0">
@@ -104,7 +104,7 @@ export async function handleFahrtenVersandCron(): Promise<{
                 </tr>
               </table>
               <p>Die detaillierte Aufstellung finden Sie im beigefügten PDF.</p>
-              <p>Mit freundlichen Grüßen<br><strong>Lebenswert Betreuung</strong></p>
+              <p>Mit freundlichen Grüßen<br><strong>Seniorenassistenz Bernhardt</strong></p>
             </div>
           `,
           attachments: pdfBuffer ? [{

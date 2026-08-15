@@ -85,7 +85,7 @@ export default function CookieBanner() {
                 Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse).
               </div>
               <div style={{ marginTop: "0.5rem" }}>
-                <strong>Verantwortlicher:</strong> Lebenswert Betreuung GmbH &bull;{" "}
+                <strong>Verantwortlicher:</strong> Seniorenassistenz Bernhardt &bull;{" "}
                 <strong>Datenschutzbeauftragter:</strong> Bitte kontaktieren Sie die Geschäftsleitung.
               </div>
             </div>

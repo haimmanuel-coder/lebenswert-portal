@@ -384,7 +384,7 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
       doc.setFontSize(18); doc.setFont("helvetica", "bold"); doc.setTextColor("#ffffff");
       doc.text("PERSONALBOGEN", lm, 14);
       doc.setFontSize(10); doc.setFont("helvetica", "normal");
-      doc.text("Lebenswert Betreuung – Vertraulich", lm, 21);
+      doc.text("Seniorenassistenz Bernhardt – Vertraulich", lm, 21);
       doc.setFontSize(9); doc.setTextColor("#ccfbf1");
       doc.text(`Erstellt: ${new Date().toLocaleDateString("de-DE")}`, 150, 21);
       y = 38;

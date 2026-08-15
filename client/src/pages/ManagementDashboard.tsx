@@ -99,7 +99,7 @@ export default function ManagementDashboard() {
       {/* Header */}
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 18, fontWeight: 800 }}>Admin-Dashboard · Management</div>
-        <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>Lebenswert Betreuung – Übersicht</div>
+        <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>Seniorenassistenz Bernhardt – Übersicht</div>
       </div>
 
       {/* Monat-Selektor */}
