@@ -25,9 +25,17 @@ socket.addEventListener("message", (event) => {
 });
 
 await send("Emulation.setDeviceMetricsOverride", { width: 828, height: 1792, deviceScaleFactor: 1, mobile: true });
+await send("Network.clearBrowserCookies");
 await send("Page.enable");
 await send("Page.navigate", { url: "http://127.0.0.1:3000" });
-await new Promise((resolve) => setTimeout(resolve, 1500));
+
+let loginReady = false;
+for (let attempt = 0; attempt < 20; attempt += 1) {
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  const ready = await send("Runtime.evaluate", { expression: "Boolean(document.querySelector('.lw-login-card'))", returnByValue: true });
+  if (ready.result.value) { loginReady = true; break; }
+}
+if (!loginReady) throw new Error("Login-Karte wurde im Browser nicht geladen.");
 
 const result = await send("Runtime.evaluate", {
   expression: `(() => {
@@ -43,7 +51,7 @@ const result = await send("Runtime.evaluate", {
       bodyScrollWidth: document.body.scrollWidth,
       card: rect('.lw-login-card'),
       email: rect('input[type="email"]'),
-      password: rect('input[type="password"], input[type="text"]'),
+      password: rect('input[type="password"]'),
     };
   })()`,
   returnByValue: true,

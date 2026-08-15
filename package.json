@@ -11,6 +11,8 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "test:security": "node scripts/security-regression.mjs",
+    "test:mobile-layout": "node scripts/check-mobile-login-layout.mjs",
+    "test:admin-smoke": "tsx scripts/admin-ui-smoke.mjs",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
   },
   "dependencies": {
