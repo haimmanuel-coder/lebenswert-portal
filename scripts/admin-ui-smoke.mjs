@@ -42,7 +42,14 @@ const result = await send("Runtime.evaluate", {
 });
 const data = result.result.value;
 const adminShellVisible = /Admin|Mitarbeiter|Kunden|Planung/.test(data.pageText) && !data.isLoginVisible;
-const moduleLabels = ["Einsatzplanung", "Kundenliste", "Leistungsnachweise", "Mitarbeiterakte", "Arbeitssicherheit", "Datenschutz", "Admin-Panel"];
+const moduleLabels = [
+  "Einsatzplanung", "Kalender", "Kundenzuteilung", "Kundenliste", "Neukundenaufnahme",
+  "Pflegekassen", "Budgetverwaltung", "Kundenbegleitungen", "Dokumentation", "Leistungsnachweise",
+  "Mitarbeiterakte", "Zeiterfassung", "Mobilität", "Urlaub", "Krankmeldung", "Mein Profil",
+  "2FA-Sicherheit", "Führerschein-Check", "Unterweisungen", "Arbeitssicherheit", "LNW-Freigabe",
+  "Benachrichtigungen", "Feedback (Testphase)", "Admin-Panel", "Datenschutz", "Integrationen",
+  "Export & Briefe", "Logbuch",
+];
 const modules = [];
 for (const label of moduleLabels) {
   const click = await send("Runtime.evaluate", {
@@ -56,7 +63,7 @@ for (const label of moduleLabels) {
   });
   await new Promise((resolve) => setTimeout(resolve, 450));
   const moduleState = await send("Runtime.evaluate", {
-    expression: `(() => ({ text: document.body.innerText, hasError: /Fehler|ErrorBoundary|Something went wrong/i.test(document.body.innerText) }))()`,
+    expression: `(() => ({ text: document.body.innerText, hasError: /ErrorBoundary|Something went wrong|TRPCClientError|Unexpected token|Objects are not valid as a React child/i.test(document.body.innerText) }))()`,
     returnByValue: true,
   });
   modules.push({ label, clicked: click.result.value, rendered: moduleState.result.value.text.includes(label), hasError: moduleState.result.value.hasError });

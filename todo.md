@@ -9,7 +9,8 @@
 - [ ] Startverhalten von „Übernehmen Sie die Kontrolle“ im externen Remote-Browser mit einem Portal-Kontext end-to-end verifizieren; das Öffnen eines neuen Tabs ist nicht durch den App-Code steuerbar
 - [x] Statische funktionale, technische, Sicherheits- und UX-Prüfung des Admin-Panels mit priorisiertem Prüfbericht durchführen
 - [x] Bestätigte kritische Zugriffsschutzbefunde aus der Admin-Panel-Prüfung gezielt beheben und per Build/Test erneut verifizieren
-- [ ] Jedes Admin-Modul mit echtem Admin-Login funktional durchtesten und je Modul CRUD, Lade-/Fehlerzustände, Kennzahlen und Reproduktionsschritte dokumentieren
+- [x] Alle regulär erreichbaren Admin- und Mitarbeiterseiten mit echtem Admin-Kontext auf Navigation, Rendering und Laufzeitfehler prüfen
+- [ ] Schreibende und löschende Admin-Abläufe je Modul mit explizit freigegebenen Testdaten prüfen und die Bereinigung dokumentieren
 - [x] Sicherheits-Regressionstests für Datenschutz-Adminrechte, SSE, Scheduler und Upload-Endpunkte ergänzen
 - [x] Sicheren Austausch sensibler HR-/Lohndaten statt Klartext-E-Mail sowie belastbare SMTP-Secret-Absicherung umsetzen
 - [x] Admin-Popup bei abgeschlossenem Erstlogin inklusive Passwortwechsel eines Mitarbeiters ergänzen
