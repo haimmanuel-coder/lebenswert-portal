@@ -101,6 +101,17 @@ export default function NeukundenAufnahme() {
   const sigKundeRef = useRef<import("@/components/SignatureCanvas").SignatureCanvasRef>(null);
 
   const { data: aufnahmen = [], refetch, isLoading: aufnahmenLoading, isError: aufnahmenError } = trpc.neukundenaufnahme.list.useQuery(undefined, { retry: false });
+
+  // Offene Neukunden-Bestätigungen
+  const { data: offeneBestaetigungen = [], refetch: refetchBest } = (trpc as any).neukundenPush.meineOffenen.useQuery();
+  const bestaetigeMutation = (trpc as any).neukundenPush.bestaetigen.useMutation({
+    onSuccess: () => {
+      toast.success("✅ Bestätigung abgehakt!");
+      refetchBest();
+    },
+    onError: (e: any) => toast.error("Fehler: " + e.message),
+  });
+
   const createAufnahme = trpc.neukundenaufnahme.create.useMutation({
     onSuccess: () => {
       toast.success("✅ Neukundenaufnahme gespeichert");
@@ -162,6 +173,41 @@ export default function NeukundenAufnahme() {
           + Neuer Kunde
         </button>
       </div>
+
+      {/* Offene Neukunden-Bestätigungen */}
+      {(offeneBestaetigungen as any[]).length > 0 && (
+        <div style={{ background: "#fef3c7", border: "2px solid #f59e0b", borderRadius: 12, padding: 16, marginBottom: 20 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#92400e", marginBottom: 10 }}>
+            ⚠️ Offene Neukunden-Bestätigungen ({(offeneBestaetigungen as any[]).length})
+          </div>
+          <p style={{ fontSize: 12, color: "#78350f", margin: "0 0 12px" }}>
+            Bitte bestätige, dass du die folgenden neuen Kunden zur Kenntnis genommen hast:
+          </p>
+          {(offeneBestaetigungen as any[]).map((b: any) => (
+            <div key={b.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fff", borderRadius: 8, padding: "10px 14px", marginBottom: 8, border: "1px solid #fcd34d" }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#1f2937" }}>
+                  Kunde #{b.kundenId}
+                </div>
+                <div style={{ fontSize: 11, color: "#6b7280" }}>
+                  Erstellt: {b.createdAt ? new Date(b.createdAt).toLocaleDateString("de-DE") : "–"}
+                </div>
+              </div>
+              <button
+                onClick={() => bestaetigeMutation.mutate({ id: b.id })}
+                disabled={bestaetigeMutation.isPending}
+                style={{
+                  padding: "8px 14px", background: "#10b981", color: "#fff",
+                  border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700,
+                  cursor: "pointer", whiteSpace: "nowrap",
+                }}
+              >
+                {bestaetigeMutation.isPending ? "⏳" : "✅ Gelesen & bestätigt"}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Liste */}
       {aufnahmenLoading ? (

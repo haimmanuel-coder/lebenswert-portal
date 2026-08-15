@@ -88,6 +88,7 @@
 - [x] LNW-Status-Widget auf dem Admin-Dashboard (offene/freigegebene Nachweise aktueller Monat)
 - [x] Feedback-Funktion für Mitarbeiterinnen während der Testphase
 - [x] Branding auf Seniorenassistenz Bernhardt umstellen (Logo, Texte, Layouts)
+- [x] Neukunden-Bestätigungs-Button in der Neukundenaufnahme-Seite ergänzen
 
 ## Datenbank & Backend
 - [x] Datenbankschema: mitarbeiter, kunden, einsaetze, leistungen, fahrten
