@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { usePortalAuth } from "@/contexts/PortalAuthContext";
 import { trpc } from "@/lib/trpc";
@@ -325,6 +325,18 @@ export default function PortalApp() {
 
   const currentPageLabel = sections.flatMap(s => s.items).find(i => i.id === activePage)?.label ?? "Dashboard";
 
+  // Ladeanimation beim Seitenwechsel
+  const [pageLoading, setPageLoading] = useState(false);
+  const prevPage = useRef(activePage);
+  useEffect(() => {
+    if (prevPage.current !== activePage) {
+      setPageLoading(true);
+      const t = setTimeout(() => setPageLoading(false), 180);
+      prevPage.current = activePage;
+      return () => clearTimeout(t);
+    }
+  }, [activePage]);
+
   const SidebarContent = () => (
     <aside style={{
       width: 240, minWidth: 240, height: "100%",
@@ -594,8 +606,22 @@ export default function PortalApp() {
         </div>
 
         {/* Seiteninhalt */}
-        <main style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
-          {renderPage()}
+        <main style={{ flex: 1, overflowY: "auto", overflowX: "hidden", position: "relative" }}>
+          {pageLoading && (
+            <div style={{
+              position: "absolute", top: 0, left: 0, right: 0, height: 3, zIndex: 999,
+              background: "linear-gradient(90deg, #4a8c3f 0%, #6ee7b7 50%, #4a8c3f 100%)",
+              backgroundSize: "200% 100%",
+              animation: "shimmer 0.8s ease-in-out infinite",
+            }} />
+          )}
+          <div style={{
+            opacity: pageLoading ? 0.6 : 1,
+            transform: pageLoading ? "translateY(4px)" : "translateY(0)",
+            transition: "opacity 0.15s ease-out, transform 0.15s ease-out",
+          }}>
+            {renderPage()}
+          </div>
         </main>
 
         {/* Smartphone-Kurzmenü: häufigste Wege immer direkt erreichbar. */}

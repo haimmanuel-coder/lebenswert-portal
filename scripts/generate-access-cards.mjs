@@ -12,7 +12,7 @@ const auditFile = path.join(outputDir, "batch-audit.json");
 const portalUrl = "https://portal.lebenswert-betreuung.de/";
 
 function createStartPassword() {
-  return `Lb!${crypto.randomBytes(9).toString("base64url")}${crypto.randomInt(10)}`;
+  return `Sb!${crypto.randomBytes(9).toString("base64url")}${crypto.randomInt(10)}`;
 }
 
 function quoted(value) {
@@ -26,7 +26,7 @@ function buildCard(entry) {
     #align(right)[#text(size: 6pt, fill: rgb("64748b"))[✂ An der Linie ausschneiden]]
     #v(0.5mm)
     #grid(columns: (1fr, auto), column-gutter: 2.5mm)[
-      [#text(size: 12.5pt, weight: "bold", fill: rgb("4a8c3f"))[Lebenswert Betreuung] \
+      [#text(size: 12.5pt, weight: "bold", fill: rgb("4a8c3f"))[Seniorenassistenz Bernhardt] \
        #text(size: 7.5pt, fill: rgb("64748b"))[Mitarbeiter-Portal]]
       [#image(${quoted(entry.qrFile)}, width: 20mm)]
     ]
