@@ -8,12 +8,16 @@ import QRCode from "qrcode";
 
 const portalUrl = "https://portal.lebenswert-betreuung.de/";
 const outputDir = "/home/ubuntu/zugangskarten_ausgabe";
-const outputPdf = path.join(outputDir, "ersatz_zugangskarten_anica_yvonne.pdf");
-const auditFile = path.join(outputDir, "ersatz_zugangskarten_audit.json");
-const targetEmails = [
+const defaultEmails = [
   "anica.schmitz@lebenswert-betreuung.de",
   "yvonne.wagner@lebenswert-betreuung.de",
 ];
+const targetEmails = (process.env.TARGET_EMAILS?.split(",") ?? defaultEmails)
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean);
+const outputName = process.env.OUTPUT_BASENAME?.trim() || "ersatz_zugangskarten_anica_yvonne";
+const outputPdf = path.join(outputDir, `${outputName}.pdf`);
+const auditFile = path.join(outputDir, `${outputName}_audit.json`);
 
 function password() {
   return `Sb!${crypto.randomBytes(9).toString("base64url")}${crypto.randomInt(10)}`;

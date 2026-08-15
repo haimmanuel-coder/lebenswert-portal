@@ -1,6 +1,7 @@
 # Lebenswert Betreuung – Mitarbeiter-Portal TODO
 
 ## Aktuelle Umsetzung – Unterweisung, Erste Hilfe und DSGVO-Startprozess
+- [x] Loginprobleme von Anica Schmitz und Yvonne Wagner prüfen, korrigieren und mit echtem Portal-Login verifizieren
 - [x] Admin-Statusanzeige für offenen Erstlogin und ausstehenden Passwortwechsel je Mitarbeiter ergänzen
 - [x] Zurück-Button in der Zugangsstatus-Detailansicht ergänzen
 - [x] Anmeldeprobleme von Anica Schmitz und Yvonne Wagner sicher diagnostizieren und Zugang wiederherstellen
