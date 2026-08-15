@@ -23,6 +23,7 @@ import { sql, eq, desc, and, isNotNull, lte, isNull } from "drizzle-orm";
 import { getDb } from "./db";
 import { ermittleErsteHilfeStatus } from "./complianceUtils";
 import { bereiteEinsatzUebernahmeVor } from "./mitarbeiterAblauf";
+import { pruefeLeistungsnachweisAbschluss } from "./monatsabschlussService";
 import { generiereEinmaligesStartpasswort, waehleDruckbareMitarbeiter } from "./accessCredentials";
 import { pruefeSicheresPasswort, SICHERES_PASSWORT_HINWEIS, startPasswortLaeuftAb } from "../shared/passwordPolicy";
 import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, einsatzAenderungen, kunden as kundenTable, notifications as notificationsTable, ersteHilfeKurse, mitarbeiterBerechtigungen as mbTable, besuchsberichte, fahrten } from "../drizzle/schema";
@@ -2788,6 +2789,15 @@ export const appRouter = router({
     monatsabschluss: adminProcedure
       .input(z.object({ monat: z.string().regex(/^\d{4}-\d{2}$/) }))
       .mutation(async ({ input, ctx }) => {
+        // Pflichtprüfung: Alle LNW müssen abgeschlossen sein
+        const kontrolle = await pruefeLeistungsnachweisAbschluss(input.monat);
+        if (!kontrolle.kannAbschliessen && kontrolle.gesamt > 0) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: `Monatsabschluss blockiert: ${kontrolle.offen} von ${kontrolle.gesamt} Leistungsnachweisen für ${input.monat} sind noch nicht abgeschlossen. Bitte zuerst alle freigeben.`,
+          });
+        }
+
         const [eis, leis, fahr, maList] = await Promise.all([
           getAllEinsaetze(),
           getAllLeistungen(),

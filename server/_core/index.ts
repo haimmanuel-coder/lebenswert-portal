@@ -19,6 +19,7 @@ import { aufbewahrungsfristenHandler } from "../scheduled/aufbewahrungsfristen";
 import { backupWoechentlichHandler } from "../scheduled/backupWoechentlich";
 import { ensureTables } from "../ensureTables";
 import { ensureHeartbeatJobs } from "../ensureHeartbeatJobs";
+import { handleMonatsabschlussErinnerung } from "../scheduled/monatsabschlussErinnerung";
 import multer from "multer";
 import { storagePut } from "../storage";
 
@@ -130,6 +131,17 @@ async function startServer() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("[Scheduled/FahrtenVersand]", err);
+      res.status(500).json({ ok: false, error: msg });
+    }
+  });
+  // Monatsabschluss-Erinnerung: am 28. jeden Monats
+  app.post("/api/scheduled/monatsabschluss-erinnerung", async (_req: any, res: any) => {
+    try {
+      const result = await handleMonatsabschlussErinnerung();
+      res.json({ ok: true, ...result });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[Scheduled/MonatsabschlussErinnerung]", err);
       res.status(500).json({ ok: false, error: msg });
     }
   });

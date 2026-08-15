@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
 
 // ─── Status-Badge ────────────────────────────────────────────────────────────
 
@@ -39,6 +40,31 @@ export default function FahrtenAbrechnung() {
   const { data: zeitraum } = trpc.fahrtenAbrechnung.aktuellerZeitraum.useQuery();
   const { data: abrechnungen, isLoading } = trpc.fahrtenAbrechnung.list.useQuery();
   const { data: einstellungen } = trpc.fahrtenAbrechnung.getEinstellungen.useQuery();
+
+  // Leistungsnachweis-Abschlussprüfung
+  const aktuellerMonat = new Date().toISOString().slice(0, 7);
+  const { data: lnwStatus } = trpc.fahrtenAbrechnung.leistungsnachweisStatus.useQuery({ monat: aktuellerMonat });
+
+  const pflegekassenExport = trpc.fahrtenAbrechnung.pflegekassenExport.useMutation({
+    onSuccess: (data: any) => {
+      // Pflegekassen-CSV herunterladen
+      const blob1 = new Blob([data.pflegekassenCsv], { type: "text/csv;charset=utf-8;" });
+      const url1 = URL.createObjectURL(blob1);
+      const a1 = document.createElement("a");
+      a1.href = url1; a1.download = `Pflegekassen_${aktuellerMonat}.csv`; a1.click();
+      URL.revokeObjectURL(url1);
+      // Stundennachweis-CSV herunterladen
+      setTimeout(() => {
+        const blob2 = new Blob([data.stundennachweisCsv], { type: "text/csv;charset=utf-8;" });
+        const url2 = URL.createObjectURL(blob2);
+        const a2 = document.createElement("a");
+        a2.href = url2; a2.download = `Stundennachweis_MA_${aktuellerMonat}.csv`; a2.click();
+        URL.revokeObjectURL(url2);
+      }, 500);
+      toast.success("Pflegekassen- und Stundennachweis-Export heruntergeladen");
+    },
+    onError: (e: { message: string }) => toast.error(e.message),
+  });
 
   // Einstellungs-State
   const [email, setEmail] = useState("");
@@ -106,10 +132,122 @@ export default function FahrtenAbrechnung() {
       </div>
 
       <Tabs defaultValue="abrechnungen">
-        <TabsList className="grid grid-cols-2 w-full max-w-sm">
+        <TabsList className="grid grid-cols-3 w-full max-w-md">
+          <TabsTrigger value="monatsabschluss">Monatsabschluss</TabsTrigger>
           <TabsTrigger value="abrechnungen">Abrechnungen</TabsTrigger>
           <TabsTrigger value="einstellungen">Einstellungen</TabsTrigger>
         </TabsList>
+
+        {/* ── Tab: Monatsabschluss ─────────────────────────────────────── */}
+        <TabsContent value="monatsabschluss" className="space-y-4 mt-4">
+          <Card className="border-amber-200 bg-amber-50">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg text-amber-900">📊 Monatsabschluss – {aktuellerMonat}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-amber-800">
+                Alle Leistungsnachweise müssen bis zum <strong>letzten Tag des Monats</strong> abgeschlossen sein.
+                Die Stunden dienen zur Abrechnung mit der Pflegekasse und als Stundennachweis für die Lohnberechnung.
+              </p>
+
+              {lnwStatus && (
+                <div className="space-y-3">
+                  {/* Fortschrittsbalken */}
+                  <div>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="font-medium text-gray-700">Leistungsnachweise abgeschlossen</span>
+                      <span className="font-bold">{lnwStatus.abgeschlossen} / {lnwStatus.gesamt}</span>
+                    </div>
+                    <Progress value={lnwStatus.gesamt > 0 ? (lnwStatus.abgeschlossen / lnwStatus.gesamt) * 100 : 0} className="h-3" />
+                  </div>
+
+                  {/* Status-Karten */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-white rounded-lg p-3 border text-center">
+                      <div className="text-xl font-bold text-gray-800">{lnwStatus.gesamt}</div>
+                      <div className="text-xs text-gray-500">Gesamt</div>
+                    </div>
+                    <div className="bg-green-50 rounded-lg p-3 border border-green-200 text-center">
+                      <div className="text-xl font-bold text-green-700">{lnwStatus.abgeschlossen}</div>
+                      <div className="text-xs text-green-600">Abgeschlossen</div>
+                    </div>
+                    <div className={`rounded-lg p-3 border text-center ${lnwStatus.offen > 0 ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"}`}>
+                      <div className={`text-xl font-bold ${lnwStatus.offen > 0 ? "text-red-700" : "text-green-700"}`}>{lnwStatus.offen}</div>
+                      <div className={`text-xs ${lnwStatus.offen > 0 ? "text-red-600" : "text-green-600"}`}>Offen</div>
+                    </div>
+                  </div>
+
+                  {/* Offene Mitarbeiter */}
+                  {lnwStatus.offen > 0 && lnwStatus.offeneMitarbeiter?.length > 0 && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                      <p className="text-sm font-bold text-red-800 mb-2">⚠️ Offene Leistungsnachweise bei:</p>
+                      <ul className="text-sm text-red-700 space-y-1">
+                        {(lnwStatus.offeneMitarbeiter as any[]).map((ma: any) => (
+                          <li key={ma.mitarbeiterId}>• {ma.mitarbeiterName} – {ma.anzahl} LNW ({ma.stunden.toFixed(1)} Std.)</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Zusammenfassung */}
+                  <div className="bg-white border rounded-lg p-3">
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div><span className="text-gray-500">Gesamtstunden:</span> <strong>{lnwStatus.gesamtStunden?.toFixed(1)} Std.</strong></div>
+                      <div><span className="text-gray-500">Gesamtbetrag:</span> <strong>{lnwStatus.gesamtBetrag?.toFixed(2)} €</strong></div>
+                    </div>
+                  </div>
+
+                  {/* Export-Buttons */}
+                  {lnwStatus.kannAbschliessen && (
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={() => pflegekassenExport.mutate({ monat: aktuellerMonat })}
+                        disabled={pflegekassenExport.isPending}
+                        className="bg-green-600 hover:bg-green-700 text-white flex-1"
+                      >
+                        {pflegekassenExport.isPending ? "Exportiert…" : "📥 Pflegekassen- & Stundenexport"}
+                      </Button>
+                    </div>
+                  )}
+
+                  {!lnwStatus.kannAbschliessen && lnwStatus.gesamt > 0 && (
+                    <div className="bg-amber-100 border border-amber-300 rounded-lg p-3 text-sm text-amber-800">
+                      <strong>Hinweis:</strong> Der Export ist erst möglich, wenn alle Leistungsnachweise freigegeben sind.
+                      Am 28. des Monats werden betroffene Mitarbeiter automatisch erinnert.
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Ablaufübersicht */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">📅 Monatlicher Ablauf</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-start gap-3">
+                  <Badge variant="outline" className="shrink-0 mt-0.5">Bis 15.</Badge>
+                  <span>Fahrtennachweise des Zeitraums 16.–15. werden automatisch gebündelt</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Badge variant="outline" className="shrink-0 mt-0.5">Bis 28.</Badge>
+                  <span>Erinnerung an offene Leistungsnachweise (automatisch)</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Badge variant="outline" className="shrink-0 mt-0.5">Monatsende</Badge>
+                  <span><strong>Alle Leistungsnachweise müssen abgeschlossen sein</strong> (Pflegekasse + Lohn)</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Badge variant="outline" className="bg-green-50 border-green-300 shrink-0 mt-0.5">18.</Badge>
+                  <span>Fahrtennachweise nach Admin-Freigabe an Steuerberaterin (automatisch oder manuell)</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {/* ── Tab: Abrechnungen ─────────────────────────────────────────── */}
         <TabsContent value="abrechnungen" className="space-y-4 mt-4">

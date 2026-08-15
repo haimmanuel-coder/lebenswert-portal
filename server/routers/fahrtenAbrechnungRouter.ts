@@ -12,6 +12,7 @@ import { getDb } from "../db";
 import { sql } from "drizzle-orm";
 import { sendEmail } from "../emailService";
 import PDFDocument from "pdfkit";
+import { pruefeLeistungsnachweisAbschluss, erstellePflegekassenCsv, erstelleStundennachweisCsv } from "../monatsabschlussService";
 
 // ─── Hilfsfunktionen ────────────────────────────────────────────────────────
 
@@ -406,5 +407,52 @@ export const fahrtenAbrechnungRouter = router({
         `);
       }
       return { success: true };
+    }),
+
+  /** Leistungsnachweis-Abschlussprüfung für einen Monat */
+  leistungsnachweisStatus: adminProcedure
+    .input(z.object({ monat: z.string().regex(/^\d{4}-\d{2}$/) }))
+    .query(async ({ input }) => {
+      return pruefeLeistungsnachweisAbschluss(input.monat);
+    }),
+
+  /** Pflegekassen-CSV exportieren (nur wenn alle LNW abgeschlossen) */
+  pflegekassenExport: adminProcedure
+    .input(z.object({ monat: z.string().regex(/^\d{4}-\d{2}$/) }))
+    .mutation(async ({ input }) => {
+      const kontrolle = await pruefeLeistungsnachweisAbschluss(input.monat);
+      if (!kontrolle.kannAbschliessen) {
+        throw new Error(`${kontrolle.offen} Leistungsnachweise sind noch nicht abgeschlossen. Bitte zuerst alle freigeben.`);
+      }
+      const zeilen = kontrolle.offeneZeilen.length === 0
+        ? (await pruefeLeistungsnachweisAbschluss(input.monat) as any) // re-fetch with all rows
+        : kontrolle;
+      // Re-fetch all rows for export
+      const voll = await pruefeLeistungsnachweisAbschluss(input.monat);
+      // Build CSV from all rows (abgeschlossen + offen = 0 means all are done)
+      const db = await getDb();
+      if (!db) throw new Error("DB nicht verfügbar");
+      const result = await db.execute(sql`
+        SELECT l.id, l.mitarbeiterId,
+          CONCAT(m.vorname, ' ', m.nachname) AS mitarbeiterName,
+          CONCAT(k.vorname, ' ', k.nachname) AS kundenName,
+          l.paragraph, l.stunden, l.betrag, l.status
+        FROM leistungen l
+        LEFT JOIN mitarbeiter m ON m.id = l.mitarbeiterId
+        LEFT JOIN kunden k ON k.id = l.kundenId
+        WHERE l.monat = ${input.monat} AND l.geloeschtAt IS NULL
+        ORDER BY m.nachname, k.nachname
+      `);
+      const rows: any[] = (result as any)[0] ?? result;
+      const mapped = rows.map((r: any) => ({
+        id: Number(r.id), mitarbeiterId: Number(r.mitarbeiterId),
+        mitarbeiterName: r.mitarbeiterName ?? "", kundenName: r.kundenName ?? "",
+        paragraph: r.paragraph ?? "", stunden: Number(r.stunden ?? 0),
+        betrag: Number(r.betrag ?? 0), status: r.status ?? "",
+      }));
+      return {
+        pflegekassenCsv: erstellePflegekassenCsv(input.monat, mapped),
+        stundennachweisCsv: erstelleStundennachweisCsv(input.monat, mapped),
+      };
     }),
 });

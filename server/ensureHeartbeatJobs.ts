@@ -60,6 +60,13 @@ const JOBS = [
     method: "POST" as const,
     description: "Wöchentlicher Datenbank-Backup: Mitarbeiter + Kunden als CSV nach S3",
   },
+  {
+    name: "monatsabschluss-erinnerung",
+    cron: "0 0 7 28 * *",           // am 28. jeden Monats 07:00 UTC (09:00 MEZ)
+    path: "/api/scheduled/monatsabschluss-erinnerung",
+    method: "POST" as const,
+    description: "Monatsabschluss: Erinnerung an offene Leistungsnachweise vor Monatsende",
+  },
 ];
 
 export async function ensureHeartbeatJobs(): Promise<void> {

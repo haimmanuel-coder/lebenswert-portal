@@ -71,6 +71,12 @@
 - [x] Datei Verfuegbarkeiten.tsx komplett löschen
 - [x] Schnellübersicht heutiger Einsätze direkt im Dashboard nach dem Login anzeigen
 - [x] Kalender um eine übersichtliche Wochenansicht für Mitarbeiter erweitern
+- [x] Monatsabschluss-Regel: Alle Leistungsnachweise eines Monats vor Abschluss und Abrechnung vollständig prüfen
+- [x] Fahrtennachweise automatisch für den Abrechnungszeitraum 16. bis 15. bündeln
+- [x] Admin-Freigabe und nachvollziehbaren Versandstatus für den Monatsabschluss einrichten
+- [x] Fahrtennachweis-Paket am 18. des Monats per konfigurierte E-Mail oder manuellem Versandknopf an die Steuerberaterin übermitteln
+- [x] Automatische Erinnerungen für fehlende Leistungsnachweise vor dem Monatsende und für offene Freigaben einrichten
+- [ ] Briefpapier mit Wasserzeichen für die Monatsdokumente prüfen und passend verwenden
 
 ## Datenbank & Backend
 - [x] Datenbankschema: mitarbeiter, kunden, einsaetze, leistungen, fahrten
