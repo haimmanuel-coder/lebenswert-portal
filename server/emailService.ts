@@ -1,4 +1,42 @@
 import nodemailer from "nodemailer";
+import { sql } from "drizzle-orm";
+
+/** Lädt SMTP-Konfiguration aus der Datenbank (Fallback wenn Env-Variablen fehlen) */
+async function getSmtpConfig(): Promise<{ host?: string; port: number; user?: string; pass?: string; from: string } | null> {
+  // Zuerst Env-Variablen prüfen
+  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+    return {
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT || "587"),
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+      from: process.env.SMTP_FROM || "portal@lebenswert-betreuung.de",
+    };
+  }
+  // Fallback: aus DB laden
+  try {
+    const { getDb } = await import("./db");
+    const db = await getDb();
+    if (!db) return null;
+    const rows = await db.execute(sql`
+      SELECT schluessel, wert FROM system_einstellungen
+      WHERE schluessel IN ('smtp_host','smtp_port','smtp_user','smtp_pass','smtp_from')
+    `);
+    const arr: any[] = (rows as any)[0] ?? rows;
+    const cfg: Record<string, string> = {};
+    for (const r of arr) cfg[r.schluessel] = r.wert ?? "";
+    if (!cfg.smtp_host || !cfg.smtp_user || !cfg.smtp_pass) return null;
+    return {
+      host: cfg.smtp_host,
+      port: parseInt(cfg.smtp_port || "587"),
+      user: cfg.smtp_user,
+      pass: cfg.smtp_pass,
+      from: cfg.smtp_from || "portal@lebenswert-betreuung.de",
+    };
+  } catch {
+    return null;
+  }
+}
 
 export interface EmailOptions {
   to: string;
@@ -9,16 +47,13 @@ export interface EmailOptions {
 
 export async function sendEmail(opts: EmailOptions): Promise<{ success: boolean; error?: string }> {
   try {
-    const host = process.env.SMTP_HOST;
-    const port = parseInt(process.env.SMTP_PORT || "587");
-    const user = process.env.SMTP_USER;
-    const pass = process.env.SMTP_PASS;
-    const from = process.env.SMTP_FROM || "portal@lebenswert-betreuung.de";
-
-    if (!host || !user || !pass) {
+    const config = await getSmtpConfig();
+    if (!config || !config.host || !config.user || !config.pass) {
       console.warn("[Email] SMTP nicht konfiguriert – E-Mail nicht gesendet.");
-      return { success: false, error: "SMTP nicht konfiguriert" };
+      return { success: false, error: "SMTP nicht konfiguriert. Bitte unter Admin → SMTP / E-Mail die Zugangsdaten hinterlegen." };
     }
+
+    const { host, port, user, pass, from } = config;
 
     const transporter = nodemailer.createTransport({ host, port, secure: port === 465, auth: { user, pass } });
     await transporter.sendMail({ from, to: opts.to, subject: opts.subject, html: opts.html, attachments: opts.attachments });

@@ -78,6 +78,11 @@
 - [x] Automatische Erinnerungen für fehlende Leistungsnachweise vor dem Monatsende und für offene Freigaben einrichten
 - [x] Briefpapier mit Wasserzeichen für die Monatsdokumente prüfen und passend verwenden
 
+## Testphase & SMTP-Konfiguration
+- [x] SMTP-Einstellungsseite im Admin-Bereich erstellen (Host, Port, User, Passwort, Absender, Steuerberaterin-E-Mail)
+- [x] Admin-Testmodus mit Reset-Funktion: alle Bewegungsdaten (Einsätze, Fahrten, LNW, Berichte) auf Knopfdruck löschen
+- [x] Testdaten für einen kompletten Monat generieren (5 MA, realistische Einsätze, Fahrten, LNW)
+
 ## Datenbank & Backend
 - [x] Datenbankschema: mitarbeiter, kunden, einsaetze, leistungen, fahrten
 - [x] Drizzle-Migration generieren und ausführen

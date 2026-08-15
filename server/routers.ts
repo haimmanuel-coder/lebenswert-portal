@@ -842,6 +842,84 @@ const einstellungenRouter = router({
       if (!result.success) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.error ?? "E-Mail konnte nicht gesendet werden" });
       return { ok: true, to: stEmail };
     }),
+
+  /** SMTP-Verbindungstest: sendet eine kurze Test-E-Mail an die konfigurierte Steuerberaterin */
+  testSmtp: adminProcedure
+    .mutation(async () => {
+      const db = await getDb();
+      const rows = await db!.execute(sql`SELECT schluessel, wert FROM system_einstellungen WHERE schluessel IN ('steuerbuero_email','smtp_host','smtp_port','smtp_user','smtp_pass','smtp_from')`);
+      const settings: Record<string, string> = {};
+      for (const r of ((rows as any)[0] ?? rows) as any[]) settings[r.schluessel] = r.wert ?? "";
+
+      // SMTP-Daten temporär in process.env setzen für den emailService
+      if (settings.smtp_host) process.env.SMTP_HOST = settings.smtp_host;
+      if (settings.smtp_port) process.env.SMTP_PORT = settings.smtp_port;
+      if (settings.smtp_user) process.env.SMTP_USER = settings.smtp_user;
+      if (settings.smtp_pass) process.env.SMTP_PASS = settings.smtp_pass;
+      if (settings.smtp_from) process.env.SMTP_FROM = settings.smtp_from;
+
+      const empfaenger = settings.steuerbuero_email;
+      if (!empfaenger || !empfaenger.includes("@")) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Bitte zuerst eine Steuerberaterin-E-Mail hinterlegen." });
+      }
+
+      const result = await sendEmail({
+        to: empfaenger,
+        subject: "[TEST] SMTP-Verbindungstest – Lebenswert Betreuung Portal",
+        html: `<div style="font-family:Arial,sans-serif;max-width:500px"><h2 style="color:#1a5c38">SMTP-Test erfolgreich</h2><p>Diese E-Mail bestätigt, dass der E-Mail-Versand aus dem Lebenswert-Portal korrekt funktioniert.</p><p style="color:#6b7280;font-size:12px">Gesendet am ${new Date().toLocaleString("de-DE")}</p></div>`,
+      });
+
+      if (!result.success) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.error ?? "SMTP-Verbindung fehlgeschlagen. Bitte Zugangsdaten prüfen." });
+      return { ok: true, to: empfaenger };
+    }),
+
+  /** Testdaten komplett löschen (Einsätze, Fahrten, LNW, Berichte, Benachrichtigungen) */
+  testdatenLoeschen: adminProcedure
+    .mutation(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB nicht verfügbar" });
+
+      // Alle Bewegungsdaten löschen (NICHT Mitarbeiter, Kunden, Systemeinstellungen)
+      const tabellen = [
+        "einsaetze",
+        "leistungen",
+        "fahrten",
+        "besuchsberichte",
+        "sonderfahrten",
+        "fahrtenAbrechnungen",
+        "monatsabschluesse",
+        "notifications",
+        "mitteilungen_lesebestaetigung",
+        "urlaubsantraege",
+        "krankmeldungen",
+        "touren",
+        "tour_einsaetze",
+        "auditLogs",
+      ];
+
+      let geloescht = 0;
+      for (const tabelle of tabellen) {
+        try {
+          await db.execute(sql.raw(`DELETE FROM \`${tabelle}\``));
+          geloescht++;
+        } catch {
+          // Tabelle existiert evtl. nicht – ignorieren
+        }
+      }
+
+      // Urlaubstage zurücksetzen
+      await db.execute(sql`UPDATE mitarbeiter SET urlaubstageVerbraucht = 0`);
+
+      await createAuditLog({
+        mitarbeiterId: ctx.adminId,
+        action: "DELETE",
+        ressource: "testdaten",
+        details: `${geloescht} Tabellen geleert (Testphase-Reset)`,
+        status: "success",
+      });
+
+      return { ok: true, geloescht, tabellen: tabellen.length };
+    }),
 });
 
 // ── CSV-Import-Protokoll ─────────────────────────────────────────────────────

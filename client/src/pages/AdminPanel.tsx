@@ -13,6 +13,7 @@ import OnboardingTab from "./OnboardingTab";
 import CsvImportTab from "./CsvImportTab";
 import KundenCsvImportTab from "./KundenCsvImportTab";
 import EinstellungenTab from "./EinstellungenTab";
+import SmtpKonfiguration from "./SmtpKonfiguration";
 import { useState, useEffect, useRef } from "react";
 import { startPasswortGueltigBis, startPasswortLaeuftAb } from "@shared/passwordPolicy";
 import { erstelleZugangskartenQrZiel } from "@shared/zugangskartenQr";
@@ -23,7 +24,7 @@ import { toast } from "sonner";
 import BottomSheet from "@/components/BottomSheet";
 import MitarbeiterDetail from "./MitarbeiterDetail";
 
-type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo" | "preise" | "sicherheit" | "fuehrerschein" | "compliance" | "compliance-gesamt" | "arbeitssicherheit" | "as-dashboard" | "unterschriften-archiv" | "lohnkosten" | "onboarding" | "csv-import" | "kunden-import" | "einstellungen" | "systemstatus";
+type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo" | "preise" | "sicherheit" | "fuehrerschein" | "compliance" | "compliance-gesamt" | "arbeitssicherheit" | "as-dashboard" | "unterschriften-archiv" | "lohnkosten" | "onboarding" | "csv-import" | "kunden-import" | "einstellungen" | "smtp" | "systemstatus";
 type PortalRolle = "mitarbeiter" | "teamleitung" | "buchhaltung" | "admin";
 type Zugangskarte = { id?: number; vorname: string; nachname: string; email: string; rolle?: string; startpasswort: string };
 
@@ -454,6 +455,7 @@ export default function AdminPanel() {
           { key: "csv-import" as AdminTab, label: "📥 CSV-Import" },
           { key: "kunden-import" as AdminTab, label: "🏠 Kunden-Import" },
           { key: "einstellungen" as AdminTab, label: "⚙️ Einstellungen" },
+          { key: "smtp" as AdminTab, label: "📧 SMTP / E-Mail" },
           { key: "systemstatus" as AdminTab, label: "🖥️ Systemstatus" },
         ].map((t) => (
           <button key={t.key} style={tabStyle(t.key)} onClick={() => setTab(t.key)}>{t.label}</button>
@@ -1124,6 +1126,9 @@ export default function AdminPanel() {
       {/* ── EINSTELLUNGEN ── */}
       {tab === "einstellungen" && (
         <EinstellungenTab />
+      )}
+      {tab === "smtp" && (
+        <SmtpKonfiguration />
       )}
       {tab === "systemstatus" && (
         <SystemstatusTab />
