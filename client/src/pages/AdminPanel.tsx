@@ -477,6 +477,29 @@ export default function AdminPanel() {
               <button onClick={() => { resetMaForm(); setMaSheet(true); }} style={{ padding: "8px 14px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>+ Neu anlegen</button>
             </div>
           </div>
+          <section style={{ background: "linear-gradient(135deg, #eff6ff, #f8fafc)", border: "1px solid #bfdbfe", borderRadius: 12, padding: 14, marginBottom: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: "#173a1a" }}>🔐 Zugangsstatus auf einen Blick</div>
+                <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>Erstlogin gilt erst als abgeschlossen, wenn das persönliche Passwort festgelegt wurde.</div>
+              </div>
+              <button onClick={() => { setZugangskartenStatusFilter("offen"); setZeigeZugangskartenTabelle(true); }} style={{ padding: "7px 10px", background: "#1d4ed8", color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>Offene anzeigen</button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8 }}>
+              <button onClick={() => { setZugangskartenStatusFilter("offen"); setZeigeZugangskartenTabelle(true); }} style={{ textAlign: "left", padding: "11px 12px", border: "1px solid #fcd34d", background: "#fffbeb", borderRadius: 9, cursor: "pointer" }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: "#92400e" }}>{zugangskartenKpis.offen}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#92400e" }}>Erstlogin / Wechsel offen</div>
+              </button>
+              <button onClick={() => { setZugangskartenStatusFilter("abgelaufen"); setZeigeZugangskartenTabelle(true); }} style={{ textAlign: "left", padding: "11px 12px", border: "1px solid #fecaca", background: "#fef2f2", borderRadius: 9, cursor: "pointer" }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: "#b91c1c" }}>{zugangskartenKpis.abgelaufen}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#b91c1c" }}>Startzugang abgelaufen</div>
+              </button>
+              <button onClick={() => { setZugangskartenStatusFilter("alle"); setZeigeZugangskartenTabelle(true); }} style={{ textAlign: "left", padding: "11px 12px", border: "1px solid #bbf7d0", background: "#f0fdf4", borderRadius: 9, cursor: "pointer" }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: "#166534" }}>{zugangskartenKpis.abgeschlossen}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#166534" }}>Zugang abgeschlossen</div>
+              </button>
+            </div>
+          </section>
           <section style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: 14, marginBottom: 14 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: zeigeZugangskartenTabelle ? 12 : 0 }}>
               <div>
@@ -492,6 +515,7 @@ export default function AdminPanel() {
             {zeigeZugangskartenTabelle && (
               <>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+                  <button onClick={() => { setZugangskartenStatusFilter("alle"); setZeigeZugangskartenTabelle(false); }} style={{ padding: "5px 9px", borderRadius: 20, border: "1px solid #cbd5e1", background: "#fff", color: "#334155", fontSize: 11, fontWeight: 800, cursor: "pointer" }}>← Zurück zur Mitarbeiterliste</button>
                   {([['alle', `Alle (${zugangskartenKpis.offen + zugangskartenKpis.abgelaufen + zugangskartenKpis.abgeschlossen})`, '#475569', '#f1f5f9'], ['offen', `Wechsel offen (${zugangskartenKpis.offen})`, '#92400e', '#fef3c7'], ['abgelaufen', `Abgelaufen (${zugangskartenKpis.abgelaufen})`, '#b91c1c', '#fee2e2']] as const).map(([wert, label, farbe, bg]) => <button key={wert} onClick={() => setZugangskartenStatusFilter(wert)} style={{ padding: '5px 9px', borderRadius: 20, border: zugangskartenStatusFilter === wert ? `2px solid ${farbe}` : '1px solid #e2e8f0', background: bg, color: farbe, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>{label}</button>)}
                 </div>
               <div style={{ overflowX: "auto" }}>
