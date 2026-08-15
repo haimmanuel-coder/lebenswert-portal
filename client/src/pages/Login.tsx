@@ -129,7 +129,7 @@ export default function Login() {
       >
         {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: 24 }}>
-          <span style={{ fontSize: 48, display: "block", marginBottom: 8 }}>🌿</span>
+          <img src="/manus-storage/logo-seniorenassistenz_fb400426.jpg" alt="Seniorenassistenz Bernhardt" style={{ width: 120, height: "auto", marginBottom: 8 }} />
           <h1 style={{ fontSize: 22, fontWeight: 800, color: "#4a8c3f", margin: 0 }}>
             Seniorenassistenz Bernhardt
           </h1>

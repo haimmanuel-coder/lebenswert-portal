@@ -334,14 +334,10 @@ export default function PortalApp() {
       {/* Logo */}
       <div style={{ padding: "20px 16px 12px", borderBottom: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 10, background: "#4a8c3f",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 20, fontWeight: 900, color: "#fff", flexShrink: 0,
-          }}>L</div>
+          <img src="/manus-storage/logo-seniorenassistenz_fb400426.jpg" alt="Logo" style={{ width: 36, height: 36, borderRadius: 10, objectFit: "cover", flexShrink: 0 }} />
           <div>
-            <div style={{ color: "#fff", fontWeight: 800, fontSize: 13, lineHeight: 1.2 }}>Lebenswert</div>
-            <div style={{ color: "#6ee7b7", fontSize: 10, fontWeight: 600 }}>Betreuung Portal</div>
+            <div style={{ color: "#fff", fontWeight: 800, fontSize: 13, lineHeight: 1.2 }}>Seniorenassistenz</div>
+            <div style={{ color: "#6ee7b7", fontSize: 10, fontWeight: 600 }}>Bernhardt Portal</div>
           </div>
         </div>
       </div>
