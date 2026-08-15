@@ -1,6 +1,8 @@
 # Lebenswert Betreuung – Mitarbeiter-Portal TODO
 
 ## Aktuelle Umsetzung – Unterweisung, Erste Hilfe und DSGVO-Startprozess
+- [x] Mobile Login-Ansicht für den Remote-Browser vollständig sichtbar und bedienbar machen
+- [ ] Startverhalten von „Übernehmen Sie die Kontrolle“ im externen Remote-Browser mit einem Portal-Kontext end-to-end verifizieren; das Öffnen eines neuen Tabs ist nicht durch den App-Code steuerbar
 - [x] Statische funktionale, technische, Sicherheits- und UX-Prüfung des Admin-Panels mit priorisiertem Prüfbericht durchführen
 - [x] Bestätigte kritische Zugriffsschutzbefunde aus der Admin-Panel-Prüfung gezielt beheben und per Build/Test erneut verifizieren
 - [ ] Jedes Admin-Modul mit echtem Admin-Login funktional durchtesten und je Modul CRUD, Lade-/Fehlerzustände, Kennzahlen und Reproduktionsschritte dokumentieren

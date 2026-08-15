@@ -113,18 +113,22 @@ export default function Login() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        minHeight: "100vh",
+        minHeight: "100dvh",
         background: "linear-gradient(150deg, #4a8c3f, #2a9d8f)",
-        padding: 20,
+        padding: "max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left))",
+        boxSizing: "border-box",
+        overflowY: "auto",
       }}
     >
       <div
+        className="lw-login-card"
         style={{
           background: "#fff",
           borderRadius: 20,
           padding: "36px 28px",
           width: "100%",
           maxWidth: 380,
+          boxSizing: "border-box",
           boxShadow: "0 12px 40px rgba(0,0,0,.15)",
         }}
       >

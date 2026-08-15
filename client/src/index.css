@@ -464,10 +464,35 @@ canvas.sig-canvas {
     line-height: 1.2;
   }
 
+  .lw-login-page {
+    min-height: 100svh !important;
+    min-height: 100dvh !important;
+    align-items: flex-start !important;
+    justify-content: center !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .lw-login-card {
+    max-width: min(380px, calc(100vw - 32px)) !important;
+    margin: auto 0 !important;
+  }
+
   body.lw-cookie-open .lw-login-page {
-    justify-content: flex-start !important;
-    min-height: calc(100vh + 180px) !important;
-    padding-top: 20px !important;
-    padding-bottom: 180px !important;
+    min-height: 100svh !important;
+    min-height: 100dvh !important;
+    padding-bottom: min(42svh, 18rem) !important;
+  }
+
+  body.lw-cookie-open .lw-login-card {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .lw-login-card {
+    border-radius: 16px !important;
+    padding: 24px 20px !important;
   }
 }
