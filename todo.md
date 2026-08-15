@@ -1,6 +1,8 @@
 # Lebenswert Betreuung – Mitarbeiter-Portal TODO
 
 ## Aktuelle Umsetzung – Unterweisung, Erste Hilfe und DSGVO-Startprozess
+- [x] Aktive Mitarbeiterkonten, Passwort-Hashes und Ablaufstatus prüfen, ohne Klartextpasswörter offenzulegen oder zu verändern
+- [x] Passwort-Anzeige mit Auge-Symbol im Login-Feld ergänzen
 - [x] Sicherheitsunterweisungen: Admin-Verwaltung, offene Bestätigungen und Unterschriftsnachweise fachlich prüfen und vervollständigen
 - [x] Erste-Hilfe-Kurse: Erfassung von Ablaufdatum und Nachweis sowie Ampelstatus in der Compliance-Übersicht prüfen und vervollständigen
 - [x] Mitarbeiteranlage: Anlageprozess und obligatorischen DSGVO-Dialog beim ersten Login validieren und absichern

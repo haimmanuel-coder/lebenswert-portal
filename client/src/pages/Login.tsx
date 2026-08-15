@@ -8,6 +8,7 @@ export default function Login() {
   const [view, setView] = useState<View>("login");
   const [email, setEmail] = useState("");
   const [passwort, setPasswort] = useState("");
+  const [passwortSichtbar, setPasswortSichtbar] = useState(false);
   const [otp, setOtp] = useState("");
   const [resetEmail, setResetEmail] = useState("");
   const [error, setError] = useState("");
@@ -165,17 +166,32 @@ export default function Login() {
 
             <div style={{ marginBottom: 8 }}>
               <label style={labelStyle}>Passwort</label>
-              <input
-                type="password"
-                value={passwort}
-                onChange={(e) => setPasswort(e.target.value)}
-                placeholder="••••••••"
-                autoComplete="current-password"
-                onKeyDown={(e) => e.key === "Enter" && doLogin()}
-                style={inputStyle}
-                onFocus={(e) => (e.target.style.borderColor = "#4a8c3f")}
-                onBlur={(e) => (e.target.style.borderColor = "#e5e7eb")}
-              />
+              <div style={{ position: "relative" }}>
+                <input
+                  type={passwortSichtbar ? "text" : "password"}
+                  value={passwort}
+                  onChange={(e) => setPasswort(e.target.value)}
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                  onKeyDown={(e) => e.key === "Enter" && doLogin()}
+                  style={{ ...inputStyle, paddingRight: 50 }}
+                  onFocus={(e) => (e.target.style.borderColor = "#4a8c3f")}
+                  onBlur={(e) => (e.target.style.borderColor = "#e5e7eb")}
+                />
+                <button
+                  type="button"
+                  onClick={() => setPasswortSichtbar((sichtbar) => !sichtbar)}
+                  aria-label={passwortSichtbar ? "Passwort verbergen" : "Passwort anzeigen"}
+                  title={passwortSichtbar ? "Passwort verbergen" : "Passwort anzeigen"}
+                  style={{
+                    position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)",
+                    border: "none", background: "transparent", color: "#4a8c3f", cursor: "pointer",
+                    width: 34, height: 34, borderRadius: 8, fontSize: 18, lineHeight: 1,
+                  }}
+                >
+                  {passwortSichtbar ? "🙈" : "👁️"}
+                </button>
+              </div>
             </div>
 
             {/* Passwort vergessen Link */}
