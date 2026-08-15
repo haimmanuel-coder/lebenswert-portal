@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useNavigation, type SeitenId } from "@/contexts/NavigationContext";
 
@@ -96,8 +96,29 @@ function AuslastungsBar({ name, art, ist, soll, pct }: { name: string; art: stri
 
 export default function AdminDashboard() {
   const [budgetFilter, setBudgetFilter] = useState<"alle" | "rot" | "gelb" | "gruen">("alle");
+  const [bestaetigteErstlogins, setBestaetigteErstlogins] = useState<number[]>(() => {
+    try { return JSON.parse(localStorage.getItem("seniorenassistenz-erstlogin-bestaetigt") ?? "[]"); } catch { return []; }
+  });
+  const [erstloginPopupId, setErstloginPopupId] = useState<number | null>(null);
   const { data, isLoading } = trpc.admin.dashboardStats.useQuery();
   const { navigiere } = useNavigation();
+  const { data: erstloginEreignisse = [] } = (trpc as any).admin.erstloginBenachrichtigungen.useQuery(undefined, { refetchInterval: 15000 });
+  const offeneErstloginEreignisse = useMemo(
+    () => erstloginEreignisse.filter((ereignis: any) => !bestaetigteErstlogins.includes(ereignis.id)),
+    [erstloginEreignisse, bestaetigteErstlogins],
+  );
+  const erstloginPopup = offeneErstloginEreignisse.find((ereignis: any) => ereignis.id === erstloginPopupId) ?? offeneErstloginEreignisse[0] ?? null;
+
+  useEffect(() => {
+    if (offeneErstloginEreignisse[0] && erstloginPopupId === null) setErstloginPopupId(offeneErstloginEreignisse[0].id);
+  }, [offeneErstloginEreignisse, erstloginPopupId]);
+
+  const bestaetigeErstlogin = (id: number) => {
+    const aktualisiert = Array.from(new Set([...bestaetigteErstlogins, id]));
+    setBestaetigteErstlogins(aktualisiert);
+    localStorage.setItem("seniorenassistenz-erstlogin-bestaetigt", JSON.stringify(aktualisiert));
+    setErstloginPopupId(null);
+  };
 
   // LNW-Status für aktuellen Monat
   const aktuellerMonat = new Date().toISOString().slice(0, 7);
@@ -143,6 +164,24 @@ export default function AdminDashboard() {
 
   return (
     <div className="lw-page">
+      {erstloginPopup && (
+        <div role="dialog" aria-modal="true" aria-labelledby="erstlogin-popup-titel" style={{ position: "fixed", inset: 0, zIndex: 80, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem", background: "rgba(15, 23, 42, 0.48)" }}>
+          <div style={{ width: "min(100%, 430px)", background: "#fff", borderRadius: 16, padding: "1.4rem", boxShadow: "0 24px 60px rgba(15,23,42,.28)", border: "1px solid #bbf7d0" }}>
+            <div style={{ width: 44, height: 44, borderRadius: "50%", display: "grid", placeItems: "center", background: "#dcfce7", fontSize: "1.35rem", marginBottom: 12 }}>✓</div>
+            <h2 id="erstlogin-popup-titel" style={{ margin: 0, fontSize: "1.1rem", color: "#166534" }}>Erstlogin erfolgreich abgeschlossen</h2>
+            <p style={{ margin: "0.6rem 0 0", color: "#475569", lineHeight: 1.55, fontSize: "0.9rem" }}>
+              <strong>{erstloginPopup.vorname} {erstloginPopup.nachname}</strong> hat den Erstlogin und den persönlichen Passwortwechsel abgeschlossen.
+            </p>
+            <div style={{ marginTop: "1rem", padding: "0.65rem 0.75rem", borderRadius: 8, background: "#f8fafc", color: "#64748b", fontSize: "0.78rem" }}>
+              {new Date(erstloginPopup.createdAt).toLocaleString("de-DE")}
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "1rem" }}>
+              <button onClick={() => navigiere("admin" as SeitenId)} style={{ border: "1px solid #cbd5e1", background: "#fff", color: "#334155", borderRadius: 8, padding: "0.65rem 0.85rem", fontWeight: 700, cursor: "pointer" }}>Mitarbeiter öffnen</button>
+              <button autoFocus onClick={() => bestaetigeErstlogin(erstloginPopup.id)} style={{ border: "none", background: "#4a8c3f", color: "#fff", borderRadius: 8, padding: "0.65rem 0.85rem", fontWeight: 800, cursor: "pointer" }}>Verstanden</button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="lw-page-header">
         <div>

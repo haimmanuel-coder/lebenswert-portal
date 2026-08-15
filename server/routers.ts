@@ -26,6 +26,7 @@ import { bereiteEinsatzUebernahmeVor } from "./mitarbeiterAblauf";
 import { pruefeLeistungsnachweisAbschluss } from "./monatsabschlussService";
 import { generiereEinmaligesStartpasswort, waehleDruckbareMitarbeiter } from "./accessCredentials";
 import { pruefeSicheresPasswort, SICHERES_PASSWORT_HINWEIS, startPasswortLaeuftAb } from "../shared/passwordPolicy";
+import { istAbgeschlossenerStartzugang } from "../shared/erstlogin";
 import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, einsatzAenderungen, kunden as kundenTable, notifications as notificationsTable, ersteHilfeKurse, mitarbeiterBerechtigungen as mbTable, besuchsberichte, fahrten } from "../drizzle/schema";
 import {
   getMitarbeiterByEmail,
@@ -1330,9 +1331,26 @@ export const appRouter = router({
         const valid = await bcrypt.compare(input.altesPasswort, ma.passwortHash);
         if (!valid) throw new Error("Das aktuelle Passwort ist falsch.");
         if (!pruefeSicheresPasswort(input.neuesPasswort).gueltig) throw new Error(`Das neue Passwort ist nicht sicher genug. ${SICHERES_PASSWORT_HINWEIS}`);
+        const startzugangAbgeschlossen = istAbgeschlossenerStartzugang(Boolean((ma as any).passwortWechselErforderlich), (ma as any).startPasswortErstelltAt);
         const hash = await bcrypt.hash(input.neuesPasswort, 10);
         await updateMitarbeiter(ctx.mitarbeiterId, { passwortHash: hash, passwortWechselErforderlich: false } as any);
         await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "PASSWORD_CHANGE", ressource: "portal", status: "success" });
+        if (startzugangAbgeschlossen) {
+          await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "FIRST_LOGIN_COMPLETED", ressource: "portal", details: "Erstlogin inklusive Passwortwechsel abgeschlossen", status: "success" });
+          try {
+            const db = await getDb();
+            const admins = db ? await db.select({ id: mitarbeiter.id }).from(mitarbeiter).where(eq(mitarbeiter.rolle, "admin")) : [];
+            await Promise.all(admins.map((admin) => createNotification({
+              empfaengerId: admin.id,
+              titel: "Erstlogin abgeschlossen",
+              nachricht: `${ma.vorname} ${ma.nachname} hat den Erstlogin und den Passwortwechsel erfolgreich abgeschlossen.`,
+              typ: "erfolg",
+              linkUrl: "/admin",
+            })));
+          } catch (error) {
+            console.warn("[Erstlogin] Admin-Benachrichtigung konnte nicht gespeichert werden:", error);
+          }
+        }
         return { success: true };
       }),
 
@@ -3022,6 +3040,20 @@ export const appRouter = router({
     auditLogs: adminProcedure
       .input(z.object({ limit: z.number().int().min(1).max(500).default(200) }))
       .query(async ({ input }) => getAuditLogs(input.limit)),
+
+    erstloginBenachrichtigungen: adminProcedure.query(async () => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const rows = await db.execute(sql`
+        SELECT a.id, a.mitarbeiterId, a.createdAt, m.vorname, m.nachname
+        FROM auditLogs a
+        INNER JOIN mitarbeiter m ON m.id = a.mitarbeiterId
+        WHERE a.action = 'FIRST_LOGIN_COMPLETED'
+        ORDER BY a.createdAt DESC
+        LIMIT 20
+      `);
+      return (rows as any)[0] ?? [];
+    }),
 
     // ── KOSTENTRÄGER ──────────────────────────────────
     kostentraegerList: adminProcedure.query(async () => getAllKostentraeger()),
