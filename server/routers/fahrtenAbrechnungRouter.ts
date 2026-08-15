@@ -13,6 +13,7 @@ import { sql } from "drizzle-orm";
 import { sendEmail } from "../emailService";
 import PDFDocument from "pdfkit";
 import { pruefeLeistungsnachweisAbschluss, erstellePflegekassenCsv, erstelleStundennachweisCsv } from "../monatsabschlussService";
+import { FIRMENDATEN } from "../../shared/firmendaten";
 
 // ─── Hilfsfunktionen ────────────────────────────────────────────────────────
 
@@ -78,10 +79,11 @@ async function generierefahrtnachweisPdf(
     doc.on("error", reject);
 
     // Header
-    doc.fontSize(18).fillColor("#2d6a2d").text("Lebenswert Betreuung", { align: "center" });
+    doc.fontSize(18).fillColor("#2d6a2d").text(FIRMENDATEN.name, { align: "center" });
     doc.fontSize(13).fillColor("#333").text("Fahrtennachweise", { align: "center" });
     doc.fontSize(11).fillColor("#555").text(`Abrechnungszeitraum: ${label}`, { align: "center" });
-    doc.moveDown(1.5);
+    doc.fontSize(9).fillColor("#888").text(`${FIRMENDATEN.strasse}, ${FIRMENDATEN.plz} ${FIRMENDATEN.ort} | IK ${FIRMENDATEN.ikNummer}`, { align: "center" });
+    doc.moveDown(1.2);
 
     // Tabellenkopf
     const col = { datum: 50, ma: 130, kunde: 240, km: 340, euro: 390, zweck: 440 };
@@ -120,8 +122,8 @@ async function generierefahrtnachweisPdf(
       .text(`${gesamtEuro.toFixed(2)} €`, col.euro, sumY);
 
     doc.moveDown(2);
-    doc.fontSize(9).fillColor("#888")
-      .text(`Erstellt am: ${new Date().toLocaleDateString("de-DE")} | Lebenswert Betreuung`, { align: "center" });
+    doc.fontSize(8).fillColor("#888")
+      .text(`Erstellt am: ${new Date().toLocaleDateString("de-DE")} | ${FIRMENDATEN.name} | ${FIRMENDATEN.strasse}, ${FIRMENDATEN.plz} ${FIRMENDATEN.ort} | Tel: ${FIRMENDATEN.telefon}`, { align: "center" });
 
     doc.end();
   });

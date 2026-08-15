@@ -76,7 +76,7 @@
 - [x] Admin-Freigabe und nachvollziehbaren Versandstatus für den Monatsabschluss einrichten
 - [x] Fahrtennachweis-Paket am 18. des Monats per konfigurierte E-Mail oder manuellem Versandknopf an die Steuerberaterin übermitteln
 - [x] Automatische Erinnerungen für fehlende Leistungsnachweise vor dem Monatsende und für offene Freigaben einrichten
-- [ ] Briefpapier mit Wasserzeichen für die Monatsdokumente prüfen und passend verwenden
+- [x] Briefpapier mit Wasserzeichen für die Monatsdokumente prüfen und passend verwenden
 
 ## Datenbank & Backend
 - [x] Datenbankschema: mitarbeiter, kunden, einsaetze, leistungen, fahrten
