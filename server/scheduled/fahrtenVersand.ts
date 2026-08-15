@@ -9,6 +9,7 @@
 import { getDb } from "../db";
 import { sql } from "drizzle-orm";
 import { sendEmail } from "../emailService";
+import { erstelleSicheresExportpaket, protokolliereSicherenExportversand, sichereExportEmail } from "../secureExportService";
 
 /**
  * Wird vom Heartbeat-Cron am 18. jeden Monats aufgerufen.
@@ -65,54 +66,25 @@ export async function handleFahrtenVersandCron(): Promise<{
 
     for (const abr of offene) {
       try {
-        // PDF-Buffer laden (optional)
-        let pdfBuffer: Buffer | undefined;
-        if (abr.pdfUrl) {
-          try {
-            const resp = await fetch(`http://localhost:${process.env.PORT ?? 3000}${abr.pdfUrl}`);
-            if (resp.ok) pdfBuffer = Buffer.from(await resp.arrayBuffer());
-          } catch {
-            // PDF-Anhang optional – Versand trotzdem durchführen
-          }
-        }
+        if (!abr.pdfKey) throw new Error("Freigegebenes Fahrtennachweis-PDF fehlt.");
+        const paket = await erstelleSicheresExportpaket({
+          db,
+          typ: "fahrtennachweis",
+          referenz: `fahrtenAbrechnung:${abr.id}`,
+          dateiname: `Fahrtennachweise_${abr.zeitraumVon}_${abr.zeitraumBis}.pdf`,
+          bestehenderDateiKey: abr.pdfKey,
+          empfaengerEmail,
+          erstelltVon: abr.freigegebenVon ?? null,
+        });
 
         // E-Mail senden
-        await sendEmail({
+        const mailResult = await sendEmail({
           to: empfaengerEmail,
           subject: `Fahrtennachweise ${abr.label} – Seniorenassistenz Bernhardt`,
-          html: `
-            <div style="font-family:Arial,sans-serif;max-width:600px">
-              <h2 style="color:#2d6a2d">Fahrtennachweise – Seniorenassistenz Bernhardt</h2>
-              <p>Sehr geehrte Damen und Herren,</p>
-              <p>anbei erhalten Sie die Fahrtennachweise für den Abrechnungszeitraum:</p>
-              <table style="border-collapse:collapse;width:100%;margin:16px 0">
-                <tr style="background:#f0f7f0">
-                  <td style="padding:8px;border:1px solid #ccc"><strong>Zeitraum</strong></td>
-                  <td style="padding:8px;border:1px solid #ccc">${abr.label}</td>
-                </tr>
-                <tr>
-                  <td style="padding:8px;border:1px solid #ccc"><strong>Anzahl Fahrten</strong></td>
-                  <td style="padding:8px;border:1px solid #ccc">${abr.anzahlFahrten}</td>
-                </tr>
-                <tr style="background:#f0f7f0">
-                  <td style="padding:8px;border:1px solid #ccc"><strong>Gesamt km</strong></td>
-                  <td style="padding:8px;border:1px solid #ccc">${Number(abr.gesamtKm).toFixed(1)} km</td>
-                </tr>
-                <tr>
-                  <td style="padding:8px;border:1px solid #ccc"><strong>Gesamt Betrag</strong></td>
-                  <td style="padding:8px;border:1px solid #ccc"><strong>${Number(abr.gesamtEuro).toFixed(2)} €</strong></td>
-                </tr>
-              </table>
-              <p>Die detaillierte Aufstellung finden Sie im beigefügten PDF.</p>
-              <p>Mit freundlichen Grüßen<br><strong>Seniorenassistenz Bernhardt</strong></p>
-            </div>
-          `,
-          attachments: pdfBuffer ? [{
-            filename: `Fahrtennachweise_${abr.zeitraumVon}_${abr.zeitraumBis}.pdf`,
-            content: pdfBuffer,
-            contentType: "application/pdf",
-          }] : [],
+          html: sichereExportEmail({ titel: "Fahrtennachweise", zeitraum: abr.label, abrufUrl: paket.abrufUrl }),
         });
+        if (!mailResult.success) throw new Error(mailResult.error ?? "Sicherer Link konnte nicht versendet werden.");
+        await protokolliereSicherenExportversand(db, paket.id);
 
         // Status aktualisieren
         await db.execute(sql`

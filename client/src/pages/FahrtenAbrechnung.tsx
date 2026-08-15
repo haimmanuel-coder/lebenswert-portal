@@ -219,8 +219,9 @@ export default function FahrtenAbrechnung() {
                         disabled={csvVersand.isPending}
                         className="bg-blue-600 hover:bg-blue-700 text-white"
                       >
-                        {csvVersand.isPending ? "Sendet…" : "📧 An Steuerberaterin senden"}
+                        {csvVersand.isPending ? "Stellt sicher bereit…" : "🔐 Sicheren Abruflink senden"}
                       </Button>
+                      <p className="w-full text-xs text-slate-600">Die CSV-Dateien werden nicht als E-Mail-Anhang versendet, sondern als geschütztes Exportpaket bereitgestellt.</p>
                     </div>
                   )}
 
@@ -364,7 +365,7 @@ export default function FahrtenAbrechnung() {
                               disabled={senden.isPending}
                               className="bg-blue-600 hover:bg-blue-700 text-white"
                             >
-                              📧 Senden
+                              🔐 Abruflink senden
                             </Button>
                           </>
                         )}

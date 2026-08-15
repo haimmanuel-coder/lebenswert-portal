@@ -14,6 +14,8 @@ import { sendEmail } from "../emailService";
 import PDFDocument from "pdfkit";
 import { pruefeLeistungsnachweisAbschluss, erstellePflegekassenCsv, erstelleStundennachweisCsv } from "../monatsabschlussService";
 import { FIRMENDATEN } from "../../shared/firmendaten";
+import JSZip from "jszip";
+import { erstelleSicheresExportpaket, protokolliereSicherenExportversand, sichereExportEmail } from "../secureExportService";
 
 // ─── Hilfsfunktionen ────────────────────────────────────────────────────────
 
@@ -45,7 +47,7 @@ function berechneAktuellenZeitraum(referenz?: Date): { von: Date; bis: Date; lab
   const bis = new Date(bisJahr, bisMonat, 15);
 
   const monate = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
-  const label = `16.${String(von.getDate()).padStart(2, "0")}.${monate[von.getMonth()]} – 15.${String(bis.getDate()).padStart(2, "0")}.${monate[bis.getMonth()]} ${bis.getFullYear()}`;
+  const label = `${String(von.getDate()).padStart(2, "0")}.${monate[von.getMonth()]} ${von.getFullYear()} – ${String(bis.getDate()).padStart(2, "0")}.${monate[bis.getMonth()]} ${bis.getFullYear()}`;
 
   return { von, bis, label };
 }
@@ -173,7 +175,7 @@ export const fahrtenAbrechnungRouter = router({
         const vonD = new Date(von);
         const bisD = new Date(bis);
         const monate = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
-        label = `16.${String(vonD.getDate()).padStart(2, "0")}.${monate[vonD.getMonth()]} – 15.${String(bisD.getDate()).padStart(2, "0")}.${monate[bisD.getMonth()]} ${bisD.getFullYear()}`;
+        label = `${String(vonD.getDate()).padStart(2, "0")}.${monate[vonD.getMonth()]} ${vonD.getFullYear()} – ${String(bisD.getDate()).padStart(2, "0")}.${monate[bisD.getMonth()]} ${bisD.getFullYear()}`;
       } else {
         const z = berechneAktuellenZeitraum();
         von = toDateStr(z.von);
@@ -282,7 +284,7 @@ export const fahrtenAbrechnungRouter = router({
   /** Manuell an Steuerbüro senden */
   senden: adminProcedure
     .input(z.object({ abrechnungId: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const dbOrNull = await getDb();
       if (!dbOrNull) throw new Error('Datenbankverbindung nicht verfügbar');
       const db = dbOrNull;
@@ -309,54 +311,24 @@ export const fahrtenAbrechnungRouter = router({
       const nameArr: any[] = (nameRows as any[])[0] ?? nameRows;
       const empfaengerName = nameArr[0]?.wert ?? "Steuerbüro";
 
-      // PDF-Buffer aus S3 holen (via URL)
-      let pdfBuffer: Buffer | undefined;
-      if (abr.pdfUrl) {
-        try {
-          const resp = await fetch(`http://localhost:${process.env.PORT ?? 3000}${abr.pdfUrl}`);
-          if (resp.ok) pdfBuffer = Buffer.from(await resp.arrayBuffer());
-        } catch {
-          // PDF-Anhang optional
-        }
-      }
+      if (!abr.pdfKey) throw new Error("Für diese Abrechnung ist kein freigegebenes PDF hinterlegt.");
+      const paket = await erstelleSicheresExportpaket({
+        db,
+        typ: "fahrtennachweis",
+        referenz: `fahrtenAbrechnung:${abr.id}`,
+        dateiname: `Fahrtennachweise_${abr.zeitraumVon}_${abr.zeitraumBis}.pdf`,
+        bestehenderDateiKey: abr.pdfKey,
+        empfaengerEmail,
+        erstelltVon: ctx.user.id,
+      });
 
-      // E-Mail senden
-      await sendEmail({
+      const mailResult = await sendEmail({
         to: empfaengerEmail,
         subject: `Fahrtennachweise ${abr.label} – Seniorenassistenz Bernhardt`,
-        html: `
-          <div style="font-family:Arial,sans-serif;max-width:600px">
-            <h2 style="color:#2d6a2d">Fahrtennachweise – Seniorenassistenz Bernhardt</h2>
-            <p>Sehr geehrte Damen und Herren,</p>
-            <p>anbei erhalten Sie die Fahrtennachweise für den Abrechnungszeitraum:</p>
-            <table style="border-collapse:collapse;width:100%;margin:16px 0">
-              <tr style="background:#f0f7f0">
-                <td style="padding:8px;border:1px solid #ccc"><strong>Zeitraum</strong></td>
-                <td style="padding:8px;border:1px solid #ccc">${abr.label}</td>
-              </tr>
-              <tr>
-                <td style="padding:8px;border:1px solid #ccc"><strong>Anzahl Fahrten</strong></td>
-                <td style="padding:8px;border:1px solid #ccc">${abr.anzahlFahrten}</td>
-              </tr>
-              <tr style="background:#f0f7f0">
-                <td style="padding:8px;border:1px solid #ccc"><strong>Gesamt km</strong></td>
-                <td style="padding:8px;border:1px solid #ccc">${Number(abr.gesamtKm).toFixed(1)} km</td>
-              </tr>
-              <tr>
-                <td style="padding:8px;border:1px solid #ccc"><strong>Gesamt Betrag</strong></td>
-                <td style="padding:8px;border:1px solid #ccc"><strong>${Number(abr.gesamtEuro).toFixed(2)} €</strong></td>
-              </tr>
-            </table>
-            <p>Die detaillierte Aufstellung finden Sie im beigefügten PDF.</p>
-            <p>Mit freundlichen Grüßen<br><strong>Seniorenassistenz Bernhardt</strong></p>
-          </div>
-        `,
-        attachments: pdfBuffer ? [{
-          filename: `Fahrtennachweise_${abr.zeitraumVon}_${abr.zeitraumBis}.pdf`,
-          content: pdfBuffer,
-          contentType: "application/pdf",
-        }] : [],
+        html: sichereExportEmail({ titel: "Fahrtennachweise", zeitraum: abr.label, abrufUrl: paket.abrufUrl }),
       });
+      if (!mailResult.success) throw new Error(mailResult.error ?? "Sicherer Link konnte nicht versendet werden.");
+      await protokolliereSicherenExportversand(db, paket.id);
 
       // Status aktualisieren
       await db.execute(sql`
@@ -455,7 +427,7 @@ export const fahrtenAbrechnungRouter = router({
   /** CSV-Export direkt per E-Mail an die Steuerberaterin senden */
   csvAnSteuerberaterinSenden: adminProcedure
     .input(z.object({ monat: z.string().regex(/^\d{4}-\d{2}$/) }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const kontrolle = await pruefeLeistungsnachweisAbschluss(input.monat);
       if (!kontrolle.kannAbschliessen) {
         throw new Error(`${kontrolle.offen} Leistungsnachweise sind noch offen. Bitte zuerst alle freigeben.`);
@@ -507,21 +479,30 @@ export const fahrtenAbrechnungRouter = router({
       const pflegekassenCsv = erstellePflegekassenCsv(input.monat, mapped);
       const stundennachweisCsv = erstelleStundennachweisCsv(input.monat, mapped);
 
-      const gesamtStunden = mapped.reduce((s, z) => s + z.stunden, 0);
-      const gesamtBetrag = mapped.reduce((s, z) => s + z.betrag, 0);
+      const zip = new JSZip();
+      zip.file(`Pflegekassen_${input.monat}.csv`, pflegekassenCsv);
+      zip.file(`Stundennachweis_MA_${input.monat}.csv`, stundennachweisCsv);
+      const zipBuffer = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
+      const paket = await erstelleSicheresExportpaket({
+        db,
+        typ: "monatsabschluss",
+        referenz: `monat:${input.monat}`,
+        dateiname: `Monatsabschluss_${input.monat}.zip`,
+        empfaengerEmail: empfaenger,
+        erstelltVon: ctx.user.id,
+        inhalt: zipBuffer,
+        contentType: "application/zip",
+      });
 
       const mailResult = await sendEmail({
         to: empfaenger,
         subject: `Leistungsnachweise & Stundenübersicht ${input.monat} – Seniorenassistenz Bernhardt`,
-        html: `<div style="font-family:Arial,sans-serif;max-width:600px"><h2 style="color:#2d6a2d">Monatsabschluss ${input.monat}</h2><p>Sehr geehrte Damen und Herren,</p><p>anbei erhalten Sie die Leistungsnachweise und Stundenübersicht für den Monat <strong>${input.monat}</strong>.</p><p>Mit freundlichen Grüßen<br><strong>Seniorenassistenz Bernhardt</strong></p></div>`,
-        attachments: [
-          { filename: `Pflegekassen_${input.monat}.csv`, content: Buffer.from(pflegekassenCsv, "utf-8"), contentType: "text/csv" },
-          { filename: `Stundennachweis_MA_${input.monat}.csv`, content: Buffer.from(stundennachweisCsv, "utf-8"), contentType: "text/csv" },
-        ],
+        html: sichereExportEmail({ titel: "Monatsabschluss", zeitraum: input.monat, abrufUrl: paket.abrufUrl }),
       });
       if (!mailResult.success) {
         throw new Error(mailResult.error ?? "E-Mail konnte nicht gesendet werden. Bitte SMTP-Daten prüfen.");
       }
-      return { success: true, empfaenger, anzahl: mapped.length };
+      await protokolliereSicherenExportversand(db, paket.id);
+      return { success: true, empfaenger, anzahl: mapped.length, paketId: paket.id };
     }),
 });

@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import { sql } from "drizzle-orm";
+import { entschluesseleSecret, istVerschluesseltesSecret, verschluesseleSecret } from "./secretEncryption";
 
 /** Lädt SMTP-Konfiguration aus der Datenbank (Fallback wenn Env-Variablen fehlen) */
 async function getSmtpConfig(): Promise<{ host?: string; port: number; user?: string; pass?: string; from: string } | null> {
@@ -26,11 +27,17 @@ async function getSmtpConfig(): Promise<{ host?: string; port: number; user?: st
     const cfg: Record<string, string> = {};
     for (const r of arr) cfg[r.schluessel] = r.wert ?? "";
     if (!cfg.smtp_host || !cfg.smtp_user || !cfg.smtp_pass) return null;
+    const pass = entschluesseleSecret(cfg.smtp_pass);
+    if (!istVerschluesseltesSecret(cfg.smtp_pass)) {
+      await db.execute(sql`
+        UPDATE system_einstellungen SET wert = ${verschluesseleSecret(cfg.smtp_pass)} WHERE schluessel = 'smtp_pass'
+      `);
+    }
     return {
       host: cfg.smtp_host,
       port: parseInt(cfg.smtp_port || "587"),
       user: cfg.smtp_user,
-      pass: cfg.smtp_pass,
+      pass,
       from: cfg.smtp_from || "portal@lebenswert-betreuung.de",
     };
   } catch {

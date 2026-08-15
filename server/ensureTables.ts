@@ -818,6 +818,21 @@ const TABLE_DEFINITIONS: string[] = [
     UNIQUE KEY \`schluessel\` (\`schluessel\`)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
+  `CREATE TABLE IF NOT EXISTS \`sichereExportpakete\` (
+    \`id\` int NOT NULL AUTO_INCREMENT,
+    \`typ\` varchar(50) NOT NULL,
+    \`referenz\` varchar(120) NOT NULL,
+    \`dateiKey\` varchar(500) NOT NULL,
+    \`dateiname\` varchar(255) NOT NULL,
+    \`empfaengerEmail\` varchar(255) NOT NULL,
+    \`erstelltVon\` int NULL,
+    \`bereitgestelltAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    \`versendetAt\` timestamp NULL,
+    \`abgerufenAt\` timestamp NULL,
+    PRIMARY KEY (\`id\`),
+    KEY \`idx_sichere_exporte_referenz\` (\`typ\`, \`referenz\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
   `CREATE TABLE IF NOT EXISTS \`sonderfahrten\` (
     \`id\` int NOT NULL AUTO_INCREMENT,
     \`einsatzId\` int,

@@ -6,7 +6,7 @@ const SMTP_FELDER = [
   { key: "smtp_host", label: "SMTP-Server", beschreibung: "z.B. smtp.gmail.com oder mail.web.de", placeholder: "smtp.beispiel.de" },
   { key: "smtp_port", label: "SMTP-Port", beschreibung: "Meist 587 (TLS) oder 465 (SSL)", placeholder: "587", type: "number" },
   { key: "smtp_user", label: "SMTP-Benutzername", beschreibung: "Meist die vollständige E-Mail-Adresse", placeholder: "ihre@email.de" },
-  { key: "smtp_pass", label: "SMTP-Passwort", beschreibung: "Das Passwort oder App-Kennwort für den E-Mail-Versand", placeholder: "••••••••", type: "password" },
+  { key: "smtp_pass", label: "SMTP-Passwort", beschreibung: "Wird verschlüsselt gespeichert und nie erneut angezeigt. Nur zum Ändern neu eingeben.", placeholder: "••••••••", type: "password" },
   { key: "smtp_from", label: "Absender-Adresse", beschreibung: "Wird als Absender in ausgehenden E-Mails angezeigt", placeholder: "portal@lebenswert-betreuung.de", type: "email" },
   { key: "steuerbuero_email", label: "E-Mail Steuerberaterin", beschreibung: "An diese Adresse werden Fahrtennachweise und Meldungen gesendet", placeholder: "steuerbuero@beispiel.de", type: "email" },
   { key: "steuerbuero_name", label: "Name Steuerbüro", beschreibung: "Name der Kanzlei oder Steuerberaterin", placeholder: "Steuerbüro Müller" },

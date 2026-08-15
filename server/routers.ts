@@ -121,6 +121,7 @@ import { planungRouter } from "./planungRouter";
 import { VAPID_PUBLIC, sendBudgetWarnungPush } from "./webpush";
 import { twoFactorRouter } from "./routers/twoFactorRouter";
 import { sendEmail, buildSteuerberaterEmail } from "./emailService";
+import { verschluesseleSecret } from "./secretEncryption";
 import { datenschutzRouter } from "./routers/datenschutzRouter";
 import { verfuegbarkeitenRouter } from "./routers/verfuegbarkeitenRouter";
 import { besuchsberichteRouter } from "./routers/besuchsberichteRouter";
@@ -801,14 +802,17 @@ const einstellungenRouter = router({
     .query(async () => {
       const db = await getDb();
       const rows = await db!.execute(sql`SELECT schluessel, wert, beschreibung FROM system_einstellungen ORDER BY schluessel ASC`);
-      return (rows as any)[0] as Array<{ schluessel: string; wert: string | null; beschreibung: string | null }>;
+      return ((rows as any)[0] as Array<{ schluessel: string; wert: string | null; beschreibung: string | null }>).map((row) =>
+        row.schluessel === "smtp_pass" ? { ...row, wert: "" } : row
+      );
     }),
 
   set: adminProcedure
     .input(z.object({ schluessel: z.string(), wert: z.string() }))
     .mutation(async ({ input }) => {
       const db = await getDb();
-      const key = input.schluessel; const val = input.wert;
+      const key = input.schluessel;
+      const val = key === "smtp_pass" ? verschluesseleSecret(input.wert) : input.wert;
       await db!.execute(sql`INSERT INTO system_einstellungen (schluessel, wert) VALUES (${key}, ${val}) ON DUPLICATE KEY UPDATE wert = ${val}`);
       return { ok: true };
     }),
@@ -852,13 +856,6 @@ const einstellungenRouter = router({
       const rows = await db!.execute(sql`SELECT schluessel, wert FROM system_einstellungen WHERE schluessel IN ('steuerbuero_email','smtp_host','smtp_port','smtp_user','smtp_pass','smtp_from')`);
       const settings: Record<string, string> = {};
       for (const r of ((rows as any)[0] ?? rows) as any[]) settings[r.schluessel] = r.wert ?? "";
-
-      // SMTP-Daten temporär in process.env setzen für den emailService
-      if (settings.smtp_host) process.env.SMTP_HOST = settings.smtp_host;
-      if (settings.smtp_port) process.env.SMTP_PORT = settings.smtp_port;
-      if (settings.smtp_user) process.env.SMTP_USER = settings.smtp_user;
-      if (settings.smtp_pass) process.env.SMTP_PASS = settings.smtp_pass;
-      if (settings.smtp_from) process.env.SMTP_FROM = settings.smtp_from;
 
       const empfaenger = settings.steuerbuero_email;
       if (!empfaenger || !empfaenger.includes("@")) {
