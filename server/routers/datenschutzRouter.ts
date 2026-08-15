@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { router } from "../_core/trpc";
-import { portalProtected } from "../portalAuth";
+import { adminProcedure, portalProtected } from "../portalAuth";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
 import {
@@ -201,7 +201,7 @@ export const datenschutzRouter = router({
   }),
 
   /** Alle Zustimmungen abrufen (Admin) */
-  getAlleZustimmungen: portalProtected.query(async () => {
+  getAlleZustimmungen: adminProcedure.query(async () => {
     const db = await getDb();
     if (!db) return [];
     const alleMa = await db.select({ id: mitarbeiterTable.id, vorname: mitarbeiterTable.vorname, nachname: mitarbeiterTable.nachname }).from(mitarbeiterTable);
@@ -231,17 +231,7 @@ export const datenschutzRouter = router({
       let dokRows = await db.select().from(datenschutzDokumente)
         .where(and(eq(datenschutzDokumente.typ, input.typ), eq(datenschutzDokumente.aktiv, true))).limit(1);
       if (dokRows.length === 0) {
-        const titelMap: Record<string, string> = {
-          datenschutzerklaerung: "Datenschutzerklärung", avv: "Auftragsverarbeitungsvertrag",
-          einwilligung: "Einwilligung Datenverarbeitung", loeschkonzept: "Löschkonzept",
-          verarbeitungsverzeichnis: "Verarbeitungsverzeichnis",
-        };
-        await db.insert(datenschutzDokumente).values({
-          typ: input.typ, version: input.version,
-          titel: titelMap[input.typ] ?? input.typ, inhalt: "", aktiv: true,
-        });
-        dokRows = await db.select().from(datenschutzDokumente)
-          .where(and(eq(datenschutzDokumente.typ, input.typ), eq(datenschutzDokumente.aktiv, true))).limit(1);
+        throw new TRPCError({ code: "NOT_FOUND", message: "Kein aktives Datenschutzdokument dieses Typs vorhanden." });
       }
       const dok = dokRows[0];
       const existing = await db.select().from(datenschutzZustimmungen)
@@ -255,7 +245,7 @@ export const datenschutzRouter = router({
     }),
 
   /** Neues Datenschutzdokument erstellen (Admin) */
-  createDokument: portalProtected
+  createDokument: adminProcedure
     .input(z.object({ version: z.string(), titel: z.string(), inhalt: z.string(), typ: z.enum(["datenschutzerklaerung", "avv", "einwilligung", "loeschkonzept", "verarbeitungsverzeichnis"]).default("datenschutzerklaerung") }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -269,14 +259,14 @@ export const datenschutzRouter = router({
     }),
 
   /** Alle Dokumente abrufen – Admin-Interface */
-  listAlleDokumente: portalProtected.query(async () => {
+  listAlleDokumente: adminProcedure.query(async () => {
     const db = await getDb();
     if (!db) return [];
     return db.select().from(datenschutzDokumente).orderBy(desc(datenschutzDokumente.createdAt));
   }),
 
   /** Einzelnes Dokument bearbeiten (Admin) */
-  updateDokument: portalProtected
+  updateDokument: adminProcedure
     .input(z.object({
       id: z.number().int().positive(),
       titel: z.string().min(1),
@@ -295,7 +285,7 @@ export const datenschutzRouter = router({
     }),
 
   /** Dokument als neue Version anlegen (versioniert, altes wird deaktiviert) */
-  neueVersion: portalProtected
+  neueVersion: adminProcedure
     .input(z.object({
       id: z.number().int().positive(),
       titel: z.string().min(1),
@@ -338,7 +328,7 @@ export const datenschutzRouter = router({
     }),
 
   /** Dokument deaktivieren (kein Hard-Delete, Audit-Trail bleibt erhalten) */
-  deaktiviereDokument: portalProtected
+  deaktiviereDokument: adminProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -350,14 +340,14 @@ export const datenschutzRouter = router({
     }),
 
   /** Vorlagen auflisten – Alias für listAlleDokumente (Frontend-kompatibel) */
-  listVorlagen: portalProtected.query(async () => {
+  listVorlagen: adminProcedure.query(async () => {
     const db = await getDb();
     if (!db) return [];
     return db.select().from(datenschutzDokumente).orderBy(desc(datenschutzDokumente.createdAt));
   }),
 
   /** Neue Vorlage erstellen (Admin) */
-  createVorlage: portalProtected
+  createVorlage: adminProcedure
     .input(z.object({
       titel: z.string().min(1),
       inhalt: z.string().min(1),
@@ -376,7 +366,7 @@ export const datenschutzRouter = router({
     }),
 
   /** Vorlage deaktivieren (soft-delete) */
-  deleteVorlage: portalProtected
+  deleteVorlage: adminProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -388,7 +378,7 @@ export const datenschutzRouter = router({
     }),
 
   /** CSV-Export aller Zustimmungen (Admin) */
-  csvExport: portalProtected.query(async () => {
+  csvExport: adminProcedure.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) return "";
     const alleZ = await db
@@ -412,11 +402,17 @@ export const datenschutzRouter = router({
       const datum = r.zugestimmtAt ? new Date(r.zugestimmtAt).toLocaleString("de-DE") : "";
       return [r.mitarbeiterId, r.vorname ?? "", r.nachname ?? "", r.email ?? "", r.dokumentId, dok?.titel ?? "", r.dokumentVersion ?? "", datum].join(";");
     }).join("\n");
+    await writeAuditLog({
+      aktion: "csv_export",
+      adminId: ctx.adminId,
+      adminName: `${ctx.portalMitarbeiter.vorname} ${ctx.portalMitarbeiter.nachname}`,
+      details: { datensaetze: alleZ.length },
+    });
     return header + rows;
   }),
 
   /** Erinnerungs-Push an alle MA ohne Zustimmung für ein Dokument (Admin) */
-  zustimmungsErinnerung: portalProtected
+  zustimmungsErinnerung: adminProcedure
     .input(z.object({ dokumentId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -451,7 +447,7 @@ export const datenschutzRouter = router({
     }),
 
   /** Zustimmungs-Übersicht für ein Dokument (Admin) */
-  getZustimmungsUebersicht: portalProtected
+  getZustimmungsUebersicht: adminProcedure
     .input(z.object({ dokumentId: z.number().int().positive() }))
     .query(async ({ input }) => {
       const db = await getDb();
@@ -476,7 +472,7 @@ export const datenschutzRouter = router({
     }),
 
   /** Audit-Log abrufen (Admin) */
-  getAuditLog: portalProtected
+  getAuditLog: adminProcedure
     .input(z.object({ limit: z.number().int().min(1).max(200).default(100) }).optional())
     .query(async ({ input }) => {
       const db = await getDb();
@@ -492,7 +488,7 @@ export const datenschutzRouter = router({
    * Heartbeat-Handler-Daten: Ablaufende Unterweisungen + fehlende Zustimmungen
    * (wird vom Heartbeat-Job aufgerufen, nicht direkt vom Frontend)
    */
-  heartbeatCheck: portalProtected.query(async () => {
+  heartbeatCheck: adminProcedure.query(async () => {
     const db = await getDb();
     if (!db) return { unterweisungen: [], zustimmungen: [] };
 

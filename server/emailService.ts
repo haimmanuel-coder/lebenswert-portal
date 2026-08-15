@@ -45,8 +45,21 @@ export interface EmailOptions {
   attachments?: { filename: string; content: Buffer; contentType: string }[];
 }
 
+export function istZulaessigerEmailEmpfaenger(value: string): boolean {
+  if (/\r|\n/.test(value)) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+export function istZulaessigerEmailBetreff(value: string): boolean {
+  return Boolean(value.trim()) && !/\r|\n/.test(value);
+}
+
 export async function sendEmail(opts: EmailOptions): Promise<{ success: boolean; error?: string }> {
   try {
+    if (!istZulaessigerEmailEmpfaenger(opts.to) || !istZulaessigerEmailBetreff(opts.subject)) {
+      console.warn("[Email] Unzulässige Empfängeradresse oder Betreffzeile abgewiesen.");
+      return { success: false, error: "E-Mail-Adresse oder Betreff ist ungültig." };
+    }
     const config = await getSmtpConfig();
     if (!config || !config.host || !config.user || !config.pass) {
       console.warn("[Email] SMTP nicht konfiguriert – E-Mail nicht gesendet.");
@@ -55,12 +68,19 @@ export async function sendEmail(opts: EmailOptions): Promise<{ success: boolean;
 
     const { host, port, user, pass, from } = config;
 
-    const transporter = nodemailer.createTransport({ host, port, secure: port === 465, auth: { user, pass } });
+    const transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure: port === 465,
+      requireTLS: port !== 465,
+      tls: { minVersion: "TLSv1.2" },
+      auth: { user, pass },
+    });
     await transporter.sendMail({ from, to: opts.to, subject: opts.subject, html: opts.html, attachments: opts.attachments });
     return { success: true };
   } catch (e: any) {
     console.error("[Email] Fehler:", e.message);
-    return { success: false, error: e.message };
+    return { success: false, error: "E-Mail konnte nicht gesendet werden. Bitte SMTP-Konfiguration und Serverprotokoll prüfen." };
   }
 }
 

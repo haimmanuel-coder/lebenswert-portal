@@ -22,6 +22,9 @@ import { ensureHeartbeatJobs } from "../ensureHeartbeatJobs";
 import { handleMonatsabschlussErinnerung } from "../scheduled/monatsabschlussErinnerung";
 import multer from "multer";
 import { storagePut } from "../storage";
+import { PORTAL_COOKIE, verifyPortalToken } from "../portalAuth";
+import { getMitarbeiterById } from "../db";
+import { sdk } from "./sdk";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -53,9 +56,38 @@ async function startServer() {
   // Trust reverse proxy (Manus gateway) so req.protocol is correctly 'https'
   app.set('trust proxy', 1);
   // Configure body parser with larger size limit for file uploads
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  app.use(express.json({ limit: "2mb" }));
+  app.use(express.urlencoded({ limit: "2mb", extended: true }));
   app.use(cookieParser());
+
+  const requirePortalMitarbeiter = async (req: any, res: any, next: any) => {
+    try {
+      const cookieToken = req.cookies?.[PORTAL_COOKIE] as string | undefined;
+      const bearerToken = typeof req.headers.authorization === "string" && req.headers.authorization.startsWith("Bearer ")
+        ? req.headers.authorization.slice(7)
+        : undefined;
+      const session = await verifyPortalToken(cookieToken ?? bearerToken ?? "");
+      if (!session) return res.status(401).json({ error: "Nicht angemeldet" });
+      const ma = await getMitarbeiterById(session.mitarbeiterId);
+      if (!ma?.aktiv) return res.status(403).json({ error: "Zugang ist nicht aktiv" });
+      req.portalMitarbeiter = ma;
+      return next();
+    } catch (error) {
+      console.warn("[PortalAuth] Zugriff auf Direkt-Endpunkt abgewiesen:", error);
+      return res.status(401).json({ error: "Nicht angemeldet" });
+    }
+  };
+
+  const requireCron = async (req: any, res: any, next: any) => {
+    try {
+      const user = await sdk.authenticateRequest(req);
+      if (!user.isCron) return res.status(403).json({ error: "cron-only endpoint" });
+      return next();
+    } catch (error) {
+      console.warn("[CronAuth] Nicht autorisierter Scheduler-Aufruf:", error);
+      return res.status(403).json({ error: "cron-only endpoint" });
+    }
+  };
 
   // ── Rate-Limiting ──────────────────────────────────────────────────────────
   // Login-Schutz: max. 10 Versuche pro 15 Minuten pro IP
@@ -98,23 +130,24 @@ async function startServer() {
   registerOAuthRoutes(app);
   // Foto/Audio-Upload-Endpoints
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 16 * 1024 * 1024 } });
-  app.post("/api/upload/foto", upload.single("file"), async (req: any, res: any) => {
+  app.post("/api/upload/foto", requirePortalMitarbeiter, upload.single("file"), async (req: any, res: any) => {
     try {
       if (!req.file) return res.status(400).json({ error: "Keine Datei" });
       const key = `fotos/${Date.now()}-${(req.file.originalname as string).replace(/[^a-zA-Z0-9._-]/g, "_")}`;
       const { url } = await storagePut(key, req.file.buffer, req.file.mimetype);
       return res.json({ url, key });
-    } catch (e: any) { return res.status(500).json({ error: e.message }); }
+    } catch (e: any) { console.error("[Upload/Foto]", e); return res.status(500).json({ error: "Foto konnte nicht gespeichert werden." }); }
   });
-  app.post("/api/upload/audio", upload.single("file"), async (req: any, res: any) => {
+  app.post("/api/upload/audio", requirePortalMitarbeiter, upload.single("file"), async (req: any, res: any) => {
     try {
       if (!req.file) return res.status(400).json({ error: "Keine Datei" });
       const key = `audio/${Date.now()}-${(req.file.originalname as string).replace(/[^a-zA-Z0-9._-]/g, "_")}`;
       const { url } = await storagePut(key, req.file.buffer, req.file.mimetype);
       return res.json({ url, key });
-    } catch (e: any) { return res.status(500).json({ error: e.message }); }
+    } catch (e: any) { console.error("[Upload/Audio]", e); return res.status(500).json({ error: "Audio konnte nicht gespeichert werden." }); }
   });
   // ⏱ Heartbeat-Handler (Cron-only, vor tRPC registrieren)
+  app.use("/api/scheduled", requireCron);
   app.post("/api/scheduled/neukunden-eskalation", neukundenEskalationHandler);
   app.post("/api/scheduled/fuehrerschein-erinnerung", fuehrerscheinErinnerungHandler);
   app.post("/api/scheduled/vertretung-bereinigung", vertretungBereinigungHandler);
@@ -129,9 +162,8 @@ async function startServer() {
       const result = await handleFahrtenVersandCron();
       res.json({ ok: true, ...result });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
       console.error("[Scheduled/FahrtenVersand]", err);
-      res.status(500).json({ ok: false, error: msg });
+      res.status(500).json({ ok: false, error: "Fahrtennachweis-Versand fehlgeschlagen." });
     }
   });
   // Monatsabschluss-Erinnerung: am 28. jeden Monats
@@ -140,17 +172,19 @@ async function startServer() {
       const result = await handleMonatsabschlussErinnerung();
       res.json({ ok: true, ...result });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
       console.error("[Scheduled/MonatsabschlussErinnerung]", err);
-      res.status(500).json({ ok: false, error: msg });
+      res.status(500).json({ ok: false, error: "Monatsabschluss-Erinnerung fehlgeschlagen." });
     }
   });
 
   // 📡 SSE-Kanal für Echtzeit-Benachrichtigungen
   const sseClients = new Map<number, Set<any>>();
-  app.get("/api/sse", (req: any, res: any) => {
-    const mitarbeiterId = parseInt(req.query.mitarbeiterId ?? "0");
-    if (!mitarbeiterId) return res.status(400).end();
+  app.get("/api/sse", requirePortalMitarbeiter, (req: any, res: any) => {
+    const angefragteId = parseInt(req.query.mitarbeiterId ?? "0");
+    const mitarbeiterId = angefragteId || req.portalMitarbeiter.id;
+    if (angefragteId && angefragteId !== req.portalMitarbeiter.id && req.portalMitarbeiter.rolle !== "admin") {
+      return res.status(403).json({ error: "Kein Zugriff auf diesen Echtzeitkanal" });
+    }
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");

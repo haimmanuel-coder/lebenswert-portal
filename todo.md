@@ -1,6 +1,11 @@
 # Lebenswert Betreuung – Mitarbeiter-Portal TODO
 
 ## Aktuelle Umsetzung – Unterweisung, Erste Hilfe und DSGVO-Startprozess
+- [x] Statische funktionale, technische, Sicherheits- und UX-Prüfung des Admin-Panels mit priorisiertem Prüfbericht durchführen
+- [x] Bestätigte kritische Zugriffsschutzbefunde aus der Admin-Panel-Prüfung gezielt beheben und per Build/Test erneut verifizieren
+- [ ] Jedes Admin-Modul mit echtem Admin-Login funktional durchtesten und je Modul CRUD, Lade-/Fehlerzustände, Kennzahlen und Reproduktionsschritte dokumentieren
+- [x] Sicherheits-Regressionstests für Datenschutz-Adminrechte, SSE, Scheduler und Upload-Endpunkte ergänzen
+- [ ] Sicheren Austausch sensibler HR-/Lohndaten statt Klartext-E-Mail sowie belastbare SMTP-Secret-Absicherung umsetzen
 - [x] Admin-Popup bei abgeschlossenem Erstlogin inklusive Passwortwechsel eines Mitarbeiters ergänzen
 - [x] Loginprobleme von Anica Schmitz und Yvonne Wagner prüfen, korrigieren und mit echtem Portal-Login verifizieren
 - [x] Admin-Statusanzeige für offenen Erstlogin und ausstehenden Passwortwechsel je Mitarbeiter ergänzen

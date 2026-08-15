@@ -5,7 +5,8 @@ import { publicProcedure } from "./_core/trpc";
 import { getMitarbeiterById } from "./db";
 
 export const PORTAL_COOKIE = "lb_portal_token";
-const JWT_SECRET_TEXT = process.env.JWT_SECRET || "lebenswert-secret-key";
+const JWT_SECRET_TEXT = process.env.JWT_SECRET || (process.env.NODE_ENV === "test" ? "test-only-portal-secret" : "");
+if (!JWT_SECRET_TEXT) throw new Error("JWT_SECRET muss für die Portal-Authentifizierung gesetzt sein.");
 const JWT_SECRET = new TextEncoder().encode(JWT_SECRET_TEXT);
 
 export type PortalRolle = "mitarbeiter" | "teamleitung" | "buchhaltung" | "admin";
