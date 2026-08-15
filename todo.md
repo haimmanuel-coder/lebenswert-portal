@@ -1,6 +1,8 @@
 # Lebenswert Betreuung – Mitarbeiter-Portal TODO
 
 ## Aktuelle Umsetzung – Unterweisung, Erste Hilfe und DSGVO-Startprozess
+- [x] Horizontalen Überlauf im mobilen Remote-Login zuverlässig beseitigen und die Eingabefelder ohne seitliches Scrollen sichtbar machen
+- [x] Mobilen Login im Remote-nahen Viewport 828×1792 visuell verifizieren und den sichtbaren Befund dokumentieren
 - [x] Mobile Login-Ansicht für den Remote-Browser vollständig sichtbar und bedienbar machen
 - [ ] Startverhalten von „Übernehmen Sie die Kontrolle“ im externen Remote-Browser mit einem Portal-Kontext end-to-end verifizieren; das Öffnen eines neuen Tabs ist nicht durch den App-Code steuerbar
 - [x] Statische funktionale, technische, Sicherheits- und UX-Prüfung des Admin-Panels mit priorisiertem Prüfbericht durchführen
