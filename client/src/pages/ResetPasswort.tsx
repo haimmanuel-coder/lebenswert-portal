@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
+import PasswordInput from "@/components/PasswordInput";
 
 // Einfache Hilfsfunktion um Token aus URL zu lesen
 function getTokenFromUrl(): string {
@@ -156,8 +157,7 @@ export default function ResetPasswort() {
 
             <div style={{ marginBottom: 16 }}>
               <label style={labelStyle}>Neues Passwort</label>
-              <input
-                type="password"
+              <PasswordInput
                 value={neuesPasswort}
                 onChange={(e) => setNeuesPasswort(e.target.value)}
                 placeholder="Mindestens 6 Zeichen"
@@ -189,8 +189,7 @@ export default function ResetPasswort() {
 
             <div style={{ marginBottom: 20 }}>
               <label style={labelStyle}>Passwort bestätigen</label>
-              <input
-                type="password"
+              <PasswordInput
                 value={bestaetigung}
                 onChange={(e) => setBestaetigung(e.target.value)}
                 placeholder="Passwort wiederholen"

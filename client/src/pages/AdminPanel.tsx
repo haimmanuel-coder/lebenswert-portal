@@ -22,6 +22,7 @@ import QRCode from "qrcode";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import BottomSheet from "@/components/BottomSheet";
+import PasswordInput from "@/components/PasswordInput";
 import MitarbeiterDetail from "./MitarbeiterDetail";
 
 type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo" | "preise" | "sicherheit" | "fuehrerschein" | "compliance" | "compliance-gesamt" | "arbeitssicherheit" | "as-dashboard" | "unterschriften-archiv" | "lohnkosten" | "onboarding" | "csv-import" | "kunden-import" | "einstellungen" | "smtp" | "systemstatus";
@@ -200,7 +201,6 @@ export default function AdminPanel() {
   // ── Passwort-Reset ───────────────────────────────────
   const [pwResetMa, setPwResetMa] = useState<{ id: number; vorname: string; nachname: string; email: string } | null>(null);
   const [pwResetNeu, setPwResetNeu] = useState("");
-  const [pwResetSichtbar, setPwResetSichtbar] = useState(false);
   const [pwResetKopiert, setPwResetKopiert] = useState(false);
   const [zugangskarten, setZugangskarten] = useState<Zugangskarte[]>([]);
   const [zugangskartenDialog, setZugangskartenDialog] = useState(false);
@@ -212,10 +212,10 @@ export default function AdminPanel() {
   const generierePasswort = () => {
     const bytes = new Uint8Array(12); window.crypto.getRandomValues(bytes);
     const pw = `Lb!${Array.from(bytes, value => value.toString(16).padStart(2, "0")).join("")}`;
-    setPwResetNeu(pw); setPwResetSichtbar(true); setPwResetKopiert(false);
+    setPwResetNeu(pw); setPwResetKopiert(false);
   };
   const passwortReset = trpc.admin.mitarbeiterPasswortReset.useMutation({
-    onSuccess: (_data, variables) => { if (pwResetMa) { setZugangskarten([{ ...pwResetMa, startpasswort: variables.neuesPasswort }]); setZugangskartenDialog(true); } toast.success("🔑 Passwort wurde zurückgesetzt – Zugangskarte jetzt ausgeben."); setPwResetMa(null); setPwResetNeu(""); setPwResetSichtbar(false); },
+    onSuccess: (_data, variables) => { if (pwResetMa) { setZugangskarten([{ ...pwResetMa, startpasswort: variables.neuesPasswort }]); setZugangskartenDialog(true); } toast.success("🔑 Passwort wurde zurückgesetzt – Zugangskarte jetzt ausgeben."); setPwResetMa(null); setPwResetNeu(""); },
     onError: (e) => toast.error("❌ " + e.message),
   });
   const startpasswoerterErstellen = (trpc as any).admin.zugangskartenStartpasswoerter.useMutation({
@@ -888,7 +888,7 @@ export default function AdminPanel() {
         </div>
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>{editMa ? "Neues Passwort (mind. 10 Zeichen, leer = unverändert)" : "Startpasswort * (mind. 10 Zeichen)"}</label>
-          <input type="password" value={maPasswort} onChange={(e) => setMaPasswort(e.target.value)} style={inputStyle} placeholder="••••••••••" />
+          <PasswordInput value={maPasswort} onChange={(e) => setMaPasswort(e.target.value)} style={inputStyle} placeholder="••••••••••" />
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
           <div>
@@ -989,17 +989,13 @@ export default function AdminPanel() {
             <button onClick={generierePasswort} style={{ width: "100%", padding: "9px 0", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", marginBottom: 10 }}>
               🎲 Sicheres Passwort generieren
             </button>
-            <div style={{ position: "relative", marginBottom: 16 }}>
-              <input
-                type={pwResetSichtbar ? "text" : "password"}
+            <div style={{ marginBottom: 16 }}>
+              <PasswordInput
                 placeholder="Neues Passwort (mind. 10 Zeichen)"
                 value={pwResetNeu}
                 onChange={(e) => { setPwResetNeu(e.target.value); setPwResetKopiert(false); }}
-                style={{ width: "100%", padding: "10px 40px 10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const }}
+                style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 14, boxSizing: "border-box" as const }}
               />
-              <button onClick={() => setPwResetSichtbar(v => !v)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 16 }}>
-                {pwResetSichtbar ? "🙈" : "👁️"}
-              </button>
             </div>
             {pwResetNeu.length >= 10 && (
               <button onClick={() => { navigator.clipboard.writeText(pwResetNeu); setPwResetKopiert(true); toast.success("📋 Passwort kopiert!"); }} style={{ width: "100%", padding: "8px 0", background: pwResetKopiert ? "#e8f5e4" : "#eff6ff", color: pwResetKopiert ? "#4a8c3f" : "#1d4ed8", border: `1px solid ${pwResetKopiert ? "#4a8c3f" : "#93c5fd"}`, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 12 }}>
@@ -1007,7 +1003,7 @@ export default function AdminPanel() {
               </button>
             )}
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => { setPwResetMa(null); setPwResetNeu(""); setPwResetSichtbar(false); }} style={{ flex: 1, padding: "10px 0", background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+              <button onClick={() => { setPwResetMa(null); setPwResetNeu(""); }} style={{ flex: 1, padding: "10px 0", background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
                 Abbrechen
               </button>
               <button

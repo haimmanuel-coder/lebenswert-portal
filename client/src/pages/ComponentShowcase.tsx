@@ -85,6 +85,7 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { Input } from "@/components/ui/input";
+import PasswordInput from "@/components/PasswordInput";
 import {
   InputOTP,
   InputOTPGroup,
@@ -926,11 +927,11 @@ export default function ComponentsShowcase() {
                   <CardContent className="space-y-2">
                     <div className="space-y-1">
                       <Label htmlFor="current">Current password</Label>
-                      <Input id="current" type="password" />
+                      <PasswordInput id="current" className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm" />
                     </div>
                     <div className="space-y-1">
                       <Label htmlFor="new">New password</Label>
-                      <Input id="new" type="password" />
+                      <PasswordInput id="new" className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm" />
                     </div>
                   </CardContent>
                   <CardFooter>

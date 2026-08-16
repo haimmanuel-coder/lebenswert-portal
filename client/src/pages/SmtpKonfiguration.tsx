@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import PasswordInput from "@/components/PasswordInput";
 
 const SMTP_FELDER = [
   { key: "smtp_host", label: "SMTP-Server", beschreibung: "z.B. smtp.gmail.com oder mail.web.de", placeholder: "smtp.beispiel.de" },
@@ -87,13 +88,22 @@ export default function SmtpKonfiguration() {
             <div key={feld.key} style={feld.key === "smtp_from" ? { gridColumn: "1 / -1" } : undefined}>
               <label style={labelStyle}>{feld.label}</label>
               <p style={descStyle}>{feld.beschreibung}</p>
-              <input
-                type={feld.type ?? "text"}
-                value={werte[feld.key] ?? ""}
-                onChange={e => setWerte(prev => ({ ...prev, [feld.key]: e.target.value }))}
-                placeholder={feld.placeholder}
-                style={inputStyle}
-              />
+              {feld.type === "password" ? (
+                <PasswordInput
+                  value={werte[feld.key] ?? ""}
+                  onChange={e => setWerte(prev => ({ ...prev, [feld.key]: e.target.value }))}
+                  placeholder={feld.placeholder}
+                  style={inputStyle}
+                />
+              ) : (
+                <input
+                  type={feld.type ?? "text"}
+                  value={werte[feld.key] ?? ""}
+                  onChange={e => setWerte(prev => ({ ...prev, [feld.key]: e.target.value }))}
+                  placeholder={feld.placeholder}
+                  style={inputStyle}
+                />
+              )}
             </div>
           ))}
         </div>

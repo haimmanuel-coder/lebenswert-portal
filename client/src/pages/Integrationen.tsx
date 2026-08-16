@@ -2,6 +2,7 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { usePortalAuth } from "@/contexts/PortalAuthContext";
 import { toast } from "sonner";
+import PasswordInput from "@/components/PasswordInput";
 
 const INTEGRATION_TYPEN = [
   { id: "optadata", name: "OptaData", icon: "💼", beschreibung: "Abrechnungssoftware für Pflegedienste", farbe: "#3b82f6" },
@@ -228,8 +229,7 @@ export default function Integrationen() {
             <div style={{ display: "grid", gap: 14 }}>
               <div>
                 <label style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", display: "block", marginBottom: 4 }}>API-Schlüssel</label>
-                <input
-                  type="password"
+                <PasswordInput
                   value={editForm.apiKey}
                   onChange={e => setEditForm(f => ({ ...f, apiKey: e.target.value }))}
                   placeholder="sk-..."

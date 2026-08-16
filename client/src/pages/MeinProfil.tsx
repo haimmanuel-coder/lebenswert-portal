@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { usePortalAuth } from "@/contexts/PortalAuthContext";
 import { toast } from "sonner";
+import PasswordInput from "@/components/PasswordInput";
 
 const DOK_TYPEN: Record<string, string> = {
   zertifikat: "📜 Zertifikat",
@@ -65,7 +66,6 @@ export default function MeinProfil() {
 
   // ── Passwort-Formular ────────────────────────────────────────────────────
   const [pwForm, setPwForm] = useState({ alt: "", neu: "", bestaetigung: "" });
-  const [pwVisible, setPwVisible] = useState({ alt: false, neu: false, best: false });
 
   // ── Dokument-Upload ──────────────────────────────────────────────────────
   const [uploadTyp, setUploadTyp] = useState<keyof typeof DOK_TYPEN>("zertifikat");
@@ -328,30 +328,20 @@ export default function MeinProfil() {
               ⚠️ Wähle ein sicheres Passwort mit mindestens 6 Zeichen.
             </div>
             {[
-              { label: "Aktuelles Passwort", key: "alt", visKey: "alt" as const },
-              { label: "Neues Passwort", key: "neu", visKey: "neu" as const },
-              { label: "Neues Passwort bestätigen", key: "bestaetigung", visKey: "best" as const },
-            ].map(({ label, key, visKey }) => (
+              { label: "Aktuelles Passwort", key: "alt" },
+              { label: "Neues Passwort", key: "neu" },
+              { label: "Neues Passwort bestätigen", key: "bestaetigung" },
+            ].map(({ label, key }) => (
               <div key={key}>
                 <label style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", display: "block", marginBottom: 4 }}>{label}</label>
-                <div style={{ position: "relative" }}>
-                  <input
-                    type={pwVisible[visKey] ? "text" : "password"}
-                    value={(pwForm as any)[key]}
-                    onChange={e => setPwForm(f => ({ ...f, [key]: e.target.value }))}
-                    placeholder="••••••••"
-                    style={{ width: "100%", padding: "10px 40px 10px 12px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, boxSizing: "border-box", outline: "none" }}
-                    onFocus={e => (e.target.style.borderColor = "#0d9488")}
-                    onBlur={e => (e.target.style.borderColor = "#e5e7eb")}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setPwVisible(v => ({ ...v, [visKey]: !v[visKey] }))}
-                    style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "#9ca3af" }}
-                  >
-                    {pwVisible[visKey] ? "🙈" : "👁️"}
-                  </button>
-                </div>
+                <PasswordInput
+                  value={(pwForm as any)[key]}
+                  onChange={e => setPwForm(f => ({ ...f, [key]: e.target.value }))}
+                  placeholder="••••••••"
+                  style={{ width: "100%", padding: "10px 12px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, boxSizing: "border-box", outline: "none" }}
+                  onFocus={e => (e.target.style.borderColor = "#0d9488")}
+                  onBlur={e => (e.target.style.borderColor = "#e5e7eb")}
+                />
               </div>
             ))}
             <button
