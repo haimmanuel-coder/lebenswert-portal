@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const COOKIE_KEY = "lw_cookie_consent";
 
@@ -7,6 +7,7 @@ type ConsentState = "accepted" | "rejected" | null;
 export default function CookieBanner() {
   const [consent, setConsent] = useState<ConsentState>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const bannerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem(COOKIE_KEY) as ConsentState;
@@ -17,6 +18,25 @@ export default function CookieBanner() {
     document.body.classList.toggle("lw-cookie-open", consent === null);
     return () => document.body.classList.remove("lw-cookie-open");
   }, [consent]);
+
+  useEffect(() => {
+    const banner = bannerRef.current;
+    if (consent !== null || !banner) {
+      document.documentElement.style.removeProperty("--lw-cookie-banner-height");
+      return;
+    }
+
+    const updateHeight = () => {
+      document.documentElement.style.setProperty("--lw-cookie-banner-height", `${Math.ceil(banner.getBoundingClientRect().height)}px`);
+    };
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(banner);
+    return () => {
+      observer.disconnect();
+      document.documentElement.style.removeProperty("--lw-cookie-banner-height");
+    };
+  }, [consent, showDetails]);
 
   const accept = () => {
     localStorage.setItem(COOKIE_KEY, "accepted");
@@ -33,6 +53,7 @@ export default function CookieBanner() {
   return (
     <div
       className="lw-cookie-banner"
+      ref={bannerRef}
       style={{
         position: "fixed",
         bottom: 0,

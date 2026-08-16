@@ -561,3 +561,15 @@ canvas.sig-canvas {
     max-height: calc(100dvh - min(34svh, 17rem) - 20px) !important;
   }
 }
+
+/* Der Einführungsdialog erhält oberhalb des tatsächlich gemessenen Cookie-Hinweises eigenen Platz.
+   Das gilt auch in niedrigen Desktop- und Remote-Viewports. */
+body.lw-cookie-open .lw-onboarding-overlay {
+  align-items: center !important;
+  padding: 16px 16px calc(var(--lw-cookie-banner-height, 0px) + 16px) !important;
+  box-sizing: border-box;
+}
+
+body.lw-cookie-open .lw-onboarding-card {
+  max-height: calc(100dvh - var(--lw-cookie-banner-height, 0px) - 32px) !important;
+}

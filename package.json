@@ -13,6 +13,7 @@
     "test:security": "node scripts/security-regression.mjs",
     "test:mobile-layout": "node scripts/check-mobile-login-layout.mjs",
     "test:mobile-onboarding": "tsx scripts/check-mobile-onboarding-layout.mjs",
+    "test:onboarding-layout": "ONBOARDING_VIEWPORT=mobile tsx scripts/check-mobile-onboarding-layout.mjs && ONBOARDING_VIEWPORT=desktop tsx scripts/check-mobile-onboarding-layout.mjs",
     "test:admin-smoke": "tsx scripts/admin-ui-smoke.mjs",
     "test:mitteilungen": "tsx scripts/check-mitteilungen-alias.mjs",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"

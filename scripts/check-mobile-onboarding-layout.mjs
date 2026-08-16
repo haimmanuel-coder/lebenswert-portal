@@ -1,6 +1,10 @@
 import { signPortalToken, PORTAL_COOKIE } from "../server/portalAuth.ts";
 
 const token = await signPortalToken(Number(process.env.ADMIN_UI_TEST_ID ?? 3), { mfa: true, expiresIn: "10m" });
+const desktop = process.env.ONBOARDING_VIEWPORT === "desktop";
+const viewport = desktop
+  ? { width: 1280, height: 900, mobile: false, name: "Desktop 1280×900" }
+  : { width: 828, height: 1792, mobile: true, name: "Remote-Mobil 828×1792" };
 const target = await fetch("http://127.0.0.1:9222/json/new?http://127.0.0.1:3000", { method: "PUT" }).then((r) => r.json());
 const socket = new WebSocket(target.webSocketDebuggerUrl);
 const pending = new Map();
@@ -24,7 +28,7 @@ socket.addEventListener("message", (event) => {
   message.error ? call.reject(new Error(message.error.message)) : call.resolve(message.result);
 });
 
-await send("Emulation.setDeviceMetricsOverride", { width: 828, height: 1792, deviceScaleFactor: 1, mobile: true });
+await send("Emulation.setDeviceMetricsOverride", { width: viewport.width, height: viewport.height, deviceScaleFactor: 1, mobile: viewport.mobile });
 await send("Network.enable");
 await send("Network.clearBrowserCookies");
 await send("Network.setCookie", { name: PORTAL_COOKIE, value: token, url: "http://127.0.0.1:3000", httpOnly: true, sameSite: "Lax" });
@@ -63,6 +67,6 @@ const measure = await send("Runtime.evaluate", {
 const data = measure.result.value;
 const cardAboveCookie = data.card.bottom <= data.cookie.top - 8;
 const nextVisible = data.next && data.next.top >= 0 && data.next.bottom <= data.cookie.top - 8;
-console.log(JSON.stringify({ ...data, cardAboveCookie, nextVisible }, null, 2));
+console.log(JSON.stringify({ viewportName: viewport.name, ...data, cardAboveCookie, nextVisible }, null, 2));
 socket.close();
 if (!data.cookieOpenClass || !cardAboveCookie || !nextVisible) process.exitCode = 1;
