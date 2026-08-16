@@ -1483,6 +1483,15 @@ export const appRouter = router({
         return { success: true };
       }),
 
+    /** Kunden werden aus Nachvollziehbarkeitsgründen deaktiviert, nicht physisch gelöscht. */
+    delete: adminProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(async ({ input, ctx }) => {
+        await updateKunde(input.id, { aktiv: 0 } as any);
+        await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "DELETE", ressource: "kunde", details: `id=${input.id} deaktiviert`, status: "success" });
+        return { success: true };
+      }),
+
     updateBudget: adminProcedure
       .input(z.object({
         id: z.number().int().positive(),

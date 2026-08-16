@@ -10,7 +10,8 @@
  * A27: Controlling-Dashboard-Daten (Admin)
  */
 import { z } from "zod";
-import { adminProcedure, protectedProcedure, router } from "../_core/trpc";
+import { router } from "../_core/trpc";
+import { adminProcedure, portalProtected } from "../portalAuth";
 import { getDb } from "../db";
 import { jahresbudgets, kunden, einsaetze, controllingSnapshots } from "../../drizzle/schema";
 import { eq, and, sql, desc, lte, gte } from "drizzle-orm";
@@ -58,7 +59,7 @@ export const budgetRouter = router({
   // ── A21: Jahresbudget CRUD (Admin) ────────────────────────────────────────
 
   /** Alle Jahresbudgets eines Kunden abrufen */
-  getByKunde: protectedProcedure
+  getByKunde: portalProtected
     .input(z.object({ kundenId: z.number() }))
     .query(async ({ input }) => {
       const dbOrNull = await getDb();
@@ -98,7 +99,8 @@ export const budgetRouter = router({
         stundensatzCent: input.stundensatzCent,
         notizen: input.notizen,
       });
-      return { id: Number((result as any).insertId), success: true };
+      const insertId = Number((result as any)[0]?.insertId ?? (result as any).insertId ?? 0);
+      return { id: insertId, success: true };
     }),
 
   /** Jahresbudget aktualisieren (Admin) */
@@ -138,7 +140,7 @@ export const budgetRouter = router({
    * Monatsbudget für einen Kunden und Leistungsbereich berechnen.
    * Mitarbeiter sehen nur €/h/% – kein Jahresbudget.
    */
-  getMonatsbudget: protectedProcedure
+  getMonatsbudget: portalProtected
     .input(
       z.object({
         kundenId: z.number(),
@@ -235,7 +237,7 @@ export const budgetRouter = router({
    * Budgetampel für alle aktiven Kunden (für Dashboard und Kundenliste).
    * Gibt für jeden Kunden die Ampelfarbe und den Verbrauchsprozentsatz zurück.
    */
-  getAmpelUebersicht: protectedProcedure.query(async () => {
+  getAmpelUebersicht: portalProtected.query(async () => {
     const dbOrNull = await getDb();
       if (!dbOrNull) throw new Error('Datenbankverbindung nicht verfügbar');
       const db = dbOrNull;
@@ -291,7 +293,7 @@ export const budgetRouter = router({
 
   // ── A25: Jahresprognose ───────────────────────────────────────────────────
 
-  getJahresprognose: protectedProcedure
+  getJahresprognose: portalProtected
     .input(z.object({ kundenId: z.number() }))
     .query(async ({ input }) => {
       const dbOrNull = await getDb();
@@ -350,7 +352,7 @@ export const budgetRouter = router({
 
   // ── A23: KI-Planungsempfehlung ────────────────────────────────────────────
 
-  getKiEmpfehlung: protectedProcedure
+  getKiEmpfehlung: portalProtected
     .input(z.object({ kundenId: z.number() }))
     .query(async ({ input, ctx }) => {
       const dbOrNull = await getDb();
@@ -445,7 +447,7 @@ Antworte auf Deutsch, sachlich und ohne rechtliche Beratung. Weise darauf hin, d
 
   // ── A26: Optimierungsvorschläge ───────────────────────────────────────────
 
-  getOptimierungsvorschlaege: protectedProcedure
+  getOptimierungsvorschlaege: portalProtected
     .input(z.object({ kundenId: z.number() }))
     .query(async ({ input }) => {
       const dbOrNull = await getDb();

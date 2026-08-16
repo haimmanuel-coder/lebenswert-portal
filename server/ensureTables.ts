@@ -1213,5 +1213,35 @@ export async function ensureTables(): Promise<void> {
     }
   }
 
+  // Bestehende Installationen enthielten früher die Pflichtspalte `text` und
+  // andere Kategorien. Die Anwendung verwendet inzwischen ausschließlich
+  // `inhalt`; deshalb wird die Altdaten-Spalte behutsam optional gemacht und
+  // ihr Inhalt einmalig übernommen, ohne vorhandene Textbausteine zu verlieren.
+  try {
+    const [legacyTextColumns] = await db.execute(sql.raw("SHOW COLUMNS FROM `textbausteine` LIKE 'text'")) as any;
+    if (Array.isArray(legacyTextColumns) && legacyTextColumns.length > 0) {
+      await db.execute(sql.raw("ALTER TABLE `textbausteine` MODIFY COLUMN `text` TEXT NULL"));
+      await db.execute(sql.raw("UPDATE `textbausteine` SET `inhalt` = COALESCE(`inhalt`, `text`, '') WHERE `inhalt` IS NULL"));
+    }
+    await db.execute(sql.raw("ALTER TABLE `textbausteine` MODIFY COLUMN `inhalt` TEXT NOT NULL"));
+    await db.execute(sql.raw("ALTER TABLE `textbausteine` MODIFY COLUMN `kategorie` ENUM('alltagsbegleitung','haushalt','mobilisierung','soziales','transport','bericht','gesundheit','aktivitaet','bemerkung','sonstiges') NOT NULL DEFAULT 'bericht'"));
+  } catch (err: any) {
+    console.error("[ensureTables] Textbaustein-Kompatibilitätsmigration fehlgeschlagen:", String(err?.message ?? "").substring(0, 160));
+    failed++;
+  }
+
+  // Ältere Kassenanfragen-Tabellen wurden vor der Soft-Delete-Funktion
+  // angelegt. Die Ergänzung verhindert Löschfehler und erhält die
+  // Abrechnungs-Historie nachvollziehbar.
+  try {
+    const [deleteColumns] = await db.execute(sql.raw("SHOW COLUMNS FROM `kassenanfragen` LIKE 'geloeschtAt'")) as any;
+    if (!Array.isArray(deleteColumns) || deleteColumns.length === 0) {
+      await db.execute(sql.raw("ALTER TABLE `kassenanfragen` ADD COLUMN `geloeschtAt` DATETIME NULL, ADD COLUMN `geloeschtVon` INT NULL"));
+    }
+  } catch (err: any) {
+    console.error("[ensureTables] Kassenanfrage-Kompatibilitätsmigration fehlgeschlagen:", String(err?.message ?? "").substring(0, 160));
+    failed++;
+  }
+
   console.log(`[ensureTables] Abgeschlossen: ${ok} OK, ${failed} Fehler`);
 }

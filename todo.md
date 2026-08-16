@@ -24,7 +24,14 @@
 - [x] Statische funktionale, technische, Sicherheits- und UX-Prüfung des Admin-Panels mit priorisiertem Prüfbericht durchführen
 - [x] Bestätigte kritische Zugriffsschutzbefunde aus der Admin-Panel-Prüfung gezielt beheben und per Build/Test erneut verifizieren
 - [x] Alle regulär erreichbaren Admin- und Mitarbeiterseiten mit echtem Admin-Kontext auf Navigation, Rendering und Laufzeitfehler prüfen
-- [ ] Schreibende und löschende Admin-Abläufe je Modul mit explizit freigegebenen Testdaten prüfen und die Bereinigung dokumentieren
+- [x] Schreibende, ändernde und löschende Admin-Abläufe für Gefährdungsbeurteilungen und PSA-Ausgaben mit freigegebenen Testdaten prüfen und vollständig bereinigen
+- [x] Reversible Schreib-/Löschtests für Textbausteine zusätzlich zu Arbeitssicherheitsmodulen ergänzen und die vollständige Bereinigung nachweisen
+- [x] Reversible Schreib-/Löschtests für Budgetverwaltung zusätzlich zu Textbausteinen und Arbeitssicherheitsmodulen ergänzen und die vollständige Bereinigung nachweisen
+- [x] Reversible Schreib-/Löschtests für Kassenanfragen zusätzlich zu Budget, Textbausteinen und Arbeitssicherheitsmodulen ergänzen und die vollständige Bereinigung nachweisen
+- [x] Kundenanlage und -bearbeitung mit Testdaten über Admin-Prozeduren prüfen
+- [x] Explizite Kunden-Deaktivierung über den vorgesehenen App-Pfad testen und den vollständigen Bereinigungsnachweis dokumentieren
+- [x] Auditbericht um Kunden-Deaktivierung, Nebeneffekte und vollständige Bereinigung aller freigegebenen Admin-Testdaten ergänzen
+- [x] Auditbericht um eine Matrix der mit Testdaten geprüften Admin-Module sowie Bereinigungsnachweise ergänzen
 - [x] Sicherheits-Regressionstests für Datenschutz-Adminrechte, SSE, Scheduler und Upload-Endpunkte ergänzen
 - [x] Sicheren Austausch sensibler HR-/Lohndaten statt Klartext-E-Mail sowie belastbare SMTP-Secret-Absicherung umsetzen
 - [x] Admin-Popup bei abgeschlossenem Erstlogin inklusive Passwortwechsel eines Mitarbeiters ergänzen

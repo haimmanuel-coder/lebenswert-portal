@@ -18,6 +18,7 @@
     "test:terminassistent": "tsx scripts/check-terminassistent.mjs",
     "test:date-render": "node scripts/check-react-date-renders.mjs",
     "test:dashboard-hooks": "node scripts/check-dashboard-hooks.mjs",
+    "test:admin-write-cleanup": "tsx scripts/check-admin-write-cleanup.mjs",
     "test:admin-smoke": "tsx scripts/admin-ui-smoke.mjs",
     "test:mitteilungen": "tsx scripts/check-mitteilungen-alias.mjs",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
