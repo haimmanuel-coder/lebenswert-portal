@@ -1,6 +1,7 @@
 # Lebenswert Betreuung – Mitarbeiter-Portal TODO
 
 ## Aktuelle Umsetzung – Unterweisung, Erste Hilfe und DSGVO-Startprozess
+- [x] Ungültigen React-Hook-Aufruf in einer tRPC-Integration finden, korrigieren und regressionstesten
 - [x] Weitere direkte Date-Ausgaben im Portal zentral absichern und den wiederkehrenden React-Fehler regressionstesten
 - [x] Direkte Ausgabe von Date-Objekten in React-Komponenten finden, formatieren und regressionstesten
 - [x] Standarddauer neuer Termine auf 1,5 Stunden setzen und Mindestdauer in der Terminplanung sichern

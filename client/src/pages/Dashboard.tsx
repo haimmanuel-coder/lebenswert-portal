@@ -12,12 +12,13 @@ function MitteilungenBereich() {
   const notifs: any[] = notifData ?? [];
   const ungelesen = notifs.filter((n: any) => !n.gelesenAt);
   const markRead = (trpc as any).notifications?.markRead?.useMutation?.({ onSuccess: () => (utils as any).notifications?.list?.invalidate?.() });
+  const markAllRead = (trpc as any).notifications?.markAllRead?.useMutation?.({ onSuccess: () => (utils as any).notifications?.list?.invalidate?.() });
   if (ungelesen.length === 0) return null;
   return (
     <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 10px rgba(0,0,0,.08)", padding: 16, marginBottom: 12 }}>
       <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span>🔔 Mitteilungen <span style={{ background: "#ef4444", color: "#fff", borderRadius: 20, padding: "2px 7px", fontSize: 11, fontWeight: 800, marginLeft: 6 }}>{ungelesen.length}</span></span>
-        <button onClick={() => (trpc as any).notifications?.markAllRead?.useMutation?.({ onSuccess: () => (utils as any).notifications?.list?.invalidate?.() })} style={{ fontSize: 11, color: "#6b7280", background: "none", border: "none", cursor: "pointer" }}>Alle gelesen</button>
+        <button onClick={() => markAllRead?.mutate?.()} disabled={markAllRead?.isPending} style={{ fontSize: 11, color: "#6b7280", background: "none", border: "none", cursor: markAllRead?.isPending ? "wait" : "pointer", opacity: markAllRead?.isPending ? 0.6 : 1 }}>Alle gelesen</button>
       </div>
       {ungelesen.slice(0, 5).map((n: any) => (
         <div key={n.id} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 0", borderBottom: "1px solid #f3f4f6" }}>
