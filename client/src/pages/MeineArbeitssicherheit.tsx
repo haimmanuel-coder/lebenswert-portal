@@ -182,7 +182,7 @@ export default function MeineArbeitssicherheit() {
                       <span style={{ background: ampel.bg, color: ampel.color, borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 600 }}>{ampel.label}</span>
                     </div>
                     <div style={{ fontSize: 12, color: "#9ca3af" }}>
-                      Datum: {u.unterweisungsDatum}
+                      Datum: {fmtD(u.unterweisungsDatum)}
                       {u.naechsteFaelligkeit ? ` · Wiederholung fällig: ${fmtD(u.naechsteFaelligkeit)}` : ""}
                     </div>
                     {u.inhalt && <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4, fontStyle: "italic" }}>{u.inhalt}</div>}
@@ -244,8 +244,8 @@ export default function MeineArbeitssicherheit() {
                 <span style={{ color: "#6b7280", fontSize: 12, marginLeft: 8 }}>Menge: {p.menge}</span>
               </div>
               <div style={{ fontSize: 12, color: "#9ca3af" }}>
-                Ausgegeben: {p.ausgabeDatum}
-                {p.rueckgabeDatum ? ` · Zurückgegeben: ${p.rueckgabeDatum}` : ""}
+                Ausgegeben: {fmtD(p.ausgabeDatum)}
+                {p.rueckgabeDatum ? ` · Zurückgegeben: ${fmtD(p.rueckgabeDatum)}` : ""}
               </div>
             </div>
           ))}
@@ -273,7 +273,7 @@ export default function MeineArbeitssicherheit() {
                       <span style={{ background: ampel.bg, color: ampel.color, borderRadius: 20, padding: "2px 8px", fontSize: 11, fontWeight: 600 }}>{ampel.label}</span>
                     </div>
                     <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>
-                      Fällig: {v.faelligkeit}
+                      Fällig: {fmtD(v.faelligkeit)}
                       {v.arzt ? ` · Arzt: ${v.arzt}` : ""}
                     </div>
                   </div>

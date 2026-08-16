@@ -258,7 +258,7 @@ function PsaTab() {
                 <td style={{ padding: "8px 10px" }}>{r.groesse ?? "–"}</td>
                 <td style={{ padding: "8px 10px" }}>{r.menge}</td>
                 <td style={{ padding: "8px 10px" }}>{fmtD(r.ausgabeDatum)}</td>
-                <td style={{ padding: "8px 10px" }}>{r.rueckgabeDatum ?? "–"}</td>
+                <td style={{ padding: "8px 10px" }}>{r.rueckgabeDatum ? fmtD(r.rueckgabeDatum) : "–"}</td>
                 <td style={{ padding: "8px 10px" }}>
                   <span style={{ background: r.zustand === "zurueckgegeben" ? "#dcfce7" : r.zustand === "beschaedigt" ? "#fee2e2" : "#f3f4f6", color: r.zustand === "zurueckgegeben" ? "#16a34a" : r.zustand === "beschaedigt" ? "#dc2626" : "#374151", borderRadius: 20, padding: "2px 8px", fontSize: 11 }}>
                     {r.zustand === "zurueckgegeben" ? "Zurückgegeben" : r.zustand === "beschaedigt" ? "Beschädigt" : r.zustand === "gut" ? "Gut" : "Neu"}

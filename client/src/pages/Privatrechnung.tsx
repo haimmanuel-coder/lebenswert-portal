@@ -202,7 +202,7 @@ export default function Privatrechnung() {
                     <div className="space-y-1 mt-2">
                       {(sonderfahrten as any[]).map((sf: any) => (
                         <div key={sf.id} className="flex justify-between items-center text-sm bg-orange-50 p-2 rounded">
-                          <span>{sf.datum} · {sf.kilometer} km · {sf.beschreibung ?? "–"}</span>
+                          <span>{new Date(sf.datum).toLocaleDateString("de-DE")} · {sf.kilometer} km · {sf.beschreibung ?? "–"}</span>
                           <Badge className="bg-orange-400">{(parseFloat(sf.kilometer) * 0.35).toFixed(2)} €</Badge>
                         </div>
                       ))}

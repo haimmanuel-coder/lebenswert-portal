@@ -312,7 +312,7 @@ export default function Einsaetze() {
       <BottomSheet open={abschlussOpen} onClose={() => setAbschlussOpen(false)} title="Einsatz abschließen">
         {activeEinsatz && (
           <div style={{ background: "#dbeafe", border: "1px solid #93c5fd", color: "#1e40af", padding: "11px 13px", borderRadius: 10, fontSize: 13, marginBottom: 14 }}>
-            Einsatz bei {activeEinsatz.name} am {activeEinsatz.datum}
+            Einsatz bei {activeEinsatz.name} am {new Date(activeEinsatz.datum).toLocaleDateString("de-DE")}
           </div>
         )}
         {activeEinsatz && (() => {

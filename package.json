@@ -16,6 +16,7 @@
     "test:onboarding-layout": "ONBOARDING_VIEWPORT=mobile tsx scripts/check-mobile-onboarding-layout.mjs && ONBOARDING_VIEWPORT=desktop tsx scripts/check-mobile-onboarding-layout.mjs",
     "test:password-visibility": "node scripts/check-password-visibility.mjs",
     "test:terminassistent": "tsx scripts/check-terminassistent.mjs",
+    "test:date-render": "node scripts/check-react-date-renders.mjs",
     "test:admin-smoke": "tsx scripts/admin-ui-smoke.mjs",
     "test:mitteilungen": "tsx scripts/check-mitteilungen-alias.mjs",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"

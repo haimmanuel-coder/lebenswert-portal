@@ -11,6 +11,12 @@ const PFLEGEGRAD_BUDGETS: Record<number, { b45b: number; b45a: number; b39: numb
   5: { b45b: 2200, b45a: 0, b39: 1612 },
 };
 
+function fmtD(value: Date | string | null | undefined) {
+  if (!value) return "–";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "–" : date.toLocaleDateString("de-DE");
+}
+
 function BudgetBalken({ label, budget, verbraucht, farbe }: { label: string; budget: number; verbraucht: number; farbe: string }) {
   const pct = budget > 0 ? Math.min((verbraucht / budget) * 100, 100) : 0;
   const rest = Math.max(budget - verbraucht, 0);
@@ -260,7 +266,7 @@ export default function BudgetDashboard() {
               </div>
               {(selected as any).vollmachtDatum && (
                 <div style={{ fontSize: 11, color: "#15803d", marginTop: 6 }}>
-                  Erteilt am: {(selected as any).vollmachtDatum}
+                  Erteilt am: {fmtD((selected as any).vollmachtDatum)}
                 </div>
               )}
             </div>

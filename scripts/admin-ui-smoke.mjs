@@ -10,7 +10,16 @@ let nextId = 1;
 function send(method, params = {}) {
   const id = nextId++;
   socket.send(JSON.stringify({ id, method, params }));
-  return new Promise((resolve, reject) => pending.set(id, { resolve, reject }));
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      pending.delete(id);
+      reject(new Error(`Browser-Antwort für ${method} blieb aus.`));
+    }, 15_000);
+    pending.set(id, {
+      resolve: (value) => { clearTimeout(timeout); resolve(value); },
+      reject: (error) => { clearTimeout(timeout); reject(error); },
+    });
+  });
 }
 
 await new Promise((resolve, reject) => {
@@ -69,6 +78,26 @@ for (const label of moduleLabels) {
   modules.push({ label, clicked: click.result.value, rendered: moduleState.result.value.text.includes(label), hasError: moduleState.result.value.hasError });
 }
 const modulesHealthy = modules.every((module) => module.clicked && !module.hasError);
-console.log(JSON.stringify({ adminShellVisible, horizontalOverflow: data.horizontalOverflow, modules, navigation: data.navigation }, null, 2));
+const safetyTabs = ["📊 Übersicht", "⚠️ Gefährdungsbeurteilung", "🦺 PSA-Ausgaben", "🏥 Arbeitsmed. Vorsorge", "📋 Unterweisungen", "📜 Nachweise", "👤 Alleinarbeit-Monitor"];
+const arbeitssicherheit = [];
+for (const label of safetyTabs) {
+  const click = await send("Runtime.evaluate", {
+    expression: `(() => {
+      const target = [...document.querySelectorAll('button')].find((el) => el.textContent?.trim().includes(${JSON.stringify(label)}));
+      if (!target) return false;
+      target.click();
+      return true;
+    })()`,
+    returnByValue: true,
+  });
+  await new Promise((resolve) => setTimeout(resolve, 350));
+  const state = await send("Runtime.evaluate", {
+    expression: `(() => ({ hasError: /ErrorBoundary|Something went wrong|TRPCClientError|Unexpected token|Objects are not valid as a React child/i.test(document.body.innerText) }))()`,
+    returnByValue: true,
+  });
+  arbeitssicherheit.push({ label, clicked: click.result.value, hasError: state.result.value.hasError });
+}
+const arbeitssicherheitHealthy = arbeitssicherheit.every((tab) => tab.clicked && !tab.hasError);
+console.log(JSON.stringify({ adminShellVisible, horizontalOverflow: data.horizontalOverflow, modules, arbeitssicherheit, navigation: data.navigation }, null, 2));
 socket.close();
-if (!adminShellVisible || data.horizontalOverflow || !modulesHealthy) process.exitCode = 1;
+if (!adminShellVisible || data.horizontalOverflow || !modulesHealthy || !arbeitssicherheitHealthy) process.exitCode = 1;
