@@ -15,6 +15,7 @@
     "test:mobile-onboarding": "tsx scripts/check-mobile-onboarding-layout.mjs",
     "test:onboarding-layout": "ONBOARDING_VIEWPORT=mobile tsx scripts/check-mobile-onboarding-layout.mjs && ONBOARDING_VIEWPORT=desktop tsx scripts/check-mobile-onboarding-layout.mjs",
     "test:password-visibility": "node scripts/check-password-visibility.mjs",
+    "test:production-card-login": "node scripts/check-production-card-login.mjs",
     "test:terminassistent": "tsx scripts/check-terminassistent.mjs",
     "test:date-render": "node scripts/check-react-date-renders.mjs",
     "test:dashboard-hooks": "node scripts/check-dashboard-hooks.mjs",

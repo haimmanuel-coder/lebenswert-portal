@@ -1,6 +1,9 @@
 # Lebenswert Betreuung – Mitarbeiter-Portal TODO
 
 ## Aktuelle Umsetzung – Unterweisung, Erste Hilfe und DSGVO-Startprozess
+- [x] Zugangskarte mit neuem Einmalpasswort für Daniela Bergmann erstellen und Portal-Login verifizieren
+- [x] Öffentlichen Portalaufruf so korrigieren, dass Mitarbeiter zuerst die eigene E-Mail-/Passwort-Anmeldung sehen und nicht zur externen OAuth-Anmeldung umgeleitet werden
+- [x] Öffentlichen Portal-Login mit einer neu ausgestellten Zugangskarte end-to-end gegen die Produktionsadresse prüfen
 - [x] Zugangskarten für Janine Bernhardt und Martina Ferretti erstellen sowie den Admin-Zugang mit neuem Einmalpasswort und Passwortwechselpflicht absichern
 - [x] Ungültigen React-Hook-Aufruf in einer tRPC-Integration finden, korrigieren und regressionstesten
 - [x] Weitere direkte Date-Ausgaben im Portal zentral absichern und den wiederkehrenden React-Fehler regressionstesten
@@ -21,7 +24,8 @@
 - [x] Einführungsdialog und Cookie-Hinweis im mobilen Remote-Viewport browsergestützt auf vollständige Bedienbarkeit prüfen
 - [x] Mobilen Login im Remote-nahen Viewport 828×1792 visuell verifizieren und den sichtbaren Befund dokumentieren
 - [x] Mobile Login-Ansicht für den Remote-Browser vollständig sichtbar und bedienbar machen
-- [ ] Startverhalten von „Übernehmen Sie die Kontrolle“ im externen Remote-Browser mit einem Portal-Kontext end-to-end verifizieren; das Öffnen eines neuen Tabs ist nicht durch den App-Code steuerbar
+- [x] Direkten Portalaufruf und überlauffreie Login-Oberfläche verifizieren sowie die externe Fernsteuerungsgrenze dokumentieren
+- [ ] End-to-End-Verifikation von „Übernehmen Sie die Kontrolle“ im tatsächlichen Remote-Browser-Kontext mit Ziel-URL und sichtbarer Login-Seite dokumentieren
 - [x] Statische funktionale, technische, Sicherheits- und UX-Prüfung des Admin-Panels mit priorisiertem Prüfbericht durchführen
 - [x] Bestätigte kritische Zugriffsschutzbefunde aus der Admin-Panel-Prüfung gezielt beheben und per Build/Test erneut verifizieren
 - [x] Alle regulär erreichbaren Admin- und Mitarbeiterseiten mit echtem Admin-Kontext auf Navigation, Rendering und Laufzeitfehler prüfen
