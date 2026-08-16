@@ -1,6 +1,7 @@
 # Lebenswert Betreuung – Mitarbeiter-Portal TODO
 
 ## Aktuelle Umsetzung – Unterweisung, Erste Hilfe und DSGVO-Startprozess
+- [x] Direkte Ausgabe von Date-Objekten in React-Komponenten finden, formatieren und regressionstesten
 - [x] Standarddauer neuer Termine auf 1,5 Stunden setzen und Mindestdauer in der Terminplanung sichern
 - [x] Dialog „Meine Termine planen“ mit vollständigem Planungsformular sichtbar und bedienbar machen
 - [x] Gemeinsame Passwort-Komponente mit Auge-Symbol für Erstlogin, Reset, SMTP, Integrationen, Mitarbeiteranlage und Schnittstellen ergänzen
