@@ -1,6 +1,8 @@
 # Lebenswert Betreuung – Mitarbeiter-Portal TODO
 
 ## Aktuelle Umsetzung – Unterweisung, Erste Hilfe und DSGVO-Startprozess
+- [x] Für alle Mitarbeiter mit offenem Erstlogin oder Passwortwechsel neue Einmalpasswörter ausstellen
+- [x] Aktualisierte Zugangskarten für alle betroffenen Mitarbeiter erstellen und Login technisch verifizieren
 - [x] Horizontalen Überlauf im mobilen Remote-Login zuverlässig beseitigen und die Eingabefelder ohne seitliches Scrollen sichtbar machen
 - [x] Mobilen Einführungsdialog vollständig sichtbar und oberhalb des Cookie-Hinweises bedienbar machen
 - [x] Einführungsdialog und Cookie-Hinweis im mobilen Remote-Viewport browsergestützt auf vollständige Bedienbarkeit prüfen
