@@ -988,28 +988,39 @@ function TerminAssistent({
 
   return (
     <div
+      className="lw-terminassistent-overlay"
+      data-testid="terminassistent-overlay"
       style={{
         position: "fixed",
         inset: 0,
         background: "rgba(0,0,0,0.45)",
-        zIndex: 300,
+        zIndex: 10100,
         display: "flex",
-        alignItems: "flex-end",
+        alignItems: "center",
         justifyContent: "center",
         backdropFilter: "blur(2px)",
+        padding: 16,
+        boxSizing: "border-box",
+        isolation: "isolate",
       }}
       onClick={onAbbrechen}
     >
       <div
+        className="lw-terminassistent-dialog"
+        data-testid="terminassistent-dialog"
         onClick={(e) => e.stopPropagation()}
         style={{
           background: "#fff",
           width: "100%",
           maxWidth: 720,
-          maxHeight: "94vh",
+          maxHeight: "calc(100dvh - 32px)",
           overflowY: "auto",
-          borderRadius: "18px 18px 0 0",
+          borderRadius: 18,
           padding: 20,
+          boxSizing: "border-box",
+          position: "relative",
+          zIndex: 1,
+          boxShadow: "0 24px 64px rgba(0,0,0,.28)",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>

@@ -1,6 +1,7 @@
 # Lebenswert Betreuung – Mitarbeiter-Portal TODO
 
 ## Aktuelle Umsetzung – Unterweisung, Erste Hilfe und DSGVO-Startprozess
+- [x] Dialog „Meine Termine planen“ mit vollständigem Planungsformular sichtbar und bedienbar machen
 - [x] Gemeinsame Passwort-Komponente mit Auge-Symbol für Erstlogin, Reset, SMTP, Integrationen, Mitarbeiteranlage und Schnittstellen ergänzen
 - [x] Verbleibende Passwortfelder in Login, Mein Profil und Admin-Passwort-Reset auf dieselbe Auge-UI vereinheitlichen
 - [x] Gezielten Regressionstest für Sichtbarkeitsschalter aller Passwortformulare ergänzen und ausführen

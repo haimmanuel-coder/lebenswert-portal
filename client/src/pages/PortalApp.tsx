@@ -617,7 +617,11 @@ export default function PortalApp() {
           )}
           <div style={{
             opacity: pageLoading ? 0.6 : 1,
-            transform: pageLoading ? "translateY(4px)" : "translateY(0)",
+            // Ein transformierter Vorfahr begrenzt position:fixed-Dialoge auf den
+            // scrollbaren Seiteninhalt. Bei ruhender Seite muss daher ausdrücklich
+            // "none" stehen, damit Planungs- und Bestätigungsdialoge den Viewport
+            // vollständig überdecken können.
+            transform: pageLoading ? "translateY(4px)" : "none",
             transition: "opacity 0.15s ease-out, transform 0.15s ease-out",
           }}>
             {renderPage()}
