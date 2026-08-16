@@ -9,7 +9,7 @@ const PRIO_STYLE: Record<string, { bg: string; border: string; color: string; ic
 };
 
 export default function MitteilungenWidget() {
-  const { data: mitteilungen = [], refetch } = (trpc as any).mitteilungen.list.useQuery();
+  const { data: mitteilungen = [], refetch } = (trpc as any).mitteilungen.liste.useQuery();
   const bestaetigen = (trpc as any).mitteilungen.bestaetigen.useMutation({
     onSuccess: () => { toast.success("✅ Lesebestätigung gespeichert"); refetch(); },
     onError: (e: any) => toast.error("❌ " + e.message),

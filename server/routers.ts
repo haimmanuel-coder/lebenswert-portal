@@ -1072,8 +1072,7 @@ const systemStatusRouter = router({
 
 
 // ── MITTEILUNGEN ROUTER ──────────────────────────────────────────
-const mitteilungenRouter = router({
-  liste: portalProtected.query(async ({ ctx }) => {
+const mitteilungenListeProcedure = portalProtected.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) return [];
     const rows = await db.select().from(mitteilungenTable)
@@ -1083,7 +1082,12 @@ const mitteilungenRouter = router({
       .where(eq(lesebestaetigungTable.mitarbeiterId, ctx.mitarbeiterId));
     const gelesenIds = new Set(bestaetigungen.map(b => b.mitteilungId));
     return rows.map(m => ({ ...m, gelesen: gelesenIds.has(m.id) }));
-  }),
+  });
+
+const mitteilungenRouter = router({
+  liste: mitteilungenListeProcedure,
+  // Kompatibilität für ältere Browser-Bundles und vorhandene Aufrufe.
+  list: mitteilungenListeProcedure,
   ungelesen: portalProtected.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) return { count: 0 };

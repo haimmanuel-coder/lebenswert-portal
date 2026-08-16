@@ -1,6 +1,9 @@
 # Lebenswert Betreuung – Mitarbeiter-Portal TODO
 
 ## Aktuelle Umsetzung – Unterweisung, Erste Hilfe und DSGVO-Startprozess
+- [x] Mitteilungs-Widget auf den vorhandenen tRPC-Endpunkt mitteilungen.liste umstellen und im Admin-Smoke-Test prüfen
+- [x] Kompatiblen tRPC-Alias mitteilungen.list ergänzen und beide Listenendpunkte regressionstesten
+- [x] Mitteilungen-Lesebestätigung über mitteilungen.bestaetigen gegen echte Portal-Authentifizierung regressionstesten
 - [x] Für alle Mitarbeiter mit offenem Erstlogin oder Passwortwechsel neue Einmalpasswörter ausstellen
 - [x] Aktualisierte Zugangskarten für alle betroffenen Mitarbeiter erstellen und Login technisch verifizieren
 - [x] Horizontalen Überlauf im mobilen Remote-Login zuverlässig beseitigen und die Eingabefelder ohne seitliches Scrollen sichtbar machen
