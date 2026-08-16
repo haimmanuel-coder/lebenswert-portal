@@ -291,12 +291,12 @@ describe("Validierung der Planungseingabe", () => {
     expect(hatBlockierendeMeldung(meldungen)).toBe(true);
   });
 
-  it("warnt bei Unterschreitung der Mindestbetreuungszeit", () => {
+  it("blockiert bei Unterschreitung der Mindestbetreuungszeit", () => {
     const meldungen = validierePlanungsEingabe({ ...gueltig, endzeit: "10:00" });
     const meldung = meldungen.find((m) => m.code === "mindestdauer_unterschritten");
     expect(meldung).toBeDefined();
-    // Eine Unterschreitung blockiert nicht, wird aber gemeldet und eskaliert.
-    expect(meldung?.schwere).toBe("warnung");
+    expect(meldung?.schwere).toBe("blockierend");
+    expect(hatBlockierendeMeldung(meldungen)).toBe(true);
   });
 
   it("meldet Einsätze außerhalb der Arbeitszeit", () => {

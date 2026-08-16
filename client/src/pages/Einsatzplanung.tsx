@@ -68,7 +68,7 @@ const LEERES_FORMULAR = {
   kundenId: null as number | null,
   datum: "",
   startzeit: "09:00",
-  endzeit: "11:30",
+  endzeit: "10:30",
   paragraph: "45b" as Paragraph,
   paragraph2: null as Paragraph | null,
   stunden2: 0,
@@ -382,7 +382,7 @@ export default function Einsatzplanung() {
               cursor: "pointer",
             }}
           >
-            + Meinen Termin planen
+            + Meinen Termin planen (1,5 Std.)
           </button>
         )}
       </div>

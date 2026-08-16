@@ -600,10 +600,10 @@ export function validierePlanungsEingabe(eingabe: PlanungsEingabe): PlanungsMeld
     } else if (stunden < MINDEST_DAUER_STUNDEN) {
       meldungen.push({
         code: "mindestdauer_unterschritten",
-        schwere: "warnung",
+        schwere: "blockierend",
         text:
           `Mindestbetreuungszeit unterschritten: ${formatStunden(stunden)} statt ` +
-          `${formatStunden(MINDEST_DAUER_STUNDEN)}. Wiederholte Unterschreitungen werden dem Admin gemeldet.`,
+          `${formatStunden(MINDEST_DAUER_STUNDEN)}. Bitte die Endzeit entsprechend anpassen.`,
         feld: "endzeit",
       });
     }
