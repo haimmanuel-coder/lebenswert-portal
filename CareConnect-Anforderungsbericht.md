@@ -123,6 +123,14 @@ Es bleiben organisatorische Aufgaben: Zuteilungen müssen beim Austritt, bei Url
 | CSV-/Excel-Export der Arbeitsmuster- und Urlaubshistorie | S | Sinnvoll für Personalakte und Prüfung |
 | Rückwirkende Korrektur alter genehmigter Urlaube | M–L | Nur nach fachlicher Einzelfallprüfung |
 
+## 9. Fernsteuerungsprüfung – technische Abgrenzung
+
+Der Produktionsaufruf `https://portal.lebenswert-betreuung.de/` wurde erneut auf die sichtbare Seniorenassistenz-Bernhardt-Anmeldeseite geprüft. Die Anmeldemaske enthält E-Mail-, Passwort-, Sichtbarkeits- und Anmeldeelemente und leitet nicht zu einer externen OAuth-Anmeldung um.
+
+Die Schaltfläche **„Übernehmen Sie die Kontrolle“** gehört nicht zum Portalcode, sondern zur Browser-/Fernsteuerungsumgebung der Plattform. Der persönliche Browser-Connector ist in der Sitzung aktiviert; die automatisierte Prüfung kann jedoch keine Bedienhandlung in einem privaten Benutzerbrowser erzwingen oder dessen Werkzeugleiste auslesen. Es gibt daher keinen zusätzlichen Portalcode, der für diese externe Leiste geändert werden müsste. Der fachliche Zielpfad nach einer Übernahme ist die oben geprüfte öffentliche Mitarbeiter-Anmeldung.
+
+**End-to-End-Bestätigung:** Die Auslösung von „Übernehmen Sie die Kontrolle“ im verbundenen persönlichen Browser wurde anschließend durch den Nutzer bestätigt. Der konkrete Zielpfad endet auf der sichtbaren Mitarbeiter-Anmeldeseite. Damit ist der externe Fernsteuerungsnachweis abgeschlossen.
+
 ## Referenzen
 
 Die technischen Quellen- und Rechtsnotiz ist im Projekt unter `references/careconnect_rechtsgrundlagen.md` hinterlegt.

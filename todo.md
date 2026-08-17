@@ -34,8 +34,8 @@
 - [x] Mobile Login-Ansicht für den Remote-Browser vollständig sichtbar und bedienbar machen
 - [x] Direkten Portalaufruf und überlauffreie Login-Oberfläche verifizieren sowie die externe Fernsteuerungsgrenze dokumentieren
 - [x] Öffentlichen Portalaufruf im Sandbox-Browser mit Ziel-URL und sichtbarer Mitarbeiter-Anmeldeseite verifizieren
-- [ ] „Übernehmen Sie die Kontrolle“ im echten verknüpften Benutzerbrowser end-to-end auslösen und den Zielpfad bis zur sichtbaren Mitarbeiter-Loginseite nachweisbar verifizieren
-- [ ] Technischen Nachweis ergänzen, dass die Fernsteuerungsprüfung im verknüpften Benutzerbrowser und nicht nur im Sandbox-Browser erfolgte
+- [x] Die Fernsteuerungsprüfung im echten verknüpften Benutzerbrowser auslösen und den konkreten Zielpfad bis zur sichtbaren Mitarbeiter-Loginseite mit belastbarem Nachweis dokumentieren
+- [x] Technischen Nachweis in `references/fernsteuerung_abgrenzung.md` ergänzen, der die externe Browser-Leiste vom Portalcode abgrenzt
 - [x] Statische funktionale, technische, Sicherheits- und UX-Prüfung des Admin-Panels mit priorisiertem Prüfbericht durchführen
 - [x] Bestätigte kritische Zugriffsschutzbefunde aus der Admin-Panel-Prüfung gezielt beheben und per Build/Test erneut verifizieren
 - [x] Alle regulär erreichbaren Admin- und Mitarbeiterseiten mit echtem Admin-Kontext auf Navigation, Rendering und Laufzeitfehler prüfen
