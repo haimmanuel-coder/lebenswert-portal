@@ -30,6 +30,14 @@ const BESCHAEFT_CONFIG: Record<Beschaeftigungsart, { label: string; color: strin
   teilzeit: { label: "Teilzeit", color: "bg-blue-100 text-blue-800 border-blue-200" },
   vollzeit: { label: "Vollzeit", color: "bg-green-100 text-green-800 border-green-200" },
 };
+const ARBEITSTAGE_KUERZ = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+const liesArbeitstage = (wert: unknown): string[] => {
+  if (Array.isArray(wert)) return wert.filter((tag) => ARBEITSTAGE_KUERZ.includes(String(tag)));
+  if (typeof wert === "string") {
+    try { return liesArbeitstage(JSON.parse(wert)); } catch { return []; }
+  }
+  return [];
+};
 const DOK_TYP_LABEL: Record<DokTyp, string> = {
   zertifikat:    "Zertifikat",
   arbeitsvertrag:"Arbeitsvertrag",
@@ -177,6 +185,10 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
   const { data: urlaubsKonto } = (trpc as any).urlaubAdmin.urlaubsKonto.useQuery(
     { mitarbeiterId },
     { enabled: activeTab === "urlaubkrank" }
+  );
+  const { data: urlaubVorschau } = (trpc as any).urlaubAdmin.vorschau.useQuery(
+    { mitarbeiterId, von: urlaubForm.von, bis: urlaubForm.bis },
+    { enabled: activeTab === "urlaubkrank" && showUrlaubForm && Boolean(urlaubForm.von && urlaubForm.bis) }
   );
   const { data: krankListe = [] } = (trpc as any).krankAdmin.listByMitarbeiter.useQuery(
     { mitarbeiterId },
@@ -526,6 +538,7 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
                     probeEnde: (ma as any).probeEnde ? String((ma as any).probeEnde).split("T")[0] : "",
                     kuendigungsfrist: String((ma as any).kuendigungsfrist ?? ""),
                     arbeitszeitmodell: (ma as any).arbeitszeitmodell ?? "",
+                    arbeitstageWoche: JSON.stringify(liesArbeitstage((ma as any).arbeitstageWoche).length ? liesArbeitstage((ma as any).arbeitstageWoche) : ["Mo", "Di", "Mi", "Do", "Fr"]),
                     sozialversicherungsnummer: (ma as any).sozialversicherungsnummer ?? "",
                     steuerklasse: String((ma as any).steuerklasse ?? ""),
                     steueridentnummer: (ma as any).steueridentnummer ?? "",
@@ -545,7 +558,7 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
               )}
               {editStamm && (
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={() => updateStamm.mutate({ id: mitarbeiterId, ...stammForm } as any)} disabled={updateStamm.isPending}>
+                  <Button size="sm" onClick={() => updateStamm.mutate({ id: mitarbeiterId, ...stammForm, arbeitstageWoche: liesArbeitstage(stammForm.arbeitstageWoche) } as any)} disabled={updateStamm.isPending}>
                     <Save className="w-4 h-4 mr-1" /> Speichern
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => setEditStamm(false)}>
@@ -653,6 +666,20 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
                         <option value="schicht">Schichtdienst</option>
                       </select></div>
                   </div>
+                  <div><label className="text-xs text-muted-foreground">Planmäßige Arbeitstage</label>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {ARBEITSTAGE_KUERZ.map((tag) => {
+                        const aktiv = liesArbeitstage(stammForm.arbeitstageWoche).includes(tag);
+                        return <button key={tag} type="button" onClick={() => setStammForm((form) => {
+                          const aktuell = liesArbeitstage(form.arbeitstageWoche);
+                          const naechste = aktiv ? aktuell.filter((wert) => wert !== tag) : [...aktuell, tag];
+                          if (naechste.length === 0) { toast.error("Mindestens ein Arbeitstag muss hinterlegt sein."); return form; }
+                          return { ...form, arbeitstageWoche: JSON.stringify(naechste) };
+                        })} className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${aktiv ? "bg-primary text-white border-primary" : "bg-white text-muted-foreground border-border"}`}>{tag}</button>;
+                      })}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">Gesetzlicher Richtwert: {liesArbeitstage(stammForm.arbeitstageWoche).length * 4} Urlaubstage pro Jahr. Höhere Vertragswerte werden im Urlaubskonto separat gepflegt.</p>
+                  </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div><label className="text-xs text-muted-foreground">Probezeit (Monate)</label>
                       <Input type="number" value={stammForm.probezeit ?? ""} onChange={e => setStammForm(f => ({ ...f, probezeit: e.target.value }))} className="mt-1" placeholder="z.B. 6" /></div>
@@ -673,6 +700,7 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
                   {ma.geburtsdatum && <div className="flex items-center gap-2 text-sm"><Calendar className="w-4 h-4 text-primary" />
                     <span>Geb.: {new Date(ma.geburtsdatum).toLocaleDateString("de-DE")}</span></div>}
                   {(ma as any).wochenstunden && <div className="flex items-center gap-2 text-sm"><span className="text-muted-foreground">⏱</span><span>{(ma as any).wochenstunden} Std./Woche · {(ma as any).arbeitszeitmodell ?? "—"}</span></div>}
+                  <div className="flex items-center gap-2 text-sm"><span className="text-muted-foreground">📆</span><span>Arbeitstage: {(liesArbeitstage((ma as any).arbeitstageWoche).length ? liesArbeitstage((ma as any).arbeitstageWoche) : ["Mo", "Di", "Mi", "Do", "Fr"]).join(", ")}</span></div>
                   {(ma as any).probeEnde && <div className="flex items-center gap-2 text-sm"><span className="text-muted-foreground">📋</span><span>Probezeit bis: {new Date((ma as any).probeEnde).toLocaleDateString("de-DE")}</span></div>}
                   {(ma as any).kuendigungsfrist && <div className="flex items-center gap-2 text-sm"><span className="text-muted-foreground">📄</span><span>Kündigungsfrist: {(ma as any).kuendigungsfrist} Tage</span></div>}
                   {ma.notizen && <div className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-2 mt-2">{ma.notizen}</div>}
@@ -1322,8 +1350,11 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
                     <div><label className="text-xs text-muted-foreground">Bis *</label>
                       <Input type="date" value={urlaubForm.bis} onChange={e => setUrlaubForm(f => ({ ...f, bis: e.target.value }))} className="mt-1" /></div>
                   </div>
-                  <div><label className="text-xs text-muted-foreground">Anzahl Tage</label>
-                    <Input type="number" min={1} value={urlaubForm.tage} onChange={e => setUrlaubForm(f => ({ ...f, tage: Number(e.target.value) }))} className="mt-1" /></div>
+                  <div className="rounded-lg border border-blue-200 bg-white px-3 py-2">
+                    <p className="text-xs text-muted-foreground">Automatisch berechnete Urlaubstage</p>
+                    <p className="text-lg font-bold text-blue-800">{urlaubVorschau?.tage ?? 0} planmäßige Arbeitstage</p>
+                    {urlaubVorschau?.ausgenommeneFeiertage?.length ? <p className="text-xs text-blue-700 mt-1">Gesetzliche Feiertage im Zeitraum werden nicht als Urlaubstag gezählt.</p> : null}
+                  </div>
                   <div><label className="text-xs text-muted-foreground">Status</label>
                     <select value={urlaubForm.status} onChange={e => setUrlaubForm(f => ({ ...f, status: e.target.value as any }))}
                       className="w-full mt-1 px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary">
@@ -1347,7 +1378,7 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button size="sm" onClick={() => urlaubCreate.mutate({ mitarbeiterId, ...urlaubForm })} disabled={!urlaubForm.von || !urlaubForm.bis || urlaubCreate.isPending}>
+                    <Button size="sm" onClick={() => urlaubCreate.mutate({ mitarbeiterId, ...urlaubForm, tage: undefined })} disabled={!urlaubForm.von || !urlaubForm.bis || !urlaubVorschau?.tage || urlaubCreate.isPending}>
                       <Save className="w-4 h-4 mr-1" /> Speichern
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => setShowUrlaubForm(false)}>Abbrechen</Button>

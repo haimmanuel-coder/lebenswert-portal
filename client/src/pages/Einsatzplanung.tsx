@@ -753,6 +753,9 @@ export default function Einsatzplanung() {
                         <span style={etikettStil("#fef3c7", "#92400e")}>
                           {formatEuro(termin.lohnkosten)}
                         </span>
+                        {termin.wochenendeinsatz && (
+                          <span style={etikettStil("#fff7ed", "#9a3412")}>Wochenendeinsatz</span>
+                        )}
                       </div>
                       {darfLoeschen && (
                         <div style={{ display: "flex", gap: 6, marginTop: 6 }}>

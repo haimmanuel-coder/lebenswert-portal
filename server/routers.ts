@@ -27,7 +27,8 @@ import { pruefeLeistungsnachweisAbschluss } from "./monatsabschlussService";
 import { generiereEinmaligesStartpasswort, waehleDruckbareMitarbeiter } from "./accessCredentials";
 import { pruefeSicheresPasswort, SICHERES_PASSWORT_HINWEIS, startPasswortLaeuftAb } from "../shared/passwordPolicy";
 import { istAbgeschlossenerStartzugang } from "../shared/erstlogin";
-import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, einsatzAenderungen, kunden as kundenTable, notifications as notificationsTable, ersteHilfeKurse, mitarbeiterBerechtigungen as mbTable, besuchsberichte, fahrten } from "../drizzle/schema";
+import { berechneUrlaubsverbrauch, berechneZeitanteiligenJahresurlaub, normalisiereArbeitstage, type Wochentag } from "../shared/urlaubsLogik";
+import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, mitarbeiterArbeitsmuster, urlaubsantraege, einsatzAenderungen, kunden as kundenTable, notifications as notificationsTable, ersteHilfeKurse, mitarbeiterBerechtigungen as mbTable, besuchsberichte, fahrten } from "../drizzle/schema";
 import {
   getMitarbeiterByEmail,
   getMitarbeiterById,
@@ -178,21 +179,53 @@ import {
   getBudgetHistorie,
 } from "./db";
 
+async function ladeArbeitsmusterHistorie(mitarbeiterId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(mitarbeiterArbeitsmuster)
+    .where(eq(mitarbeiterArbeitsmuster.mitarbeiterId, mitarbeiterId))
+    .orderBy(desc(mitarbeiterArbeitsmuster.gueltigAb));
+}
+
 export const urlaubRouter = router({
   list: portalProtected.query(async ({ ctx }) => {
     const ma = await getMitarbeiterById(ctx.mitarbeiterId);
     if (ma?.rolle === 'admin') return getAllUrlaubsantraege();
     return getUrlaubsantraegeByMitarbeiter(ctx.mitarbeiterId);
   }),
+  vorschau: portalProtected
+    .input(z.object({ von: z.string(), bis: z.string() }))
+    .query(async ({ input, ctx }) => {
+      const ma = await getMitarbeiterById(ctx.mitarbeiterId);
+      if (!ma) throw new TRPCError({ code: "NOT_FOUND", message: "Mitarbeiterkonto nicht gefunden." });
+      const arbeitsmusterHistorie = await ladeArbeitsmusterHistorie(ctx.mitarbeiterId);
+      return berechneUrlaubsverbrauch({
+        von: input.von,
+        bis: input.bis,
+        arbeitstageWoche: (ma as any).arbeitstageWoche,
+        arbeitsmusterHistorie,
+      });
+    }),
   create: portalProtected
     .input(z.object({
       von: z.string(),
       bis: z.string(),
-      tage: z.number().int().min(1),
       notizen: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      await createUrlaubsantrag({ mitarbeiterId: ctx.mitarbeiterId, von: new Date(input.von), bis: new Date(input.bis), tage: input.tage, notizen: input.notizen, status: 'beantragt' });
+      const ma = await getMitarbeiterById(ctx.mitarbeiterId);
+      if (!ma) throw new TRPCError({ code: "NOT_FOUND", message: "Mitarbeiterkonto nicht gefunden." });
+      const arbeitsmusterHistorie = await ladeArbeitsmusterHistorie(ctx.mitarbeiterId);
+      const verbrauch = berechneUrlaubsverbrauch({
+        von: input.von,
+        bis: input.bis,
+        arbeitstageWoche: (ma as any).arbeitstageWoche,
+        arbeitsmusterHistorie,
+      });
+      if (verbrauch.tage < 1) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Im gewählten Zeitraum liegt kein planmäßiger Arbeitstag ohne Feiertag." });
+      }
+      await createUrlaubsantrag({ mitarbeiterId: ctx.mitarbeiterId, von: new Date(input.von), bis: new Date(input.bis), tage: verbrauch.tage, notizen: input.notizen, status: 'beantragt' });
       // Benachrichtigung an Admin
       const allMa = await getAllMitarbeiter();
       const admins = allMa.filter((m: { rolle: string }) => m.rolle === 'admin');
@@ -201,12 +234,12 @@ export const urlaubRouter = router({
         await createNotification({
           empfaengerId: admin.id,
           titel: 'Urlaubsantrag eingegangen',
-          nachricht: `${antragsteller?.vorname} ${antragsteller?.nachname} hat Urlaub vom ${input.von} bis ${input.bis} (${input.tage} Tage) beantragt.`,
+          nachricht: `${antragsteller?.vorname} ${antragsteller?.nachname} hat Urlaub vom ${input.von} bis ${input.bis} (${verbrauch.tage} Arbeitstage) beantragt.`,
           typ: 'info',
         });
       }
-      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'CREATE', ressource: 'urlaub', status: 'success' });
-      return { success: true };
+      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: 'CREATE', ressource: 'urlaub', details: `von=${input.von} bis=${input.bis} tage=${verbrauch.tage}`, status: 'success' });
+      return { success: true, verbrauch };
     }),
   updateStatus: adminProcedure
     .input(z.object({
@@ -215,6 +248,21 @@ export const urlaubRouter = router({
       adminNotiz: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      const [antrag] = db ? await db.select().from(urlaubsantraege).where(eq(urlaubsantraege.id, input.id)).limit(1) : [];
+      if (!antrag) throw new TRPCError({ code: "NOT_FOUND", message: "Urlaubsantrag nicht gefunden." });
+      const antragMa = await getMitarbeiterById(antrag.mitarbeiterId);
+      if (input.status === "genehmigt" && antragMa) {
+        const arbeitsmusterHistorie = await ladeArbeitsmusterHistorie(antrag.mitarbeiterId);
+        const verbrauch = berechneUrlaubsverbrauch({
+          von: String(antrag.von),
+          bis: String(antrag.bis),
+          arbeitstageWoche: (antragMa as any).arbeitstageWoche,
+          arbeitsmusterHistorie,
+        });
+        if (verbrauch.tage < 1) throw new TRPCError({ code: "BAD_REQUEST", message: "Der Antrag enthält keine planmäßigen Arbeitstage." });
+        await db!.update(urlaubsantraege).set({ tage: verbrauch.tage }).where(eq(urlaubsantraege.id, input.id));
+      }
       await updateUrlaubsantragStatus(input.id, input.status, input.adminNotiz);
       await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'UPDATE', ressource: 'urlaub', details: `id=${input.id} status=${input.status}`, status: 'success' });
 
@@ -1103,6 +1151,10 @@ const mitteilungenRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [mitteilung] = await db.select().from(mitteilungenTable)
+        .where(and(eq(mitteilungenTable.id, input.mitteilungId), eq(mitteilungenTable.aktiv, true)))
+        .limit(1);
+      if (!mitteilung) throw new TRPCError({ code: "NOT_FOUND", message: "Mitteilung ist nicht mehr aktiv." });
       await db.insert(lesebestaetigungTable).ignore().values({
         mitteilungId: input.mitteilungId,
         mitarbeiterId: ctx.mitarbeiterId,
@@ -1112,7 +1164,17 @@ const mitteilungenRouter = router({
   adminListe: adminProcedure.query(async () => {
     const db = await getDb();
     if (!db) return [];
-    return db.select().from(mitteilungenTable).orderBy(desc(mitteilungenTable.createdAt));
+    const [eintraege, alleMitarbeiter, bestaetigungen] = await Promise.all([
+      db.select().from(mitteilungenTable).orderBy(desc(mitteilungenTable.createdAt)),
+      getAllMitarbeiter(),
+      db.select().from(lesebestaetigungTable),
+    ]);
+    const gesamtMitarbeiter = (alleMitarbeiter as any[]).filter((ma: any) => ma.aktiv !== false && ma.aktiv !== 0).length;
+    return eintraege.map((mitteilung) => ({
+      ...mitteilung,
+      anzahlBestaetigt: bestaetigungen.filter((b) => b.mitteilungId === mitteilung.id).length,
+      gesamtMitarbeiter,
+    }));
   }),
   erstellen: adminProcedure
     .input(z.object({
@@ -1402,16 +1464,17 @@ export const appRouter = router({
 
   // ── KUNDEN ───────────────────────────────────────────
   kunden: router({
-    // Entscheidung 4: Rollenabhängig gestaffelter Zugriff.
-    // Mitarbeiter: strikt nur die eigenen zugewiesenen Kunden (kundenZuordnung).
-    // Teamleitung/Buchhaltung/Admin: vollständige Kundenübersicht (Buchhaltung
-    // erhält dieselben Stammdaten, da diese abrechnungsrelevant sind – die
-    // Einschränkung für Buchhaltung greift bei Pflegedokumentation/Gesundheits-
-    // daten in den Einsätzen, siehe einsaetze.list/listWithKunden unten).
+    // Rollenabhängig gestaffelter Zugriff. Mitarbeiter sehen ausschließlich
+    // zugewiesene Kunden. Pflegegrad bleibt in der Planungsansicht auf Admins
+    // und tatsächlich zugeordnete Betreuungskräfte beschränkt.
     list: portalProtected.query(async ({ ctx }) => {
       const ma = await getMitarbeiterById(ctx.mitarbeiterId);
       if (ma?.rolle === "mitarbeiter") return getKundenByMitarbeiter(ctx.mitarbeiterId);
-      return getAllKunden();
+      const alle = await getAllKunden();
+      if (ma?.rolle === "admin") return alle;
+      // Teamleitung und Buchhaltung können Kunden für Disposition bzw.
+      // Abrechnung identifizieren, erhalten jedoch keine Gesundheitsangabe.
+      return alle.map((kunde: any) => ({ ...kunde, pflegegrad: null, pflegegradSeit: null }));
     }),
 
     detail: portalProtected
@@ -2572,6 +2635,7 @@ export const appRouter = router({
         telefon: z.string().optional(),
         beschaeftigungsart: z.enum(["minijob", "teilzeit", "vollzeit"]).default("minijob"),
         urlaubstageJahr: z.number().int().min(0).max(365).optional(),
+        arbeitstageWoche: z.array(z.enum(["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"])).min(1).max(7).optional(),
         wochenstunden: z.number().min(0).max(168).optional(),
         monatslohn: z.number().min(0).optional(),
         stundenlohn: z.number().min(0).optional(),
@@ -2583,8 +2647,9 @@ export const appRouter = router({
           throw new TRPCError({ code: 'CONFLICT', message: `Die E-Mail-Adresse ist bereits vergeben (Mitarbeiter: ${vorhandener.vorname} ${vorhandener.nachname}).` });
         }
         const hash = await bcrypt.hash(input.passwort, 10);
-        const { wochenstunden, monatslohn, stundenlohn, ...restInput } = input;
-        await createMitarbeiter({
+        const { wochenstunden, monatslohn, stundenlohn, arbeitstageWoche, ...restInput } = input;
+        const muster = normalisiereArbeitstage(arbeitstageWoche);
+        const neueMitarbeiterId = await createMitarbeiter({
           ...restInput,
           passwortHash: hash,
           passwortWechselErforderlich: true,
@@ -2593,10 +2658,20 @@ export const appRouter = router({
           // Urlaubskonto automatisch initialisieren
           urlaubstageJahr: restInput.urlaubstageJahr ?? 24,
           urlaubstageVerbraucht: 0,
+          arbeitstageWoche: JSON.stringify(muster),
           ...(wochenstunden !== undefined ? { wochenstunden: String(wochenstunden) } : {}),
           ...(monatslohn !== undefined ? { monatslohn: String(monatslohn) } : {}),
           ...(stundenlohn !== undefined ? { stundenlohn: String(stundenlohn) } : {}),
         } as any);
+        if (neueMitarbeiterId) {
+          const db = await getDb();
+          await db?.insert(mitarbeiterArbeitsmuster).values({
+            mitarbeiterId: neueMitarbeiterId,
+            arbeitstageWoche: JSON.stringify(muster),
+            gueltigAb: new Date(),
+            geaendertVon: ctx.adminId,
+          });
+        }
         await createAuditLog({ mitarbeiterId: ctx.adminId, action: "ADMIN", ressource: "mitarbeiter", details: `create ${input.email} urlaubstage=${restInput.urlaubstageJahr ?? 24}`, status: "success" });
         // Onboarding-Checkliste automatisch erstellen
         try {
@@ -2673,17 +2748,34 @@ export const appRouter = router({
         neuesPasswort: z.string().min(6).optional(),
         beschaeftigungsart: z.enum(["minijob", "teilzeit", "vollzeit"]).optional(),
         urlaubstageJahr: z.number().int().min(0).max(365).optional(),
+        arbeitstageWoche: z.array(z.enum(["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"])).min(1).max(7).optional(),
+        arbeitsmusterGueltigAb: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
         wochenstunden: z.number().min(0).max(168).optional(),
         monatslohn: z.number().min(0).optional(),
         stundenlohn: z.number().min(0).optional(),
       }))
       .mutation(async ({ input, ctx }) => {
-        const { id, neuesPasswort, ...data } = input;
+        const { id, neuesPasswort, arbeitstageWoche, arbeitsmusterGueltigAb, ...data } = input;
         const updateData: Record<string, unknown> = { ...data };
         if (neuesPasswort) {
           updateData.passwortHash = await bcrypt.hash(neuesPasswort, 10);
           updateData.passwortWechselErforderlich = true;
           updateData.startPasswortErstelltAt = new Date();
+        }
+        if (arbeitstageWoche) {
+          const muster = normalisiereArbeitstage(arbeitstageWoche);
+          const gueltigAb = arbeitsmusterGueltigAb ?? new Date().toISOString().slice(0, 10);
+          updateData.arbeitstageWoche = JSON.stringify(muster);
+          const db = await getDb();
+          if (db) {
+            await db.execute(sql`UPDATE mitarbeiterArbeitsmuster SET gueltigBis = DATE_SUB(${gueltigAb}, INTERVAL 1 DAY) WHERE mitarbeiterId = ${id} AND gueltigBis IS NULL`);
+            await db.insert(mitarbeiterArbeitsmuster).values({
+              mitarbeiterId: id,
+              arbeitstageWoche: JSON.stringify(muster),
+              gueltigAb: new Date(`${gueltigAb}T12:00:00`),
+              geaendertVon: ctx.adminId,
+            });
+          }
         }
         await updateMitarbeiter(id, updateData as any);
         await createAuditLog({ mitarbeiterId: ctx.adminId, action: "ADMIN", ressource: "mitarbeiter", details: `update id=${id}`, status: "success" });
@@ -2989,6 +3081,8 @@ export const appRouter = router({
         notizen: z.string().optional(),
         urlaubstageJahr: z.number().int().min(0).max(365).optional(),
         urlaubstageVerbraucht: z.number().int().min(0).optional(),
+        arbeitstageWoche: z.array(z.enum(["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"])).min(1).max(7).optional(),
+        arbeitsmusterGueltigAb: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
         wochenstunden: z.number().min(0).max(168).optional(),
         monatslohn: z.number().min(0).optional(),
         stundenlohn: z.number().min(0).optional(),
@@ -3011,9 +3105,24 @@ export const appRouter = router({
         neuesPasswort: z.string().min(6).optional(),
       }))
       .mutation(async ({ input, ctx }) => {
-        const { id, neuesPasswort, ...data } = input;
+        const { id, neuesPasswort, arbeitstageWoche, arbeitsmusterGueltigAb, ...data } = input;
         const updateData: Record<string, unknown> = { ...data };
         if (neuesPasswort) updateData.passwortHash = await bcrypt.hash(neuesPasswort, 10);
+        if (arbeitstageWoche) {
+          const muster = normalisiereArbeitstage(arbeitstageWoche);
+          const gueltigAb = arbeitsmusterGueltigAb ?? new Date().toISOString().slice(0, 10);
+          updateData.arbeitstageWoche = JSON.stringify(muster);
+          const db = await getDb();
+          if (db) {
+            await db.execute(sql`UPDATE mitarbeiterArbeitsmuster SET gueltigBis = DATE_SUB(${gueltigAb}, INTERVAL 1 DAY) WHERE mitarbeiterId = ${id} AND gueltigBis IS NULL`);
+            await db.insert(mitarbeiterArbeitsmuster).values({
+              mitarbeiterId: id,
+              arbeitstageWoche: JSON.stringify(muster),
+              gueltigAb: new Date(`${gueltigAb}T12:00:00`),
+              geaendertVon: ctx.adminId,
+            });
+          }
+        }
         await updateMitarbeiter(id, updateData as any);
         await createAuditLog({ mitarbeiterId: ctx.adminId, action: "ADMIN", ressource: "mitarbeiter", details: `stammdaten update id=${id}`, status: "success" });
         return { success: true };
@@ -3711,6 +3820,14 @@ export const appRouter = router({
           .where(eq(urlaubsantraege.mitarbeiterId, input.mitarbeiterId))
           .orderBy(desc(urlaubsantraege.createdAt));
       }),
+    vorschau: adminProcedure
+      .input(z.object({ mitarbeiterId: z.number().int().positive(), von: z.string(), bis: z.string() }))
+      .query(async ({ input }) => {
+        const ma = await getMitarbeiterById(input.mitarbeiterId);
+        if (!ma) throw new TRPCError({ code: "NOT_FOUND", message: "Mitarbeiterkonto nicht gefunden." });
+        const arbeitsmusterHistorie = await ladeArbeitsmusterHistorie(input.mitarbeiterId);
+        return berechneUrlaubsverbrauch({ von: input.von, bis: input.bis, arbeitstageWoche: (ma as any).arbeitstageWoche, arbeitsmusterHistorie });
+      }),
     /** Resturlaub-Berechnung für einen Mitarbeiter (aktuelles Jahr) */
     urlaubsKonto: adminProcedure
       .input(z.object({ mitarbeiterId: z.number().int().positive(), jahr: z.number().int().optional() }))
@@ -3718,15 +3835,23 @@ export const appRouter = router({
         const db = await getDb();
         if (!db) return { urlaubstageJahr: 24, genommen: 0, rest: 24 };
         const ma = await getMitarbeiterById(input.mitarbeiterId);
-        const urlaubstageJahr = (ma as any)?.urlaubstageJahr ?? 24;
+        const vertraglicherAnspruch = (ma as any)?.urlaubstageJahr ?? 24;
         const { urlaubsantraege } = await import('../drizzle/schema.js');
         const jahr = input.jahr ?? new Date().getFullYear();
+        const arbeitsmusterHistorie = await ladeArbeitsmusterHistorie(input.mitarbeiterId);
+        const gesetzlicherMindestanspruch = ma ? berechneZeitanteiligenJahresurlaub({
+          jahr,
+          arbeitstageWoche: (ma as any).arbeitstageWoche,
+          eintrittsdatum: (ma as any).eintrittsdatum,
+          arbeitsmusterHistorie,
+        }) : 0;
+        const urlaubstageJahr = Math.max(vertraglicherAnspruch, gesetzlicherMindestanspruch);
         const alle = await db.select().from(urlaubsantraege)
           .where(and(eq(urlaubsantraege.mitarbeiterId, input.mitarbeiterId), eq(urlaubsantraege.status, 'genehmigt')));
         const genommen = alle
           .filter((a: any) => { const y = new Date(a.von).getFullYear(); return y === jahr; })
           .reduce((sum: number, a: any) => sum + (a.tage ?? 0), 0);
-        return { urlaubstageJahr, genommen, rest: Math.max(0, urlaubstageJahr - genommen) };
+        return { urlaubstageJahr, vertraglicherAnspruch, gesetzlicherMindestanspruch, genommen, rest: Math.max(0, urlaubstageJahr - genommen) };
       }),
     /** Admin legt Urlaubsantrag für Mitarbeiter an */
     create: adminProcedure
@@ -3734,7 +3859,7 @@ export const appRouter = router({
         mitarbeiterId: z.number().int().positive(),
         von: z.string().min(1),
         bis: z.string().min(1),
-        tage: z.number().int().min(1),
+        tage: z.number().int().min(1).optional(),
         notizen: z.string().optional(),
         status: z.enum(['beantragt', 'genehmigt', 'abgelehnt']).default('genehmigt'),
         keineVertretung: z.boolean().optional(),
@@ -3742,18 +3867,25 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
-        const { urlaubsantraege } = await import('../drizzle/schema.js');
+        const ma = await getMitarbeiterById(input.mitarbeiterId);
+        if (!ma) throw new TRPCError({ code: 'NOT_FOUND', message: 'Mitarbeiterkonto nicht gefunden.' });
+        const arbeitsmusterHistorie = await ladeArbeitsmusterHistorie(input.mitarbeiterId);
+        const verbrauch = berechneUrlaubsverbrauch({ von: input.von, bis: input.bis, arbeitstageWoche: (ma as any).arbeitstageWoche, arbeitsmusterHistorie });
+        if (verbrauch.tage < 1) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Der Zeitraum enthält keine planmäßigen Arbeitstage.' });
         await db.insert(urlaubsantraege).values({
           mitarbeiterId: input.mitarbeiterId,
           von: input.von as any,
           bis: input.bis as any,
-          tage: input.tage,
+          tage: verbrauch.tage,
           notizen: input.notizen ?? null,
           status: input.status,
           keineVertretung: input.keineVertretung ? 1 : 0,
         } as any);
-        await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'ADMIN', ressource: 'urlaub', details: `admin-create ma=${input.mitarbeiterId}`, status: 'success' });
-        return { success: true };
+        if (input.status === 'genehmigt') {
+          await db.execute(sql`UPDATE mitarbeiter SET urlaubstageVerbraucht = urlaubstageVerbraucht + ${verbrauch.tage} WHERE id = ${input.mitarbeiterId}`);
+        }
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: 'ADMIN', ressource: 'urlaub', details: `admin-create ma=${input.mitarbeiterId} tage=${verbrauch.tage}`, status: 'success' });
+        return { success: true, verbrauch };
       }),
     /** Admin aktualisiert Status eines Urlaubsantrags */
     updateStatus: adminProcedure

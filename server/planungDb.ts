@@ -151,6 +151,7 @@ export type PlanungsEinsatz = {
   kostenGesamt: number;
   lohnkosten: number;
   anfahrtPauschale: number;
+  wochenendeinsatz: boolean;
   status: string;
   notizen: string | null;
   bemerkung: string | null;
@@ -187,6 +188,7 @@ function zuPlanungsEinsatz(zeile: Record<string, any>): PlanungsEinsatz {
     kostenGesamt: runde2(kosten1 + kosten2),
     lohnkosten: zuZahl(zeile.lohnkosten),
     anfahrtPauschale: zuZahl(zeile.anfahrtPauschale),
+    wochenendeinsatz: Boolean(zeile.wochenendeinsatz),
     status: String(zeile.status ?? "geplant"),
     notizen: zeile.notizen ?? null,
     bemerkung: zeile.bemerkung ?? null,
@@ -242,6 +244,7 @@ export async function getEinsaetzeImZeitraum(args: {
       kundeOrt: kunden.ort,
       kundeTelefon: kunden.telefon,
       kundeMobil: kunden.mobil,
+      wochenendeinsatz: einsaetze.wochenendeinsatz,
     })
     .from(einsaetze)
     .leftJoin(mitarbeiter, eq(einsaetze.mitarbeiterId, mitarbeiter.id))
@@ -515,6 +518,7 @@ export async function erstellePlanungsEinsatz(
   geplantVon: number,
 ): Promise<number> {
   const verbindung = await db();
+  const tag = new Date(`${daten.datum}T12:00:00`).getDay();
   const ergebnis = await verbindung.insert(einsaetze).values({
     mitarbeiterId: daten.mitarbeiterId,
     kundenId: daten.kundenId,
@@ -532,6 +536,7 @@ export async function erstellePlanungsEinsatz(
     anfahrtPauschale: String(daten.anfahrtPauschale),
     notizen: daten.notizen ?? null,
     geplantVon,
+    wochenendeinsatz: tag === 0 || tag === 6,
     status: "geplant",
     // Die Planung reserviert das Budget sofort; der spätere Abschluss darf
     // deshalb kein zweites Mal abbuchen.
@@ -546,6 +551,7 @@ export async function aktualisierePlanungsEinsatz(
   daten: EinsatzSchreibDaten,
 ): Promise<void> {
   const verbindung = await db();
+  const tag = new Date(`${daten.datum}T12:00:00`).getDay();
   await verbindung
     .update(einsaetze)
     .set({
@@ -564,6 +570,7 @@ export async function aktualisierePlanungsEinsatz(
       lohnkosten: String(daten.lohnkosten),
       anfahrtPauschale: String(daten.anfahrtPauschale),
       notizen: daten.notizen ?? null,
+      wochenendeinsatz: tag === 0 || tag === 6,
       // Budget wird beim Aktualisieren storniert und neu gebucht.
       budgetGebucht: true,
     })

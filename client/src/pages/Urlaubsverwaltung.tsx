@@ -31,6 +31,10 @@ export default function Urlaubsverwaltung() {
   const [von, setVon] = useState("");
   const [bis, setBis] = useState("");
   const [notizen, setNotizen] = useState("");
+  const { data: vorschau } = trpc.urlaub.vorschau.useQuery(
+    { von, bis },
+    { enabled: Boolean(von && bis && new Date(bis) >= new Date(von)) },
+  );
 
   const createMut = trpc.urlaub.create.useMutation({
     onSuccess: () => {
@@ -52,16 +56,10 @@ export default function Urlaubsverwaltung() {
     onError: (e) => toast.error(e.message),
   });
 
-  function calcTage(von: string, bis: string) {
-    if (!von || !bis) return 0;
-    const d1 = new Date(von), d2 = new Date(bis);
-    return Math.max(1, Math.round((d2.getTime() - d1.getTime()) / 86400000) + 1);
-  }
-
   function handleSubmit() {
     if (!von || !bis) { toast.error("Bitte Von- und Bis-Datum angeben."); return; }
     if (new Date(bis) < new Date(von)) { toast.error("Das Bis-Datum darf nicht vor dem Von-Datum liegen."); return; }
-    createMut.mutate({ von, bis, tage: calcTage(von, bis), notizen: notizen || undefined });
+    createMut.mutate({ von, bis, notizen: notizen || undefined });
   }
 
   const offen = antraege.filter((a: any) => a.status === "beantragt").length;
@@ -111,7 +109,7 @@ export default function Urlaubsverwaltung() {
             </div>
             {von && bis && (
               <p className="text-sm text-teal-700 font-medium">
-                📅 {calcTage(von, bis)} Urlaubstag{calcTage(von, bis) !== 1 ? "e" : ""}
+                📅 {vorschau?.tage ?? 0} planmäßige{(vorschau?.tage ?? 0) !== 1 ? " Arbeitstage" : "r Arbeitstag"}
               </p>
             )}
             <div>

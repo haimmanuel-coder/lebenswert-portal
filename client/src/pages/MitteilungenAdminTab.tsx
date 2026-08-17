@@ -16,12 +16,12 @@ export default function MitteilungenAdminTab() {
   const [gueltigBis, setGueltigBis] = useState("");
   const [showForm, setShowForm] = useState(false);
 
-  const { data: mitteilungen = [], refetch } = (trpc as any).mitteilungen.adminList.useQuery();
+  const { data: mitteilungen = [], refetch } = (trpc as any).mitteilungen.adminListe.useQuery();
   const erstellen = (trpc as any).mitteilungen.erstellen.useMutation({
     onSuccess: () => { toast.success("✅ Mitteilung erstellt und an alle Mitarbeiter gesendet"); refetch(); setShowForm(false); setTitel(""); setInhalt(""); setPrioritaet("normal"); setPflicht(true); setGueltigBis(""); },
     onError: (e: any) => toast.error("❌ " + e.message),
   });
-  const deaktivieren = (trpc as any).mitteilungen.deaktivieren.useMutation({
+  const deaktivieren = (trpc as any).mitteilungen.loeschen.useMutation({
     onSuccess: () => { toast.success("Mitteilung deaktiviert"); refetch(); },
   });
 
@@ -73,7 +73,7 @@ export default function MitteilungenAdminTab() {
                 <label htmlFor="pflicht" style={{ fontSize: 12, fontWeight: 600, color: "#374151", cursor: "pointer" }}>Lesebestätigung Pflicht</label>
               </div>
             </div>
-            <button onClick={() => erstellen.mutate({ titel, inhalt, prioritaet, lesebestaetigung_pflicht: pflicht, gueltigBis: gueltigBis || undefined })}
+            <button onClick={() => erstellen.mutate({ titel, inhalt, typ: prioritaet, pflichtBestaetigung: pflicht, gueltigBis: gueltigBis || undefined })}
               disabled={!titel.trim() || !inhalt.trim() || erstellen.isPending}
               style={{ padding: "10px 20px", background: !titel.trim() || !inhalt.trim() ? "#9ca3af" : "#4a8c3f", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: !titel.trim() || !inhalt.trim() ? "not-allowed" : "pointer" }}>
               {erstellen.isPending ? "⏳ Wird gesendet..." : "📢 An alle Mitarbeiter senden"}
@@ -87,7 +87,7 @@ export default function MitteilungenAdminTab() {
       ) : (
         <div style={{ display: "grid", gap: 12 }}>
           {(mitteilungen as any[]).map((m: any) => {
-            const prio = PRIO_STYLE[m.prioritaet] ?? PRIO_STYLE.normal;
+            const prio = PRIO_STYLE[m.typ] ?? PRIO_STYLE.normal;
             const bestaetigt = Number(m.anzahlBestaetigt ?? 0);
             const gesamt = Number(m.gesamtMitarbeiter ?? 0);
             const prozent = gesamt > 0 ? Math.round((bestaetigt / gesamt) * 100) : 0;
@@ -98,7 +98,7 @@ export default function MitteilungenAdminTab() {
                     <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
                       <span style={{ padding: "2px 8px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: prio.bg, color: prio.color }}>{prio.label}</span>
                       {!m.aktiv && <span style={{ padding: "2px 8px", borderRadius: 10, fontSize: 11, background: "#f3f4f6", color: "#9ca3af" }}>Deaktiviert</span>}
-                      {m.lesebestaetigung_pflicht ? <span style={{ fontSize: 11, color: "#6b7280" }}>✍️ Bestätigung Pflicht</span> : null}
+                      {m.pflichtBestaetigung ? <span style={{ fontSize: 11, color: "#6b7280" }}>✍️ Bestätigung Pflicht</span> : null}
                     </div>
                     <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>{m.titel}</div>
                     <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 8, whiteSpace: "pre-wrap" }}>{m.inhalt}</div>

@@ -1,6 +1,14 @@
 # Lebenswert Betreuung – Mitarbeiter-Portal TODO
 
 ## Aktuelle Umsetzung – Unterweisung, Erste Hilfe und DSGVO-Startprozess
+- [x] Kundenzuteilung in der Einsatzplanung um Name, Adresse, Pflegegrad und abrechnungsrelevante Paragraphen mit rollenbasiertem Zugriff ergänzen
+- [x] Wochenendplanung für Samstag und Sonntag fachlich und technisch prüfen sowie bei Sperre freischalten
+- [x] Mitteilungsfunktion einschließlich Navigation, Handler, Berechtigungen und Lesestatus end-to-end prüfen und vervollständigen
+- [x] Individuelle Wochenarbeitsmuster je Mitarbeiter hinterlegen und proportionale Urlaubsberechnung nach planmäßigen Arbeitstagen implementieren
+- [x] Bestehende Urlaubsdaten auf Abweichungen prüfen, Datenmigration vorbereiten und Feiertags-/Umfangswechsel-Fälle absichern
+- [x] CareConnect-Anforderungsbericht mit Architekturabweichungen, RBAC-/DSGVO-Bewertung, Akzeptanzkriterien und Aufwandsschätzung erstellen
+- [x] Bestehende Urlaubsdaten mit einer eindeutigen SQL-/Berichtsauswertung gegen genehmigte Anträge und gebuchte Urlaubstage abgleichen
+- [x] CareConnect-Anforderungsbericht um explizite prüfbare Akzeptanzkriterien je Anforderung ergänzen
 - [x] Zugangskarte mit neuem Einmalpasswort für Daniela Bergmann erstellen und Portal-Login verifizieren
 - [x] Öffentlichen Portalaufruf so korrigieren, dass Mitarbeiter zuerst die eigene E-Mail-/Passwort-Anmeldung sehen und nicht zur externen OAuth-Anmeldung umgeleitet werden
 - [x] Öffentlichen Portal-Login mit einer neu ausgestellten Zugangskarte end-to-end gegen die Produktionsadresse prüfen
@@ -25,7 +33,9 @@
 - [x] Mobilen Login im Remote-nahen Viewport 828×1792 visuell verifizieren und den sichtbaren Befund dokumentieren
 - [x] Mobile Login-Ansicht für den Remote-Browser vollständig sichtbar und bedienbar machen
 - [x] Direkten Portalaufruf und überlauffreie Login-Oberfläche verifizieren sowie die externe Fernsteuerungsgrenze dokumentieren
-- [ ] End-to-End-Verifikation von „Übernehmen Sie die Kontrolle“ im tatsächlichen Remote-Browser-Kontext mit Ziel-URL und sichtbarer Login-Seite dokumentieren
+- [x] Öffentlichen Portalaufruf im Sandbox-Browser mit Ziel-URL und sichtbarer Mitarbeiter-Anmeldeseite verifizieren
+- [ ] „Übernehmen Sie die Kontrolle“ im echten verknüpften Benutzerbrowser end-to-end auslösen und den Zielpfad bis zur sichtbaren Mitarbeiter-Loginseite nachweisbar verifizieren
+- [ ] Technischen Nachweis ergänzen, dass die Fernsteuerungsprüfung im verknüpften Benutzerbrowser und nicht nur im Sandbox-Browser erfolgte
 - [x] Statische funktionale, technische, Sicherheits- und UX-Prüfung des Admin-Panels mit priorisiertem Prüfbericht durchführen
 - [x] Bestätigte kritische Zugriffsschutzbefunde aus der Admin-Panel-Prüfung gezielt beheben und per Build/Test erneut verifizieren
 - [x] Alle regulär erreichbaren Admin- und Mitarbeiterseiten mit echtem Admin-Kontext auf Navigation, Rendering und Laufzeitfehler prüfen

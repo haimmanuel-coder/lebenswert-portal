@@ -48,6 +48,13 @@ const BESCHAEFT_BADGE: Record<string, { label: string; bg: string; color: string
   vollzeit: { label: "Vollzeit", bg: "#e8f5e4", color: "#4a8c3f" },
 };
 
+const WOCHENTAGE = [
+  { kuerzel: "Mo", label: "Montag" }, { kuerzel: "Di", label: "Dienstag" },
+  { kuerzel: "Mi", label: "Mittwoch" }, { kuerzel: "Do", label: "Donnerstag" },
+  { kuerzel: "Fr", label: "Freitag" }, { kuerzel: "Sa", label: "Samstag" },
+  { kuerzel: "So", label: "Sonntag" },
+] as const;
+
 export default function AdminPanel() {
   const [tab, setTab] = useState<AdminTab>("mitarbeiter");
 
@@ -62,6 +69,7 @@ export default function AdminPanel() {
   const [maTelefon, setMaTelefon] = useState("");
   const [maBeschaeftigung, setMaBeschaeftigung] = useState<"minijob" | "teilzeit" | "vollzeit">("minijob");
   const [maUrlaubstage, setMaUrlaubstage] = useState<number>(24);
+  const [maArbeitstage, setMaArbeitstage] = useState<string[]>(["Mo", "Di", "Mi", "Do", "Fr"]);
   const [maWochenstunden, setMaWochenstunden] = useState<number>(0);
   const [maMonatslohn, setMaMonatslohn] = useState<number>(0);
   const [maStundenlohn, setMaStundenlohn] = useState<number>(0);
@@ -101,7 +109,7 @@ export default function AdminPanel() {
     onError: (e) => toast.error("❌ " + e.message),
   });
 
-  const resetMaForm = () => { setEditMa(null); setMaVorname(""); setMaNachname(""); setMaEmail(""); setMaPasswort(""); setMaRolle("mitarbeiter"); setMaTelefon(""); setMaBeschaeftigung("minijob"); setMaUrlaubstage(24); setMaWochenstunden(0); setMaMonatslohn(0); setMaStundenlohn(0); };
+  const resetMaForm = () => { setEditMa(null); setMaVorname(""); setMaNachname(""); setMaEmail(""); setMaPasswort(""); setMaRolle("mitarbeiter"); setMaTelefon(""); setMaBeschaeftigung("minijob"); setMaUrlaubstage(24); setMaArbeitstage(["Mo", "Di", "Mi", "Do", "Fr"]); setMaWochenstunden(0); setMaMonatslohn(0); setMaStundenlohn(0); };
   // ── Export ───────────────────────────────────────────
   const { data: exportDaten = [] } = trpc.admin.mitarbeiterExport.useQuery();
   const { data: onboardingFortschritte = [] } = (trpc as any).onboarding.alleFortschritte.useQuery();
@@ -254,6 +262,10 @@ export default function AdminPanel() {
     setMaRolle(ma.rolle); setMaTelefon(ma.telefon || "");
     setMaBeschaeftigung(((ma as any).beschaeftigungsart as "minijob" | "teilzeit" | "vollzeit") || "minijob");
     setMaUrlaubstage((ma as any).urlaubstageJahr ?? 24);
+    try {
+      const gespeicherteTage = JSON.parse((ma as any).arbeitstageWoche ?? "[]");
+      setMaArbeitstage(Array.isArray(gespeicherteTage) && gespeicherteTage.length ? gespeicherteTage : ["Mo", "Di", "Mi", "Do", "Fr"]);
+    } catch { setMaArbeitstage(["Mo", "Di", "Mi", "Do", "Fr"]); }
     setMaWochenstunden((ma as any).wochenstunden ?? 0);
     setMaMonatslohn((ma as any).monatslohn ?? 0);
     setMaStundenlohn((ma as any).stundenlohn ?? 0);
@@ -262,10 +274,10 @@ export default function AdminPanel() {
   const saveMa = () => {
     if (!maVorname || !maNachname || !maEmail) { toast.error("Pflichtfelder ausfüllen!"); return; }
     if (editMa) {
-      updateMa.mutate({ id: editMa.id, vorname: maVorname, nachname: maNachname, email: maEmail, rolle: maRolle, telefon: maTelefon, beschaeftigungsart: maBeschaeftigung, urlaubstageJahr: maUrlaubstage, wochenstunden: maWochenstunden, monatslohn: maMonatslohn, stundenlohn: maStundenlohn, ...(maPasswort ? { neuesPasswort: maPasswort } : {}) });
+      updateMa.mutate({ id: editMa.id, vorname: maVorname, nachname: maNachname, email: maEmail, rolle: maRolle, telefon: maTelefon, beschaeftigungsart: maBeschaeftigung, urlaubstageJahr: maUrlaubstage, arbeitstageWoche: maArbeitstage as any, wochenstunden: maWochenstunden, monatslohn: maMonatslohn, stundenlohn: maStundenlohn, ...(maPasswort ? { neuesPasswort: maPasswort } : {}) });
     } else {
       if (maPasswort.length < 10) { toast.error("Das Startpasswort muss mindestens 10 Zeichen haben."); return; }
-      createMa.mutate({ vorname: maVorname, nachname: maNachname, email: maEmail, passwort: maPasswort, rolle: maRolle, telefon: maTelefon, beschaeftigungsart: maBeschaeftigung, urlaubstageJahr: maUrlaubstage, wochenstunden: maWochenstunden, monatslohn: maMonatslohn, stundenlohn: maStundenlohn });
+      createMa.mutate({ vorname: maVorname, nachname: maNachname, email: maEmail, passwort: maPasswort, rolle: maRolle, telefon: maTelefon, beschaeftigungsart: maBeschaeftigung, urlaubstageJahr: maUrlaubstage, arbeitstageWoche: maArbeitstage as any, wochenstunden: maWochenstunden, monatslohn: maMonatslohn, stundenlohn: maStundenlohn });
     }
   };
 
@@ -918,6 +930,21 @@ export default function AdminPanel() {
             <label style={labelStyle}>Urlaubstage/Jahr *</label>
             <input type="number" min={0} max={40} value={maUrlaubstage} onChange={(e) => setMaUrlaubstage(Number(e.target.value))} style={inputStyle} placeholder="24" />
           </div>
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelStyle}>Planmäßige Arbeitstage pro Woche *</label>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+            {WOCHENTAGE.map((tag) => {
+              const aktiv = maArbeitstage.includes(tag.kuerzel);
+              return <button key={tag.kuerzel} type="button" title={tag.label} onClick={() => {
+                const naechste = aktiv ? maArbeitstage.filter((wert) => wert !== tag.kuerzel) : [...maArbeitstage, tag.kuerzel];
+                if (naechste.length === 0) { toast.error("Mindestens ein Arbeitstag muss hinterlegt bleiben."); return; }
+                setMaArbeitstage(naechste);
+                setMaUrlaubstage(naechste.length * 4);
+              }} style={{ padding: "7px 10px", borderRadius: 8, border: aktiv ? "2px solid #4a8c3f" : "1px solid #d1d5db", background: aktiv ? "#e8f5e4" : "#fff", color: aktiv ? "#166534" : "#6b7280", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{tag.kuerzel}</button>;
+            })}
+          </div>
+          <p style={{ margin: "7px 0 0", fontSize: 11, lineHeight: 1.4, color: "#6b7280" }}>Gesetzlicher Richtwert: <strong>{maArbeitstage.length * 4} Tage/Jahr</strong> bei {maArbeitstage.length} Arbeitstag{maArbeitstage.length !== 1 ? "en" : ""} pro Woche. Vertraglich höhere Werte können oben manuell eingetragen werden.</p>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
           <div>

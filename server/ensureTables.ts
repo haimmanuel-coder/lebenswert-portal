@@ -46,6 +46,7 @@ const TABLE_DEFINITIONS: string[] = [
     \`arbeitsvertragUrl\` varchar(500),
     \`arbeitsvertragDatum\` date,
     \`berechtigungen\` text,
+    \`arbeitstageWoche\` text,
     \`geloeschtAt\` timestamp NULL,
     \`geloeschtVon\` int,
     \`createdAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -158,6 +159,7 @@ const TABLE_DEFINITIONS: string[] = [
     \`stunden2\` decimal(4,2) DEFAULT 0,
     \`lohnkosten\` decimal(10,2) DEFAULT 0,
     \`notizen\` text,
+    \`wochenendeinsatz\` tinyint(1) NOT NULL DEFAULT 0,
     \`status\` enum('geplant','unterwegs','abgeschlossen','verpasst') NOT NULL DEFAULT 'geplant',
     \`anfahrtPauschale\` tinyint(1) DEFAULT 0,
     \`unterschriftFreigabeStatus\` enum('ausstehend','freigegeben','abgelehnt') DEFAULT 'ausstehend',
@@ -1176,6 +1178,18 @@ const TABLE_DEFINITIONS: string[] = [
     KEY \`idx_kz_kunde\` (\`kundenId\`),
     KEY \`idx_kz_ma\` (\`mitarbeiterId\`)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  // ── 81. mitarbeiterArbeitsmuster ───────────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS \`mitarbeiterArbeitsmuster\` (
+    \`id\` int NOT NULL AUTO_INCREMENT,
+    \`mitarbeiterId\` int NOT NULL,
+    \`arbeitstageWoche\` text NOT NULL,
+    \`gueltigAb\` date NOT NULL,
+    \`gueltigBis\` date NULL,
+    \`geaendertVon\` int NULL,
+    \`createdAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    KEY \`idx_mamuster_ma_ab\` (\`mitarbeiterId\`, \`gueltigAb\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ];
 
 let ensureTablesRan = false;
@@ -1240,6 +1254,21 @@ export async function ensureTables(): Promise<void> {
     }
   } catch (err: any) {
     console.error("[ensureTables] Kassenanfrage-Kompatibilitätsmigration fehlgeschlagen:", String(err?.message ?? "").substring(0, 160));
+    failed++;
+  }
+
+  // Arbeitstagsmuster wurden nach der ersten Mitarbeiterakte eingeführt.
+  // Vorhandene Urlaubskonten werden nicht verändert; die Muster sind lediglich
+  // klar dokumentierte Startwerte und werden im Adminbereich individuell gepflegt.
+  try {
+    const [arbeitstageSpalte] = await db.execute(sql.raw("SHOW COLUMNS FROM `mitarbeiter` LIKE 'arbeitstageWoche'")) as any;
+    if (!Array.isArray(arbeitstageSpalte) || arbeitstageSpalte.length === 0) {
+      await db.execute(sql.raw("ALTER TABLE `mitarbeiter` ADD COLUMN `arbeitstageWoche` TEXT NULL"));
+      await db.execute(sql.raw("UPDATE `mitarbeiter` SET `arbeitstageWoche` = CASE WHEN `urlaubstageJahr` <= 12 THEN '[\\\"Mo\\\",\\\"Mi\\\",\\\"Fr\\\"]' WHEN `urlaubstageJahr` <= 16 THEN '[\\\"Mo\\\",\\\"Di\\\",\\\"Do\\\",\\\"Fr\\\"]' ELSE '[\\\"Mo\\\",\\\"Di\\\",\\\"Mi\\\",\\\"Do\\\",\\\"Fr\\\"]' END WHERE `arbeitstageWoche` IS NULL OR `arbeitstageWoche` = ''"));
+    }
+    await db.execute(sql.raw("INSERT INTO `mitarbeiterArbeitsmuster` (`mitarbeiterId`,`arbeitstageWoche`,`gueltigAb`) SELECT m.id, m.arbeitstageWoche, COALESCE(m.eintrittsdatum, '2026-01-01') FROM `mitarbeiter` m LEFT JOIN `mitarbeiterArbeitsmuster` h ON h.mitarbeiterId = m.id WHERE h.id IS NULL AND m.arbeitstageWoche IS NOT NULL"));
+  } catch (err: any) {
+    console.error("[ensureTables] Arbeitstagsmuster-Migration fehlgeschlagen:", String(err?.message ?? "").substring(0, 160));
     failed++;
   }
 

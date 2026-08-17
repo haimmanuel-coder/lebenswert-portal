@@ -373,8 +373,13 @@ export function kundenZuOptionen(
     .filter((k) => k && k.id && (k.vorname || k.nachname))
     .map((k) => {
       const hinweise: string[] = [];
-      if (k.pflegegrad) hinweise.push(`PG ${k.pflegegrad}`);
-      if (k.paragraph) hinweise.push(`§${k.paragraph}`);
+      const adresse = [k.strasse, [k.plz, k.ort].filter(Boolean).join(" ")]
+        .filter(Boolean)
+        .join(", ");
+      if (adresse) hinweise.push(adresse);
+      if (k.pflegegrad) hinweise.push(`Pflegegrad ${k.pflegegrad}`);
+      const paragraphen = kundenParagraphen(k);
+      if (paragraphen.length > 0) hinweise.push(paragraphen.map((p) => `§${p}`).join(" · "));
       return {
         id: Number(k.id),
         label: `${k.nachname ?? ""}, ${k.vorname ?? ""}`.replace(/^,\s*|,\s*$/g, "").trim(),
@@ -383,11 +388,34 @@ export function kundenZuOptionen(
           k.vorname ?? "",
           k.nachname ?? "",
           k.ort ?? "",
+          k.strasse ?? "",
+          adresse,
           k.versicherungsnummer ?? "",
           k.telefon ?? "",
         ].filter(Boolean),
       };
     });
+}
+
+/** Liest den neuen Mehrfachwert robust und bleibt zu älteren Einzelwerten kompatibel. */
+function kundenParagraphen(kunde: Record<string, any>): string[] {
+  let werte: unknown = kunde.paragraphen;
+  if (typeof werte === "string") {
+    const paragraphenText = werte;
+    try {
+      werte = JSON.parse(paragraphenText);
+    } catch {
+      werte = paragraphenText.split(",");
+    }
+  }
+  const liste = Array.isArray(werte) ? werte : [];
+  const bereinigt = liste
+    .map((wert) => String(wert).replace(/^§\s*/, "").trim())
+    .filter((wert) => ["45b", "45a", "39"].includes(wert));
+  if (bereinigt.length === 0 && kunde.paragraph && kunde.paragraph !== "privat") {
+    bereinigt.push(String(kunde.paragraph));
+  }
+  return Array.from(new Set(bereinigt));
 }
 
 /** Baut Auswahloptionen aus einer Mitarbeiterliste. */

@@ -15,7 +15,7 @@ export default function MitteilungenWidget() {
     onError: (e: any) => toast.error("❌ " + e.message),
   });
 
-  const ungelesen = (mitteilungen as any[]).filter((m: any) => !Number(m.gelesen));
+  const ungelesen = (mitteilungen as any[]).filter((m: any) => !Boolean(m.gelesen));
 
   const [zeigeAlle, setZeigeAlle] = useState(false);
   const angezeigt = zeigeAlle ? (mitteilungen as any[]) : ungelesen;
@@ -43,8 +43,8 @@ export default function MitteilungenWidget() {
         <div style={{ textAlign: "center", padding: "12px 0", color: "#9ca3af", fontSize: 12 }}>✅ Alle Mitteilungen gelesen</div>
       )}
       {angezeigt.map((m: any) => {
-        const prio = PRIO_STYLE[m.prioritaet] ?? PRIO_STYLE.normal;
-        const gelesen = Number(m.gelesen) > 0;
+        const prio = PRIO_STYLE[m.typ] ?? PRIO_STYLE.normal;
+        const gelesen = Boolean(m.gelesen);
         return (
           <div key={m.id} style={{ background: prio.bg, border: `2px solid ${prio.border}`, borderRadius: 12, padding: 14, marginBottom: 10, opacity: gelesen ? 0.7 : 1 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
@@ -58,7 +58,7 @@ export default function MitteilungenWidget() {
               <div style={{ flexShrink: 0 }}>
                 {gelesen ? (
                   <span style={{ padding: "4px 10px", background: "#dcfce7", color: "#166534", borderRadius: 8, fontSize: 11, fontWeight: 700 }}>✓ Gelesen</span>
-                ) : m.lesebestaetigung_pflicht ? (
+                ) : m.pflichtBestaetigung ? (
                   <button onClick={() => bestaetigen.mutate({ mitteilungId: m.id })}
                     disabled={bestaetigen.isPending}
                     style={{ padding: "6px 14px", background: prio.color, color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>

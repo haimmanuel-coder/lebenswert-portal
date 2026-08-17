@@ -34,6 +34,7 @@ import {
   getAllMitarbeiter,
   getKundeById,
   getMitarbeiterById,
+  getZuordnungenForMitarbeiter,
 } from "./db";
 import {
   aktualisierePlanungsEinsatz,
@@ -827,6 +828,13 @@ export const planungRouter = router({
       const heute = zuDatumsString(new Date());
       if (!liegtImPlanungsfenster(input.datum, heute)) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Eigene Termine können nur für die kommenden 14 Tage geplant werden." });
+      }
+      const zuordnungen = await getZuordnungenForMitarbeiter(ctx.mitarbeiterId);
+      if (!zuordnungen.some((zuordnung: { kundenId: number }) => zuordnung.kundenId === input.kundenId)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Eigene Termine dürfen nur für zugewiesene Kunden geplant werden.",
+        });
       }
     }
     const istAdmin = ctx.portalMitarbeiter.rolle === "admin";

@@ -103,6 +103,7 @@ export async function getAllMitarbeiter() {
     notizen: mitarbeiter.notizen,
     urlaubstageJahr: mitarbeiter.urlaubstageJahr,
     urlaubstageVerbraucht: mitarbeiter.urlaubstageVerbraucht,
+    arbeitstageWoche: (mitarbeiter as any).arbeitstageWoche,
     wochenstunden: (mitarbeiter as any).wochenstunden,
     monatslohn: (mitarbeiter as any).monatslohn,
     stundenlohn: (mitarbeiter as any).stundenlohn,
@@ -129,7 +130,8 @@ export async function getAllMitarbeiter() {
 export async function createMitarbeiter(data: InsertMitarbeiter) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.insert(mitarbeiter).values(data);
+  const result = await db.insert(mitarbeiter).values(data);
+  return Number((result as any)[0]?.insertId ?? (result as any).insertId ?? 0);
 }
 
 export async function updateMitarbeiter(id: number, data: Partial<InsertMitarbeiter>) {
@@ -1180,15 +1182,32 @@ export async function updateUrlaubsantragStatus(
 ) {
   const db = await getDb();
   if (!db) return;
-  await db.update(urlaubsantraege)
-    .set({ status, adminNotiz: adminNotiz ?? null })
-    .where(eq(urlaubsantraege.id, id));
+  const [antrag] = await db.select().from(urlaubsantraege).where(eq(urlaubsantraege.id, id)).limit(1);
+  if (!antrag) return;
+  const vorherGenehmigt = antrag.status === 'genehmigt';
+  const nachherGenehmigt = status === 'genehmigt';
+  const delta = nachherGenehmigt === vorherGenehmigt ? 0 : (nachherGenehmigt ? Number(antrag.tage ?? 0) : -Number(antrag.tage ?? 0));
+  await db.transaction(async (tx) => {
+    await tx.update(urlaubsantraege)
+      .set({ status, adminNotiz: adminNotiz ?? null })
+      .where(eq(urlaubsantraege.id, id));
+    if (delta !== 0) {
+      await tx.execute(sql`UPDATE mitarbeiter SET urlaubstageVerbraucht = GREATEST(0, urlaubstageVerbraucht + ${delta}) WHERE id = ${antrag.mitarbeiterId}`);
+    }
+  });
 }
 
 export async function deleteUrlaubsantrag(id: number) {
   const db = await getDb();
   if (!db) return;
-  await db.delete(urlaubsantraege).where(eq(urlaubsantraege.id, id));
+  const [antrag] = await db.select().from(urlaubsantraege).where(eq(urlaubsantraege.id, id)).limit(1);
+  if (!antrag) return;
+  await db.transaction(async (tx) => {
+    if (antrag.status === 'genehmigt') {
+      await tx.execute(sql`UPDATE mitarbeiter SET urlaubstageVerbraucht = GREATEST(0, urlaubstageVerbraucht - ${Number(antrag.tage ?? 0)}) WHERE id = ${antrag.mitarbeiterId}`);
+    }
+    await tx.delete(urlaubsantraege).where(eq(urlaubsantraege.id, id));
+  });
 }
 
 // ── KRANKMELDUNGEN ───────────────────────────────────────────────────────

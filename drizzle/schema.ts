@@ -69,6 +69,9 @@ export const mitarbeiter = mysqlTable("mitarbeiter", {
   // Jahresurlaubskonto
   urlaubstageJahr: int("urlaubstageJahr").default(24).notNull(),
   urlaubstageVerbraucht: int("urlaubstageVerbraucht").default(0).notNull(),
+  // Feste planmäßige Arbeitstage, z. B. ["Mo","Mi","Fr"]. Das Feld ist
+  // Grundlage für Urlaubsverbrauch und bleibt unabhängig von Wochenstunden.
+  arbeitstageWoche: text("arbeitstageWoche"),
   // Fahrzeug (P3: Dienstwagen-Flag)
   hatDienstwagen: boolean("hatDienstwagen").default(false).notNull(),
   // Vergütung & Vertrag
@@ -100,6 +103,19 @@ export const mitarbeiter = mysqlTable("mitarbeiter", {
 
 export type Mitarbeiter = typeof mitarbeiter.$inferSelect;
 export type InsertMitarbeiter = typeof mitarbeiter.$inferInsert;
+
+/** Historie der vertraglich vereinbarten Arbeitstage für unterjährige Wechsel. */
+export const mitarbeiterArbeitsmuster = mysqlTable("mitarbeiterArbeitsmuster", {
+  id: int("id").autoincrement().primaryKey(),
+  mitarbeiterId: int("mitarbeiterId").notNull(),
+  arbeitstageWoche: text("arbeitstageWoche").notNull(),
+  gueltigAb: date("gueltigAb").notNull(),
+  gueltigBis: date("gueltigBis"),
+  geaendertVon: int("geaendertVon"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type MitarbeiterArbeitsmuster = typeof mitarbeiterArbeitsmuster.$inferSelect;
+export type InsertMitarbeiterArbeitsmuster = typeof mitarbeiterArbeitsmuster.$inferInsert;
 
 // ── MODUL 1: KOSTENTRÄGER-SYSTEM ─────────────────────────────────
 export const kostentraeger = mysqlTable("kostentraeger", {
@@ -260,6 +276,9 @@ export const einsaetze = mysqlTable("einsaetze", {
   anfahrtPauschale: decimal("anfahrtPauschale", { precision: 5, scale: 2 }).default("6.00"),
   // Mindestzeit-Eskalation (P3: nach 3× Unterschreitung Admin-Alert)
   unterschreitungEskaliert: boolean("unterschreitungEskaliert").default(false),
+  // Automatisch gesetzte Kennzeichnung für Auswertungen von Sonn- und Wochenendarbeit.
+  // Sie sperrt keine Planung und löst allein keinen Zuschlag aus.
+  wochenendeinsatz: boolean("wochenendeinsatz").default(false).notNull(),
 
   // ── EINSATZPLANUNG (Phase 31) ────────────────────────────────────────────
   // Endzeit des Einsatzes. Aus startzeit + endzeit werden die Stunden IMMER
