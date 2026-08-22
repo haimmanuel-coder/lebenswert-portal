@@ -988,6 +988,9 @@ const csvImportRouter = router({
       const fail = input.fehlgeschlagen;
       const details = input.fehlerDetails ?? null;
       await db!.execute(sql`INSERT INTO csv_import_protokolle (importiertVon, dateiname, gesamtZeilen, erfolgreich, fehlgeschlagen, fehlerDetails) VALUES (${von}, ${datei}, ${gesamt}, ${ok}, ${fail}, ${details})`);
+      // DSGVO: Import personenbezogener Daten zusätzlich zentral auditieren (die einzelnen
+      // Zeilen werden bereits über kunden.create als CREATE/kunde protokolliert).
+      await createAuditLog({ mitarbeiterId: von, action: "IMPORT", ressource: "kunden", details: `datei=${datei ?? "?"} gesamt=${gesamt} ok=${ok} fehler=${fail}`, status: fail > 0 ? "partial" : "success" });
       return { ok: true };
     }),
 
@@ -1508,7 +1511,7 @@ export const appRouter = router({
         kostentraegerId: z.number().int().positive().optional().nullable(),
         versicherungsnummer: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const newId = await createKunde({ ...input, aktiv: 1 });
         // P1: Neukunden-Push an alle Mitarbeiter senden
         if (newId) {
@@ -1520,6 +1523,9 @@ export const appRouter = router({
             await db!.execute(sql`INSERT IGNORE INTO budget_39 (kundenId, monatlicheStunden, verbraucht) VALUES (${newId}, 0, 0)`);
           } catch (e) { console.warn('[Budget-Sync] Initialisierung fehlgeschlagen:', e); }
         }
+        // DSGVO: Anlage personenbezogener Kundendaten auditieren (greift auch beim CSV-Import,
+        // der pro Zeile diese Mutation aufruft).
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "CREATE", ressource: "kunde", details: `id=${newId ?? "?"} name=${input.vorname} ${input.nachname}`, status: newId ? "success" : "failure" });
         return { success: true };
       }),
 
@@ -1540,9 +1546,11 @@ export const appRouter = router({
         vollmachtDatum: z.string().optional(),
         vollmachtSignatur: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const { id, ...data } = input;
         await updateKunde(id, data as any);
+        // DSGVO: Änderung personenbezogener Kundendaten auditieren.
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "UPDATE", ressource: "kunde", details: `id=${id} felder=${Object.keys(data).join(",")}`, status: "success" });
         return { success: true };
       }),
 
@@ -1704,7 +1712,7 @@ export const appRouter = router({
       }),
 
     export: adminProcedure
-      .query(async () => {
+      .query(async ({ ctx }) => {
         const db = await getDb();
         const rows = await db!.execute(sql`
           SELECT
@@ -1734,7 +1742,7 @@ export const appRouter = router({
           LEFT JOIN budget_39 b39 ON b39.kundenId = k.id
           ORDER BY k.nachname ASC, k.vorname ASC
         `);
-        return (rows as any)[0] as Array<{
+        const daten = (rows as any)[0] as Array<{
           id: number; vorname: string; nachname: string;
           strasse: string | null; plz: string | null; ort: string | null;
           telefon: string | null; pflegegrad: number | null; paragraph: string | null;
@@ -1742,6 +1750,9 @@ export const appRouter = router({
           budget45b: number | null; verbraucht45b: number | null; rest45b: number | null;
           stunden39: number | null; zugeordneterMitarbeiter: string | null;
         }>;
+        // DSGVO: Massen-Export personenbezogener Kundendaten (inkl. Pflegegrad, Anschrift) auditieren.
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "EXPORT", ressource: "kunden", details: `kundenliste zeilen=${daten.length}`, status: "success" });
+        return daten;
       }),
 
   }),
@@ -2482,7 +2493,7 @@ export const appRouter = router({
   export: router({
     monatspaket: adminProcedure
       .input(z.object({ monat: z.string().regex(/^\d{4}-\d{2}$/) }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const [eis, leis, fahr, maList, kundenList] = await Promise.all([
           getAllEinsaetze(),
           getAllLeistungen(),
@@ -2536,6 +2547,10 @@ export const appRouter = router({
         const gesamtKm = monFahr.reduce((s, f) => s + parseFloat(String(f.kilometer ?? 0)), 0);
         const gesamtVerguetung = monFahr.reduce((s, f) => s + parseFloat(String(f.verguetung ?? 0)), 0);
         const gesamtBetrag = monLeis.reduce((s, l) => s + parseFloat(String(l.betrag ?? 0)), 0);
+
+        // DSGVO Art. 9: Das Monatspaket enthält Gesundheitsdaten (Spalte „Gesundheit") und
+        // Kundennamen – der Export wird daher zwingend auditiert.
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "EXPORT", ressource: "monatspaket", details: `monat=${input.monat} einsaetze=${monEis.length} leistungen=${monLeis.length} fahrten=${monFahr.length} enthaelt=gesundheitsdaten`, status: "success" });
 
         return {
           monat: input.monat,
@@ -2853,8 +2868,10 @@ export const appRouter = router({
       return { karten, anzahl: karten.length };
     }),
     /** Mitarbeiterliste als strukturierte Daten für Export */
-    mitarbeiterExport: adminProcedure.query(async () => {
+    mitarbeiterExport: adminProcedure.query(async ({ ctx }) => {
       const allMa = await getAllMitarbeiter();
+      // DSGVO: Export von Personaldaten inkl. Lohn/Gehalt auditieren.
+      await createAuditLog({ mitarbeiterId: ctx.adminId, action: "EXPORT", ressource: "mitarbeiter", details: `mitarbeiterliste zeilen=${allMa.length} enthaelt=lohndaten`, status: "success" });
       return allMa.map((ma: any) => ({
         id: ma.id,
         vorname: ma.vorname ?? "",
