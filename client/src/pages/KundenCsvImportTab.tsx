@@ -153,6 +153,7 @@ export default function KundenCsvImportTab() {
     try {
       const fehlerDetails = results.filter(r => !r.ok).map(r => `${r.name}: ${r.fehler}`).join("; ");
       await protokollSpeichern.mutateAsync({
+        entitaet: "kunden",
         dateiname: `[KUNDEN] ${dateiname}`,
         gesamtZeilen: gueltig.length,
         erfolgreich: ok,

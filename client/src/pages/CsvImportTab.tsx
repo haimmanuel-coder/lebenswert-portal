@@ -142,7 +142,7 @@ export default function CsvImportTab() {
     // Protokoll speichern
     try {
       const fehlerDetails = results.filter(r => !r.ok).map(r => `${r.email}: ${r.fehler}`).join("; ");
-      await protokollSpeichern.mutateAsync({ dateiname, gesamtZeilen: gueltig.length, erfolgreich: ok, fehlgeschlagen: fail, fehlerDetails: fehlerDetails || undefined });
+      await protokollSpeichern.mutateAsync({ entitaet: "mitarbeiter", dateiname, gesamtZeilen: gueltig.length, erfolgreich: ok, fehlgeschlagen: fail, fehlerDetails: fehlerDetails || undefined });
       refetchProtokolle();
     } catch (_e) {}
   };
