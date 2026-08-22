@@ -3,6 +3,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
 import { STUNDENSATZ, ANFAHRT_PAUSCHALE, berechneEinsatzkostenInklPauschale } from "@shared/leistungssaetze";
+import { baueAbgleichIndex, baueKundenDatensatz, ergaenzeIndex, klassifiziereKunde, type AbgleichKunde } from "@shared/kundenAbgleich";
 
 /**
  * Entscheidung 4: Die Rolle "buchhaltung" darf abrechnungsrelevante Daten sehen,
@@ -1533,6 +1534,94 @@ export const appRouter = router({
         // der pro Zeile diese Mutation aufruft).
         await createAuditLog({ mitarbeiterId: ctx.adminId, action: "CREATE", ressource: "kunde", details: `id=${newId ?? "?"} name=${input.vorname} ${input.nachname}`, status: newId ? "success" : "failure" });
         return { success: true };
+      }),
+
+    /**
+     * Idempotenter Massen-/CSV-Import (Phase 2 – „Synchronisation"): Bestehende
+     * Kunden werden über die Versicherungsnummer bzw. Vor-/Nachname erkannt und
+     * AKTUALISIERT, unbekannte neu angelegt. Manuell ausgelöst über die
+     * Import-Maske; die reine Abgleichlogik liegt in shared/kundenAbgleich.ts.
+     */
+    upsertImport: adminProcedure
+      .input(z.object({
+        zeilen: z.array(z.object({
+          vorname: z.string(),
+          nachname: z.string(),
+          strasse: z.string().optional(),
+          plz: z.string().optional(),
+          ort: z.string().optional(),
+          telefon: z.string().optional(),
+          pflegegrad: z.union([z.string(), z.number()]).optional(),
+          paragraph: z.string().optional(),
+          kostentraeger: z.string().optional(),
+          versicherungsnummer: z.string().optional(),
+          notizen: z.string().optional(),
+        })).min(1).max(5000),
+        dateiname: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const bestand = await getAllKunden();
+        const index = baueAbgleichIndex(
+          (bestand as any[]).map((k) => ({
+            id: k.id, vorname: k.vorname, nachname: k.nachname, versicherungsnummer: k.versicherungsnummer,
+          } as AbgleichKunde)),
+        );
+        const ergebnisse: Array<{ name: string; typ: "neu" | "aktualisierung" | "fehler"; fehler?: string }> = [];
+        let neu = 0, aktualisiert = 0, fehler = 0;
+
+        for (const row of input.zeilen) {
+          const name = `${row.vorname ?? ""} ${row.nachname ?? ""}`.trim();
+          if (!row.vorname?.trim() || !row.nachname?.trim()) {
+            fehler++;
+            ergebnisse.push({ name: name || "(ohne Namen)", typ: "fehler", fehler: "Vor- und Nachname sind Pflicht" });
+            continue;
+          }
+          try {
+            const { typ, matchId } = klassifiziereKunde(row, index);
+            const daten = baueKundenDatensatz(row);
+            if (typ === "aktualisierung" && matchId != null) {
+              await updateKunde(matchId, daten as any);
+              aktualisiert++;
+              ergebnisse.push({ name, typ: "aktualisierung" });
+              await createAuditLog({ mitarbeiterId: ctx.adminId, action: "UPDATE", ressource: "kunde", details: `import id=${matchId} name=${name}`, status: "success" });
+            } else {
+              const newId = await createKunde({ ...(daten as any), aktiv: 1 });
+              // Nachfolgende Dubletten im selben Import aktualisieren statt erneut anzulegen.
+              ergaenzeIndex(index, row, Number(newId) || 0);
+              // Folgeaktionen analog kunden.create (best effort, dürfen den Import nicht abbrechen).
+              if (newId) {
+                try { await createNeukundenPushEintraege(Number(newId)); } catch (e) { console.warn("[Import] Neukunden-Push fehlgeschlagen:", e); }
+                try {
+                  const db = await getDb();
+                  await db!.execute(sql`INSERT IGNORE INTO budget_45b (kundenId, jahresbudget, verbraucht) VALUES (${Number(newId)}, 0, 0)`);
+                  await db!.execute(sql`INSERT IGNORE INTO budget_39 (kundenId, monatlicheStunden, verbraucht) VALUES (${Number(newId)}, 0, 0)`);
+                } catch (e) { console.warn("[Import] Budget-Init fehlgeschlagen:", e); }
+              }
+              neu++;
+              ergebnisse.push({ name, typ: "neu" });
+              await createAuditLog({ mitarbeiterId: ctx.adminId, action: "CREATE", ressource: "kunde", details: `import id=${newId ?? "?"} name=${name}`, status: newId ? "success" : "failure" });
+            }
+          } catch (e: any) {
+            fehler++;
+            ergebnisse.push({ name, typ: "fehler", fehler: e?.message ?? "Unbekannter Fehler" });
+          }
+        }
+
+        // Import-Verlauf (dieselbe Tabelle wie csvImport.protokollListe zeigt).
+        try {
+          const db = await getDb();
+          const fehlerDetails = ergebnisse
+            .filter((e) => e.typ === "fehler")
+            .map((e) => `${e.name}: ${e.fehler ?? ""}`)
+            .join("; ")
+            .slice(0, 60000);
+          await db!.execute(sql`INSERT INTO csv_import_protokolle (importiertVon, dateiname, gesamtZeilen, erfolgreich, fehlgeschlagen, fehlerDetails) VALUES (${ctx.adminId ?? 1}, ${input.dateiname ?? null}, ${input.zeilen.length}, ${neu + aktualisiert}, ${fehler}, ${fehlerDetails || null})`);
+        } catch (e) { console.warn("[Import] Protokoll nicht geschrieben:", e); }
+
+        // DSGVO: Zusammenfassender Import-Eintrag im zentralen Audit-Log.
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "IMPORT", ressource: "kunden", details: `datei=${input.dateiname ?? "?"} neu=${neu} aktualisiert=${aktualisiert} fehler=${fehler}`, status: fehler > 0 ? "partial" : "success" });
+
+        return { neu, aktualisiert, fehler, gesamt: input.zeilen.length, ergebnisse };
       }),
 
     update: adminProcedure
