@@ -27,8 +27,12 @@ Beim Abgleich fielen fünf personenbezogene Zugriffe **ohne** zentralen Audit-Ei
 | `mitarbeiterExport` | `server/routers.ts` | Personaldaten inkl. Lohn/Gehalt | `EXPORT` / `mitarbeiter` |
 
 Zusätzlich schreibt der CSV-Import (`csvImport.protokollSpeichern`) jetzt einen
-zusammenfassenden `IMPORT`-Eintrag ins zentrale `auditLogs` (die einzelnen Zeilen sind
-über `kunden.create` bereits als `CREATE`/`kunde` protokolliert).
+zusammenfassenden `IMPORT`-Eintrag ins zentrale `auditLogs`. Der Endpunkt wird von zwei
+Import-Masken geteilt (Kunden über `KundenCsvImportTab`, Mitarbeiter über `CsvImportTab`);
+die Entität wird deshalb mitgegeben, damit `ressource` den tatsächlichen Datenbestand
+benennt (`kunden` bzw. `mitarbeiter`). Die einzelnen Zeilen sind bereits über das jeweilige
+Anlage-Endpunkt protokolliert – Kunden über `kunden.create` (`CREATE`/`kunde`), Mitarbeiter
+über `admin.mitarbeiterCreate` (`ADMIN`/`mitarbeiter`).
 
 **Wirkung:** Jeder lesende Massen-Zugriff auf personenbezogene bzw. Gesundheitsdaten
 (Export) und jede schreibende Änderung an Kundenstammdaten ist nun im Audit-Log

@@ -973,6 +973,10 @@ const einstellungenRouter = router({
 const csvImportRouter = router({
   protokollSpeichern: adminProcedure
     .input(z.object({
+      // Dieser Endpunkt wird von zwei Import-Masken geteilt: KundenCsvImportTab
+      // (Kunden) und CsvImportTab (Mitarbeiter). Die Entität muss daher mitgegeben
+      // werden, damit der Audit-Eintrag den tatsächlichen Datenbestand benennt.
+      entitaet: z.enum(["kunden", "mitarbeiter"]).default("kunden"),
       dateiname: z.string().optional(),
       gesamtZeilen: z.number(),
       erfolgreich: z.number(),
@@ -988,9 +992,11 @@ const csvImportRouter = router({
       const fail = input.fehlgeschlagen;
       const details = input.fehlerDetails ?? null;
       await db!.execute(sql`INSERT INTO csv_import_protokolle (importiertVon, dateiname, gesamtZeilen, erfolgreich, fehlgeschlagen, fehlerDetails) VALUES (${von}, ${datei}, ${gesamt}, ${ok}, ${fail}, ${details})`);
-      // DSGVO: Import personenbezogener Daten zusätzlich zentral auditieren (die einzelnen
-      // Zeilen werden bereits über kunden.create als CREATE/kunde protokolliert).
-      await createAuditLog({ mitarbeiterId: von, action: "IMPORT", ressource: "kunden", details: `datei=${datei ?? "?"} gesamt=${gesamt} ok=${ok} fehler=${fail}`, status: fail > 0 ? "partial" : "success" });
+      // DSGVO: Import personenbezogener Daten zusätzlich zentral auditieren. Die einzelnen
+      // Zeilen sind bereits über das jeweilige Anlage-Endpunkt protokolliert – bei Kunden
+      // über kunden.create (CREATE/kunde), bei Mitarbeitern über admin.mitarbeiterCreate
+      // (ADMIN/mitarbeiter).
+      await createAuditLog({ mitarbeiterId: von, action: "IMPORT", ressource: input.entitaet, details: `datei=${datei ?? "?"} gesamt=${gesamt} ok=${ok} fehler=${fail}`, status: fail > 0 ? "partial" : "success" });
       return { ok: true };
     }),
 
