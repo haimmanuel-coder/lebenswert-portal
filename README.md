@@ -118,9 +118,15 @@ Diese Funktionen nutzen von Manus bereitgestellte Dienste über die
 
 | Funktion | Abhängigkeit | Ersatz beim Umzug |
 |---|---|---|
-| Datei-Speicher (Unterschriften, Backups, Export-Pakete) | Forge-Speicher | eigener S3-kompatibler Speicher |
+| Datei-Speicher (Unterschriften, Backups, Export-Pakete) | Forge-Speicher | **eingebaut:** S3-kompatibler Speicher über `S3_*`-Variablen (siehe unten) |
 | KI (Berichtsvorschläge, Sprache-zu-Text, Bildgenerierung) | Forge-KI | eigener KI-Anbieter oder Funktion deaktivieren |
 | Karten (Tourenplanung) | Forge-Maps | eigener Kartendienst oder Funktion deaktivieren |
+
+**Datei-Speicher umstellen:** Setze `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`
+(sowie `S3_REGION`/`S3_ENDPOINT` je nach Anbieter). Sobald diese gesetzt sind, nutzt die
+App automatisch den eigenen S3-Speicher statt Forge – ohne Codeänderung. Der Download-Pfad
+`/manus-storage/{key}` bleibt erhalten, sodass bereits gespeicherte Verweise weiter
+funktionieren. Läuft mit jedem S3-kompatiblen EU-Anbieter (AWS S3 eu-*, Hetzner, IONOS, MinIO …).
 
 **Kernbetrieb** (Login per E-Mail/Passwort, Kunden, Termine, Import, Export-Berechnung,
 Audit-Log) ist von diesen Diensten **unabhängig** und läuft mit MySQL + `JWT_SECRET`

@@ -10,4 +10,13 @@ export const ENV = {
   vapidPublicKey: process.env.VAPID_PUBLIC_KEY ?? "",
   vapidPrivateKey: process.env.VAPID_PRIVATE_KEY ?? "",
   redisUrl: process.env.REDIS_URL ?? "",
+  // Eigener S3-kompatibler Datei-Speicher (Ersatz für den Manus/Forge-Speicher).
+  // Wenn Bucket + Zugangsdaten gesetzt sind, wird dieser statt Forge verwendet.
+  s3Endpoint: process.env.S3_ENDPOINT ?? "",
+  s3Region: process.env.S3_REGION ?? "",
+  s3Bucket: process.env.S3_BUCKET ?? "",
+  s3AccessKeyId: process.env.S3_ACCESS_KEY_ID ?? "",
+  s3SecretAccessKey: process.env.S3_SECRET_ACCESS_KEY ?? "",
+  // Nicht-AWS-Anbieter (Hetzner, IONOS, MinIO …) benötigen meist Path-Style-URLs.
+  s3ForcePathStyle: (process.env.S3_FORCE_PATH_STYLE ?? "true") !== "false",
 };
