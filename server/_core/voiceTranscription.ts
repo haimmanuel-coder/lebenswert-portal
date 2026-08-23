@@ -74,19 +74,22 @@ export async function transcribeAudio(
   options: TranscribeOptions
 ): Promise<TranscriptionResponse | TranscriptionError> {
   try {
-    // Step 1: Validate environment configuration
-    if (!ENV.forgeApiUrl) {
+    // Step 1: Anbieter auflösen – eigener STT-Dienst (STT_API_*) bevorzugt, sonst Forge.
+    const sttBasis = (ENV.sttApiUrl || ENV.forgeApiUrl || "").trim();
+    const sttKey = (ENV.sttApiKey || ENV.forgeApiKey || "").trim();
+    const sttModel = (ENV.sttModel || "whisper-1").trim();
+    if (!sttBasis) {
       return {
         error: "Voice transcription service is not configured",
         code: "SERVICE_ERROR",
-        details: "BUILT_IN_FORGE_API_URL is not set"
+        details: "STT_API_URL bzw. BUILT_IN_FORGE_API_URL ist nicht gesetzt"
       };
     }
-    if (!ENV.forgeApiKey) {
+    if (!sttKey) {
       return {
         error: "Voice transcription service authentication is missing",
         code: "SERVICE_ERROR",
-        details: "BUILT_IN_FORGE_API_KEY is not set"
+        details: "STT_API_KEY bzw. BUILT_IN_FORGE_API_KEY ist nicht gesetzt"
       };
     }
 
@@ -131,7 +134,7 @@ export async function transcribeAudio(
     const audioBlob = new Blob([new Uint8Array(audioBuffer)], { type: mimeType });
     formData.append("file", audioBlob, filename);
     
-    formData.append("model", "whisper-1");
+    formData.append("model", sttModel);
     formData.append("response_format", "verbose_json");
     
     // Add prompt - use custom prompt if provided, otherwise generate based on language
@@ -143,10 +146,8 @@ export async function transcribeAudio(
     formData.append("prompt", prompt);
 
     // Step 4: Call the transcription service
-    const baseUrl = ENV.forgeApiUrl.endsWith("/")
-      ? ENV.forgeApiUrl
-      : `${ENV.forgeApiUrl}/`;
-    
+    const baseUrl = sttBasis.endsWith("/") ? sttBasis : `${sttBasis}/`;
+
     const fullUrl = new URL(
       "v1/audio/transcriptions",
       baseUrl
@@ -155,7 +156,7 @@ export async function transcribeAudio(
     const response = await fetch(fullUrl, {
       method: "POST",
       headers: {
-        authorization: `Bearer ${ENV.forgeApiKey}`,
+        authorization: `Bearer ${sttKey}`,
         "Accept-Encoding": "identity",
       },
       body: formData,

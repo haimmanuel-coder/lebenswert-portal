@@ -119,8 +119,14 @@ Diese Funktionen nutzen von Manus bereitgestellte Dienste über die
 | Funktion | Abhängigkeit | Ersatz beim Umzug |
 |---|---|---|
 | Datei-Speicher (Unterschriften, Backups, Export-Pakete) | Forge-Speicher | **eingebaut:** S3-kompatibler Speicher über `S3_*`-Variablen (siehe unten) |
-| KI (Berichtsvorschläge, Sprache-zu-Text, Bildgenerierung) | Forge-KI | eigener KI-Anbieter oder Funktion deaktivieren |
-| Karten (Tourenplanung) | Forge-Maps | eigener Kartendienst oder Funktion deaktivieren |
+| KI – Berichtsvorschläge/Analysen (LLM) | Forge-KI | **eingebaut:** OpenAI-kompatibler Anbieter über `LLM_API_URL`/`LLM_API_KEY`/`LLM_MODEL` |
+| KI – Sprache-zu-Text (Besuchsberichte) | Forge-STT | **eingebaut:** OpenAI-/Whisper-kompatibel über `STT_API_URL`/`STT_API_KEY`/`STT_MODEL` |
+| Karten (Tourenplanung + Anzeige) | Forge-Maps | **eingebaut:** eigener Google-Maps-Schlüssel (`GOOGLE_MAPS_API_KEY` server, `VITE_GOOGLE_MAPS_API_KEY` Browser) |
+
+Alle vier Bereiche greifen automatisch auf den eigenen Anbieter zu, sobald die
+jeweiligen Variablen gesetzt sind – sonst weiter Forge (Manus). Kein Codeeingriff nötig.
+Hinweis: `VITE_GOOGLE_MAPS_API_KEY` wird zur **Build-Zeit** eingebettet (bei Docker als
+Build-Argument übergeben); die übrigen Werte wirken zur Laufzeit.
 
 **Datei-Speicher umstellen:** Setze `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`
 (sowie `S3_REGION`/`S3_ENDPOINT` je nach Anbieter). Sobald diese gesetzt sind, nutzt die

@@ -1,4 +1,5 @@
 import { ENV } from "./env";
+import { resolveEndpunkt } from "./externeDienste";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -212,16 +213,23 @@ const normalizeToolChoice = (
   return toolChoice;
 };
 
-const resolveApiUrl = () =>
-  ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
-    ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`
-    : "https://forge.manus.im/v1/chat/completions";
-
-const assertApiKey = () => {
-  if (!ENV.forgeApiKey) {
-    throw new Error("OPENAI_API_KEY is not configured");
+// Bevorzugt einen eigenen OpenAI-kompatiblen Anbieter (LLM_API_URL/LLM_API_KEY),
+// fällt sonst auf Manus/Forge zurück.
+function llmEndpunkt() {
+  const ep = resolveEndpunkt({
+    eigenUrl: ENV.llmApiUrl,
+    eigenKey: ENV.llmApiKey,
+    forgeUrl: ENV.forgeApiUrl,
+    forgeKey: ENV.forgeApiKey,
+    forgeFallbackBasis: "https://forge.manus.im",
+  });
+  if (!ep) {
+    throw new Error(
+      "KI-Anbieter nicht konfiguriert: LLM_API_URL/LLM_API_KEY oder BUILT_IN_FORGE_API_KEY setzen.",
+    );
   }
-};
+  return ep;
+}
 
 const normalizeResponseFormat = ({
   responseFormat,
@@ -340,7 +348,7 @@ const fetchWithBackoff = async (
 };
 
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
-  assertApiKey();
+  const endpunkt = llmEndpunkt();
 
   const {
     messages,
@@ -362,8 +370,12 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     messages: messages.map(normalizeMessage),
   };
 
+  // Eigene OpenAI-kompatible Anbieter benötigen i. d. R. einen Modellnamen;
+  // ohne expliziten Wert greift LLM_MODEL (bei Forge optional).
   if (model) {
     payload.model = model;
+  } else if (ENV.llmModel) {
+    payload.model = ENV.llmModel;
   }
 
   if (tools && tools.length > 0) {
@@ -401,11 +413,11 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.response_format = normalizedResponseFormat;
   }
 
-  const response = await fetchWithBackoff(resolveApiUrl(), {
+  const response = await fetchWithBackoff(`${endpunkt.basis}/v1/chat/completions`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${ENV.forgeApiKey}`,
+      authorization: `Bearer ${endpunkt.key}`,
     },
     body: JSON.stringify(payload),
   });
@@ -433,14 +445,10 @@ export type ModelsResponse = {
 };
 
 export async function listLLMModels(): Promise<ModelsResponse> {
-  assertApiKey();
+  const endpunkt = llmEndpunkt();
 
-  const url = ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
-    ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/models`
-    : "https://forge.manus.im/v1/models";
-
-  const response = await fetchWithBackoff(url, {
-    headers: { authorization: `Bearer ${ENV.forgeApiKey}` },
+  const response = await fetchWithBackoff(`${endpunkt.basis}/v1/models`, {
+    headers: { authorization: `Bearer ${endpunkt.key}` },
   });
 
   if (!response.ok) {
