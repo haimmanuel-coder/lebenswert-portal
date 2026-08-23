@@ -91,6 +91,19 @@ Hinweise:
 
 Nach dem Speichern der Variablen baut/startet Railway den App-Service neu.
 
+### Erstes Admin-Konto (leere Installation)
+Eine frische Datenbank hat noch kein Login. Setze **einmalig** diese Variablen, damit
+beim Start ein Admin angelegt wird (nur solange noch kein Admin existiert):
+
+| Variable | Beispiel |
+|---|---|
+| `SEED_ADMIN_EMAIL` | deine Admin-Adresse |
+| `SEED_ADMIN_PASSWORT` | ein starkes Startpasswort (min. 8 Zeichen) |
+| `SEED_ADMIN_NAME` | z. B. `Daniela Bergmann` (optional) |
+
+Nach dem Redeploy einloggen. Danach **`SEED_ADMIN_PASSWORT` wieder entfernen** und das
+Passwort im Portal ändern. Auf einem bereits befüllten System ist die Funktion wirkungslos.
+
 ## Phase 4 – Datenbank befüllen (Daten aus Manus übernehmen)
 
 **A) Daten aus Manus exportieren:**
