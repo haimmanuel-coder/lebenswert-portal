@@ -86,16 +86,27 @@ declare global {
   }
 }
 
+// Eigener Google-Maps-Schlüssel (zur Build-Zeit gesetzt) bevorzugt – lädt die
+// Karte direkt von Google. Ohne diesen Wert wird der Manus/Forge-Proxy genutzt.
+const DIRECT_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 const API_KEY = import.meta.env.VITE_FRONTEND_FORGE_API_KEY;
 const FORGE_BASE_URL =
   import.meta.env.VITE_FRONTEND_FORGE_API_URL ||
   "https://forge.butterfly-effect.dev";
 const MAPS_PROXY_URL = `${FORGE_BASE_URL}/v1/maps/proxy`;
 
+function mapsScriptSrc(): string {
+  const libs = "marker,places,geocoding,geometry";
+  if (DIRECT_MAPS_KEY) {
+    return `https://maps.googleapis.com/maps/api/js?key=${DIRECT_MAPS_KEY}&v=weekly&libraries=${libs}`;
+  }
+  return `${MAPS_PROXY_URL}/maps/api/js?key=${API_KEY}&v=weekly&libraries=${libs}`;
+}
+
 function loadMapScript() {
   return new Promise(resolve => {
     const script = document.createElement("script");
-    script.src = `${MAPS_PROXY_URL}/maps/api/js?key=${API_KEY}&v=weekly&libraries=marker,places,geocoding,geometry`;
+    script.src = mapsScriptSrc();
     script.async = true;
     script.crossOrigin = "anonymous";
     script.onload = () => {
