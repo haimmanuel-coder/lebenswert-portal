@@ -67,12 +67,27 @@ App-Service → **Variables** → folgende Werte anlegen:
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | optional (Push) |
 | `REDIS_URL` | optional |
 
+**Datei-Speicher (empfohlen, ersetzt den Manus-Speicher):** Bei einem
+S3-kompatiblen EU-Anbieter (z. B. Hetzner Object Storage, IONOS, AWS S3 eu-*) einen
+Bucket anlegen und ergänzen:
+
+| Variable | Wert |
+|---|---|
+| `S3_BUCKET` | Name des Buckets |
+| `S3_REGION` | z. B. `eu-central-1` |
+| `S3_ENDPOINT` | Endpunkt des Anbieters (bei echtem AWS leer lassen) |
+| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | Zugangsschlüssel des Buckets |
+
+Sobald diese gesetzt sind, nutzt die App automatisch den eigenen Speicher – ohne
+Codeänderung. Ohne diese Werte funktionieren Unterschriften/Backups/Export-Dateien
+(noch) nicht.
+
 Hinweise:
 - **`PORT` NICHT setzen** – Railway vergibt den Port automatisch; die App liest ihn
   (`process.env.PORT`) und lauscht darauf.
 - Die **Manus/Forge-Variablen** (`BUILT_IN_FORGE_*`, `OAUTH_*`, `VITE_APP_ID`) bleiben
-  **leer**. Dann funktionieren Datei-Speicher, KI und Karten (noch) nicht – der
-  Kernbetrieb läuft trotzdem (siehe README, Abschnitt „Umzug von Manus").
+  **leer**. KI und Karten funktionieren dann (noch) nicht – der Kernbetrieb inkl.
+  Datei-Speicher (bei gesetzten `S3_*`) läuft trotzdem (siehe README, „Umzug von Manus").
 
 Nach dem Speichern der Variablen baut/startet Railway den App-Service neu.
 
