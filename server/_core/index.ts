@@ -19,6 +19,7 @@ import { aufbewahrungsfristenHandler } from "../scheduled/aufbewahrungsfristen";
 import { backupWoechentlichHandler } from "../scheduled/backupWoechentlich";
 import { pflichtmitteilungenErinnerungHandler } from "../scheduled/pflichtmitteilungenErinnerung";
 import { ensureTables } from "../ensureTables";
+import { seedAdminFallsNoetig } from "../seedAdmin";
 import { ensureHeartbeatJobs } from "../ensureHeartbeatJobs";
 import { handleMonatsabschlussErinnerung } from "../scheduled/monatsabschlussErinnerung";
 import multer from "multer";
@@ -49,6 +50,8 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   // Tabellen-Absicherung: alle Tabellen per CREATE TABLE IF NOT EXISTS erstellen
   await ensureTables();
+  // Start-Admin einmalig anlegen (nur bei leerer Installation + gesetzten SEED_ADMIN_*).
+  await seedAdminFallsNoetig().catch((e) => console.warn("[SeedAdmin] übersprungen:", e));
   // Heartbeat-Jobs registrieren (idempotent)
   ensureHeartbeatJobs().catch((e) => console.warn("[HeartbeatJobs] Hintergrund-Init fehlgeschlagen:", e));
 

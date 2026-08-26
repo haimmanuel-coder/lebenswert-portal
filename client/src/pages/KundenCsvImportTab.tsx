@@ -16,6 +16,8 @@ interface KundenCsvRow {
   versicherungsnummer: string;
   notizen: string;
   _fehler?: string;
+  /** Nicht-blockierender Hinweis, z. B. „Bestandskunde – wird aktualisiert". */
+  _hinweis?: string;
 }
 
 const CSV_HEADER = [
@@ -82,13 +84,12 @@ function parseCSV(text: string): KundenCsvRow[] {
 export default function KundenCsvImportTab() {
   const [rows, setRows] = useState<KundenCsvRow[]>([]);
   const [importing, setImporting] = useState(false);
-  const [ergebnisse, setErgebnisse] = useState<Array<{ name: string; ok: boolean; fehler?: string }>>([]);
+  const [ergebnisse, setErgebnisse] = useState<Array<{ name: string; ok: boolean; typ?: string; fehler?: string }>>([]);
   const [dateiname, setDateiname] = useState("");
   const [showVerlauf, setShowVerlauf] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const createKunde = (trpc as any).kunden.create.useMutation();
-  const protokollSpeichern = (trpc as any).csvImport.protokollSpeichern.useMutation();
+  const upsertImport = (trpc as any).kunden.upsertImport.useMutation();
   const { data: protokollListe = [], refetch: refetchProtokolle } = (trpc as any).csvImport.protokollListe.useQuery();
   const { data: kundenNameListe = [] } = (trpc as any).admin.kundenNameListe.useQuery();
   const vorhandeneKunden = (kundenNameListe as Array<{ vorname: string; nachname: string; ort: string }>)
@@ -102,20 +103,21 @@ export default function KundenCsvImportTab() {
     reader.onload = ev => {
       const text = ev.target?.result as string;
       const parsed = parseCSV(text);
-      // Duplikat-Prüfung: Vor- + Nachname bereits vorhanden?
-      const mitDuplikat = parsed.map(row => {
+      // Abgleich-Vorschau: bereits vorhandene Kunden (Vor- + Nachname) werden beim
+      // Import AKTUALISIERT statt übersprungen – daher nur ein Hinweis, kein Fehler.
+      const mitHinweis = parsed.map(row => {
         if (!row._fehler) {
           const key = `${row.vorname.toLowerCase()} ${row.nachname.toLowerCase()}`;
           if (vorhandeneKunden.includes(key)) {
-            return { ...row, _fehler: `⚠️ Duplikat: Kunde "${row.vorname} ${row.nachname}" bereits vorhanden` };
+            return { ...row, _hinweis: "↻ Bestandskunde – wird aktualisiert" };
           }
         }
         return row;
       });
-      setRows(mitDuplikat);
+      setRows(mitHinweis);
       setErgebnisse([]);
-      const duplikate = mitDuplikat.filter(r => r._fehler?.includes("Duplikat")).length;
-      if (duplikate > 0) toast.warning(`${parsed.length} Zeilen eingelesen – ${duplikate} Duplikat(e) erkannt`);
+      const updates = mitHinweis.filter(r => r._hinweis).length;
+      if (updates > 0) toast.info(`${parsed.length} Zeilen – ${updates} bestehende werden aktualisiert`);
       else toast.info(`${parsed.length} Zeilen eingelesen`);
     };
     reader.readAsText(file, "UTF-8");
@@ -125,53 +127,52 @@ export default function KundenCsvImportTab() {
     const gueltig = rows.filter(r => !r._fehler);
     if (gueltig.length === 0) { toast.error("Keine gültigen Zeilen zum Importieren"); return; }
     setImporting(true);
-    const results: Array<{ name: string; ok: boolean; fehler?: string }> = [];
-    for (const row of gueltig) {
-      const name = `${row.vorname} ${row.nachname}`;
-      try {
-        await createKunde.mutateAsync({
-          vorname: row.vorname,
-          nachname: row.nachname,
-          adresse: row.strasse ? `${row.strasse}, ${row.plz} ${row.ort}`.trim() : undefined,
-          telefon: row.telefon || undefined,
-          pflegegrad: Number(row.pflegegrad) || 2,
-          paragraph: (PARAGRAPH_WERTE.includes(row.paragraph) ? row.paragraph : "45b") as any,
-          versicherungsnummer: row.versicherungsnummer || undefined,
-        });
-        results.push({ name, ok: true });
-      } catch (e: any) {
-        results.push({ name, ok: false, fehler: e.message });
-      }
-    }
-    setErgebnisse(results);
-    setImporting(false);
-    const ok = results.filter(r => r.ok).length;
-    const fail = results.filter(r => !r.ok).length;
-    if (fail === 0) toast.success(`✅ ${ok} Kunden erfolgreich importiert`);
-    else toast.warning(`⚠️ ${ok} OK, ${fail} Fehler`);
-    // Protokoll speichern (nutzt denselben csvImport Router wie MA-Import)
     try {
-      const fehlerDetails = results.filter(r => !r.ok).map(r => `${r.name}: ${r.fehler}`).join("; ");
-      await protokollSpeichern.mutateAsync({
+      // Ein einziger, idempotenter Aufruf: der Server erkennt Bestandskunden
+      // (Versicherungsnummer/Name) und aktualisiert sie, neue werden angelegt.
+      const res = await upsertImport.mutateAsync({
         dateiname: `[KUNDEN] ${dateiname}`,
-        gesamtZeilen: gueltig.length,
-        erfolgreich: ok,
-        fehlgeschlagen: fail,
-        fehlerDetails: fehlerDetails || undefined,
+        zeilen: gueltig.map(r => ({
+          vorname: r.vorname,
+          nachname: r.nachname,
+          strasse: r.strasse || undefined,
+          plz: r.plz || undefined,
+          ort: r.ort || undefined,
+          telefon: r.telefon || undefined,
+          pflegegrad: r.pflegegrad || undefined,
+          paragraph: (PARAGRAPH_WERTE.includes(r.paragraph) ? r.paragraph : "45b"),
+          kostentraeger: r.kostentraeger || undefined,
+          versicherungsnummer: r.versicherungsnummer || undefined,
+          notizen: r.notizen || undefined,
+        })),
       });
+      const results = (res.ergebnisse as Array<{ name: string; typ: string; fehler?: string }>).map(e => ({
+        name: e.name, ok: e.typ !== "fehler", typ: e.typ, fehler: e.fehler,
+      }));
+      setErgebnisse(results);
+      if (res.fehler === 0) toast.success(`✅ ${res.neu} neu · ${res.aktualisiert} aktualisiert`);
+      else toast.warning(`⚠️ ${res.neu} neu · ${res.aktualisiert} aktualisiert · ${res.fehler} Fehler`);
       refetchProtokolle();
-    } catch (_e) {}
+    } catch (e: any) {
+      toast.error(`Import fehlgeschlagen: ${e?.message ?? "Unbekannter Fehler"}`);
+    } finally {
+      setImporting(false);
+    }
   };
 
   const gueltigCount = rows.filter(r => !r._fehler).length;
   const fehlerCount = rows.filter(r => r._fehler).length;
+  const updateCount = rows.filter(r => !r._fehler && r._hinweis).length;
+  const neuCount = gueltigCount - updateCount;
 
   return (
     <div style={{ padding: "0 4px" }}>
       <div style={{ marginBottom: 16 }}>
         <h3 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 4px" }}>🏠 Kunden-CSV-Import</h3>
         <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>
-          Importiere mehrere Kunden auf einmal. Lade die Vorlage herunter, fülle sie aus und lade sie hoch.
+          Importiere mehrere Kunden auf einmal. Bestandskunden werden dabei automatisch erkannt
+          (über Versicherungsnummer bzw. Name) und <strong>aktualisiert</strong> statt doppelt angelegt –
+          ein erneuter Import derselben Datei ist damit gefahrlos wiederholbar.
         </p>
       </div>
 
@@ -246,7 +247,8 @@ export default function KundenCsvImportTab() {
         <div style={{ marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
             <span style={{ fontSize: 13, fontWeight: 700 }}>Vorschau ({rows.length} Zeilen)</span>
-            {gueltigCount > 0 && <span style={{ background: "#dcfce7", color: "#166534", padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>✓ {gueltigCount} gültig</span>}
+            {neuCount > 0 && <span style={{ background: "#dcfce7", color: "#166534", padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>✓ {neuCount} neu</span>}
+            {updateCount > 0 && <span style={{ background: "#dbeafe", color: "#1e40af", padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>↻ {updateCount} werden aktualisiert</span>}
             {fehlerCount > 0 && <span style={{ background: "#fee2e2", color: "#991b1b", padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>✗ {fehlerCount} Fehler</span>}
           </div>
           <div style={{ overflowX: "auto", borderRadius: 10, border: "1px solid #e5e7eb" }}>
@@ -264,7 +266,9 @@ export default function KundenCsvImportTab() {
                     <td style={{ padding: "6px 10px" }}>
                       {row._fehler
                         ? <span title={row._fehler} style={{ color: "#dc2626", fontWeight: 700, cursor: "help" }}>✗</span>
-                        : <span style={{ color: "#4a8c3f", fontWeight: 700 }}>✓</span>}
+                        : row._hinweis
+                          ? <span title={row._hinweis} style={{ color: "#2563eb", fontWeight: 700, cursor: "help" }}>↻</span>
+                          : <span title="Neuer Kunde" style={{ color: "#4a8c3f", fontWeight: 700 }}>✓</span>}
                     </td>
                     <td style={{ padding: "6px 10px" }}>{row.vorname}</td>
                     <td style={{ padding: "6px 10px" }}>{row.nachname}</td>
@@ -295,7 +299,7 @@ export default function KundenCsvImportTab() {
           disabled={importing}
           style={{ padding: "10px 20px", background: importing ? "#9ca3af" : "#4a8c3f", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: importing ? "default" : "pointer", width: "100%" }}
         >
-          {importing ? `⏳ Importiere… (${ergebnisse.length}/${gueltigCount})` : `🚀 ${gueltigCount} Kunden importieren`}
+          {importing ? "⏳ Synchronisiere…" : `🚀 Import starten (${neuCount} neu${updateCount > 0 ? ` · ${updateCount} aktualisieren` : ""})`}
         </button>
       )}
 
@@ -305,8 +309,10 @@ export default function KundenCsvImportTab() {
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Import-Ergebnis</div>
           {ergebnisse.map((r, i) => (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: r.ok ? "#f0fdf4" : "#fff5f5", borderRadius: 8, marginBottom: 4, fontSize: 12 }}>
-              <span style={{ color: r.ok ? "#4a8c3f" : "#dc2626", fontWeight: 700 }}>{r.ok ? "✓" : "✗"}</span>
+              <span style={{ color: r.ok ? "#4a8c3f" : "#dc2626", fontWeight: 700 }}>{r.typ === "aktualisierung" ? "↻" : r.ok ? "✓" : "✗"}</span>
               <span style={{ flex: 1 }}>{r.name}</span>
+              {r.typ === "neu" && <span style={{ color: "#166534", background: "#dcfce7", padding: "1px 6px", borderRadius: 10, fontSize: 10, fontWeight: 700 }}>neu</span>}
+              {r.typ === "aktualisierung" && <span style={{ color: "#1e40af", background: "#dbeafe", padding: "1px 6px", borderRadius: 10, fontSize: 10, fontWeight: 700 }}>aktualisiert</span>}
               {r.fehler && <span style={{ color: "#dc2626", fontSize: 11 }}>{r.fehler}</span>}
             </div>
           ))}
