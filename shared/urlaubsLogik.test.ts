@@ -36,6 +36,17 @@ describe("Urlaubslogik nach planmäßigen Arbeitstagen", () => {
     expect(verbrauch.tage).toBe(2);
   });
 
+  it("nimmt auch nur im gewählten Bundesland geltende Feiertage aus dem Verbrauch heraus", () => {
+    const verbrauch = berechneUrlaubsverbrauch({
+      von: "2026-03-06",
+      bis: "2026-03-10",
+      arbeitstageWoche: ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"],
+      bundesland: "BE",
+    });
+    expect(verbrauch.ausgenommeneFeiertage).toEqual([{ datum: "2026-03-08", name: "Internationaler Frauentag" }]);
+    expect(verbrauch.tage).toBe(4);
+  });
+
   it("berücksichtigt bei einem unterjährigen Vertragswechsel das jeweils gültige Wochenmuster", () => {
     const verbrauch = berechneUrlaubsverbrauch({
       von: "2026-06-01",

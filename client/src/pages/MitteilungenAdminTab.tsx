@@ -17,6 +17,7 @@ export default function MitteilungenAdminTab() {
   const [showForm, setShowForm] = useState(false);
 
   const { data: mitteilungen = [], refetch } = (trpc as any).mitteilungen.adminListe.useQuery();
+  const { data: erinnerungsStatus = { offen: 0, heuteErinnert: 0 } } = (trpc as any).mitteilungen.erinnerungsStatus.useQuery();
   const erstellen = (trpc as any).mitteilungen.erstellen.useMutation({
     onSuccess: () => { toast.success("✅ Mitteilung erstellt und an alle Mitarbeiter gesendet"); refetch(); setShowForm(false); setTitel(""); setInhalt(""); setPrioritaet("normal"); setPflicht(true); setGueltigBis(""); },
     onError: (e: any) => toast.error("❌ " + e.message),
@@ -36,6 +37,17 @@ export default function MitteilungenAdminTab() {
           style={{ padding: "8px 16px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
           {showForm ? "✕ Abbrechen" : "+ Neue Mitteilung"}
         </button>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginBottom: 16 }}>
+        <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 10, padding: 12 }}>
+          <div style={{ fontSize: 11, color: "#9a3412", fontWeight: 700 }}>OFFENE PFLICHTBESTÄTIGUNGEN</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: "#c2410c" }}>{erinnerungsStatus.offen}</div>
+        </div>
+        <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: 12 }}>
+          <div style={{ fontSize: 11, color: "#1d4ed8", fontWeight: 700 }}>HEUTE AUTOMATISCH ERINNERT</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: "#1d4ed8" }}>{erinnerungsStatus.heuteErinnert}</div>
+        </div>
       </div>
 
       {showForm && (

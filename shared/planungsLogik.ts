@@ -757,7 +757,35 @@ export function liegtImZeitraum(
   return d >= v && d <= b;
 }
 
-// ── Feiertage (bundeseinheitlich) ───────────────────────────────────────────
+// ── Feiertage (bundeseinheitlich und bundeslandspezifisch) ──────────────────
+
+export const BUNDESLAENDER = [
+  { code: "DE", label: "Bundeseinheitliche Feiertage" },
+  { code: "BW", label: "Baden-Württemberg" },
+  { code: "BY", label: "Bayern" },
+  { code: "BE", label: "Berlin" },
+  { code: "BB", label: "Brandenburg" },
+  { code: "HB", label: "Bremen" },
+  { code: "HH", label: "Hamburg" },
+  { code: "HE", label: "Hessen" },
+  { code: "MV", label: "Mecklenburg-Vorpommern" },
+  { code: "NI", label: "Niedersachsen" },
+  { code: "NW", label: "Nordrhein-Westfalen" },
+  { code: "RP", label: "Rheinland-Pfalz" },
+  { code: "SL", label: "Saarland" },
+  { code: "SN", label: "Sachsen" },
+  { code: "ST", label: "Sachsen-Anhalt" },
+  { code: "SH", label: "Schleswig-Holstein" },
+  { code: "TH", label: "Thüringen" },
+] as const;
+
+export type Bundesland = (typeof BUNDESLAENDER)[number]["code"];
+
+export function normalisiereBundesland(wert: unknown): Bundesland {
+  return BUNDESLAENDER.some((bundesland) => bundesland.code === wert)
+    ? wert as Bundesland
+    : "DE";
+}
 
 /** Berechnet den Ostersonntag eines Jahres (Gaußsche Osterformel). */
 function ostersonntag(jahr: number): Date {
@@ -779,17 +807,20 @@ function ostersonntag(jahr: number): Date {
 }
 
 /**
- * Liefert die bundeseinheitlichen gesetzlichen Feiertage eines Jahres
- * als Zuordnung "YYYY-MM-DD" → Bezeichnung.
+ * Liefert die gesetzlichen Feiertage des gewählten Bundeslands als Zuordnung
+ * "YYYY-MM-DD" → Bezeichnung. Kommunale Sonderfälle (zum Beispiel das
+ * Augsburger Friedensfest oder Mariä Himmelfahrt in Teilen Bayerns) werden
+ * bewusst nicht pauschal für ein ganzes Bundesland abgezogen.
  */
-export function getFeiertage(jahr: number): Record<string, string> {
+export function getFeiertage(jahr: number, bundesland: Bundesland | string = "DE"): Record<string, string> {
+  const land = normalisiereBundesland(bundesland);
   const ostern = ostersonntag(jahr);
   const relativ = (tage: number) => {
     const d = new Date(ostern);
     d.setDate(d.getDate() + tage);
     return zuDatumsString(d);
   };
-  return {
+  const feiertage: Record<string, string> = {
     [`${jahr}-01-01`]: "Neujahr",
     [relativ(-2)]: "Karfreitag",
     [relativ(1)]: "Ostermontag",
@@ -800,13 +831,34 @@ export function getFeiertage(jahr: number): Record<string, string> {
     [`${jahr}-12-25`]: "1. Weihnachtstag",
     [`${jahr}-12-26`]: "2. Weihnachtstag",
   };
+  const hinzufuegen = (datum: string, name: string) => { feiertage[datum] = name; };
+  const hat = (...laender: Bundesland[]) => laender.includes(land);
+  const bussUndBettag = () => {
+    const datum = new Date(jahr, 10, 22, 12);
+    datum.setDate(datum.getDate() - ((datum.getDay() + 4) % 7)); // letzter Mittwoch vor dem 23. November
+    return zuDatumsString(datum);
+  };
+
+  if (hat("BW", "BY", "ST")) hinzufuegen(`${jahr}-01-06`, "Heilige Drei Könige");
+  if (hat("BE", "BB", "MV")) hinzufuegen(`${jahr}-03-08`, "Internationaler Frauentag");
+  if (hat("BB")) {
+    hinzufuegen(relativ(0), "Ostersonntag");
+    hinzufuegen(relativ(49), "Pfingstsonntag");
+  }
+  if (hat("BW", "BY", "HE", "NW", "RP", "SL")) hinzufuegen(relativ(60), "Fronleichnam");
+  if (hat("SL")) hinzufuegen(`${jahr}-08-15`, "Mariä Himmelfahrt");
+  if (hat("TH")) hinzufuegen(`${jahr}-09-20`, "Weltkindertag");
+  if (hat("BB", "HB", "HH", "MV", "NI", "SN", "ST", "SH", "TH")) hinzufuegen(`${jahr}-10-31`, "Reformationstag");
+  if (hat("BW", "BY", "NW", "RP", "SL")) hinzufuegen(`${jahr}-11-01`, "Allerheiligen");
+  if (hat("SN")) hinzufuegen(bussUndBettag(), "Buß- und Bettag");
+  return feiertage;
 }
 
 /** Gibt den Feiertagsnamen zurück, falls das Datum ein Feiertag ist. */
-export function getFeiertag(datum: string): string | null {
+export function getFeiertag(datum: string, bundesland: Bundesland | string = "DE"): string | null {
   const jahr = Number(datum.slice(0, 4));
   if (!Number.isFinite(jahr)) return null;
-  return getFeiertage(jahr)[datum] ?? null;
+  return getFeiertage(jahr, bundesland)[datum] ?? null;
 }
 
 // ── Farbzuordnung für Mitarbeiter (Kalender/Tourenplanung) ─────────────────

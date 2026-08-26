@@ -63,6 +63,8 @@ export default function Kalender() {
   const [filterMitarbeiterId, setFilterMitarbeiterId] = useState<number | null>(null);
   const [ansicht, setAnsicht] = useState<"monat" | "woche">("monat");
   const [wochenOffset, setWochenOffset] = useState(0);
+  const { data: feiertagsEinstellung } = (trpc as any).einstellungen.urlaubsBundesland.useQuery();
+  const bundesland = feiertagsEinstellung?.bundesland ?? "DE";
 
   // Wochenberechnung
   const wochenStart = useMemo(() => {
@@ -148,7 +150,7 @@ export default function Kalender() {
       const datum = `${monatsSchluessel}-${String(tag).padStart(2, "0")}`;
       const wochentag = new Date(`${datum}T12:00:00`).getDay();
       if (wochentag === 0 || wochentag === 6) continue;
-      if (getFeiertag(datum)) continue;
+      if (getFeiertag(datum, bundesland)) continue;
       if ((termineNachTag[datum]?.length ?? 0) > 0) continue;
       if (abwesenheitenAmTag(datum).length > 0) continue;
       freieTage++;
@@ -298,7 +300,7 @@ export default function Kalender() {
             {wochenTage.map((tag, idx) => {
               const termine = (termineNachTag[tag] ?? []);
               const istHeute = tag === heute;
-              const feiertag = getFeiertag(tag);
+              const feiertag = getFeiertag(tag, bundesland);
               const abwesenheit = abwesenheiten.find((a: any) => liegtImZeitraum(tag, a.von, a.bis));
               return (
                 <div
@@ -367,7 +369,7 @@ export default function Kalender() {
             const datum = `${monatsSchluessel}-${String(tag).padStart(2, "0")}`;
             const termine = termineNachTag[datum] ?? [];
             const abwesende = abwesenheitenAmTag(datum);
-            const feiertag = getFeiertag(datum);
+            const feiertag = getFeiertag(datum, bundesland);
             const istHeute = datum === heute;
             const istGewaehlt = datum === gewaehlterTag;
             const wochenende = (startSpalte + i) % 7 >= 5;
@@ -557,7 +559,7 @@ export default function Kalender() {
             </button>
           </div>
 
-          {getFeiertag(gewaehlterTag) && (
+          {getFeiertag(gewaehlterTag, bundesland) && (
             <div
               style={{
                 background: "#fff7ed",
@@ -570,7 +572,7 @@ export default function Kalender() {
                 marginBottom: 8,
               }}
             >
-              🎌 Gesetzlicher Feiertag: {getFeiertag(gewaehlterTag)}
+              🎌 Gesetzlicher Feiertag: {getFeiertag(gewaehlterTag, bundesland)}
             </div>
           )}
 

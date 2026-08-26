@@ -1,6 +1,15 @@
 # Lebenswert Betreuung – Mitarbeiter-Portal TODO
 
 ## Aktuelle Umsetzung – Unterweisung, Erste Hilfe und DSGVO-Startprozess
+- [x] Bundeslandspezifische Feiertagsverwaltung mit administrativer Standortauswahl in die Urlaubsberechnung integrieren
+- [x] Tägliche automatische Erinnerung für ausstehende Pflichtmitteilungen mit idempotenter Ausführung und Admin-Übersicht ergänzen
+- [x] CSV-Export der Arbeitsmuster- und Urlaubshistorie für die Personalakte einschließlich Audit-Protokoll bereitstellen
+- [x] Erweiterungen für Feiertage, Pflichtmitteilungen und Personalexport mit TypeScript, Vitest und Abnahmeprüfung absichern
+- [x] Client-Anbindung für den Personalaktenexport auf einen tatsächlich auslösbaren Query-Abruf korrigieren und mit TypeScript sowie Vertragsprüfung absichern
+- [x] Regressionstest für CSV-Inhalt, Dateiname und Audit-Log-Vertrag des Personalaktenexports ergänzen
+- [x] Technischen Admin-Abnahmeweg für Bundeslandauswahl, Pflichtmitteilungsstatus und Personalaktenexport dokumentieren
+- [ ] Personalaktenexport im angemeldeten Admin-Browser auslösen und den tatsächlichen CSV-Download mit Dateiname/Inhalt dokumentiert verifizieren
+- [ ] Finale Admin-Abnahme nach den Änderungen im Browser durchführen: Bundesland speichern, Urlaubs-/Feiertagseffekt prüfen, Mitteilungsstatus sehen und Personalexport auslösen
 - [x] Kundenzuteilung in der Einsatzplanung um Name, Adresse, Pflegegrad und abrechnungsrelevante Paragraphen mit rollenbasiertem Zugriff ergänzen
 - [x] Wochenendplanung für Samstag und Sonntag fachlich und technisch prüfen sowie bei Sperre freischalten
 - [x] Mitteilungsfunktion einschließlich Navigation, Handler, Berechtigungen und Lesestatus end-to-end prüfen und vervollständigen

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { BUNDESLAENDER } from "@shared/planungsLogik";
 
 const EINSTELLUNGEN_LABELS: Record<string, { label: string; beschreibung: string; type?: string }> = {
   steuerberater_email: { label: "Steuerberater E-Mail", beschreibung: "E-Mail für automatische Knappschaft-Meldungen nach MA-Anlegen", type: "email" },
@@ -13,6 +14,7 @@ export default function EinstellungenTab() {
   const { data: alleEinstellungen = [], refetch } = (trpc as any).einstellungen.getAll.useQuery();
   const setEinstellung = (trpc as any).einstellungen.set.useMutation();
   const testMail = (trpc as any).einstellungen.testSteuerberaterMail.useMutation();
+  const exportPersonalakte = (trpc as any).export.personalaktenHistorie.useQuery(undefined, { enabled: false });
   const { data: maList = [] } = (trpc as any).admin.mitarbeiterList.useQuery();
 
   const [werte, setWerte] = useState<Record<string, string>>({});
@@ -50,6 +52,22 @@ export default function EinstellungenTab() {
     }
   };
 
+  const handlePersonalaktenExport = async () => {
+    try {
+      const { data: result } = await exportPersonalakte.refetch();
+      if (!result) throw new Error("Exportdaten konnten nicht geladen werden.");
+      const url = URL.createObjectURL(new Blob([result.csv], { type: "text/csv;charset=utf-8" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = result.dateiName;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast.success(`✅ ${result.zeilen} Historienzeilen exportiert`);
+    } catch (e: any) {
+      toast.error("Export fehlgeschlagen: " + e.message);
+    }
+  };
+
   return (
     <div style={{ padding: "0 4px" }}>
       <div style={{ marginBottom: 20 }}>
@@ -82,6 +100,29 @@ export default function EinstellungenTab() {
             </div>
           </div>
         ))}
+      </div>
+
+      <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 12, padding: 20, marginBottom: 20 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6, color: "#1e3a8a" }}>📅 Bundesland für Urlaubstage</div>
+        <p style={{ fontSize: 12, color: "#475569", margin: "0 0 12px" }}>
+          Dieses Bundesland bestimmt, welche gesetzlichen Feiertage bei Urlaubsanträgen nicht als Urlaubstag zählen. Kommunale Sonderfälle werden bewusst nicht automatisch pauschal abgezogen.
+        </p>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <select
+            value={werte.urlaubs_bundesland ?? "DE"}
+            onChange={e => setWerte(prev => ({ ...prev, urlaubs_bundesland: e.target.value }))}
+            style={{ flex: 1, minWidth: 220, padding: "8px 12px", border: "1px solid #93c5fd", borderRadius: 8, fontSize: 13, background: "#fff" }}
+          >
+            {BUNDESLAENDER.map((bundesland) => <option key={bundesland.code} value={bundesland.code}>{bundesland.label}</option>)}
+          </select>
+          <button
+            onClick={() => handleSave("urlaubs_bundesland")}
+            disabled={saving === "urlaubs_bundesland"}
+            style={{ padding: "8px 14px", background: saving === "urlaubs_bundesland" ? "#9ca3af" : "#1d4ed8", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
+          >
+            {saving === "urlaubs_bundesland" ? "⏳" : "💾 Feiertagsregel speichern"}
+          </button>
+        </div>
       </div>
 
       {/* SMTP-Hinweis */}
@@ -124,6 +165,20 @@ export default function EinstellungenTab() {
             {testMail.isPending ? "⏳ Sende…" : "📧 Test-Mail senden"}
           </button>
         </div>
+      </div>
+
+      <div style={{ background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: 12, padding: 20, marginTop: 20 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8, color: "#334155" }}>📁 Personalakten-Historie exportieren</div>
+        <p style={{ fontSize: 12, color: "#475569", margin: "0 0 12px" }}>
+          Lädt eine CSV mit den aktuellen Vertragsdaten sowie der lückenlosen Arbeitsmuster- und Urlaubshistorie aller Mitarbeiter herunter. Jeder Export wird im Audit-Protokoll festgehalten.
+        </p>
+        <button
+          onClick={handlePersonalaktenExport}
+          disabled={exportPersonalakte.isFetching}
+          style={{ padding: "9px 16px", background: exportPersonalakte.isFetching ? "#94a3b8" : "#334155", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+        >
+          {exportPersonalakte.isFetching ? "⏳ Export wird erstellt…" : "⬇️ Arbeitsmuster- & Urlaubshistorie (CSV)"}
+        </button>
       </div>
     </div>
   );

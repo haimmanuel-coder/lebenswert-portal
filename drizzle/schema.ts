@@ -1293,3 +1293,15 @@ export const mitteilungenLesebestaetigung = mysqlTable("mitteilungen_lesebestaet
   gelesenAt: timestamp("gelesenAt").defaultNow().notNull(),
 });
 export type MitteilungLesebestaetigung = typeof mitteilungenLesebestaetigung.$inferSelect;
+
+/** Verhindert doppelte Tageserinnerungen bei erneuter Heartbeat-Ausführung. */
+export const pflichtmitteilungErinnerungen = mysqlTable("pflichtmitteilung_erinnerungen", {
+  id: int("id").autoincrement().primaryKey(),
+  mitteilungId: int("mitteilungId").notNull(),
+  mitarbeiterId: int("mitarbeiterId").notNull(),
+  erinnerungsDatum: date("erinnerungsDatum").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  proTagEindeutig: uniqueIndex("uq_pflichtmitteilung_ma_tag").on(table.mitteilungId, table.mitarbeiterId, table.erinnerungsDatum),
+}));
+export type PflichtmitteilungErinnerung = typeof pflichtmitteilungErinnerungen.$inferSelect;

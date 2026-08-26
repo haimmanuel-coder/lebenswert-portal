@@ -17,6 +17,7 @@ import { datenschutzErinnerungHandler } from "../scheduled/datenschutzErinnerung
 import { unterweisungenFaelligkeitHandler } from "../scheduled/unterweisungenFaelligkeit";
 import { aufbewahrungsfristenHandler } from "../scheduled/aufbewahrungsfristen";
 import { backupWoechentlichHandler } from "../scheduled/backupWoechentlich";
+import { pflichtmitteilungenErinnerungHandler } from "../scheduled/pflichtmitteilungenErinnerung";
 import { ensureTables } from "../ensureTables";
 import { ensureHeartbeatJobs } from "../ensureHeartbeatJobs";
 import { handleMonatsabschlussErinnerung } from "../scheduled/monatsabschlussErinnerung";
@@ -154,6 +155,7 @@ async function startServer() {
   app.post("/api/scheduled/datenschutz-erinnerung", datenschutzErinnerungHandler);
   app.post("/api/scheduled/aufbewahrungsfristen-pruefung", aufbewahrungsfristenHandler);
   app.post("/api/scheduled/unterweisungen-faelligkeit", unterweisungenFaelligkeitHandler);
+  app.post("/api/scheduled/pflichtmitteilungen-erinnerung", pflichtmitteilungenErinnerungHandler);
   // Fahrtennachweise: automatischer Versand am 18. jeden Monats
   app.post("/api/scheduled/backup-woechentlich", backupWoechentlichHandler);
   // Fahrtennachweise: automatischer Versand am 18. jeden Monats

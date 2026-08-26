@@ -1190,6 +1190,16 @@ const TABLE_DEFINITIONS: string[] = [
     PRIMARY KEY (\`id\`),
     KEY \`idx_mamuster_ma_ab\` (\`mitarbeiterId\`, \`gueltigAb\`)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  // ── 82. Pflichtmitteilungs-Erinnerungen ─────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS \`pflichtmitteilung_erinnerungen\` (
+    \`id\` int NOT NULL AUTO_INCREMENT,
+    \`mitteilungId\` int NOT NULL,
+    \`mitarbeiterId\` int NOT NULL,
+    \`erinnerungsDatum\` date NOT NULL,
+    \`createdAt\` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    UNIQUE KEY \`uq_pflichtmitteilung_ma_tag\` (\`mitteilungId\`, \`mitarbeiterId\`, \`erinnerungsDatum\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ];
 
 let ensureTablesRan = false;

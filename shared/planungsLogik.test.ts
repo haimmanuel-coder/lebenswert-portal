@@ -439,6 +439,15 @@ describe("Datums- und Kalenderhilfen", () => {
     expect(getFeiertag("2026-04-06")).toBe("Ostermontag");
     expect(getFeiertag("2026-08-04")).toBeNull();
   });
+
+  it("berücksichtigt gesetzliche Feiertage des gewählten Bundeslands", () => {
+    expect(getFeiertag("2026-03-08", "BE")).toBe("Internationaler Frauentag");
+    expect(getFeiertag("2026-03-08", "BW")).toBeNull();
+    expect(getFeiertag("2026-11-18", "SN")).toBe("Buß- und Bettag");
+    expect(getFeiertag("2026-10-31", "NI")).toBe("Reformationstag");
+    expect(getFeiertag("2026-06-04", "NW")).toBe("Fronleichnam");
+    expect(getFeiertag("2026-04-05", "BB")).toBe("Ostersonntag");
+  });
 });
 
 // ── Sonstige Hilfsfunktionen ────────────────────────────────────────────────

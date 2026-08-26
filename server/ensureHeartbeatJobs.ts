@@ -67,6 +67,13 @@ const JOBS = [
     method: "POST" as const,
     description: "Monatsabschluss: Erinnerung an offene Leistungsnachweise vor Monatsende",
   },
+  {
+    name: "pflichtmitteilungen-erinnerung",
+    cron: "0 0 8 * * *",           // täglich 08:00 UTC
+    path: "/api/scheduled/pflichtmitteilungen-erinnerung",
+    method: "POST" as const,
+    description: "Pflichtmitteilungen: tägliche, doppelfreie Erinnerung an offene Lesebestätigungen",
+  },
 ];
 
 export async function ensureHeartbeatJobs(): Promise<void> {

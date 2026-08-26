@@ -105,6 +105,8 @@ export default function Einsatzplanung() {
   });
 
   const { data: kunden = [] } = trpc.kunden.list.useQuery();
+  const { data: feiertagsEinstellung } = (trpc as any).einstellungen.urlaubsBundesland.useQuery();
+  const bundesland = feiertagsEinstellung?.bundesland ?? "DE";
   // Eigene Planungsroute: liefert der Teamleitung nur die Basisangaben,
   // ohne dass Admin-Rechte auf die volle Mitarbeiterakte nötig wären.
   const { data: alleMitarbeiter = [] } = (trpc as any).planung.mitarbeiterListe.useQuery();
@@ -601,7 +603,7 @@ export default function Einsatzplanung() {
         {tage.map((datum) => {
           const termine = termineProTag.get(datum) ?? [];
           const abwesend = abwesenheitenProTag(datum);
-          const feiertag = getFeiertag(datum);
+          const feiertag = getFeiertag(datum, bundesland);
           const istHeute = datum === heute;
           const wochenende = istWochenende(datum);
 

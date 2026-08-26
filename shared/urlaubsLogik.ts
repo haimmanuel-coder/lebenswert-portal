@@ -1,4 +1,4 @@
-import { getFeiertag, zuDatumsString } from "./planungsLogik";
+import { getFeiertag, zuDatumsString, type Bundesland } from "./planungsLogik";
 
 export const WOCHENTAGE = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"] as const;
 export type Wochentag = (typeof WOCHENTAGE)[number];
@@ -88,7 +88,7 @@ export type ArbeitsmusterHistorie = {
  * entsprechend der für dieses Portal festgelegten Abrechnungsregel nicht als
  * Urlaubstag verbraucht und werden nachvollziehbar zurückgegeben.
  */
-export function berechneUrlaubsverbrauch(args: { von: string; bis: string; arbeitstageWoche: unknown; arbeitsmusterHistorie?: ArbeitsmusterHistorie[] }): Urlaubsverbrauch {
+export function berechneUrlaubsverbrauch(args: { von: string; bis: string; arbeitstageWoche: unknown; arbeitsmusterHistorie?: ArbeitsmusterHistorie[]; bundesland?: Bundesland | string }): Urlaubsverbrauch {
   const von = zuDatumsString(args.von);
   const bis = zuDatumsString(args.bis);
   if (!von || !bis || bis < von) return { tage: 0, arbeitstage: [], ausgenommeneFeiertage: [] };
@@ -106,7 +106,7 @@ export function berechneUrlaubsverbrauch(args: { von: string; bis: string; arbei
     });
     const tagesMuster = historischesMuster ? normalisiereArbeitstage(historischesMuster.arbeitstageWoche, muster) : muster;
     if (tagesMuster.includes(wochentagVonDatum(datum))) {
-      const feiertag = getFeiertag(datum);
+      const feiertag = getFeiertag(datum, args.bundesland);
       if (feiertag) ausgenommeneFeiertage.push({ datum, name: feiertag });
       else arbeitstage.push(datum);
     }

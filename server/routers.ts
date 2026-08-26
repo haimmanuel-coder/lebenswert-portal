@@ -28,6 +28,8 @@ import { generiereEinmaligesStartpasswort, waehleDruckbareMitarbeiter } from "./
 import { pruefeSicheresPasswort, SICHERES_PASSWORT_HINWEIS, startPasswortLaeuftAb } from "../shared/passwordPolicy";
 import { istAbgeschlossenerStartzugang } from "../shared/erstlogin";
 import { berechneUrlaubsverbrauch, berechneZeitanteiligenJahresurlaub, normalisiereArbeitstage, type Wochentag } from "../shared/urlaubsLogik";
+import { normalisiereBundesland } from "../shared/planungsLogik";
+import { erstellePersonalaktenHistorienCsv } from "../shared/personalaktenExport";
 import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, mitarbeiterArbeitsmuster, urlaubsantraege, einsatzAenderungen, kunden as kundenTable, notifications as notificationsTable, ersteHilfeKurse, mitarbeiterBerechtigungen as mbTable, besuchsberichte, fahrten } from "../drizzle/schema";
 import {
   getMitarbeiterByEmail,
@@ -187,6 +189,13 @@ async function ladeArbeitsmusterHistorie(mitarbeiterId: number) {
     .orderBy(desc(mitarbeiterArbeitsmuster.gueltigAb));
 }
 
+async function ladeUrlaubsBundesland() {
+  const db = await getDb();
+  if (!db) return normalisiereBundesland("DE");
+  const rows = await db.execute(sql`SELECT wert FROM system_einstellungen WHERE schluessel = 'urlaubs_bundesland' LIMIT 1`);
+  return normalisiereBundesland((rows as any)[0]?.[0]?.wert);
+}
+
 export const urlaubRouter = router({
   list: portalProtected.query(async ({ ctx }) => {
     const ma = await getMitarbeiterById(ctx.mitarbeiterId);
@@ -199,11 +208,13 @@ export const urlaubRouter = router({
       const ma = await getMitarbeiterById(ctx.mitarbeiterId);
       if (!ma) throw new TRPCError({ code: "NOT_FOUND", message: "Mitarbeiterkonto nicht gefunden." });
       const arbeitsmusterHistorie = await ladeArbeitsmusterHistorie(ctx.mitarbeiterId);
+      const bundesland = await ladeUrlaubsBundesland();
       return berechneUrlaubsverbrauch({
         von: input.von,
         bis: input.bis,
         arbeitstageWoche: (ma as any).arbeitstageWoche,
         arbeitsmusterHistorie,
+        bundesland,
       });
     }),
   create: portalProtected
@@ -216,11 +227,13 @@ export const urlaubRouter = router({
       const ma = await getMitarbeiterById(ctx.mitarbeiterId);
       if (!ma) throw new TRPCError({ code: "NOT_FOUND", message: "Mitarbeiterkonto nicht gefunden." });
       const arbeitsmusterHistorie = await ladeArbeitsmusterHistorie(ctx.mitarbeiterId);
+      const bundesland = await ladeUrlaubsBundesland();
       const verbrauch = berechneUrlaubsverbrauch({
         von: input.von,
         bis: input.bis,
         arbeitstageWoche: (ma as any).arbeitstageWoche,
         arbeitsmusterHistorie,
+        bundesland,
       });
       if (verbrauch.tage < 1) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Im gewählten Zeitraum liegt kein planmäßiger Arbeitstag ohne Feiertag." });
@@ -254,11 +267,13 @@ export const urlaubRouter = router({
       const antragMa = await getMitarbeiterById(antrag.mitarbeiterId);
       if (input.status === "genehmigt" && antragMa) {
         const arbeitsmusterHistorie = await ladeArbeitsmusterHistorie(antrag.mitarbeiterId);
+        const bundesland = await ladeUrlaubsBundesland();
         const verbrauch = berechneUrlaubsverbrauch({
           von: String(antrag.von),
           bis: String(antrag.bis),
           arbeitstageWoche: (antragMa as any).arbeitstageWoche,
           arbeitsmusterHistorie,
+          bundesland,
         });
         if (verbrauch.tage < 1) throw new TRPCError({ code: "BAD_REQUEST", message: "Der Antrag enthält keine planmäßigen Arbeitstage." });
         await db!.update(urlaubsantraege).set({ tage: verbrauch.tage }).where(eq(urlaubsantraege.id, input.id));
@@ -846,6 +861,9 @@ const onboardingRouter = router({
 
 // ── System-Einstellungen ─────────────────────────────────────────────────────
 const einstellungenRouter = router({
+  urlaubsBundesland: portalProtected.query(async () => ({
+    bundesland: await ladeUrlaubsBundesland(),
+  })),
   getAll: adminProcedure
     .query(async () => {
       const db = await getDb();
@@ -1175,6 +1193,29 @@ const mitteilungenRouter = router({
       anzahlBestaetigt: bestaetigungen.filter((b) => b.mitteilungId === mitteilung.id).length,
       gesamtMitarbeiter,
     }));
+  }),
+  erinnerungsStatus: adminProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return { offen: 0, heuteErinnert: 0 };
+    const rows = await db.execute(sql`
+      SELECT
+        COUNT(*) AS offen,
+        SUM(CASE WHEN erinnerung.id IS NOT NULL THEN 1 ELSE 0 END) AS heuteErinnert
+      FROM mitteilungen m
+      JOIN mitarbeiter ma ON ma.aktiv = 1
+      LEFT JOIN mitteilungen_lesebestaetigung bestaetigung
+        ON bestaetigung.mitteilungId = m.id AND bestaetigung.mitarbeiterId = ma.id
+      LEFT JOIN pflichtmitteilung_erinnerungen erinnerung
+        ON erinnerung.mitteilungId = m.id
+        AND erinnerung.mitarbeiterId = ma.id
+        AND erinnerung.erinnerungsDatum = CURDATE()
+      WHERE m.aktiv = 1
+        AND m.lesebestaetigung_pflicht = 1
+        AND (m.gueltigBis IS NULL OR DATE(m.gueltigBis) >= CURDATE())
+        AND bestaetigung.id IS NULL
+    `);
+    const status = (rows as any)[0]?.[0] ?? {};
+    return { offen: Number(status.offen ?? 0), heuteErinnert: Number(status.heuteErinnert ?? 0) };
   }),
   erstellen: adminProcedure
     .input(z.object({
@@ -2555,6 +2596,36 @@ export const appRouter = router({
           },
         };
       }),
+    personalaktenHistorie: adminProcedure
+      .input(z.object({ mitarbeiterId: z.number().int().positive().optional() }).optional())
+      .query(async ({ input, ctx }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Datenbank nicht verfügbar." });
+        const mitarbeiterId = input?.mitarbeiterId;
+        const [mitarbeiterRows, musterRows, urlaubsRows] = await Promise.all([
+          mitarbeiterId
+            ? db.execute(sql`SELECT id, vorname, nachname, email, aktiv, eintrittsdatum, beschaeftigungsart, urlaubstageJahr, urlaubstageVerbraucht, arbeitstageWoche FROM mitarbeiter WHERE id = ${mitarbeiterId} ORDER BY nachname, vorname`)
+            : db.execute(sql`SELECT id, vorname, nachname, email, aktiv, eintrittsdatum, beschaeftigungsart, urlaubstageJahr, urlaubstageVerbraucht, arbeitstageWoche FROM mitarbeiter ORDER BY nachname, vorname`),
+          mitarbeiterId
+            ? db.execute(sql`SELECT mitarbeiterId, arbeitstageWoche, gueltigAb, gueltigBis, geaendertVon, createdAt FROM mitarbeiterArbeitsmuster WHERE mitarbeiterId = ${mitarbeiterId} ORDER BY mitarbeiterId, gueltigAb`)
+            : db.execute(sql`SELECT mitarbeiterId, arbeitstageWoche, gueltigAb, gueltigBis, geaendertVon, createdAt FROM mitarbeiterArbeitsmuster ORDER BY mitarbeiterId, gueltigAb`),
+          mitarbeiterId
+            ? db.execute(sql`SELECT mitarbeiterId, von, bis, tage, status, notizen, adminNotiz, createdAt, updatedAt FROM urlaubsantraege WHERE mitarbeiterId = ${mitarbeiterId} AND geloeschtAt IS NULL ORDER BY mitarbeiterId, von`)
+            : db.execute(sql`SELECT mitarbeiterId, von, bis, tage, status, notizen, adminNotiz, createdAt, updatedAt FROM urlaubsantraege WHERE geloeschtAt IS NULL ORDER BY mitarbeiterId, von`),
+        ]);
+        const mitarbeiterListe = ((mitarbeiterRows as any)[0] ?? []) as any[];
+        const musterListe = ((musterRows as any)[0] ?? []) as any[];
+        const urlaubsListe = ((urlaubsRows as any)[0] ?? []) as any[];
+        const exportDaten = erstellePersonalaktenHistorienCsv({ mitarbeiter: mitarbeiterListe, arbeitsmuster: musterListe, urlaube: urlaubsListe });
+        await createAuditLog({
+          mitarbeiterId: ctx.adminId,
+          action: "EXPORT",
+          ressource: "personalakte_arbeitsmuster_urlaub",
+          details: `mitarbeiter=${mitarbeiterId ?? "alle"}; stammdaten=${mitarbeiterListe.length}; muster=${musterListe.length}; urlaub=${urlaubsListe.length}`,
+          status: "success",
+        });
+        return exportDaten;
+      }),
   }),
 
   // ── ADMIN ─────────────────────────────────────────────
@@ -3826,7 +3897,8 @@ export const appRouter = router({
         const ma = await getMitarbeiterById(input.mitarbeiterId);
         if (!ma) throw new TRPCError({ code: "NOT_FOUND", message: "Mitarbeiterkonto nicht gefunden." });
         const arbeitsmusterHistorie = await ladeArbeitsmusterHistorie(input.mitarbeiterId);
-        return berechneUrlaubsverbrauch({ von: input.von, bis: input.bis, arbeitstageWoche: (ma as any).arbeitstageWoche, arbeitsmusterHistorie });
+        const bundesland = await ladeUrlaubsBundesland();
+        return berechneUrlaubsverbrauch({ von: input.von, bis: input.bis, arbeitstageWoche: (ma as any).arbeitstageWoche, arbeitsmusterHistorie, bundesland });
       }),
     /** Resturlaub-Berechnung für einen Mitarbeiter (aktuelles Jahr) */
     urlaubsKonto: adminProcedure
@@ -3870,7 +3942,8 @@ export const appRouter = router({
         const ma = await getMitarbeiterById(input.mitarbeiterId);
         if (!ma) throw new TRPCError({ code: 'NOT_FOUND', message: 'Mitarbeiterkonto nicht gefunden.' });
         const arbeitsmusterHistorie = await ladeArbeitsmusterHistorie(input.mitarbeiterId);
-        const verbrauch = berechneUrlaubsverbrauch({ von: input.von, bis: input.bis, arbeitstageWoche: (ma as any).arbeitstageWoche, arbeitsmusterHistorie });
+        const bundesland = await ladeUrlaubsBundesland();
+        const verbrauch = berechneUrlaubsverbrauch({ von: input.von, bis: input.bis, arbeitstageWoche: (ma as any).arbeitstageWoche, arbeitsmusterHistorie, bundesland });
         if (verbrauch.tage < 1) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Der Zeitraum enthält keine planmäßigen Arbeitstage.' });
         await db.insert(urlaubsantraege).values({
           mitarbeiterId: input.mitarbeiterId,
