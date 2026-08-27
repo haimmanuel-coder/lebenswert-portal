@@ -25,6 +25,8 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
 # Server-Bundle + gebautes Frontend (dist/index.js, dist/public)
 COPY --from=build /app/dist ./dist
+# Kurzlebiger Starter für separate Railway-Cron-Dienste
+COPY --from=build /app/scripts ./scripts
 # Baseline-Schema für die Ersteinrichtung der Datenbank mitliefern
 COPY --from=build /app/drizzle ./drizzle
 

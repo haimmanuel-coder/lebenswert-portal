@@ -150,7 +150,15 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
+// Auf Railway wird kein Manus-Laufzeit-Skript in den Produktions-Bundle eingebettet.
+const isExternalHosting = process.env.EXTERNAL_HOSTING === "true";
+const plugins = [
+  react(),
+  tailwindcss(),
+  jsxLocPlugin(),
+  ...(isExternalHosting ? [] : [vitePluginManusRuntime()]),
+  vitePluginManusDebugCollector(),
+];
 
 export default defineConfig({
   plugins,

@@ -22,6 +22,7 @@
     "test:admin-write-cleanup": "tsx scripts/check-admin-write-cleanup.mjs",
     "test:admin-smoke": "tsx scripts/admin-ui-smoke.mjs",
     "test:mitteilungen": "tsx scripts/check-mitteilungen-alias.mjs",
+    "cron:railway": "node scripts/railway-cron-trigger.mjs",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
   },
   "dependencies": {

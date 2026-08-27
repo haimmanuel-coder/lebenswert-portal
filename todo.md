@@ -1,6 +1,24 @@
 # Lebenswert Betreuung – Mitarbeiter-Portal TODO
 
 ## Aktuelle Umsetzung – Unterweisung, Erste Hilfe und DSGVO-Startprozess
+- [ ] Railway als alleinigen Live-Betrieb festlegen und Manus nur als Entwicklungs-/Übergabequelle dokumentieren
+- [ ] GitHub-Branch, Mergekonfliktfreiheit und automatischen Railway-Deploypfad für künftige Aktualisierungen verifizieren
+- [ ] Manus-exklusive Laufzeitabhängigkeiten für den Railway-Betrieb identifizieren und durch sichere Railway-kompatible Alternativen ersetzen oder klar begrenzen
+- [ ] Railway-sicheren Scheduler-Zugang mit separatem Geheimnis und ohne Manus-Cron-Authentifizierung implementieren
+- [ ] Eigenständigen Railway-Cron-Starter für alle neun wiederkehrenden Aufgaben und nachvollziehbare UTC-Zeitpläne bereitstellen
+- [ ] Railway-Betriebsanleitung mit Variablen, Datenbank-/Dateiablage, Cron-Diensten und Domainumschaltung erstellen
+- [ ] Einfachen, sicheren Updateablauf „Entwicklung → GitHub → Railway“ für künftige Änderungen dokumentieren
+- [ ] Railway-Zielprojekt, GitHub-Repository und vorhandene Zielressourcen für die App-Übernahme prüfen
+- [ ] Sichtbaren persönlichen Railway-Zugriff für die kontrollierte Projektübernahme herstellen
+- [ ] Manus-gebundene Dienste, Umgebungsvariablen und geplante Aufgaben für einen Railway-Betrieb inventarisieren
+- [ ] Railway-kompatible Startkonfiguration, Dienstadressen und Produktionsdokumentation vorbereiten
+- [ ] Verbliebene Merge-Konfliktmarkierungen vor jeder externen Bereitstellung auflösen und Projekt erneut vollständig prüfen
+- [ ] Produktionsdatenbank sowie Dateiablage sicher für den Railway-Betrieb anbinden und validieren
+- [ ] Neun wiederkehrende Systemaufgaben auf einen Railway-kompatiblen Scheduler übertragen und idempotent absichern
+- [ ] Anwendung auf Railway bereitstellen, Admin-Login testen und die Custom Domain erst nach erfolgreichem Test umstellen
+- [ ] Öffentliche Produktionsdomain auf nicht sichtbare Loginoberfläche und Wartungsseite prüfen
+- [ ] Ursache für die nicht erreichbare Loginoberfläche beheben und korrekten öffentlichen Domainzugang wiederherstellen
+- [ ] Produktionslogin und den Admin-Testweg nach der Korrektur browsergestützt verifizieren
 - [x] Bundeslandspezifische Feiertagsverwaltung mit administrativer Standortauswahl in die Urlaubsberechnung integrieren
 - [x] Tägliche automatische Erinnerung für ausstehende Pflichtmitteilungen mit idempotenter Ausführung und Admin-Übersicht ergänzen
 - [x] CSV-Export der Arbeitsmuster- und Urlaubshistorie für die Personalakte einschließlich Audit-Protokoll bereitstellen

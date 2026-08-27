@@ -18,6 +18,7 @@ import { unterweisungenFaelligkeitHandler } from "../scheduled/unterweisungenFae
 import { aufbewahrungsfristenHandler } from "../scheduled/aufbewahrungsfristen";
 import { backupWoechentlichHandler } from "../scheduled/backupWoechentlich";
 import { pflichtmitteilungenErinnerungHandler } from "../scheduled/pflichtmitteilungenErinnerung";
+import { requireScheduledInvocation } from "../railwaySchedulerAuth";
 import { ensureTables } from "../ensureTables";
 import { seedAdminFallsNoetig } from "../seedAdmin";
 import { ensureHeartbeatJobs } from "../ensureHeartbeatJobs";
@@ -52,8 +53,11 @@ async function startServer() {
   await ensureTables();
   // Start-Admin einmalig anlegen (nur bei leerer Installation + gesetzten SEED_ADMIN_*).
   await seedAdminFallsNoetig().catch((e) => console.warn("[SeedAdmin] übersprungen:", e));
-  // Heartbeat-Jobs registrieren (idempotent)
-  ensureHeartbeatJobs().catch((e) => console.warn("[HeartbeatJobs] Hintergrund-Init fehlgeschlagen:", e));
+  // Railway startet die Aufgaben als getrennte, kurzlebige Cron-Dienste.
+  // Nur der Manus-Betrieb registriert weiterhin Heartbeat-Aufgaben beim Start.
+  if (process.env.SCHEDULER_PROVIDER !== "railway") {
+    ensureHeartbeatJobs().catch((e) => console.warn("[HeartbeatJobs] Hintergrund-Init fehlgeschlagen:", e));
+  }
 
   const app = express();
   const server = createServer(app);
@@ -79,17 +83,6 @@ async function startServer() {
     } catch (error) {
       console.warn("[PortalAuth] Zugriff auf Direkt-Endpunkt abgewiesen:", error);
       return res.status(401).json({ error: "Nicht angemeldet" });
-    }
-  };
-
-  const requireCron = async (req: any, res: any, next: any) => {
-    try {
-      const user = await sdk.authenticateRequest(req);
-      if (!user.isCron) return res.status(403).json({ error: "cron-only endpoint" });
-      return next();
-    } catch (error) {
-      console.warn("[CronAuth] Nicht autorisierter Scheduler-Aufruf:", error);
-      return res.status(403).json({ error: "cron-only endpoint" });
     }
   };
 
@@ -151,7 +144,7 @@ async function startServer() {
     } catch (e: any) { console.error("[Upload/Audio]", e); return res.status(500).json({ error: "Audio konnte nicht gespeichert werden." }); }
   });
   // ⏱ Heartbeat-Handler (Cron-only, vor tRPC registrieren)
-  app.use("/api/scheduled", requireCron);
+  app.use("/api/scheduled", requireScheduledInvocation);
   app.post("/api/scheduled/neukunden-eskalation", neukundenEskalationHandler);
   app.post("/api/scheduled/fuehrerschein-erinnerung", fuehrerscheinErinnerungHandler);
   app.post("/api/scheduled/vertretung-bereinigung", vertretungBereinigungHandler);
