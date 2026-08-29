@@ -23,7 +23,10 @@ async function startProtectedTestEndpoint() {
 
 describe("Railway-Cron-Schutz", () => {
   it("akzeptiert nur einen Aufruf mit dem gesetzten Railway-Cron-Secret", async () => {
-    const suppliedSecret = process.env.RAILWAY_CRON_SECRET;
+    // CI erhält keine Produktivgeheimnisse. Lokal wird das gesetzte Secret geprüft,
+    // in CI simuliert ein ausschließlich testbezogenes Secret denselben HTTP-Vertrag.
+    const suppliedSecret = process.env.RAILWAY_CRON_SECRET || "railway-ci-test-secret";
+    process.env.RAILWAY_CRON_SECRET = suppliedSecret;
     expect(suppliedSecret).toBeTruthy();
 
     process.env.SCHEDULER_PROVIDER = "railway";

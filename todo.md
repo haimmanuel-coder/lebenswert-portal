@@ -3,6 +3,7 @@
 ## Aktuelle Umsetzung – Unterweisung, Erste Hilfe und DSGVO-Startprozess
 - [ ] Railway als alleinigen Live-Betrieb festlegen und Manus nur als Entwicklungs-/Übergabequelle dokumentieren
 - [ ] GitHub-Branch, Mergekonfliktfreiheit und automatischen Railway-Deploypfad für künftige Aktualisierungen verifizieren
+- [ ] GitHub-CI-Prüfung für den Railway-Cron-Schutz ohne produktives Geheimnis stabilisieren
 - [ ] Manus-exklusive Laufzeitabhängigkeiten für den Railway-Betrieb identifizieren und durch sichere Railway-kompatible Alternativen ersetzen oder klar begrenzen
 - [ ] Railway-sicheren Scheduler-Zugang mit separatem Geheimnis und ohne Manus-Cron-Authentifizierung implementieren
 - [ ] Eigenständigen Railway-Cron-Starter für alle neun wiederkehrenden Aufgaben und nachvollziehbare UTC-Zeitpläne bereitstellen
