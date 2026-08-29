@@ -2,6 +2,10 @@
 FROM node:20-slim AS build
 WORKDIR /app
 
+# Railway reicht VITE-relevante Buildvariablen bei Docker nur über ARG weiter.
+# EXTERNAL_HOSTING ist nicht geheim und entscheidet lediglich über das Runtime-Plugin.
+ARG EXTERNAL_HOSTING
+
 # pnpm über das im Projekt gepinnte packageManager-Feld aktivieren
 RUN corepack enable
 
@@ -11,7 +15,7 @@ RUN pnpm install --frozen-lockfile
 
 # Restlichen Quellcode kopieren und bauen
 COPY . .
-RUN pnpm build
+RUN EXTERNAL_HOSTING=${EXTERNAL_HOSTING} pnpm build
 
 # ── Laufzeit-Stufe ───────────────────────────────────────────────────────────
 FROM node:20-slim AS runtime
