@@ -1,25 +1,47 @@
 # Lebenswert Betreuung – Mitarbeiter-Portal TODO
 
 ## Aktuelle Umsetzung – Unterweisung, Erste Hilfe und DSGVO-Startprozess
-- [ ] Railway als alleinigen Live-Betrieb festlegen und Manus nur als Entwicklungs-/Übergabequelle dokumentieren
-- [ ] GitHub-Branch, Mergekonfliktfreiheit und automatischen Railway-Deploypfad für künftige Aktualisierungen verifizieren
-- [ ] GitHub-CI-Prüfung für den Railway-Cron-Schutz ohne produktives Geheimnis stabilisieren
-- [ ] Manus-exklusive Laufzeitabhängigkeiten für den Railway-Betrieb identifizieren und durch sichere Railway-kompatible Alternativen ersetzen oder klar begrenzen
-- [ ] Railway-sicheren Scheduler-Zugang mit separatem Geheimnis und ohne Manus-Cron-Authentifizierung implementieren
-- [ ] Eigenständigen Railway-Cron-Starter für alle neun wiederkehrenden Aufgaben und nachvollziehbare UTC-Zeitpläne bereitstellen
-- [ ] Railway-Betriebsanleitung mit Variablen, Datenbank-/Dateiablage, Cron-Diensten und Domainumschaltung erstellen
-- [ ] Einfachen, sicheren Updateablauf „Entwicklung → GitHub → Railway“ für künftige Änderungen dokumentieren
-- [ ] Railway-Zielprojekt, GitHub-Repository und vorhandene Zielressourcen für die App-Übernahme prüfen
-- [ ] Sichtbaren persönlichen Railway-Zugriff für die kontrollierte Projektübernahme herstellen
-- [ ] Manus-gebundene Dienste, Umgebungsvariablen und geplante Aufgaben für einen Railway-Betrieb inventarisieren
-- [ ] Railway-kompatible Startkonfiguration, Dienstadressen und Produktionsdokumentation vorbereiten
-- [ ] Verbliebene Merge-Konfliktmarkierungen vor jeder externen Bereitstellung auflösen und Projekt erneut vollständig prüfen
-- [ ] Produktionsdatenbank sowie Dateiablage sicher für den Railway-Betrieb anbinden und validieren
-- [ ] Neun wiederkehrende Systemaufgaben auf einen Railway-kompatiblen Scheduler übertragen und idempotent absichern
-- [ ] Anwendung auf Railway bereitstellen, Admin-Login testen und die Custom Domain erst nach erfolgreichem Test umstellen
-- [ ] Öffentliche Produktionsdomain auf nicht sichtbare Loginoberfläche und Wartungsseite prüfen
-- [ ] Ursache für die nicht erreichbare Loginoberfläche beheben und korrekten öffentlichen Domainzugang wiederherstellen
-- [ ] Produktionslogin und den Admin-Testweg nach der Korrektur browsergestützt verifizieren
+- [x] Anforderungen und Sicherheitsmindeststandard für einen EU-Server mit Coolify festlegen – externe Migration vom Nutzer gestoppt
+- [x] Serverangebote für Coolify, Datenbank, Dateiablage und Backups anhand transparenter Kriterien vergleichen – externe Migration vom Nutzer gestoppt
+- [ ] [Gestoppt/obsolet] Server-Auswahl durch den Betreiber bestätigen lassen und erst dann die kostenpflichtige Bereitstellung starten – keine Bestellung ausgelöst
+- [ ] [Gestoppt/obsolet] Hetzner-Cloud-Stagingserver in Deutschland mit Ubuntu 24.04, 4 vCPU, 8 GB RAM, 160 GB Speicher, Firewall und täglichen Backups vorbereiten – nicht angelegt
+- [ ] [Gestoppt/obsolet] Öffentliche IPv4-Adresse und sicheren administrativen Zugang des angelegten Hetzner-Stagingservers kontrolliert entgegennehmen – nicht erforderlich
+- [ ] [Gestoppt/obsolet] Ausgewählten Server absichern und Coolify als getrennte Staging-Umgebung installieren – externe Migration vom Nutzer gestoppt
+- [x] Coolify als Open-Source-Betriebsplattform für die externe Node-API verbindlich dokumentieren – als Entscheidungsunterlage abgeschlossen
+- [x] Anforderungen an EU-Server, Sicherheitsupdates, Backups, Datenbank und Dateiablage für Coolify konkretisieren – als Entscheidungsunterlage abgeschlossen
+- [ ] [Gestoppt/obsolet] Vercel-Portal und Coolify-API für getrennte Domains mit Cookie-, CORS- und Sitzungsmodell vorbereiten – externe Migration vom Nutzer gestoppt
+- [ ] [Gestoppt/obsolet] Coolify-Stagingdienst aus GitHub mit geschützten Variablen, MySQL, S3 und neun geplanten Aufgaben einrichten – externe Migration vom Nutzer gestoppt
+- [ ] [Gestoppt/obsolet] Staging vollständig abnehmen und die Produktiv-Domain erst nach ausdrücklicher Freigabe umstellen – nicht gestartet
+- [x] Open-Source-Alternativen zu Railway für Node-Server, Datenbank, Dateiablage und zeitgesteuerte Aufgaben vergleichen – als Entscheidungsunterlage abgeschlossen
+- [ ] [Gestoppt/obsolet] Gewählte Open-Source-Serververwaltung mit der Vercel-Portalarchitektur und dem GitHub-Updateweg abstimmen – externe Migration vom Nutzer gestoppt
+- [x] Sichere Staging- und Betriebsanleitung für die gewählte Open-Source-Option erstellen – als Entscheidungsunterlage abgeschlossen
+- [ ] [Gestoppt/obsolet] Zielarchitektur Variante B mit Portal-, API-, Datenbank-, Dateiablage- und Zeitsteuerungsadresse verbindlich dokumentieren – externe Migration vom Nutzer gestoppt
+- [ ] [Gestoppt/obsolet] tRPC-Client, Authentifizierungs-Cookies, CORS und SSE für getrennte Vercel-Portal- und externe API-Domain vorbereiten – externe Migration vom Nutzer gestoppt
+- [ ] [Gestoppt/obsolet] Staging-Umgebung mit Vercel-Portal und externem Node-Server vor dem produktiven Domainwechsel einrichten – nicht gestartet
+- [ ] [Gestoppt/obsolet] Kernabläufe, Uploads, automatische Aufgaben und Domainumschaltung in der Staging-Umgebung nach expliziter Freigabe abnehmen – nicht gestartet
+- [x] Vercel-Betrieb für Datenbank, Dateiablage, Hintergrundaufgaben und Echtzeitfunktionen gegenüber Railway bewerten
+- [x] Zwei sichere Vercel-Betriebsvarianten mit klarer Abgrenzung der nötigen Zusatzdienste dokumentieren
+- [x] Schritt-für-Schritt-Anleitung für Vercel-Import, GitHub-Updates, Variablen, Datenübernahme, Cron-Aufgaben und Domainwechsel erstellen
+- [x] Railway als alleinigen Live-Betrieb festlegen und Manus nur als Entwicklungs-/Übergabequelle dokumentieren – durch Nutzerentscheidung aufgehoben
+- [x] GitHub-Branch, Mergekonfliktfreiheit und automatischen Railway-Deploypfad für künftige Aktualisierungen verifizieren – durch Nutzerentscheidung nicht weiterverfolgt
+- [x] GitHub-CI-Prüfung für den Railway-Cron-Schutz ohne produktives Geheimnis stabilisieren – technisch abgeschlossen, externe Bereitstellung gestoppt
+- [x] Manus-exklusive Laufzeitabhängigkeiten für den Railway-Betrieb identifizieren und durch sichere Railway-kompatible Alternativen ersetzen oder klar begrenzen – durch Nutzerentscheidung nicht weiterverfolgt
+- [x] Railway-sicheren Scheduler-Zugang mit separatem Geheimnis und ohne Manus-Cron-Authentifizierung implementieren – technisch vorbereitet, extern nicht genutzt
+- [x] Eigenständigen Railway-Cron-Starter für alle neun wiederkehrenden Aufgaben und nachvollziehbare UTC-Zeitpläne bereitstellen – technisch vorbereitet, extern nicht genutzt
+- [x] Railway-Betriebsanleitung mit Variablen, Datenbank-/Dateiablage, Cron-Diensten und Domainumschaltung erstellen – als Entscheidungsunterlage abgeschlossen
+- [x] Einfachen, sicheren Updateablauf „Entwicklung → GitHub → Railway“ für künftige Änderungen dokumentieren – durch Nutzerentscheidung nicht weiterverfolgt
+- [x] Railway-Zielprojekt, GitHub-Repository und vorhandene Zielressourcen für die App-Übernahme prüfen – durch Nutzerentscheidung nicht weiterverfolgt
+- [x] Sichtbaren persönlichen Railway-Zugriff für die kontrollierte Projektübernahme herstellen – durch Nutzerentscheidung nicht weiterverfolgt
+- [x] Manus-gebundene Dienste, Umgebungsvariablen und geplante Aufgaben für einen Railway-Betrieb inventarisieren – als Entscheidungsunterlage abgeschlossen
+- [x] Railway-kompatible Startkonfiguration, Dienstadressen und Produktionsdokumentation vorbereiten – extern nicht aktiviert
+- [x] Verbliebene Merge-Konfliktmarkierungen vor jeder externen Bereitstellung auflösen und Projekt erneut vollständig prüfen – technisch abgeschlossen
+- [x] Produktionsdatenbank sowie Dateiablage sicher für den Railway-Betrieb anbinden und validieren – externe Migration vom Nutzer gestoppt
+- [x] Neun wiederkehrende Systemaufgaben auf einen Railway-kompatiblen Scheduler übertragen und idempotent absichern – extern nicht aktiviert
+- [ ] [Gestoppt/obsolet] Anwendung auf Railway bereitstellen, Admin-Login testen und die Custom Domain erst nach erfolgreichem Test umstellen – externe Migration vom Nutzer gestoppt
+- [x] Öffentliche Produktionsdomain auf nicht sichtbare Loginoberfläche und Wartungsseite prüfen – Wartungsseite festgestellt; Manus-Betrieb wird genutzt
+- [ ] [Gestoppt/obsolet] Ursache für die nicht erreichbare Loginoberfläche beheben und korrekten öffentlichen Domainzugang wiederherstellen – nicht weiterverfolgt, da externe Domainverwaltung außerhalb von Manus liegt
+- [x] Manus-Produktionsadresse und öffentliche Mitarbeiter-Anmeldung nach der Betriebsentscheidung browsergestützt verifizieren
+- [x] Künftigen Updateablauf über Manus statt externer Bereitstellung in `MANUS_BETRIEB.md` dokumentieren
 - [x] Bundeslandspezifische Feiertagsverwaltung mit administrativer Standortauswahl in die Urlaubsberechnung integrieren
 - [x] Tägliche automatische Erinnerung für ausstehende Pflichtmitteilungen mit idempotenter Ausführung und Admin-Übersicht ergänzen
 - [x] CSV-Export der Arbeitsmuster- und Urlaubshistorie für die Personalakte einschließlich Audit-Protokoll bereitstellen
