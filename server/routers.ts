@@ -31,7 +31,6 @@ import { istAbgeschlossenerStartzugang } from "../shared/erstlogin";
 import { berechneUrlaubsverbrauch, berechneZeitanteiligenJahresurlaub, normalisiereArbeitstage, type Wochentag } from "../shared/urlaubsLogik";
 import { normalisiereBundesland } from "../shared/planungsLogik";
 import { erstellePersonalaktenHistorienCsv } from "../shared/personalaktenExport";
-import { istPortalPasswortGueltig } from "./portalLoginCredentials";
 import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, mitarbeiterArbeitsmuster, urlaubsantraege, einsatzAenderungen, kunden as kundenTable, notifications as notificationsTable, ersteHilfeKurse, mitarbeiterBerechtigungen as mbTable, besuchsberichte, fahrten } from "../drizzle/schema";
 import {
   getMitarbeiterByEmail,
@@ -1318,7 +1317,7 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         const ma = await getMitarbeiterByEmail(input.email);
         if (!ma || !ma.aktiv) throw new Error("E-Mail oder Passwort ungültig.");
-        const valid = await istPortalPasswortGueltig(input.passwort, ma.passwortHash);
+        const valid = await bcrypt.compare(input.passwort, ma.passwortHash);
         if (!valid) {
           await createAuditLog({ mitarbeiterId: ma.id, action: "LOGIN", ressource: "portal", status: "failure", details: "Passwortprüfung fehlgeschlagen" });
           throw new Error("E-Mail oder Passwort ungültig.");
