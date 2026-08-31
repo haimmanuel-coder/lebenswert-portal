@@ -54,6 +54,8 @@ import BudgetVerwaltung from "./BudgetVerwaltung";
 import FahrtenAbrechnung from "./FahrtenAbrechnung";
 import Privatrechnung from "./Privatrechnung";
 import { NavigationProvider, type SeitenId } from "@/contexts/NavigationContext";
+import { ZurueckNavigation } from "@/components/ZurueckNavigation";
+import { naechsterVerlauf, vorherigeSeite } from "@/lib/portalNavigationHistory";
 
 /**
  * Seitenkennungen werden zentral im NavigationContext gepflegt, damit
@@ -97,6 +99,7 @@ export default function PortalApp() {
   // ── Menü-Suche ───────────────────────────────────────
   const [menuSearch, setMenuSearch] = useState("");
   const [kundenDetailId, setKundenDetailId] = useState<number | null>(null);
+  const [seitenVerlauf, setSeitenVerlauf] = useState<PageId[]>([]);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   const { data: leistungen = [] } = trpc.leistungen.list.useQuery();
@@ -184,10 +187,29 @@ export default function PortalApp() {
   }, []);
 
   const navTo = (page: PageId) => {
+    setSeitenVerlauf((verlauf) => naechsterVerlauf(verlauf, activePage, page));
     setKundenDetailId(null);
     setActivePage(page);
     if (isMobile) setSidebarOpen(false);
   };
+
+  const geheZurueck = () => {
+    // Ein geöffnetes Kundendetail gehört zur Kundenliste und schließt sich
+    // deshalb zuerst, ohne den Nutzer aus dem Portal herauszuführen.
+    if (kundenDetailId !== null) {
+      setKundenDetailId(null);
+      return;
+    }
+    const { seite, verbleibenderVerlauf } = vorherigeSeite(seitenVerlauf);
+    setSeitenVerlauf(verbleibenderVerlauf);
+    // Bei einem Direktaufruf ohne Verlauf führt der Pfeil zur passenden
+    // Übersichtsseite, niemals aus der Anwendung heraus.
+    setActivePage(seite ?? (isAdmin || isTeamleitung ? "admindashboard" : "home"));
+    if (isMobile) setSidebarOpen(false);
+  };
+
+  const startSeite: PageId = isAdmin || isTeamleitung ? "admindashboard" : "home";
+  const kannZurueck = kundenDetailId !== null || seitenVerlauf.length > 0 || activePage !== startSeite;
 
   const sections: NavSection[] = [
     // ── 🏠 DASHBOARD ──────────────────────────────────────────────────────
@@ -579,6 +601,7 @@ export default function PortalApp() {
               color: "#1a2e1a", fontSize: 22, padding: 4, lineHeight: 1,
             }}>☰</button>
           )}
+          {kannZurueck && <ZurueckNavigation onZurueck={geheZurueck} kompakt={isMobile} />}
           <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
             {!isMobile && <span style={{ fontSize: 12, color: "#9ca3af" }}>Seniorenassistenz Bernhardt /</span>}
             <span style={{ fontSize: 14, fontWeight: 700, color: "#1f2937" }}>{currentPageLabel}</span>
