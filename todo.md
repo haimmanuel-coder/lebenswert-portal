@@ -1,6 +1,15 @@
 # Lebenswert Betreuung – Mitarbeiter-Portal TODO
 
 ## Aktuelle Umsetzung – Unterweisung, Erste Hilfe und DSGVO-Startprozess
+- [x] Einheitliche Rückpfeil-Komponente mit großem mobilen Touchbereich und sicherem Übersichts-Fallback wiederherstellen
+- [x] Rückpfeil auf allen internen Mitarbeiter- und Admin-Unterseiten zentral einbinden und Navigationsvertrag absichern
+- [x] Isoliertes aktives Testkonto für einen End-to-End-Portal-Login erstellen, testen und vollständig bereinigen
+- [x] Temporären Login-Test nach der Bereinigung zuverlässig beenden und die Löschung des Testkontos nachweisen
+- [x] Rücknavigation und Testlogin mit TypeScript, Vitest sowie sichtbarer Desktop-/Mobilprüfung der Loginseite abnehmen
+- [x] Rücknavigation im angemeldeten Mitarbeiter-Portal browsergestützt auf Desktop und Mobil mit sichtbarem Rückpfeil und korrekter interner Zielseite verifizieren
+- [x] Rückpfeil-Browsertest nach dem Klick auf die konkrete Mitarbeiter-Übersicht und das konkrete Admin-Dashboard prüfen
+- [x] Rückpfeil im angemeldeten Admin-Portal browsergestützt auf Desktop und Mobil mit sichtbarem Pfeil sowie korrekter interner Zielseite prüfen
+- [x] tRPC-Transformationsstörung beim echten Browser-Login des temporären Testkontos als durch lokales Rate-Limit verursachte Testbedingung eingegrenzt und nach Reset erfolgreich end-to-end geprüft
 - [x] Anforderungen und Sicherheitsmindeststandard für einen EU-Server mit Coolify festlegen – externe Migration vom Nutzer gestoppt
 - [x] Serverangebote für Coolify, Datenbank, Dateiablage und Backups anhand transparenter Kriterien vergleichen – externe Migration vom Nutzer gestoppt
 - [x] [Gestoppt/obsolet] Server-Auswahl dokumentiert beendet – keine Bestellung ausgelöst

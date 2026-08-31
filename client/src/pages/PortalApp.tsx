@@ -604,7 +604,7 @@ export default function PortalApp() {
           {kannZurueck && <ZurueckNavigation onZurueck={geheZurueck} kompakt={isMobile} />}
           <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
             {!isMobile && <span style={{ fontSize: 12, color: "#9ca3af" }}>Seniorenassistenz Bernhardt /</span>}
-            <span style={{ fontSize: 14, fontWeight: 700, color: "#1f2937" }}>{currentPageLabel}</span>
+            <span data-testid="portal-aktuelle-seite" style={{ fontSize: 14, fontWeight: 700, color: "#1f2937" }}>{currentPageLabel}</span>
           </div>
           {!isOnline && (
             <div style={{ background: "#fef3c7", border: "1px solid #f59e0b", borderRadius: 8, padding: "3px 10px", fontSize: 11, fontWeight: 700, color: "#92400e" }}>
