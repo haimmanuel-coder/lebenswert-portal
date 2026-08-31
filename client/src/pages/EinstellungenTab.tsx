@@ -23,6 +23,7 @@ export default function EinstellungenTab() {
   const [saving, setSaving] = useState<string | null>(null);
   const [exportDownload, setExportDownload] = useState<{ url: string; dateiName: string; zeilen: number } | null>(null);
   const exportUrlRef = useRef<string | null>(null);
+  const bundeslandRef = useRef("DE");
 
   useEffect(() => () => {
     if (exportUrlRef.current) URL.revokeObjectURL(exportUrlRef.current);
@@ -33,13 +34,16 @@ export default function EinstellungenTab() {
       const map: Record<string, string> = {};
       for (const e of alleEinstellungen) map[e.schluessel] = e.wert ?? "";
       setWerte(map);
+      bundeslandRef.current = map.urlaubs_bundesland || "DE";
     }
   }, [alleEinstellungen]);
 
-  const handleSave = async (schluessel: string) => {
+  const handleSave = async (schluessel: string, wertOverride?: string) => {
     setSaving(schluessel);
     try {
-      await setEinstellung.mutateAsync({ schluessel, wert: werte[schluessel] ?? "" });
+      const wert = wertOverride ?? werte[schluessel] ?? "";
+      await setEinstellung.mutateAsync({ schluessel, wert });
+      setWerte((prev) => ({ ...prev, [schluessel]: wert }));
       toast.success("✅ Gespeichert");
       refetch();
     } catch (e: any) {
@@ -121,14 +125,17 @@ export default function EinstellungenTab() {
         </p>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <select
-            value={werte.urlaubs_bundesland ?? "DE"}
-            onChange={e => setWerte(prev => ({ ...prev, urlaubs_bundesland: e.target.value }))}
+            value={werte.urlaubs_bundesland || "DE"}
+            onChange={e => {
+              bundeslandRef.current = e.target.value;
+              setWerte(prev => ({ ...prev, urlaubs_bundesland: e.target.value }));
+            }}
             style={{ flex: 1, minWidth: 220, padding: "8px 12px", border: "1px solid #93c5fd", borderRadius: 8, fontSize: 13, background: "#fff" }}
           >
             {BUNDESLAENDER.map((bundesland) => <option key={bundesland.code} value={bundesland.code}>{bundesland.label}</option>)}
           </select>
           <button
-            onClick={() => handleSave("urlaubs_bundesland")}
+            onClick={() => handleSave("urlaubs_bundesland", bundeslandRef.current)}
             disabled={saving === "urlaubs_bundesland"}
             style={{ padding: "8px 14px", background: saving === "urlaubs_bundesland" ? "#9ca3af" : "#1d4ed8", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
           >

@@ -64,18 +64,20 @@
 - [x] Client-Anbindung für den Personalaktenexport auf einen tatsächlich auslösbaren Query-Abruf korrigieren und mit TypeScript sowie Vertragsprüfung absichern
 - [x] Regressionstest für CSV-Inhalt, Dateiname und Audit-Log-Vertrag des Personalaktenexports ergänzen
 - [x] Technischen Admin-Abnahmeweg für Bundeslandauswahl, Pflichtmitteilungsstatus und Personalaktenexport dokumentieren
-- [ ] Personalaktenexport im angemeldeten Admin-Browser auslösen und den tatsächlichen CSV-Download mit Dateiname/Inhalt dokumentiert verifizieren
-- [ ] Automatisierten Admin-Browsercheck für sichtbare Bundeslandregel, Mitteilungsstatus, Personalaktenexportkarte und echten CSV-Download ergänzen
-- [ ] Vorhandene Mitteilungsverwaltung mit Erinnerungsstatus als sichtbaren Tab in das Admin-Panel einbinden und browsergestützt prüfen
+- [x] Personalaktenexport im angemeldeten Admin-Browser ausgelöst und tatsächlichen CSV-Download mit Dateiname sowie Inhalt dokumentiert verifiziert
+- [x] Automatisierten Admin-Browsercheck für sichtbare Bundeslandregel, Mitteilungsstatus, Personalaktenexportkarte und echten CSV-Download ergänzt
+- [x] Vorhandene Mitteilungsverwaltung mit Erinnerungsstatus als sichtbaren Tab in das Admin-Panel eingebunden und browsergestützt geprüft
 - [x] Personalaktenexport: Browser-Download und Dateiauffindbarkeit untersucht, mit sichtbarer Downloadkarte ergänzt und regressionstesten
-- [ ] Personalaktenexport mit der neuen Downloadkarte im angemeldeten Admin-Browser auslösen und den sichtbaren Dateinamen sowie den tatsächlichen CSV-Download bestätigen
+- [x] Personalaktenexport mit der neuen Downloadkarte im angemeldeten Admin-Browser ausgelöst sowie sichtbaren Dateinamen und tatsächlichen CSV-Download bestätigt
 - [x] Gezielten UI-Integrationstest ergänzt, der die sichtbare Downloadkarte samt Dateiname nach einem erfolgreichen Personalaktenexport prüft
 - [x] Einheitliche Rückpfeil-Komponente mit verständlicher Beschriftung, Tastaturzugriff und mobiler Touch-Fläche erstellen
 - [x] Rücknavigation auf allen geeigneten Mitarbeiter- und Admin-Unterseiten zentral einbinden, ohne Hauptseiten mit direkter Navigation zu überladen
 - [x] Rücknavigation auf Desktop und Mobilgerät per Verlaufstest, Komponentenprüfung und Navigationsvertrag auf tote Wege prüfen
 - [x] Rücknavigation im angemeldeten Mitarbeiter- und Admin-Portal browsergestützt auf Desktop und Mobil bis zur korrekten internen Zielseite verifizieren
 - [x] Gezielten UI-Integrationstest ergänzt, der den globalen Rückpfeil in PortalApp für Verlauf und Startübersichts-Fallback ohne Browser-Exit nachweist
-- [ ] Finale Admin-Abnahme nach den Änderungen im Browser durchführen: Bundesland speichern, Urlaubs-/Feiertagseffekt prüfen, Mitteilungsstatus sehen und Personalexport auslösen
+- [x] Finale Admin-Abnahme nach den Änderungen im Browser durchgeführt: Bundeslandregel sichtbar, Mitteilungsstatus sichtbar und Personalexport ausgelöst
+- [x] Mitteilungsverwaltung im Admin-Panel browsergestützt um sichtbare Kennzahlen für offene Pflichtbestätigungen und heutige Erinnerungen ergänzt sowie geprüft
+- [x] Bundeslandregel im Admin-Browser tatsächlich gespeichert und ihren Feiertagseffekt in einer Urlaubsberechnung nachweisbar geprüft
 - [x] Kundenzuteilung in der Einsatzplanung um Name, Adresse, Pflegegrad und abrechnungsrelevante Paragraphen mit rollenbasiertem Zugriff ergänzen
 - [x] Wochenendplanung für Samstag und Sonntag fachlich und technisch prüfen sowie bei Sperre freischalten
 - [x] Mitteilungsfunktion einschließlich Navigation, Handler, Berechtigungen und Lesestatus end-to-end prüfen und vervollständigen
