@@ -257,7 +257,7 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
   const addDokument = (trpc.admin as any).addDokumentAdmin.useMutation({
     onSuccess: () => {
       toast.success("Dokument hinzugefügt");
-      (trpc.mitarbeiterakte as any).listDokumente.invalidate({ mitarbeiterId });
+      utils.mitarbeiterakte.listDokumente.invalidate({ mitarbeiterId });
       utils.admin.mitarbeiterDetail.invalidate({ id: mitarbeiterId });
       setShowDokForm(false);
       setDokForm({ typ: "sonstiges", bezeichnung: "", ausstellungsdatum: "", ablaufdatum: "", notizen: "" });
@@ -268,7 +268,7 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
   const deleteDokument = (trpc.admin as any).deleteDokumentAdmin.useMutation({
     onSuccess: () => {
       toast.success("Dokument gelöscht");
-      (trpc.mitarbeiterakte as any).listDokumente.invalidate({ mitarbeiterId });
+      utils.mitarbeiterakte.listDokumente.invalidate({ mitarbeiterId });
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -351,13 +351,25 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 10 * 1024 * 1024) { toast.error("Datei max. 10 MB"); return; }
+    const endung = file.name.toLowerCase().split(".").pop();
+    const erlaubteMimeTypes: Record<string, string> = {
+      pdf: "application/pdf", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png",
+      doc: "application/msword", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    };
+    const mimeType = endung ? erlaubteMimeTypes[endung] : undefined;
+    if (!mimeType || (file.type && file.type !== mimeType)) {
+      toast.error("Erlaubt sind PDF-, JPG-, PNG-, DOC- und DOCX-Dateien.");
+      e.target.value = "";
+      return;
+    }
     setDokUploading(true);
     const reader = new FileReader();
     reader.onload = () => {
       const base64 = (reader.result as string).split(",")[1];
-      setDokForm(f => ({ ...f, base64, mimeType: file.type, dateiname: file.name }));
+      setDokForm(f => ({ ...f, base64, mimeType, dateiname: file.name }));
       setDokUploading(false);
     };
+    reader.onerror = () => { setDokUploading(false); toast.error("Datei konnte nicht gelesen werden."); };
     reader.readAsDataURL(file);
   };
 
@@ -918,10 +930,11 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
                     <label className="flex items-center gap-2 cursor-pointer bg-white border rounded-lg px-3 py-2 text-sm hover:bg-gray-50 transition-colors">
                       <Upload className="w-4 h-4 text-primary" />
                       {dokForm.dateiname ? dokForm.dateiname : "Datei auswählen"}
-                      <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" onChange={handleDokFileSelect} />
+                      <input data-testid="mitarbeiterakte-datei" aria-label="Mitarbeiterdokument auswählen" type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" onChange={handleDokFileSelect} />
                     </label>
                     {dokUploading && <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />}
                   </div>
+                  <p className="text-xs text-muted-foreground mt-2">Erlaubt: PDF, JPG, PNG, DOC und DOCX. Dateien werden extern abgelegt; die Akte speichert nur die geschützte Referenz.</p>
                 </div>
                 <div className="flex gap-2">
                   <Button size="sm" onClick={handleDokSave} disabled={addDokument.isPending || dokUploading}>

@@ -31,6 +31,7 @@ import { istAbgeschlossenerStartzugang } from "../shared/erstlogin";
 import { berechneUrlaubsverbrauch, berechneZeitanteiligenJahresurlaub, normalisiereArbeitstage, type Wochentag } from "../shared/urlaubsLogik";
 import { normalisiereBundesland } from "../shared/planungsLogik";
 import { erstellePersonalaktenHistorienCsv } from "../shared/personalaktenExport";
+import { ermittleMitarbeiterDokumentMimeType, pruefeMitarbeiterDokumentUpload } from "./mitarbeiterDokumentUpload";
 import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, mitarbeiterArbeitsmuster, urlaubsantraege, einsatzAenderungen, kunden as kundenTable, notifications as notificationsTable, ersteHilfeKurse, mitarbeiterBerechtigungen as mbTable, besuchsberichte, fahrten } from "../drizzle/schema";
 import {
   getMitarbeiterByEmail,
@@ -649,35 +650,64 @@ const mitarbeiterakteRouter = router({
     .query(async ({ input, ctx }) => {
       const db = await getDb();
       const targetId = input.mitarbeiterId ?? ctx.mitarbeiterId;
+      const angemeldeterMitarbeiter = await getMitarbeiterById(ctx.mitarbeiterId);
+      if (targetId !== ctx.mitarbeiterId && angemeldeterMitarbeiter?.rolle !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Mitarbeiter dürfen nur ihre eigenen Dokumente einsehen." });
+      }
       return db!.select().from(mitarbeiterDokumente)
         .where(eq(mitarbeiterDokumente.mitarbeiterId, targetId))
         .orderBy(desc(mitarbeiterDokumente.createdAt));
     }),
   addDokument: portalProtected
     .input(z.object({
-      mitarbeiterId: z.number().int().positive().optional(),
       typ: z.enum(["zertifikat", "arbeitsvertrag", "krankmeldung", "fuehrerschein", "erstehilfe", "sonstiges"]),
       bezeichnung: z.string().min(1).max(255),
-      dateiUrl: z.string().optional(),
       dateiname: z.string().optional(),
+      base64: z.string().optional(),
+      mimeType: z.string().optional(),
       ausstellungsdatum: z.string().optional(),
       ablaufdatum: z.string().optional(),
       notizen: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      const targetId = input.mitarbeiterId ?? ctx.mitarbeiterId;
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (Boolean(input.base64) !== Boolean(input.mimeType)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Datei und Dateityp müssen gemeinsam übermittelt werden." });
+      }
+      let dateiUrl: string | undefined;
+      let dateiname: string | undefined;
+      if (input.base64 && input.mimeType) {
+        if (!input.dateiname) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Der Dateiname fehlt." });
+        }
+        let mimeType: string;
+        let buffer: Buffer;
+        try {
+          mimeType = ermittleMitarbeiterDokumentMimeType(input.dateiname, input.mimeType);
+          buffer = pruefeMitarbeiterDokumentUpload(input.base64, mimeType, input.dateiname);
+        } catch (error: any) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+        }
+        const { storagePut } = await import("./storage.js");
+        const sichererDateiname = input.dateiname.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const key = `mitarbeiter-dokumente/ma-${ctx.mitarbeiterId}/${Date.now()}-${sichererDateiname}`;
+        const gespeichert = await storagePut(key, buffer, mimeType);
+        dateiUrl = gespeichert.url;
+        dateiname = input.dateiname;
+      }
       await db!.insert(mitarbeiterDokumente).values({
-        mitarbeiterId: targetId,
+        mitarbeiterId: ctx.mitarbeiterId,
         typ: input.typ,
         bezeichnung: input.bezeichnung,
-        dateiUrl: input.dateiUrl,
-        dateiname: input.dateiname,
+        dateiUrl,
+        dateiname,
         ausstellungsdatum: input.ausstellungsdatum ? new Date(input.ausstellungsdatum) : undefined,
         ablaufdatum: input.ablaufdatum ? new Date(input.ablaufdatum) : undefined,
         notizen: input.notizen,
         hochgeladenVon: ctx.mitarbeiterId,
       });
+      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "CREATE", ressource: "mitarbeiterdokument", details: `selfupload typ=${input.typ}`, status: "success" });
       return { success: true };
     }),
   deleteDokument: portalProtected
@@ -693,18 +723,6 @@ const mitarbeiterakteRouter = router({
       }
       await db!.delete(mitarbeiterDokumente).where(eq(mitarbeiterDokumente.id, input.id));
       return { success: true };
-    }),
-  // Self-Service: Upload-URL für eigene Dokumente generieren
-  getUploadUrl: portalProtected
-    .input(z.object({
-      dateiname: z.string().min(1),
-      contentType: z.string().default('application/pdf'),
-    }))
-    .mutation(async ({ input, ctx }) => {
-      const { storagePut } = await import('./storage');
-      const key = `mitarbeiter-dokumente/ma-${ctx.mitarbeiterId}/${Date.now()}-${input.dateiname}`;
-      const { url } = await storagePut(key, Buffer.from(''), input.contentType);
-      return { uploadUrl: url, key };
     }),
 });
 
@@ -3123,13 +3141,23 @@ export const appRouter = router({
         if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
         let dateiUrl = input.dateiUrl;
         let dateiname = input.dateiname;
+        if (Boolean(input.base64) !== Boolean(input.mimeType)) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Datei und Dateityp müssen gemeinsam übermittelt werden.' });
+        }
         if (input.base64 && input.mimeType) {
           const { storagePut } = await import('./storage.js');
-          const ext = input.mimeType.split('/')[1] ?? 'pdf';
-          const fname = input.dateiname ?? `dokument-${Date.now()}.${ext}`;
+          if (!input.dateiname) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Der Dateiname fehlt.' });
+          let mimeType: string;
+          let buf: Buffer;
+          try {
+            mimeType = ermittleMitarbeiterDokumentMimeType(input.dateiname, input.mimeType);
+            buf = pruefeMitarbeiterDokumentUpload(input.base64, mimeType, input.dateiname);
+          } catch (error: any) {
+            throw new TRPCError({ code: 'BAD_REQUEST', message: error.message });
+          }
+          const fname = input.dateiname;
           const key = `mitarbeiter-dokumente/ma-${input.mitarbeiterId}/${Date.now()}-${fname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-          const buf = Buffer.from(input.base64, 'base64');
-          const res = await storagePut(key, buf, input.mimeType);
+          const res = await storagePut(key, buf, mimeType);
           dateiUrl = res.url;
           dateiname = fname;
         }

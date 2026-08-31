@@ -13,6 +13,15 @@ const DOK_TYPEN: Record<string, string> = {
   sonstiges: "📁 Sonstiges",
 };
 
+const DATEI_MIME_TYPES: Record<string, string> = {
+  pdf: "application/pdf",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+};
+
 export default function MeinProfil() {
   const { mitarbeiter, refreshAuth } = usePortalAuth() as any;
   const [tab, setTab] = useState<"profil" | "passwort" | "dokumente" | "sicherheit">("profil");
@@ -99,39 +108,36 @@ export default function MeinProfil() {
     onError: (e: any) => toast.error("❌ " + e.message),
   });
 
-  const getUploadUrl = (trpc.mitarbeiterakte as any).getUploadUrl.useMutation();
-
   async function handleUpload() {
     if (!uploadBezeichnung.trim()) { toast.error("Bitte Bezeichnung eingeben"); return; }
     const file = fileInputRef.current?.files?.[0];
 
     setUploading(true);
     try {
-      let dateiUrl: string | undefined;
-      let dateiname: string | undefined;
+      let base64: string | undefined;
+      let mimeType: string | undefined;
 
       if (file) {
-        // Upload-URL vom Server holen
-        const { uploadUrl, key } = await getUploadUrl.mutateAsync({
-          dateiname: file.name,
-          contentType: file.type || "application/octet-stream",
+        if (file.size > 10 * 1024 * 1024) throw new Error("Die Datei ist zu groß. Erlaubt sind maximal 10 MB.");
+        const endung = file.name.toLowerCase().split(".").pop() ?? "";
+        mimeType = DATEI_MIME_TYPES[endung];
+        if (!mimeType || (file.type && file.type !== mimeType)) {
+          throw new Error("Erlaubt sind PDF-, JPG-, PNG-, DOC- und DOCX-Dateien.");
+        }
+        base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+          reader.onerror = () => reject(new Error("Datei konnte nicht gelesen werden."));
+          reader.readAsDataURL(file);
         });
-        // Datei direkt per PUT hochladen
-        const res = await fetch(uploadUrl, {
-          method: "PUT",
-          body: file,
-          headers: { "Content-Type": file.type || "application/octet-stream" },
-        });
-        if (!res.ok) throw new Error("Upload fehlgeschlagen");
-        dateiUrl = `/manus-storage/${key}`;
-        dateiname = file.name;
       }
 
       await addDokument.mutateAsync({
         typ: uploadTyp as any,
         bezeichnung: uploadBezeichnung.trim(),
-        dateiUrl,
-        dateiname,
+        dateiname: file?.name,
+        base64,
+        mimeType,
         ausstellungsdatum: uploadAusstellungsdatum || undefined,
         ablaufdatum: uploadAblaufdatum || undefined,
         notizen: uploadNotizen || undefined,
@@ -423,11 +429,12 @@ export default function MeinProfil() {
                 <label style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", display: "block", marginBottom: 4 }}>Datei (optional)</label>
                 <input
                   ref={fileInputRef}
+                  data-testid="meinprofil-datei"
                   type="file"
                   accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
                   style={{ width: "100%", padding: "8px 12px", border: "2px dashed #d1d5db", borderRadius: 10, fontSize: 13, boxSizing: "border-box", cursor: "pointer", background: "#fafafa" }}
                 />
-                <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>PDF, JPG, PNG, DOC bis 16 MB</div>
+                <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>PDF, JPG, PNG, DOC, DOCX bis 10 MB</div>
               </div>
 
               {/* Notizen */}

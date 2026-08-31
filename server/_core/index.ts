@@ -63,9 +63,10 @@ async function startServer() {
   const server = createServer(app);
   // Trust reverse proxy (Manus gateway) so req.protocol is correctly 'https'
   app.set('trust proxy', 1);
-  // Configure body parser with larger size limit for file uploads
-  app.use(express.json({ limit: "2mb" }));
-  app.use(express.urlencoded({ limit: "2mb", extended: true }));
+  // Dokumente werden vor der Speicherung serverseitig auf maximal 10 MB geprüft.
+  // Base64 benötigt rund ein Drittel mehr Platz, daher muss der tRPC-JSON-Pfad 16 MB annehmen.
+  app.use(express.json({ limit: "16mb" }));
+  app.use(express.urlencoded({ limit: "16mb", extended: true }));
   app.use(cookieParser());
 
   const requirePortalMitarbeiter = async (req: any, res: any, next: any) => {

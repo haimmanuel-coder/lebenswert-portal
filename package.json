@@ -19,6 +19,7 @@
     "test:temporary-portal-login": "node scripts/check-temporary-portal-login.mjs",
     "test:authenticated-back-navigation": "node scripts/check-authenticated-back-navigation.mjs",
     "test:admin-personalexport": "node scripts/check-admin-personalexport.mjs",
+    "test:mitarbeiterdokument-upload": "node scripts/check-mitarbeiterdokument-upload.mjs",
     "test:terminplanung-kundenname": "node scripts/check-terminplanung-kundenname.mjs",
     "test:terminassistent": "tsx scripts/check-terminassistent.mjs",
     "test:date-render": "node scripts/check-react-date-renders.mjs",

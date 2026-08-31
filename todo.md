@@ -1,6 +1,11 @@
 # Lebenswert Betreuung – Mitarbeiter-Portal TODO
 
 ## Aktuelle Umsetzung – Unterweisung, Erste Hilfe und DSGVO-Startprozess
+- [x] Dokumenten-Upload in der Mitarbeiterakte auf fehlende Oberfläche, Rechte und Speicheranbindung prüfen
+- [x] Sicheren Upload für Mitarbeiterdokumente mit Dateiauswahl, Validierung, Fortschrittsanzeige und S3-Verweis in der Mitarbeiterakte wiederherstellen
+- [x] tRPC-Uploadlimit für die zugesagten 10-MB-Dokumente auf die Base64-Größe abstimmen und serverseitig Dateigröße sowie Dateityp absichern
+- [x] Mitarbeiterakten-Upload mit temporärem Dokument, Adminrechten und vollständiger Bereinigung end-to-end prüfen
+- [x] Lokale Netzwerkdiagnose um Maskierung deutscher Passwort-, Mitarbeiter- und Dateifelder ergänzen und auf fehlende Klartextwerte prüfen
 - [x] Einheitliche Rückpfeil-Komponente mit großem mobilen Touchbereich und sicherem Übersichts-Fallback wiederherstellen
 - [x] Rückpfeil auf allen internen Mitarbeiter- und Admin-Unterseiten zentral einbinden und Navigationsvertrag absichern
 - [x] Isoliertes aktives Testkonto für einen End-to-End-Portal-Login erstellen, testen und vollständig bereinigen

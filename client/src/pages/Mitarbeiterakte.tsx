@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
@@ -47,21 +47,39 @@ export default function Mitarbeiterakte() {
   );
 
   const [showForm, setShowForm] = useState(false);
+  const [dateiWirdGelesen, setDateiWirdGelesen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     typ: "zertifikat" as DokTyp,
     bezeichnung: "",
-    dateiUrl: "",
     dateiname: "",
+    base64: "",
+    mimeType: "",
     ausstellungsdatum: "",
     ablaufdatum: "",
     notizen: "",
   });
 
+  const formZuruecksetzen = () => {
+    setForm({ typ: "zertifikat", bezeichnung: "", dateiname: "", base64: "", mimeType: "", ausstellungsdatum: "", ablaufdatum: "", notizen: "" });
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const addMut = trpc.mitarbeiterakte.addDokument.useMutation({
     onSuccess: () => {
       refetch();
       setShowForm(false);
-      setForm({ typ: "zertifikat", bezeichnung: "", dateiUrl: "", dateiname: "", ausstellungsdatum: "", ablaufdatum: "", notizen: "" });
+      formZuruecksetzen();
+      toast.success("Dokument gespeichert!");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const addAdminMut = trpc.admin.addDokumentAdmin.useMutation({
+    onSuccess: () => {
+      refetch();
+      setShowForm(false);
+      formZuruecksetzen();
       toast.success("Dokument gespeichert!");
     },
     onError: (e) => toast.error(e.message),
@@ -74,7 +92,44 @@ export default function Mitarbeiterakte() {
 
   const handleSave = () => {
     if (!form.bezeichnung.trim()) { toast.error("Bezeichnung erforderlich"); return; }
-    addMut.mutate({ ...form, mitarbeiterId: targetId ?? undefined });
+    if (!targetId) { toast.error("Mitarbeiterakte konnte nicht geladen werden."); return; }
+    const payload = {
+      typ: form.typ,
+      bezeichnung: form.bezeichnung.trim(),
+      dateiname: form.dateiname || undefined,
+      base64: form.base64 || undefined,
+      mimeType: form.mimeType || undefined,
+      ausstellungsdatum: form.ausstellungsdatum || undefined,
+      ablaufdatum: form.ablaufdatum || undefined,
+      notizen: form.notizen || undefined,
+    };
+    if (isAdmin) addAdminMut.mutate({ ...payload, mitarbeiterId: targetId });
+    else addMut.mutate(payload);
+  };
+
+  const handleDateiAuswahl = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { toast.error("Die Datei ist zu groß. Erlaubt sind maximal 10 MB."); event.target.value = ""; return; }
+    const endung = file.name.toLowerCase().split(".").pop() ?? "";
+    const erlaubteMimeTypes: Record<string, string> = {
+      pdf: "application/pdf", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png",
+      doc: "application/msword", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    };
+    const mimeType = erlaubteMimeTypes[endung];
+    if (!mimeType || (file.type && file.type !== mimeType)) {
+      toast.error("Erlaubt sind PDF-, JPG-, PNG-, DOC- und DOCX-Dateien.");
+      event.target.value = "";
+      return;
+    }
+    setDateiWirdGelesen(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setForm((aktuellesFormular) => ({ ...aktuellesFormular, dateiname: file.name, mimeType, base64: String(reader.result).split(",")[1] ?? "" }));
+      setDateiWirdGelesen(false);
+    };
+    reader.onerror = () => { setDateiWirdGelesen(false); event.target.value = ""; toast.error("Datei konnte nicht gelesen werden."); };
+    reader.readAsDataURL(file);
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -155,16 +210,19 @@ export default function Mitarbeiterakte() {
               </div>
             </div>
             <div style={{ marginBottom: "0.75rem" }}>
-              <label className="lw-label">Datei-URL (optional)</label>
-              <input className="lw-input" placeholder="https://..." value={form.dateiUrl} onChange={e => setForm(f => ({ ...f, dateiUrl: e.target.value }))} />
+              <label className="lw-label">Datei hochladen (optional, max. 10 MB)</label>
+              <input ref={fileInputRef} data-testid="alternative-mitarbeiterakte-datei" aria-label="Dokumentdatei auswählen" type="file" className="lw-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" onChange={handleDateiAuswahl} />
+              <div style={{ fontSize: "0.75rem", color: "var(--lw-gray-500)", marginTop: 6 }}>
+                {dateiWirdGelesen ? "Datei wird vorbereitet …" : form.dateiname || "Erlaubt: PDF, JPG, PNG, DOC und DOCX. Die Datei wird extern gespeichert."}
+              </div>
             </div>
             <div style={{ marginBottom: "0.75rem" }}>
               <label className="lw-label">Notizen</label>
               <textarea className="lw-input" rows={2} placeholder="Zusätzliche Informationen..." value={form.notizen} onChange={e => setForm(f => ({ ...f, notizen: e.target.value }))} />
             </div>
             <div style={{ display: "flex", gap: "0.75rem" }}>
-              <button className="lw-btn lw-btn-primary" onClick={handleSave} disabled={addMut.isPending}>
-                {addMut.isPending ? "Speichern…" : "💾 Speichern"}
+              <button className="lw-btn lw-btn-primary" onClick={handleSave} disabled={addMut.isPending || addAdminMut.isPending || dateiWirdGelesen}>
+                {addMut.isPending || addAdminMut.isPending ? "Speichern…" : "💾 Speichern"}
               </button>
               <button className="lw-btn lw-btn-secondary" onClick={() => setShowForm(false)}>Abbrechen</button>
             </div>
