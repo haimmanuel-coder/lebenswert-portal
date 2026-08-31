@@ -3122,6 +3122,47 @@ export const appRouter = router({
         return { success: true };
       }),
 
+    /** Systemrolle und individuelle Ausnahmen gemeinsam, nachvollziehbar speichern. */
+    setRollenKonfiguration: adminProcedure
+      .input(z.object({
+        mitarbeiterId: z.number().int().positive(),
+        rolle: z.enum(["mitarbeiter", "teamleitung", "buchhaltung", "admin"]),
+        berechtigungen: z.array(z.object({
+          modul: z.string().min(1),
+          zugriff: z.enum(["erlaubt", "verweigert"]),
+        })),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const zielMitarbeiter = await getMitarbeiterById(input.mitarbeiterId);
+        if (!zielMitarbeiter) throw new TRPCError({ code: "NOT_FOUND", message: "Mitarbeiter nicht gefunden" });
+        if (input.mitarbeiterId === ctx.adminId && input.rolle !== "admin") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Die eigene Admin-Rolle kann nicht in der laufenden Sitzung entzogen werden." });
+        }
+
+        await db.transaction(async (tx) => {
+          await tx.update(mitarbeiter).set({ rolle: input.rolle }).where(eq(mitarbeiter.id, input.mitarbeiterId));
+          await tx.delete(mbTable).where(eq(mbTable.mitarbeiterId, input.mitarbeiterId));
+          if (input.berechtigungen.length > 0) {
+            await tx.insert(mbTable).values(input.berechtigungen.map((berechtigung) => ({
+              mitarbeiterId: input.mitarbeiterId,
+              modul: berechtigung.modul,
+              zugriff: berechtigung.zugriff,
+              gesetztVonId: ctx.adminId,
+            })));
+          }
+        });
+        await createAuditLog({
+          mitarbeiterId: ctx.adminId,
+          action: "ADMIN",
+          ressource: "rollenvergabe",
+          details: `ma=${input.mitarbeiterId} rolle=${input.rolle} ausnahmen=${input.berechtigungen.length}`,
+          status: "success",
+        });
+        return { success: true, rolle: input.rolle, ausnahmen: input.berechtigungen.length };
+      }),
+
     /** Dokument für beliebigen Mitarbeiter hochladen (Admin) */
     addDokumentAdmin: adminProcedure
       .input(z.object({

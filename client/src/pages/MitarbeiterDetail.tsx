@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { usePortalAuth } from "@/contexts/PortalAuthContext";
 import { toast } from "sonner";
@@ -18,6 +18,7 @@ type ZertifikatStatus = "erhalten" | "angemeldet" | "nicht_angemeldet";
 type Beschaeftigungsart = "minijob" | "teilzeit" | "vollzeit";
 type AkteTab = "stamm" | "dokumente" | "zertifikat" | "vertrag" | "rechte" | "urlaubkrank" | "erstehilfe";
 type DokTyp = "zertifikat" | "arbeitsvertrag" | "krankmeldung" | "fuehrerschein" | "erstehilfe" | "sonstiges";
+type Systemrolle = "mitarbeiter" | "teamleitung" | "buchhaltung" | "admin";
 
 // ─── Konfigurationen ──────────────────────────────────────────────────────────
 const ZERT_CONFIG: Record<ZertifikatStatus, { label: string; color: string; icon: typeof CheckCircle }> = {
@@ -160,6 +161,7 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
   // Rechte-State
   const [rechteMap, setRechteMap] = useState<Record<string, "erlaubt" | "verweigert" | "standard">>({});
   const [rechteLoaded, setRechteLoaded] = useState(false);
+  const [ausgewaehlteRolle, setAusgewaehlteRolle] = useState<Systemrolle>("mitarbeiter");
 
   // Deaktivierungs-Dialog
   const [showDeaktDialog, setShowDeaktDialog] = useState(false);
@@ -223,6 +225,10 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
     }
   );
 
+  useEffect(() => {
+    setAusgewaehlteRolle((ma?.rolle ?? "mitarbeiter") as Systemrolle);
+  }, [ma?.rolle]);
+
   // ─── Mutations ─────────────────────────────────────────────────────────────
   const updateStamm = trpc.admin.updateStammdaten.useMutation({
     onSuccess: () => {
@@ -273,10 +279,13 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
     onError: (e: any) => toast.error(e.message),
   });
 
-  const setBerechtigungen = (trpc.admin as any).setBerechtigungen.useMutation({
-    onSuccess: () => {
-      toast.success("Berechtigungen gespeichert");
-      (trpc.admin as any).getBerechtigungen.invalidate({ mitarbeiterId });
+  const setRollenKonfiguration = (trpc.admin as any).setRollenKonfiguration.useMutation({
+    onSuccess: (ergebnis: { rolle: Systemrolle; ausnahmen: number }) => {
+      toast.success(`Rolle „${ergebnis.rolle}“ und ${ergebnis.ausnahmen} Rechte-Ausnahmen gespeichert`);
+      utils.admin.mitarbeiterDetail.invalidate({ id: mitarbeiterId });
+      utils.admin.mitarbeiterList.invalidate();
+      utils.admin.getBerechtigungen.invalidate({ mitarbeiterId });
+      setRechteLoaded(false);
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -382,7 +391,7 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
     const berechtigungen = Object.entries(rechteMap)
       .filter(([, v]) => v !== "standard")
       .map(([modul, zugriff]) => ({ modul, zugriff: zugriff as "erlaubt" | "verweigert" }));
-    setBerechtigungen.mutate({ mitarbeiterId, berechtigungen });
+    setRollenKonfiguration.mutate({ mitarbeiterId, rolle: ausgewaehlteRolle, berechtigungen });
   };
 
   async function exportPersonalbogen(maData: any) {
@@ -1207,11 +1216,11 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="font-semibold text-foreground">Rollenrechte & Berechtigungen</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">Systemrolle: <strong>{ma.rolle ?? "mitarbeiter"}</strong></p>
+                <p className="text-xs text-muted-foreground mt-0.5">Ausgewählte Systemrolle: <strong>{ausgewaehlteRolle}</strong></p>
               </div>
               {isAdmin && (
-                <Button size="sm" onClick={handleRechteSave} disabled={setBerechtigungen.isPending}>
-                  <Save className="w-4 h-4 mr-1" /> Speichern
+                <Button size="sm" onClick={handleRechteSave} disabled={setRollenKonfiguration.isPending}>
+                  <Save className="w-4 h-4 mr-1" /> {setRollenKonfiguration.isPending ? "Speichert …" : "Rolle & Rechte speichern"}
                 </Button>
               )}
             </div>
@@ -1223,9 +1232,10 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
                 <div className="grid grid-cols-2 gap-2">
                   {(["mitarbeiter", "teamleitung", "buchhaltung", "admin"] as const).map((rolle) => (
                     <button key={rolle}
-                      onClick={() => updateStamm.mutate({ id: mitarbeiterId, rolle } as any)}
+                      type="button"
+                      onClick={() => setAusgewaehlteRolle(rolle)}
                       className={`py-2 px-3 rounded-lg text-sm font-medium border transition-colors ${
-                        ma.rolle === rolle ? "bg-primary text-white border-primary" : "bg-white text-muted-foreground border-border hover:border-primary"
+                        ausgewaehlteRolle === rolle ? "bg-primary text-white border-primary" : "bg-white text-muted-foreground border-border hover:border-primary"
                       }`}>
                       {rolle === "mitarbeiter" ? "👤 Mitarbeiter" :
                        rolle === "teamleitung" ? "👥 Teamleitung" :
