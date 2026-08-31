@@ -10,6 +10,12 @@
 - [x] Rückpfeil-Browsertest nach dem Klick auf die konkrete Mitarbeiter-Übersicht und das konkrete Admin-Dashboard prüfen
 - [x] Rückpfeil im angemeldeten Admin-Portal browsergestützt auf Desktop und Mobil mit sichtbarem Pfeil sowie korrekter interner Zielseite prüfen
 - [x] tRPC-Transformationsstörung beim echten Browser-Login des temporären Testkontos als durch lokales Rate-Limit verursachte Testbedingung eingegrenzt und nach Reset erfolgreich end-to-end geprüft
+- [x] Kunden-Auswahlfeld der Terminplanung mit eindeutigem Vor- und Nachnamen in Auswahlliste und Auswahlzustand prüfen und korrigieren
+- [x] Vor- und Nachname eines Kunden im geöffneten Auswahlfeld und nach Auswahl im echten angemeldeten Planungsdialog browsergestützt prüfen
+- [x] Zugeordnete Mitarbeiter sehen den vollständigen Kunden-Vor- und Nachnamen auch bei Mehrfachbetreuung
+- [x] Aktuelle Betreuungsperson auch im Termineinsatz-/Termin-Rendering der Einsatzplanung sichtbar anzeigen und browsergestützt nachweisen
+- [x] End-to-End-Rechteprüfung ergänzt: unzugeordneter Mitarbeiter sieht den Kunden nicht, beide zugeordneten Mitarbeiter sehen ihn, Testdaten vollständig bereinigt
+- [x] Bestehende Kunden-Zuordnungstabelle um fehlende Prioritäts- und Rollenfelder migrationssicher ergänzen
 - [x] Anforderungen und Sicherheitsmindeststandard für einen EU-Server mit Coolify festlegen – externe Migration vom Nutzer gestoppt
 - [x] Serverangebote für Coolify, Datenbank, Dateiablage und Backups anhand transparenter Kriterien vergleichen – externe Migration vom Nutzer gestoppt
 - [x] [Gestoppt/obsolet] Server-Auswahl dokumentiert beendet – keine Bestellung ausgelöst
@@ -59,13 +65,15 @@
 - [x] Regressionstest für CSV-Inhalt, Dateiname und Audit-Log-Vertrag des Personalaktenexports ergänzen
 - [x] Technischen Admin-Abnahmeweg für Bundeslandauswahl, Pflichtmitteilungsstatus und Personalaktenexport dokumentieren
 - [ ] Personalaktenexport im angemeldeten Admin-Browser auslösen und den tatsächlichen CSV-Download mit Dateiname/Inhalt dokumentiert verifizieren
+- [ ] Automatisierten Admin-Browsercheck für sichtbare Bundeslandregel, Mitteilungsstatus, Personalaktenexportkarte und echten CSV-Download ergänzen
+- [ ] Vorhandene Mitteilungsverwaltung mit Erinnerungsstatus als sichtbaren Tab in das Admin-Panel einbinden und browsergestützt prüfen
 - [x] Personalaktenexport: Browser-Download und Dateiauffindbarkeit untersucht, mit sichtbarer Downloadkarte ergänzt und regressionstesten
 - [ ] Personalaktenexport mit der neuen Downloadkarte im angemeldeten Admin-Browser auslösen und den sichtbaren Dateinamen sowie den tatsächlichen CSV-Download bestätigen
 - [x] Gezielten UI-Integrationstest ergänzt, der die sichtbare Downloadkarte samt Dateiname nach einem erfolgreichen Personalaktenexport prüft
 - [x] Einheitliche Rückpfeil-Komponente mit verständlicher Beschriftung, Tastaturzugriff und mobiler Touch-Fläche erstellen
 - [x] Rücknavigation auf allen geeigneten Mitarbeiter- und Admin-Unterseiten zentral einbinden, ohne Hauptseiten mit direkter Navigation zu überladen
 - [x] Rücknavigation auf Desktop und Mobilgerät per Verlaufstest, Komponentenprüfung und Navigationsvertrag auf tote Wege prüfen
-- [ ] Rücknavigation im angemeldeten Mitarbeiter- und Admin-Portal browsergestützt auf Desktop und Mobil bis zur korrekten internen Zielseite verifizieren
+- [x] Rücknavigation im angemeldeten Mitarbeiter- und Admin-Portal browsergestützt auf Desktop und Mobil bis zur korrekten internen Zielseite verifizieren
 - [x] Gezielten UI-Integrationstest ergänzt, der den globalen Rückpfeil in PortalApp für Verlauf und Startübersichts-Fallback ohne Browser-Exit nachweist
 - [ ] Finale Admin-Abnahme nach den Änderungen im Browser durchführen: Bundesland speichern, Urlaubs-/Feiertagseffekt prüfen, Mitteilungsstatus sehen und Personalexport auslösen
 - [x] Kundenzuteilung in der Einsatzplanung um Name, Adresse, Pflegegrad und abrechnungsrelevante Paragraphen mit rollenbasiertem Zugriff ergänzen

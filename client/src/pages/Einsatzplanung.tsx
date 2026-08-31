@@ -733,8 +733,8 @@ export default function Einsatzplanung() {
                       >
                         {termin.startzeit}–{termin.endzeit} · {termin.kundenName}
                       </div>
-                      <div style={{ fontSize: 10.5, color: "#4b5563", marginTop: 2 }}>
-                        {termin.mitarbeiterName}
+                      <div style={{ fontSize: 10.5, color: "#4b5563", marginTop: 2 }} data-testid={`termin-betreuung-${termin.id}`}>
+                        Aktuell eingeteilt: {termin.mitarbeiterName}
                       </div>
                       <div
                         style={{

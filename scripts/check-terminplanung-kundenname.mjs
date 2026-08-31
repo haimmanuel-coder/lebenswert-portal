@@ -1,0 +1,188 @@
+import { randomUUID } from "node:crypto";
+import bcrypt from "bcryptjs";
+import mysql from "mysql2/promise";
+import { chromium } from "playwright";
+
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) throw new Error("DATABASE_URL ist für den Planungsdialog-Browsercheck erforderlich.");
+
+const portalUrl = (process.env.TEST_PORTAL_BASE_URL || "http://127.0.0.1:3000").replace(/\/$/, "");
+const kennung = randomUUID().replace(/-/g, "").slice(0, 14);
+const passwort = `Qa!${kennung}B7`;
+const kundenVorname = "Termin";
+const kundenNachname = `Namenspruefung${kennung.slice(0, 4)}`;
+const kundenName = `${kundenVorname} ${kundenNachname}`;
+const erstesTeammitglied = "Planung Team Alpha";
+const zweitesTeammitglied = "Planung Team Beta";
+const emails = {
+  alpha: `qa-kundenname-${kennung}@example.invalid`,
+  beta: `qa-kundenname-team-${kennung}@example.invalid`,
+  ohneZuordnung: `qa-kundenname-ohne-${kennung}@example.invalid`,
+};
+
+const db = await mysql.createConnection(databaseUrl);
+let mitarbeiterId;
+let zweiterMitarbeiterId;
+let unzugeordneterMitarbeiterId;
+let kundenId;
+let einsatzId;
+let browser;
+
+async function erstelleMitarbeiter(vorname, nachname, email, passwortHash) {
+  const [result] = await db.execute(
+    `INSERT INTO mitarbeiter
+      (vorname, nachname, email, passwortHash, rolle, aktiv, passwortWechselErforderlich, zweiFaktorAktiv, datevEinwilligung)
+     VALUES (?, ?, ?, ?, 'mitarbeiter', 1, 0, 0, 0)`,
+    [vorname, nachname, email, passwortHash],
+  );
+  return result.insertId;
+}
+
+async function erstelleTestdaten() {
+  const passwortHash = await bcrypt.hash(passwort, 10);
+  mitarbeiterId = await erstelleMitarbeiter("Planung", "Team Alpha", emails.alpha, passwortHash);
+  zweiterMitarbeiterId = await erstelleMitarbeiter("Planung", "Team Beta", emails.beta, passwortHash);
+  unzugeordneterMitarbeiterId = await erstelleMitarbeiter("Planung", "Ohne Zuordnung", emails.ohneZuordnung, passwortHash);
+
+  const [dokumente] = await db.execute("SELECT id, version FROM datenschutzDokumente WHERE aktiv = 1");
+  for (const dokument of dokumente) {
+    for (const id of [mitarbeiterId, zweiterMitarbeiterId, unzugeordneterMitarbeiterId]) {
+      await db.execute(
+        `INSERT INTO datenschutzZustimmungen (mitarbeiterId, dokumentId, dokumentVersion) VALUES (?, ?, ?)`,
+        [id, dokument.id, dokument.version],
+      );
+    }
+  }
+
+  const [kundenInsert] = await db.execute(
+    `INSERT INTO kunden (vorname, nachname, strasse, plz, ort, pflegegrad, paragraph, paragraphen, aktiv)
+     VALUES (?, ?, 'Teststraße 1', '90402', 'Nürnberg', 3, '45b', '["45b","39"]', 1)`,
+    [kundenVorname, kundenNachname],
+  );
+  kundenId = kundenInsert.insertId;
+  await db.execute(
+    `INSERT INTO kundenZuordnung (mitarbeiterId, kundenId, prioritaet, rolle)
+     VALUES (?, ?, 1, 'hauptbetreuer'), (?, ?, 2, 'vertretung')`,
+    [mitarbeiterId, kundenId, zweiterMitarbeiterId, kundenId],
+  );
+  const [einsatzInsert] = await db.execute(
+    `INSERT INTO einsaetze (mitarbeiterId, kundenId, datum, startzeit, dauerStunden, paragraph, status)
+     VALUES (?, ?, CURDATE(), '09:00:00', 1.50, '45b', 'geplant')`,
+    [mitarbeiterId, kundenId],
+  );
+  einsatzId = einsatzInsert.insertId;
+}
+
+async function schliesseHinweise(page) {
+  const dialog = page.getByRole("dialog", { name: /erstlogin erfolgreich abgeschlossen/i });
+  for (let i = 0; i < 50; i += 1) {
+    if (!await dialog.isVisible().catch(() => false)) break;
+    await page.getByRole("button", { name: "Verstanden" }).click();
+    await page.waitForTimeout(25);
+  }
+}
+
+async function anmeldeUndOeffnePlanung(email) {
+  const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
+  await context.addInitScript(() => window.localStorage.setItem("lebensnah_onboarding_done_v2", "true"));
+  const page = await context.newPage();
+  await page.goto(portalUrl, { waitUntil: "networkidle" });
+  const cookieButton = page.getByRole("button", { name: /verstanden.*akzeptieren/i });
+  if (await cookieButton.isVisible().catch(() => false)) await cookieButton.click();
+  await page.locator('input[type="email"]').fill(email);
+  await page.locator('input[type="password"]').fill(passwort);
+  await page.getByRole("button", { name: "Anmelden" }).click();
+  await page.getByTestId("portal-aktuelle-seite").waitFor({ state: "visible", timeout: 15_000 });
+  await schliesseHinweise(page);
+  await page.getByRole("button", { name: /einsatzplanung/i }).last().click();
+  await page.getByRole("button", { name: /meinen termin planen/i }).click();
+  const dialog = page.getByTestId("terminassistent-dialog");
+  await dialog.waitFor({ state: "visible", timeout: 10_000 });
+  return { context, page, dialog };
+}
+
+async function pruefeZugeordnetenMitarbeiter(email, pruefeTerminkarte = false) {
+  const test = await anmeldeUndOeffnePlanung(email);
+  try {
+    const kundenAusloeser = test.dialog.getByRole("button", { name: /kunden auswählen/i }).last();
+    await kundenAusloeser.click();
+    await test.dialog.getByPlaceholder("Name, Ort, Versicherungsnummer …").fill(kundenName);
+    const kundenOption = test.dialog.getByRole("button", { name: new RegExp(kundenName, "i") }).last();
+    await kundenOption.waitFor({ state: "visible", timeout: 10_000 });
+    const auswahlText = (await kundenOption.textContent() || "").replace(/\s+/g, " ");
+    if (!auswahlText.includes(kundenName) || auswahlText.includes(`${kundenNachname}, ${kundenVorname}`)) {
+      throw new Error("Die Kundenliste zeigt Vor- und Nachname nicht in der geforderten Reihenfolge.");
+    }
+    if (!auswahlText.includes(erstesTeammitglied) || !auswahlText.includes(zweitesTeammitglied)) {
+      throw new Error("Das Betreuungsteam ist im Kunden-Auswahlfeld nicht vollständig sichtbar.");
+    }
+    await kundenOption.click();
+    const ausgewaehlt = test.dialog.getByRole("button", { name: new RegExp(kundenName, "i") }).last();
+    await ausgewaehlt.waitFor({ state: "visible", timeout: 10_000 });
+    const ausgewaehltText = (await ausgewaehlt.textContent() || "").replace(/\s+/g, " ");
+    if (!ausgewaehltText.includes(erstesTeammitglied) || !ausgewaehltText.includes(zweitesTeammitglied)) {
+      throw new Error("Der ausgewählte Kunde zeigt das Betreuungsteam nicht vollständig an.");
+    }
+    if (pruefeTerminkarte) {
+      await test.page.getByTestId(`termin-betreuung-${einsatzId}`)
+        .getByText(`Aktuell eingeteilt: ${erstesTeammitglied}`, { exact: true })
+        .waitFor({ state: "visible", timeout: 10_000 });
+    }
+  } finally {
+    await test.context.close();
+  }
+}
+
+async function pruefeUnzugeordnetenMitarbeiter() {
+  const test = await anmeldeUndOeffnePlanung(emails.ohneZuordnung);
+  try {
+    await test.dialog.getByRole("button", { name: /kunden auswählen/i }).last().click();
+    await test.dialog.getByPlaceholder("Name, Ort, Versicherungsnummer …").fill(kundenName);
+    await test.dialog.getByText("Keine Einträge vorhanden.", { exact: true }).waitFor({ state: "visible", timeout: 10_000 });
+  } finally {
+    await test.context.close();
+  }
+}
+
+try {
+  await erstelleTestdaten();
+  browser = await chromium.launch({
+    headless: true,
+    executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium",
+    args: ["--no-sandbox", "--disable-dev-shm-usage"],
+  });
+  await pruefeZugeordnetenMitarbeiter(emails.alpha, true);
+  await pruefeZugeordnetenMitarbeiter(emails.beta);
+  await pruefeUnzugeordnetenMitarbeiter();
+
+  console.log(JSON.stringify({
+    planungsdialogSichtbar: true,
+    kundenAuswahllisteVornameNachname: true,
+    ausgewaehlterKundeVornameNachname: true,
+    beideZugeordneteMitarbeiterSehenKunden: true,
+    unzugeordneterMitarbeiterSiehtKundenNicht: true,
+    aktuellesBetreuungsteamSichtbar: true,
+    aktuelleTerminBetreuungSichtbar: true,
+    mobilGeprueft: true,
+    klartextpasswortAusgegeben: false,
+  }, null, 2));
+} finally {
+  if (browser) await browser.close();
+  if (einsatzId) await db.execute("DELETE FROM einsaetze WHERE id = ?", [einsatzId]);
+  if (kundenId) await db.execute("DELETE FROM kundenZuordnung WHERE kundenId = ?", [kundenId]);
+  if (kundenId) await db.execute("DELETE FROM kunden WHERE id = ?", [kundenId]);
+  for (const id of [unzugeordneterMitarbeiterId, zweiterMitarbeiterId, mitarbeiterId]) {
+    if (!id) continue;
+    await db.execute("DELETE FROM datenschutzZustimmungen WHERE mitarbeiterId = ?", [id]);
+    await db.execute("DELETE FROM auditLogs WHERE mitarbeiterId = ?", [id]);
+    await db.execute("DELETE FROM mitarbeiterArbeitsmuster WHERE mitarbeiterId = ?", [id]);
+    await db.execute("DELETE FROM mitarbeiter WHERE id = ?", [id]);
+  }
+  console.log(JSON.stringify({ testdatenBereinigt: true }, null, 2));
+  await db.end();
+}
+
+// Chromium oder der Entwicklungsserver können nach der Bereinigung offene
+// Handles behalten. Der Test ist erst nach dem vollständigen Finally-Block
+// erfolgreich und wird dann bewusst als kurzlebiger CI-Schritt beendet.
+process.exit(0);

@@ -12,6 +12,7 @@ import LohnkostenTab from "./LohnkostenTab";
 import OnboardingTab from "./OnboardingTab";
 import CsvImportTab from "./CsvImportTab";
 import KundenCsvImportTab from "./KundenCsvImportTab";
+import MitteilungenAdminTab from "./MitteilungenAdminTab";
 import EinstellungenTab from "./EinstellungenTab";
 import SmtpKonfiguration from "./SmtpKonfiguration";
 import { useState, useEffect, useRef } from "react";
@@ -25,7 +26,7 @@ import BottomSheet from "@/components/BottomSheet";
 import PasswordInput from "@/components/PasswordInput";
 import MitarbeiterDetail from "./MitarbeiterDetail";
 
-type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo" | "preise" | "sicherheit" | "fuehrerschein" | "compliance" | "compliance-gesamt" | "arbeitssicherheit" | "as-dashboard" | "unterschriften-archiv" | "lohnkosten" | "onboarding" | "csv-import" | "kunden-import" | "einstellungen" | "smtp" | "systemstatus";
+type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo" | "preise" | "sicherheit" | "fuehrerschein" | "compliance" | "compliance-gesamt" | "arbeitssicherheit" | "as-dashboard" | "unterschriften-archiv" | "lohnkosten" | "onboarding" | "csv-import" | "kunden-import" | "mitteilungen" | "einstellungen" | "smtp" | "systemstatus";
 type PortalRolle = "mitarbeiter" | "teamleitung" | "buchhaltung" | "admin";
 type Zugangskarte = { id?: number; vorname: string; nachname: string; email: string; rolle?: string; startpasswort: string };
 
@@ -466,6 +467,7 @@ export default function AdminPanel() {
           { key: "onboarding" as AdminTab, label: "🎯 Onboarding" },
           { key: "csv-import" as AdminTab, label: "📥 CSV-Import" },
           { key: "kunden-import" as AdminTab, label: "🏠 Kunden-Import" },
+          { key: "mitteilungen" as AdminTab, label: "📢 Mitteilungen" },
           { key: "einstellungen" as AdminTab, label: "⚙️ Einstellungen" },
           { key: "smtp" as AdminTab, label: "📧 SMTP / E-Mail" },
           { key: "systemstatus" as AdminTab, label: "🖥️ Systemstatus" },
@@ -1168,6 +1170,9 @@ export default function AdminPanel() {
       )}
       {tab === "kunden-import" && (
         <KundenCsvImportTab />
+      )}
+      {tab === "mitteilungen" && (
+        <MitteilungenAdminTab />
       )}
 
       {/* ── EINSTELLUNGEN ── */}

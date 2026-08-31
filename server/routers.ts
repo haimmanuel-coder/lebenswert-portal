@@ -44,6 +44,7 @@ import {
   createKunde,
   updateKunde,
   getKundenByMitarbeiter,
+  ergaenzeKundenMitBetreuungsteam,
   getEinsatzById,
   getEinsaetzeMitAusstehenderFreigabe,
   setUnterschriftFreigabe,
@@ -1520,12 +1521,19 @@ export const appRouter = router({
     // und tatsächlich zugeordnete Betreuungskräfte beschränkt.
     list: portalProtected.query(async ({ ctx }) => {
       const ma = await getMitarbeiterById(ctx.mitarbeiterId);
-      if (ma?.rolle === "mitarbeiter") return getKundenByMitarbeiter(ctx.mitarbeiterId);
+      if (ma?.rolle === "mitarbeiter") {
+        // Auch bei Mehrfachbetreuung bleibt die Liste auf die tatsächlich
+        // zugeordneten Kunden begrenzt. Namen weiterer Betreuungspersonen
+        // werden nur für diese Kunden zur Einsatzkoordination ergänzt.
+        return ergaenzeKundenMitBetreuungsteam(await getKundenByMitarbeiter(ctx.mitarbeiterId));
+      }
       const alle = await getAllKunden();
-      if (ma?.rolle === "admin") return alle;
+      if (ma?.rolle === "admin") return ergaenzeKundenMitBetreuungsteam(alle);
       // Teamleitung und Buchhaltung können Kunden für Disposition bzw.
       // Abrechnung identifizieren, erhalten jedoch keine Gesundheitsangabe.
-      return alle.map((kunde: any) => ({ ...kunde, pflegegrad: null, pflegegradSeit: null }));
+      return ergaenzeKundenMitBetreuungsteam(
+        alle.map((kunde: any) => ({ ...kunde, pflegegrad: null, pflegegradSeit: null })),
+      );
     }),
 
     detail: portalProtected

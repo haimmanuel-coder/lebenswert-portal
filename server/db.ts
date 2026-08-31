@@ -1,4 +1,4 @@
-import { and, eq, gte, lte, desc, sql, like, or, isNull } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lte, desc, sql, like, or, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users, mitarbeiter, kunden, einsaetze, leistungen, fahrten, auditLogs, kundenZuordnung, monatsabschluesse, passwordResets, kostentraeger, textbausteine, ebriefLog, pushSubscriptions, urlaubsantraege, krankmeldungen, touren, tourEinsaetze, notifications, refreshTokens, budgetTransaktionen, neukundenPushBestaetigung, vertretungsUebernahmen } from "../drizzle/schema";
 import type { InsertMitarbeiter, InsertKunde, InsertEinsatz, InsertLeistung, InsertFahrt, InsertAuditLog, InsertKostentraeger, InsertTextbaustein, InsertEbriefLog, InsertPushSubscription, InsertUrlaubsantrag, InsertKrankmeldung, InsertTour, InsertNotification, InsertRefreshToken } from "../drizzle/schema";
@@ -184,6 +184,65 @@ export async function getKundenByMitarbeiter(mitarbeiterId: number) {
   if (zuordnungen.length === 0) return [];
   const ids = zuordnungen.map((z) => z.kundenId);
   return db.select().from(kunden).where(and(eq(kunden.aktiv, 1), sql`${kunden.id} IN (${ids.join(",")})`));
+}
+
+export type BetreuungsteamEintrag = {
+  mitarbeiterId: number;
+  name: string;
+  rolle: "hauptbetreuer" | "vertretung";
+  prioritaet: number;
+};
+
+/**
+ * Ergänzt sichtbar berechtigte Kundendaten um das aktuell zugeordnete
+ * Betreuungsteam. Diese Information dient ausschließlich der Einsatzplanung:
+ * Mitarbeitende erkennen damit, wer denselben Kunden im Team betreut.
+ */
+export async function ergaenzeKundenMitBetreuungsteam<T extends { id: number }>(
+  kundenListe: T[],
+): Promise<Array<T & { betreuungsteam: BetreuungsteamEintrag[]; betreuungsteamText: string | null }>> {
+  const db = await getDb();
+  if (!db || kundenListe.length === 0) {
+    return kundenListe.map((kunde) => ({ ...kunde, betreuungsteam: [], betreuungsteamText: null }));
+  }
+
+  const kundenIds = Array.from(new Set(kundenListe.map((kunde) => Number(kunde.id)).filter(Number.isFinite)));
+  const zuordnungen = await db
+    .select({
+      kundenId: kundenZuordnung.kundenId,
+      mitarbeiterId: mitarbeiter.id,
+      vorname: mitarbeiter.vorname,
+      nachname: mitarbeiter.nachname,
+      rolle: kundenZuordnung.rolle,
+      prioritaet: kundenZuordnung.prioritaet,
+    })
+    .from(kundenZuordnung)
+    .innerJoin(mitarbeiter, eq(kundenZuordnung.mitarbeiterId, mitarbeiter.id))
+    .where(and(inArray(kundenZuordnung.kundenId, kundenIds), eq(mitarbeiter.aktiv, 1)))
+    .orderBy(asc(kundenZuordnung.prioritaet), asc(mitarbeiter.nachname), asc(mitarbeiter.vorname));
+
+  const nachKunde = new Map<number, BetreuungsteamEintrag[]>();
+  for (const zuordnung of zuordnungen) {
+    const eintrag: BetreuungsteamEintrag = {
+      mitarbeiterId: Number(zuordnung.mitarbeiterId),
+      name: `${zuordnung.vorname ?? ""} ${zuordnung.nachname ?? ""}`.trim(),
+      rolle: zuordnung.rolle === "vertretung" ? "vertretung" : "hauptbetreuer",
+      prioritaet: Number(zuordnung.prioritaet ?? 1),
+    };
+    if (!eintrag.name) continue;
+    const team = nachKunde.get(Number(zuordnung.kundenId)) ?? [];
+    team.push(eintrag);
+    nachKunde.set(Number(zuordnung.kundenId), team);
+  }
+
+  return kundenListe.map((kunde) => {
+    const betreuungsteam = nachKunde.get(Number(kunde.id)) ?? [];
+    return {
+      ...kunde,
+      betreuungsteam,
+      betreuungsteamText: betreuungsteam.length > 0 ? betreuungsteam.map((person) => person.name).join(", ") : null,
+    };
+  });
 }
 
 export async function setKundenZuordnung(mitarbeiterId: number, kundenIds: number[]) {

@@ -29,6 +29,8 @@ export type AuswahlOption = {
   label: string;
   /** Zusatzinformation, z. B. "PG 3 · §45b" */
   hinweis?: string;
+  /** Aktuell zugeordnete Betreuungspersonen zur schnellen Einsatzkoordination */
+  betreuungsteam?: string;
   /** Farbiger Punkt links (z. B. Mitarbeiterfarbe) */
   farbe?: string;
   /** Zusätzliche Begriffe, über die gesucht werden kann */
@@ -201,17 +203,22 @@ export default function AuswahlFeld({
             }}
           />
         )}
-        <span
-          style={{
-            flex: 1,
-            minWidth: 0,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-            fontWeight: ausgewaehlt ? 600 : 400,
-          }}
-        >
-          {laedt ? "Daten werden geladen …" : (ausgewaehlt?.label ?? platzhalter)}
+        <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+          <span
+            style={{
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              fontWeight: ausgewaehlt ? 600 : 400,
+            }}
+          >
+            {laedt ? "Daten werden geladen …" : (ausgewaehlt?.label ?? platzhalter)}
+          </span>
+          {ausgewaehlt?.betreuungsteam && (
+            <span style={{ fontSize: 10.5, color: "#4b5563", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              Betreuungsteam: {ausgewaehlt.betreuungsteam}
+            </span>
+          )}
         </span>
         {ausgewaehlt?.hinweis && (
           <span style={{ fontSize: 11, color: "#6b7280", flexShrink: 0 }}>{ausgewaehlt.hinweis}</span>
@@ -301,7 +308,7 @@ export default function AuswahlFeld({
                     style={{
                       width: "100%",
                       display: "flex",
-                      alignItems: "center",
+                      alignItems: "flex-start",
                       gap: 8,
                       padding: "9px 12px",
                       border: "none",
@@ -322,19 +329,24 @@ export default function AuswahlFeld({
                         }}
                       />
                     )}
-                    <span
-                      style={{
-                        flex: 1,
-                        minWidth: 0,
-                        fontSize: 13.5,
-                        fontWeight: istAusgewaehlt ? 700 : 500,
-                        color: "#111827",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {option.label}
+                    <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+                      <span
+                        style={{
+                          fontSize: 13.5,
+                          fontWeight: istAusgewaehlt ? 700 : 500,
+                          color: "#111827",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {option.label}
+                      </span>
+                      {option.betreuungsteam && (
+                        <span style={{ fontSize: 10.5, color: "#4b5563", lineHeight: 1.3 }}>
+                          Betreuungsteam: {option.betreuungsteam}
+                        </span>
+                      )}
                     </span>
                     {option.hinweis && (
                       <span style={{ fontSize: 11, color: "#6b7280", flexShrink: 0 }}>{option.hinweis}</span>
@@ -380,10 +392,15 @@ export function kundenZuOptionen(
       if (k.pflegegrad) hinweise.push(`Pflegegrad ${k.pflegegrad}`);
       const paragraphen = kundenParagraphen(k);
       if (paragraphen.length > 0) hinweise.push(paragraphen.map((p) => `§${p}`).join(" · "));
+      const betreuungsteam = kundenBetreuungsteam(k);
       return {
         id: Number(k.id),
-        label: `${k.nachname ?? ""}, ${k.vorname ?? ""}`.replace(/^,\s*|,\s*$/g, "").trim(),
+        // In der Einsatzplanung wird der Kunde wie in einer persönlichen
+        // Ansprache gezeigt: erst Vorname, dann Nachname. Das gilt sowohl
+        // für die geöffnete Liste als auch für den ausgewählten Feldwert.
+        label: [k.vorname, k.nachname].filter(Boolean).join(" ").trim(),
         hinweis: hinweise.join(" · ") || undefined,
+        betreuungsteam: betreuungsteam || undefined,
         suchbegriffe: [
           k.vorname ?? "",
           k.nachname ?? "",
@@ -394,7 +411,19 @@ export function kundenZuOptionen(
           k.telefon ?? "",
         ].filter(Boolean),
       };
-    });
+  });
+}
+
+/** Liest das serverseitig ergänzte Betreuungsteam robust und ohne Rolleninternas. */
+function kundenBetreuungsteam(kunde: Record<string, any>): string {
+  if (typeof kunde.betreuungsteamText === "string" && kunde.betreuungsteamText.trim()) {
+    return kunde.betreuungsteamText.trim();
+  }
+  if (!Array.isArray(kunde.betreuungsteam)) return "";
+  return kunde.betreuungsteam
+    .map((person: any) => typeof person === "string" ? person : person?.name)
+    .filter(Boolean)
+    .join(", ");
 }
 
 /** Liest den neuen Mehrfachwert robust und bleibt zu älteren Einzelwerten kompatibel. */

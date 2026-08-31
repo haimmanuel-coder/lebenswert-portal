@@ -1314,6 +1314,25 @@ export async function ensureTables(): Promise<void> {
     failed++;
   }
 
+  // Die ursprüngliche Unterstrich-Tabelle der Kunden-Zuordnungen enthielt
+  // noch keine Rollen- und Prioritätsfelder. Ohne diese Felder wäre eine
+  // Mehrfachbetreuung weder eindeutig sortierbar noch im Planungsteam
+  // sichtbar. Bestehende Zuordnungen erhalten den sicheren Standardwert
+  // „Hauptbetreuer“ mit Priorität 1.
+  try {
+    const [prioritaetSpalte] = await db.execute(sql.raw("SHOW COLUMNS FROM `kunden_zuordnung` LIKE 'prioritaet'")) as any;
+    if (!Array.isArray(prioritaetSpalte) || prioritaetSpalte.length === 0) {
+      await db.execute(sql.raw("ALTER TABLE `kunden_zuordnung` ADD COLUMN `prioritaet` INT NOT NULL DEFAULT 1"));
+    }
+    const [rolleSpalte] = await db.execute(sql.raw("SHOW COLUMNS FROM `kunden_zuordnung` LIKE 'rolle'")) as any;
+    if (!Array.isArray(rolleSpalte) || rolleSpalte.length === 0) {
+      await db.execute(sql.raw("ALTER TABLE `kunden_zuordnung` ADD COLUMN `rolle` ENUM('hauptbetreuer','vertretung') NOT NULL DEFAULT 'hauptbetreuer'"));
+    }
+  } catch (err: any) {
+    console.error("[ensureTables] Kunden-Zuordnung-Kompatibilitätsmigration fehlgeschlagen:", String(err?.message ?? "").substring(0, 160));
+    failed++;
+  }
+
   // Arbeitstagsmuster wurden nach der ersten Mitarbeiterakte eingeführt.
   // Vorhandene Urlaubskonten werden nicht verändert; die Muster sind lediglich
   // klar dokumentierte Startwerte und werden im Adminbereich individuell gepflegt.
