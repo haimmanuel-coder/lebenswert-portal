@@ -29,7 +29,7 @@ const STANDARD_RECHTE: Record<PortalRolle, PortalRecht[]> = {
     "kunden:lesen", "kunden:schreiben", "berichte:lesen", "berichte:freigeben",
     "planung:verwalten", "mitarbeiter:verwalten",
   ],
-  buchhaltung: ["kunden:lesen", "finanzen:lesen", "finanzen:exportieren"],
+  buchhaltung: ["kunden:lesen", "kunden:schreiben", "finanzen:lesen", "finanzen:exportieren"],
   admin: [
     "kunden:lesen", "kunden:schreiben", "kunden:loeschen", "berichte:lesen",
     "berichte:freigeben", "planung:verwalten", "finanzen:lesen",

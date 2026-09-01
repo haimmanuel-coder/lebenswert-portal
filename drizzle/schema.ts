@@ -416,6 +416,19 @@ export const auditLogs = mysqlTable("auditLogs", {
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = typeof auditLogs.$inferInsert;
 
+// Zugangskarten-PDF: Es werden ausschließlich Ablagemetadaten gespeichert.
+// Vertrauliche Startpasswörter werden nie in der Datenbank abgelegt.
+export const zugangskartenPdfAusgaben = mysqlTable("zugangskartenPdfAusgaben", {
+  id: int("id").autoincrement().primaryKey(),
+  storageKey: varchar("storageKey", { length: 500 }).notNull(),
+  dateiname: varchar("dateiname", { length: 255 }).notNull(),
+  kartenAnzahl: int("kartenAnzahl").notNull(),
+  erstelltVon: int("erstelltVon"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ZugangskartenPdfAusgabe = typeof zugangskartenPdfAusgaben.$inferSelect;
+
 // Monatsabschlüsse
 export const monatsabschluesse = mysqlTable("monatsabschluesse", {
   id: int("id").autoincrement().primaryKey(),

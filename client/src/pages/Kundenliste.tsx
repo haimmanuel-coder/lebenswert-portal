@@ -297,8 +297,8 @@ function BudgetHistorieTab({ kundenId, kundenName }: { kundenId: number; kundenN
 }
 
 function KundenDetailSheet({
-  k, onClose, onEdit, onDeactivate, isAdmin,
-}: { k: KundeDetail; onClose: () => void; onEdit: () => void; onDeactivate: () => void; isAdmin: boolean }) {
+  k, onClose, onEdit, onDeactivate, isAdmin, kannKundenBearbeiten,
+}: { k: KundeDetail; onClose: () => void; onEdit: () => void; onDeactivate: () => void; isAdmin: boolean; kannKundenBearbeiten: boolean }) {
   const [activeTab, setActiveTab] = useState<'info' | 'budget' | 'historie'>('info');
   const b45b = toNum(k.budget45b); const v45b = toNum(k.verbraucht45b);
   const b45a = toNum(k.budget45a); const v45a = toNum(k.verbraucht45a);
@@ -390,15 +390,15 @@ function KundenDetailSheet({
           )}
         </div>
 
-        {/* Admin-Aktionen */}
-        {isAdmin && (
+        {/* Kundenpflege: Buchhaltung darf pflegen, nur Admins dürfen deaktivieren. */}
+        {kannKundenBearbeiten && (
           <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
             <button onClick={onEdit} style={{ flex: 1, padding: 13, background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
               ✏️ Bearbeiten
             </button>
-            <button onClick={onDeactivate} style={{ flex: 1, padding: 13, background: "#fee2e2", color: "#dc2626", border: "2px solid #fca5a5", borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+            {isAdmin && <button onClick={onDeactivate} style={{ flex: 1, padding: 13, background: "#fee2e2", color: "#dc2626", border: "2px solid #fca5a5", borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
               🚫 Deaktivieren
-            </button>
+            </button>}
           </div>
         )}
         </>}
@@ -720,6 +720,7 @@ function KundeFormSheet({
 export default function Kundenliste({ onKundeSelect }: { onKundeSelect?: (id: number) => void } = {}) {
   const { mitarbeiter } = usePortalAuth();
   const isAdmin = mitarbeiter?.rolle === "admin";
+  const kannKundenBearbeiten = isAdmin || mitarbeiter?.rolle === "buchhaltung";
 
   const utils = trpc.useUtils();
   const { data: kundenRaw = [], isLoading, isError, refetch } = trpc.kunden.list.useQuery();
@@ -810,7 +811,7 @@ export default function Kundenliste({ onKundeSelect }: { onKundeSelect?: (id: nu
           <div style={{ fontSize: 18, fontWeight: 800 }}>Kundenliste</div>
           <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>Seniorenassistenz Bernhardt – {kunden.length} Kunden</div>
         </div>
-        {isAdmin && (
+        {kannKundenBearbeiten && (
           <button
             id="kunden-neu-btn"
             onClick={() => setShowNeuSheet(true)}
@@ -884,7 +885,7 @@ export default function Kundenliste({ onKundeSelect }: { onKundeSelect?: (id: nu
           <div style={{ fontSize: 40, marginBottom: 8 }}>🔍</div>
           <div style={{ fontSize: 15, fontWeight: 600 }}>Keine Kunden gefunden</div>
           <div style={{ fontSize: 13, marginTop: 4 }}>Suchbegriff oder Filter anpassen</div>
-          {isAdmin && kunden.length === 0 && (
+          {kannKundenBearbeiten && kunden.length === 0 && (
             <button onClick={() => setShowNeuSheet(true)} style={{ marginTop: 16, padding: "12px 24px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
               ➕ Ersten Kunden anlegen
             </button>
@@ -913,6 +914,7 @@ export default function Kundenliste({ onKundeSelect }: { onKundeSelect?: (id: nu
           onEdit={() => setEditKunde(selectedKunde)}
           onDeactivate={() => handleDeactivate(selectedKunde)}
           isAdmin={isAdmin}
+          kannKundenBearbeiten={kannKundenBearbeiten}
         />
       )}
 
@@ -939,4 +941,3 @@ export default function Kundenliste({ onKundeSelect }: { onKundeSelect?: (id: nu
     </div>
   );
 }
-

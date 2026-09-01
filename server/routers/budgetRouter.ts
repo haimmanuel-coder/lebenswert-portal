@@ -11,7 +11,7 @@
  */
 import { z } from "zod";
 import { router } from "../_core/trpc";
-import { adminProcedure, portalProtected } from "../portalAuth";
+import { adminProcedure, portalProtected, roleProcedure } from "../portalAuth";
 import { getDb } from "../db";
 import { jahresbudgets, kunden, einsaetze, controllingSnapshots } from "../../drizzle/schema";
 import { eq, and, sql, desc, lte, gte } from "drizzle-orm";
@@ -72,8 +72,8 @@ export const budgetRouter = router({
         .orderBy(desc(jahresbudgets.gueltigAb));
     }),
 
-  /** Jahresbudget anlegen (Admin) */
-  create: adminProcedure
+  /** Jahresbudget anlegen (Admin oder Buchhaltung) */
+  create: roleProcedure(["admin", "buchhaltung"])
     .input(
       z.object({
         kundenId: z.number(),
@@ -103,8 +103,8 @@ export const budgetRouter = router({
       return { id: insertId, success: true };
     }),
 
-  /** Jahresbudget aktualisieren (Admin) */
-  update: adminProcedure
+  /** Jahresbudget aktualisieren (Admin oder Buchhaltung) */
+  update: roleProcedure(["admin", "buchhaltung"])
     .input(
       z.object({
         id: z.number(),

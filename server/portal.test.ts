@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
+import { hasRecht } from "./portalAuth";
 
 function makeCtx(overrides: Partial<TrpcContext> = {}): TrpcContext {
   const cleared: string[] = [];
@@ -183,6 +184,17 @@ describe("kunden – protected", () => {
   it("detail throws when not authenticated", async () => {
     const caller = appRouter.createCaller(makeCtx());
     await expect(caller.kunden.detail({ id: 1 })).rejects.toThrow("Nicht angemeldet");
+  });
+});
+
+describe("Buchhaltungsrolle – Rechtekatalog", () => {
+  it("darf Kunden- und Finanzdaten pflegen, aber weder Kunden deaktivieren noch Einsätze planen", () => {
+    expect(hasRecht("buchhaltung", "kunden:lesen")).toBe(true);
+    expect(hasRecht("buchhaltung", "kunden:schreiben")).toBe(true);
+    expect(hasRecht("buchhaltung", "finanzen:lesen")).toBe(true);
+    expect(hasRecht("buchhaltung", "finanzen:exportieren")).toBe(true);
+    expect(hasRecht("buchhaltung", "kunden:loeschen")).toBe(false);
+    expect(hasRecht("buchhaltung", "planung:verwalten")).toBe(false);
   });
 });
 

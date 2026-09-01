@@ -32,7 +32,8 @@ import { berechneUrlaubsverbrauch, berechneZeitanteiligenJahresurlaub, normalisi
 import { normalisiereBundesland } from "../shared/planungsLogik";
 import { erstellePersonalaktenHistorienCsv } from "../shared/personalaktenExport";
 import { ermittleMitarbeiterDokumentMimeType, pruefeMitarbeiterDokumentUpload } from "./mitarbeiterDokumentUpload";
-import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, mitarbeiterArbeitsmuster, urlaubsantraege, einsatzAenderungen, kunden as kundenTable, notifications as notificationsTable, ersteHilfeKurse, mitarbeiterBerechtigungen as mbTable, besuchsberichte, fahrten } from "../drizzle/schema";
+import { storageGetSignedUrl } from "./storage";
+import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, mitarbeiterArbeitsmuster, urlaubsantraege, einsatzAenderungen, kunden as kundenTable, notifications as notificationsTable, ersteHilfeKurse, mitarbeiterBerechtigungen as mbTable, besuchsberichte, fahrten, zugangskartenPdfAusgaben } from "../drizzle/schema";
 import {
   getMitarbeiterByEmail,
   getMitarbeiterById,
@@ -1546,9 +1547,11 @@ export const appRouter = router({
         return ergaenzeKundenMitBetreuungsteam(await getKundenByMitarbeiter(ctx.mitarbeiterId));
       }
       const alle = await getAllKunden();
-      if (ma?.rolle === "admin") return ergaenzeKundenMitBetreuungsteam(alle);
-      // Teamleitung und Buchhaltung können Kunden für Disposition bzw.
-      // Abrechnung identifizieren, erhalten jedoch keine Gesundheitsangabe.
+      if (ma?.rolle === "admin" || ma?.rolle === "buchhaltung") {
+        return ergaenzeKundenMitBetreuungsteam(alle);
+      }
+      // Teamleitung kann Kunden für die Disposition identifizieren, erhält
+      // jedoch keine Gesundheitsangabe.
       return ergaenzeKundenMitBetreuungsteam(
         alle.map((kunde: any) => ({ ...kunde, pflegegrad: null, pflegegradSeit: null })),
       );
@@ -1574,19 +1577,39 @@ export const appRouter = router({
         return { kunde, einsaetze: eis, leistungen: leis, fahrten: fahr };
       }),
 
-    create: adminProcedure
+    create: roleProcedure(["admin", "buchhaltung"])
       .input(z.object({
         vorname: z.string().min(1),
         nachname: z.string().min(1),
         adresse: z.string().optional(),
+        strasse: z.string().optional(),
+        plz: z.string().optional(),
+        ort: z.string().optional(),
         telefon: z.string().optional(),
+        mobil: z.string().optional(),
+        email: z.string().email().optional(),
+        geburtsdatum: z.string().optional(),
         pflegegrad: z.number().int().min(1).max(5).optional(),
         paragraph: z.enum(["45b", "45a", "39", "privat"]).optional(),
+        paragraphen: z.string().optional(),
         kostentraegerId: z.number().int().positive().optional().nullable(),
+        kostentraegerName: z.string().optional(),
         versicherungsnummer: z.string().optional(),
+        beihilfe: z.boolean().optional(),
+        beihilfeProzent: z.number().int().min(0).max(100).optional(),
+        pflegekasseProzent: z.number().int().min(0).max(100).optional(),
+        beihilfeVersicherung: z.string().optional(),
+        beihilfeBemerkungen: z.string().optional(),
+        wunschtag1: z.string().optional(),
+        wunschtag2: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
-        const newId = await createKunde({ ...input, aktiv: 1 });
+        const { geburtsdatum, ...kundenDaten } = input;
+        const newId = await createKunde({
+          ...kundenDaten,
+          geburtsdatum: geburtsdatum ? new Date(geburtsdatum) : undefined,
+          aktiv: 1,
+        } as any);
         // P1: Neukunden-Push an alle Mitarbeiter senden
         if (newId) {
           try { await createNeukundenPushEintraege(newId); } catch (e) { console.warn('[P1] Neukunden-Push fehlgeschlagen:', e); }
@@ -1599,7 +1622,7 @@ export const appRouter = router({
         }
         // DSGVO: Anlage personenbezogener Kundendaten auditieren (greift auch beim CSV-Import,
         // der pro Zeile diese Mutation aufruft).
-        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "CREATE", ressource: "kunde", details: `id=${newId ?? "?"} name=${input.vorname} ${input.nachname}`, status: newId ? "success" : "failure" });
+        await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "CREATE", ressource: "kunde", details: `id=${newId ?? "?"}`, status: newId ? "success" : "failure" });
         return { success: true };
       }),
 
@@ -1691,28 +1714,46 @@ export const appRouter = router({
         return { neu, aktualisiert, fehler, gesamt: input.zeilen.length, ergebnisse };
       }),
 
-    update: adminProcedure
+    update: roleProcedure(["admin", "buchhaltung"])
       .input(z.object({
         id: z.number().int().positive(),
         vorname: z.string().min(1).optional(),
         nachname: z.string().min(1).optional(),
         adresse: z.string().optional(),
+        strasse: z.string().optional(),
+        plz: z.string().optional(),
+        ort: z.string().optional(),
         telefon: z.string().optional(),
+        mobil: z.string().optional(),
+        email: z.string().email().optional(),
+        geburtsdatum: z.string().optional(),
         pflegegrad: z.number().int().min(1).max(5).optional(),
         pflegegradSeit: z.string().nullable().optional(),
         paragraph: z.enum(["45b", "45a", "39", "privat"]).optional(),
+        paragraphen: z.string().optional(),
         aktiv: z.number().int().optional(),
         kostentraegerId: z.number().int().positive().optional().nullable(),
+        kostentraegerName: z.string().optional(),
         versicherungsnummer: z.string().optional(),
+        beihilfe: z.boolean().optional(),
+        beihilfeProzent: z.number().int().min(0).max(100).optional(),
+        pflegekasseProzent: z.number().int().min(0).max(100).optional(),
+        beihilfeVersicherung: z.string().optional(),
+        beihilfeBemerkungen: z.string().optional(),
+        wunschtag1: z.string().optional(),
+        wunschtag2: z.string().optional(),
         vollmachtErteilt: z.boolean().optional(),
         vollmachtDatum: z.string().optional(),
         vollmachtSignatur: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         const { id, ...data } = input;
+        if (ctx.portalMitarbeiter.rolle === "buchhaltung" && data.aktiv !== undefined) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Nur Admins dürfen Kunden aktivieren oder deaktivieren." });
+        }
         await updateKunde(id, data as any);
         // DSGVO: Änderung personenbezogener Kundendaten auditieren.
-        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "UPDATE", ressource: "kunde", details: `id=${id} felder=${Object.keys(data).join(",")}`, status: "success" });
+        await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "UPDATE", ressource: "kunde", details: `id=${id} felder=${Object.keys(data).join(",")}`, status: "success" });
         return { success: true };
       }),
 
@@ -1725,7 +1766,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    updateBudget: adminProcedure
+    updateBudget: roleProcedure(["admin", "buchhaltung"])
       .input(z.object({
         id: z.number().int().positive(),
         budget45b: z.string().optional(),
@@ -3058,6 +3099,30 @@ export const appRouter = router({
         karten.push({ id: ma.id, vorname: ma.vorname, nachname: ma.nachname, email: ma.email, rolle: ma.rolle, startpasswort });
       }
       return { karten, anzahl: karten.length };
+    }),
+    /** Die aktuellste Zugangskarten-PDF erhält nur ein angemeldeter Admin als 60-Minuten-Signaturlink. */
+    aktuelleZugangskartenPdf: adminProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Datenbank nicht verfügbar." });
+      const [ausgabe] = await db.select().from(zugangskartenPdfAusgaben)
+        .orderBy(desc(zugangskartenPdfAusgaben.createdAt))
+        .limit(1);
+      if (!ausgabe) return null;
+      const downloadUrl = await storageGetSignedUrl(ausgabe.storageKey);
+      await createAuditLog({
+        mitarbeiterId: ctx.adminId,
+        action: "EXPORT",
+        ressource: "zugangskarten-pdf",
+        details: `abruf ausgabe=${ausgabe.id} karten=${ausgabe.kartenAnzahl}`,
+        status: "success",
+      });
+      return {
+        dateiname: ausgabe.dateiname,
+        kartenAnzahl: ausgabe.kartenAnzahl,
+        erstelltAm: ausgabe.createdAt,
+        downloadUrl,
+        gueltigMinuten: 60,
+      };
     }),
     /** Mitarbeiterliste als strukturierte Daten für Export */
     mitarbeiterExport: adminProcedure.query(async ({ ctx }) => {

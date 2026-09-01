@@ -7,6 +7,12 @@
 - [x] Mitarbeiterakten-Upload mit temporärem Dokument, Adminrechten und vollständiger Bereinigung end-to-end prüfen
 - [x] Lokale Netzwerkdiagnose um Maskierung deutscher Passwort-, Mitarbeiter- und Dateifelder ergänzen und auf fehlende Klartextwerte prüfen
 - [x] Rollenvergabe in der Mitarbeiterakte dauerhaft speichern, nach Neuladen korrekt anzeigen und mit einem Admin-Test absichern
+- [x] Buchhaltungsrolle um Budgetverwaltung und Bearbeitung der freigegebenen Kundendaten erweitern und serverseitig durchsetzen
+- [x] Geschütztes PDF mit ausschneidbaren Zugangskarten und aktuellen Einmal-Startpasswörtern für alle aktiven Mitarbeitenden erstellen
+- [x] Zugangskarten-PDF als serverseitig zugriffsgeschützte Admin-Ausgabe hinterlegen und zeitlich begrenzten Abruf absichern
+- [x] Geschützten Zugangskarten-PDF-Abruf im Admin-Workflow sichtbar einbinden und gegen unbefugte Rollen testen
+- [x] Geschützten Zugangskarten-PDF-Download im echten Admin-Browser bis zum sichtbaren Button end-to-end prüfen
+- [x] Browser- und HTTP-Test ergänzen: Nicht-Admins erhalten weder einen PDF-Abruf noch einen gültigen Signaturlink
 - [x] Einheitliche Rückpfeil-Komponente mit großem mobilen Touchbereich und sicherem Übersichts-Fallback wiederherstellen
 - [x] Rückpfeil auf allen internen Mitarbeiter- und Admin-Unterseiten zentral einbinden und Navigationsvertrag absichern
 - [x] Isoliertes aktives Testkonto für einen End-to-End-Portal-Login erstellen, testen und vollständig bereinigen

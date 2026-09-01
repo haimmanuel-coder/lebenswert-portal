@@ -122,6 +122,7 @@ export default function PortalApp() {
   const neukundenPushCount = (neukundenPushOffen as any[]).length;
   const isAdmin = mitarbeiter?.rolle === "admin";
   const isTeamleitung = mitarbeiter?.rolle === "teamleitung";
+  const isBuchhaltung = mitarbeiter?.rolle === "buchhaltung";
   // ── Modul-Berechtigungen: Gesperrte Module aus Navigation ausblenden ──
   const { data: meineBerechtigungen = [] } = (trpc as any).compliance.meineBerechtigungen.useQuery(
     undefined, { enabled: !!mitarbeiter && !isAdmin, staleTime: 60_000 }
@@ -234,10 +235,12 @@ export default function PortalApp() {
       title: "👥 Kunden",
       items: [
         { id: "kunden", icon: "👥", label: "Kundenliste", badge: warnungen.length > 0 ? warnungen.length : undefined },
-        ...(isAdmin ? [
-          { id: "neukundenaufnahme" as PageId, icon: "➕", label: "Neukundenaufnahme", badge: neukundenPushCount > 0 ? neukundenPushCount : undefined },
-          { id: "pflegekassen" as PageId, icon: "🏥", label: "Pflegekassen", adminOnly: true },
-          { id: "budget" as PageId, icon: "💰", label: "Budgetverwaltung", adminOnly: true },
+        ...(isAdmin || isBuchhaltung ? [
+          ...(isAdmin ? [
+            { id: "neukundenaufnahme" as PageId, icon: "➕", label: "Neukundenaufnahme", badge: neukundenPushCount > 0 ? neukundenPushCount : undefined },
+            { id: "pflegekassen" as PageId, icon: "🏥", label: "Pflegekassen", adminOnly: true },
+          ] : []),
+          { id: "budget" as PageId, icon: "💰", label: "Budgetverwaltung" },
         ] : []),
         ...(isAdmin || isTeamleitung ? [{ id: "privatrechnung" as PageId, icon: "🩺", label: "Kundenbegleitungen", adminOnly: true }] : []),
         { id: "besuchsberichte" as PageId, icon: "📋", label: "Dokumentation" },

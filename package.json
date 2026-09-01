@@ -21,6 +21,8 @@
     "test:admin-personalexport": "node scripts/check-admin-personalexport.mjs",
     "test:mitarbeiterdokument-upload": "node scripts/check-mitarbeiterdokument-upload.mjs",
     "test:rollenvergabe": "node scripts/check-rollenvergabe.mjs",
+    "test:buchhaltung-kundenrechte": "node scripts/check-buchhaltung-kundenrechte.mjs",
+    "test:zugangskarten-pdf-schutz": "node scripts/check-zugangskarten-pdf-schutz.mjs",
     "test:terminplanung-kundenname": "node scripts/check-terminplanung-kundenname.mjs",
     "test:terminassistent": "tsx scripts/check-terminassistent.mjs",
     "test:date-render": "node scripts/check-react-date-renders.mjs",
