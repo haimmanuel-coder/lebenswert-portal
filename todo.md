@@ -13,6 +13,8 @@
 - [x] Geschützten Zugangskarten-PDF-Abruf im Admin-Workflow sichtbar einbinden und gegen unbefugte Rollen testen
 - [x] Geschützten Zugangskarten-PDF-Download im echten Admin-Browser bis zum sichtbaren Button end-to-end prüfen
 - [x] Browser- und HTTP-Test ergänzen: Nicht-Admins erhalten weder einen PDF-Abruf noch einen gültigen Signaturlink
+- [ ] Domain portal.lebenswert-betreuung.de in der App-Verwaltung verknüpfen, erforderliche DNS-Einträge prüfen und HTTPS-Abruf bestätigen
+- [x] Terminplanung: Kundenauswahl mit vollständigem Vor- und Nachnamen darstellen und für Mitarbeitende strikt auf zugeordnete Kunden begrenzen
 - [x] Einheitliche Rückpfeil-Komponente mit großem mobilen Touchbereich und sicherem Übersichts-Fallback wiederherstellen
 - [x] Rückpfeil auf allen internen Mitarbeiter- und Admin-Unterseiten zentral einbinden und Navigationsvertrag absichern
 - [x] Isoliertes aktives Testkonto für einen End-to-End-Portal-Login erstellen, testen und vollständig bereinigen

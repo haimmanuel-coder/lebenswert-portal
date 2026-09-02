@@ -104,7 +104,6 @@ export default function Einsatzplanung() {
     mitarbeiterId: filterMitarbeiterId,
   });
 
-  const { data: kunden = [] } = trpc.kunden.list.useQuery();
   const { data: feiertagsEinstellung } = (trpc as any).einstellungen.urlaubsBundesland.useQuery();
   const bundesland = feiertagsEinstellung?.bundesland ?? "DE";
   // Eigene Planungsroute: liefert der Teamleitung nur die Basisangaben,
@@ -115,11 +114,31 @@ export default function Einsatzplanung() {
   const darfLoeschen = Boolean(planung?.rechte?.darfLoeschen);
   const darfAlleSehen = Boolean(planung?.rechte?.darfAlleSehen);
 
-  const kundenOptionen = useMemo(() => kundenZuOptionen(kunden as any[]), [kunden]);
+  const zielMitarbeiterId = formular.mitarbeiterId ?? undefined;
+  const {
+    data: zugeordneteKunden,
+    isLoading: kundenLaden,
+  } = (trpc as any).planung.kundenFuerMitarbeiter.useQuery(
+    { mitarbeiterId: zielMitarbeiterId },
+    { enabled: formularOffen && Boolean(zielMitarbeiterId) },
+  );
+  const kundenOptionen = useMemo(
+    () => kundenZuOptionen(zugeordneteKunden as any[] | undefined),
+    [zugeordneteKunden],
+  );
   const mitarbeiterOptionen = useMemo(
     () => mitarbeiterZuOptionen(alleMitarbeiter as any[], getMitarbeiterFarbe),
     [alleMitarbeiter],
   );
+
+  // Wechselt die Planerin oder der Planer den Mitarbeiter, wird ein zuvor
+  // ausgewählter Kunde nur dann behalten, wenn dessen Zuordnung weiterhin gilt.
+  useEffect(() => {
+    if (!formularOffen || !formular.kundenId || !zugeordneteKunden) return;
+    if (!(zugeordneteKunden as any[]).some((kunde) => Number(kunde.id) === formular.kundenId)) {
+      setFormular((vorher) => ({ ...vorher, kundenId: null }));
+    }
+  }, [formularOffen, formular.kundenId, zugeordneteKunden]);
 
   // ── Live-Prüfung des Formulars ───────────────────────────────────────────
   // Wird bei jeder Eingabe neu ausgeführt, damit Warnungen während der
@@ -477,10 +496,7 @@ export default function Einsatzplanung() {
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {heutigeTermine.map((t: any) => {
-                const kunde = (kunden as any[]).find((k: any) => k.id === t.kundenId);
-                const kundeName = kunde
-                  ? `${kunde.vorname ?? ""} ${kunde.nachname ?? ""}`.trim()
-                  : `Kunde #${t.kundenId}`;
+                const kundeName = String(t.kundenName ?? "").trim() || `Kunde #${t.kundenId}`;
                 const sf = STATUS_FARBEN[t.status] ?? STATUS_FARBEN.geplant;
                 return (
                   <div key={t.id} style={{
@@ -876,13 +892,14 @@ export default function Einsatzplanung() {
           formular={formular}
           setFormular={setFormular}
           kundenOptionen={kundenOptionen}
+          kundenLaden={kundenLaden}
           mitarbeiterOptionen={mitarbeiterOptionen}
           berechneteStunden={berechneteStunden}
           pruefung={pruefung}
           pruefungLaeuft={pruefungLaeuft}
           uebersteuern={uebersteuern}
           setUebersteuern={setUebersteuern}
-          istAdmin={mitarbeiter?.rolle === "admin"}
+          istAdmin={darfAlleSehen && darfPlanen}
           speichert={erstellen.isPending || aktualisieren.isPending}
           onSpeichern={speichern}
           onAbbrechen={() => {
@@ -954,6 +971,7 @@ type AssistentProps = {
   formular: FormularZustand;
   setFormular: React.Dispatch<React.SetStateAction<FormularZustand>>;
   kundenOptionen: ReturnType<typeof kundenZuOptionen>;
+  kundenLaden: boolean;
   mitarbeiterOptionen: ReturnType<typeof mitarbeiterZuOptionen>;
   berechneteStunden: number | null;
   pruefung: any;
@@ -971,6 +989,7 @@ function TerminAssistent({
   formular,
   setFormular,
   kundenOptionen,
+  kundenLaden,
   mitarbeiterOptionen,
   berechneteStunden,
   pruefung,
@@ -1067,12 +1086,16 @@ function TerminAssistent({
           </div>
           <div>
             <label style={feldLabelStil}>Kunde *</label>
+            <div style={{ fontSize: 11, color: "#4b5563", marginBottom: 5 }}>
+              Es werden nur die diesem Mitarbeiter zugeordneten Kunden angezeigt.
+            </div>
             <AuswahlFeld
               optionen={kundenOptionen}
               wert={formular.kundenId}
               onChange={(id) => aendere("kundenId", id)}
               platzhalter="Kunden auswählen …"
               suchPlatzhalter="Name, Ort, Versicherungsnummer …"
+              laedt={kundenLaden}
               pflicht
             />
           </div>

@@ -15,40 +15,44 @@ const kundenName = `${kundenVorname} ${kundenNachname}`;
 const erstesTeammitglied = "Planung Team Alpha";
 const zweitesTeammitglied = "Planung Team Beta";
 const emails = {
+  admin: `qa-kundenname-admin-${kennung}@example.invalid`,
   alpha: `qa-kundenname-${kennung}@example.invalid`,
   beta: `qa-kundenname-team-${kennung}@example.invalid`,
   ohneZuordnung: `qa-kundenname-ohne-${kennung}@example.invalid`,
 };
 
 const db = await mysql.createConnection(databaseUrl);
+let adminMitarbeiterId;
 let mitarbeiterId;
 let zweiterMitarbeiterId;
 let unzugeordneterMitarbeiterId;
 let kundenId;
+let nichtZugeordneterKundenId;
 let einsatzId;
 let browser;
 
-async function erstelleMitarbeiter(vorname, nachname, email, passwortHash) {
+async function erstelleMitarbeiter(vorname, nachname, email, passwortHash, rolle = "mitarbeiter") {
   const [result] = await db.execute(
     `INSERT INTO mitarbeiter
       (vorname, nachname, email, passwortHash, rolle, aktiv, passwortWechselErforderlich, zweiFaktorAktiv, datevEinwilligung)
-     VALUES (?, ?, ?, ?, 'mitarbeiter', 1, 0, 0, 0)`,
-    [vorname, nachname, email, passwortHash],
+     VALUES (?, ?, ?, ?, ?, 1, 0, 0, 0)`,
+    [vorname, nachname, email, passwortHash, rolle],
   );
   return result.insertId;
 }
 
 async function erstelleTestdaten() {
   const passwortHash = await bcrypt.hash(passwort, 10);
+  adminMitarbeiterId = await erstelleMitarbeiter("Planung", "Admin", emails.admin, passwortHash, "admin");
   mitarbeiterId = await erstelleMitarbeiter("Planung", "Team Alpha", emails.alpha, passwortHash);
   zweiterMitarbeiterId = await erstelleMitarbeiter("Planung", "Team Beta", emails.beta, passwortHash);
   unzugeordneterMitarbeiterId = await erstelleMitarbeiter("Planung", "Ohne Zuordnung", emails.ohneZuordnung, passwortHash);
 
   const [dokumente] = await db.execute("SELECT id, version FROM datenschutzDokumente WHERE aktiv = 1");
   for (const dokument of dokumente) {
-    for (const id of [mitarbeiterId, zweiterMitarbeiterId, unzugeordneterMitarbeiterId]) {
+    for (const id of [adminMitarbeiterId, mitarbeiterId, zweiterMitarbeiterId, unzugeordneterMitarbeiterId]) {
       await db.execute(
-        `INSERT INTO datenschutzZustimmungen (mitarbeiterId, dokumentId, dokumentVersion) VALUES (?, ?, ?)`,
+        "INSERT INTO datenschutzZustimmungen (mitarbeiterId, dokumentId, dokumentVersion) VALUES (?, ?, ?)",
         [id, dokument.id, dokument.version],
       );
     }
@@ -60,6 +64,12 @@ async function erstelleTestdaten() {
     [kundenVorname, kundenNachname],
   );
   kundenId = kundenInsert.insertId;
+  const [nichtZugeordneterKundenInsert] = await db.execute(
+    `INSERT INTO kunden (vorname, nachname, strasse, plz, ort, pflegegrad, paragraph, paragraphen, aktiv)
+     VALUES ('Sperr', ?, 'Teststraße 2', '90402', 'Nürnberg', 2, '45b', '["45b"]', 1)`,
+    [`NichtZugeordnet${kennung.slice(0, 4)}`],
+  );
+  nichtZugeordneterKundenId = nichtZugeordneterKundenInsert.insertId;
   await db.execute(
     `INSERT INTO kundenZuordnung (mitarbeiterId, kundenId, prioritaet, rolle)
      VALUES (?, ?, 1, 'hauptbetreuer'), (?, ?, 2, 'vertretung')`,
@@ -74,10 +84,11 @@ async function erstelleTestdaten() {
 }
 
 async function schliesseHinweise(page) {
-  const dialog = page.getByRole("dialog", { name: /erstlogin erfolgreich abgeschlossen/i });
+  const dialog = page.getByRole("dialog").filter({ hasText: /erstlogin erfolgreich abgeschlossen/i });
+  await dialog.waitFor({ state: "visible", timeout: 3_000 }).catch(() => undefined);
   for (let i = 0; i < 50; i += 1) {
     if (!await dialog.isVisible().catch(() => false)) break;
-    await page.getByRole("button", { name: "Verstanden" }).click();
+    await dialog.getByRole("button", { name: "Verstanden" }).click();
     await page.waitForTimeout(25);
   }
 }
@@ -137,8 +148,25 @@ async function pruefeUnzugeordnetenMitarbeiter() {
   const test = await anmeldeUndOeffnePlanung(emails.ohneZuordnung);
   try {
     await test.dialog.getByRole("button", { name: /kunden auswählen/i }).last().click();
-    await test.dialog.getByPlaceholder("Name, Ort, Versicherungsnummer …").fill(kundenName);
     await test.dialog.getByText("Keine Einträge vorhanden.", { exact: true }).waitFor({ state: "visible", timeout: 10_000 });
+  } finally {
+    await test.context.close();
+  }
+}
+
+async function pruefeAdminFilterung() {
+  const test = await anmeldeUndOeffnePlanung(emails.admin);
+  try {
+    await test.dialog.getByRole("button", { name: /Admin, Planung/i }).click();
+    await test.dialog.getByPlaceholder("Name suchen …").fill("Team Alpha");
+    await test.dialog.getByRole("button", { name: /Team Alpha, Planung/i }).last().click();
+    const kundenAusloeser = test.dialog.getByRole("button", { name: /kunden auswählen/i }).last();
+    await kundenAusloeser.click();
+    const suche = test.dialog.getByPlaceholder("Name, Ort, Versicherungsnummer …");
+    await suche.fill(kundenName);
+    await test.dialog.getByRole("button", { name: new RegExp(kundenName, "i") }).last().waitFor({ state: "visible", timeout: 10_000 });
+    await suche.fill("Sperr NichtZugeordnet");
+    await test.dialog.getByText(/kein treffer/i).waitFor({ state: "visible", timeout: 10_000 });
   } finally {
     await test.context.close();
   }
@@ -154,6 +182,7 @@ try {
   await pruefeZugeordnetenMitarbeiter(emails.alpha, true);
   await pruefeZugeordnetenMitarbeiter(emails.beta);
   await pruefeUnzugeordnetenMitarbeiter();
+  await pruefeAdminFilterung();
 
   console.log(JSON.stringify({
     planungsdialogSichtbar: true,
@@ -161,6 +190,7 @@ try {
     ausgewaehlterKundeVornameNachname: true,
     beideZugeordneteMitarbeiterSehenKunden: true,
     unzugeordneterMitarbeiterSiehtKundenNicht: true,
+    adminSiehtBeiMitarbeiterwahlNurDessenKunden: true,
     aktuellesBetreuungsteamSichtbar: true,
     aktuelleTerminBetreuungSichtbar: true,
     mobilGeprueft: true,
@@ -171,7 +201,8 @@ try {
   if (einsatzId) await db.execute("DELETE FROM einsaetze WHERE id = ?", [einsatzId]);
   if (kundenId) await db.execute("DELETE FROM kundenZuordnung WHERE kundenId = ?", [kundenId]);
   if (kundenId) await db.execute("DELETE FROM kunden WHERE id = ?", [kundenId]);
-  for (const id of [unzugeordneterMitarbeiterId, zweiterMitarbeiterId, mitarbeiterId]) {
+  if (nichtZugeordneterKundenId) await db.execute("DELETE FROM kunden WHERE id = ?", [nichtZugeordneterKundenId]);
+  for (const id of [adminMitarbeiterId, unzugeordneterMitarbeiterId, zweiterMitarbeiterId, mitarbeiterId]) {
     if (!id) continue;
     await db.execute("DELETE FROM datenschutzZustimmungen WHERE mitarbeiterId = ?", [id]);
     await db.execute("DELETE FROM auditLogs WHERE mitarbeiterId = ?", [id]);
@@ -182,7 +213,4 @@ try {
   await db.end();
 }
 
-// Chromium oder der Entwicklungsserver können nach der Bereinigung offene
-// Handles behalten. Der Test ist erst nach dem vollständigen Finally-Block
-// erfolgreich und wird dann bewusst als kurzlebiger CI-Schritt beendet.
 process.exit(0);

@@ -206,9 +206,8 @@ export default function AuswahlFeld({
         <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
           <span
             style={{
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
+              overflowWrap: "anywhere",
+              whiteSpace: "normal",
               fontWeight: ausgewaehlt ? 600 : 400,
             }}
           >
@@ -219,10 +218,10 @@ export default function AuswahlFeld({
               Betreuungsteam: {ausgewaehlt.betreuungsteam}
             </span>
           )}
+          {ausgewaehlt?.hinweis && (
+            <span style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.3 }}>{ausgewaehlt.hinweis}</span>
+          )}
         </span>
-        {ausgewaehlt?.hinweis && (
-          <span style={{ fontSize: 11, color: "#6b7280", flexShrink: 0 }}>{ausgewaehlt.hinweis}</span>
-        )}
         <span style={{ fontSize: 11, color: "#9ca3af", flexShrink: 0 }}>{offen ? "▲" : "▼"}</span>
       </button>
 
@@ -329,28 +328,28 @@ export default function AuswahlFeld({
                         }}
                       />
                     )}
-                    <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-                      <span
-                        style={{
-                          fontSize: 13.5,
-                          fontWeight: istAusgewaehlt ? 700 : 500,
-                          color: "#111827",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {option.label}
+                      <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+                        <span
+                          style={{
+                            fontSize: 13.5,
+                            fontWeight: istAusgewaehlt ? 700 : 500,
+                            color: "#111827",
+                            overflowWrap: "anywhere",
+                            whiteSpace: "normal",
+                            lineHeight: 1.25,
+                          }}
+                        >
+                          {option.label}
                       </span>
                       {option.betreuungsteam && (
                         <span style={{ fontSize: 10.5, color: "#4b5563", lineHeight: 1.3 }}>
                           Betreuungsteam: {option.betreuungsteam}
                         </span>
                       )}
+                      {option.hinweis && (
+                        <span style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.3 }}>{option.hinweis}</span>
+                      )}
                     </span>
-                    {option.hinweis && (
-                      <span style={{ fontSize: 11, color: "#6b7280", flexShrink: 0 }}>{option.hinweis}</span>
-                    )}
                     {istAusgewaehlt && <span style={{ color: "#4a8c3f", fontSize: 12 }}>✓</span>}
                   </button>
                 );
