@@ -15,6 +15,21 @@
 - [x] Browser- und HTTP-Test ergänzen: Nicht-Admins erhalten weder einen PDF-Abruf noch einen gültigen Signaturlink
 - [ ] Domain portal.lebenswert-betreuung.de in der App-Verwaltung verknüpfen, erforderliche DNS-Einträge prüfen und HTTPS-Abruf bestätigen
 - [x] Terminplanung: Kundenauswahl mit vollständigem Vor- und Nachnamen darstellen und für Mitarbeitende strikt auf zugeordnete Kunden begrenzen
+- [x] Bereitgestellte Sicherheits- und Fehlerbehebungsunterlagen inventarisieren, auf Risiken prüfen und konkrete Maßnahmen ableiten
+- [ ] Nach Abgleich mit dem Portal nachvollziehbare Sicherheits- und Fehlerkorrekturen implementieren und automatisiert testen
+- [x] Passwort-Reset ohne Tokenoffenlegung umstellen, neutral beantworten und ausschließlich per SMTP-Link zustellen
+- [x] Sitzungs-JWT aus Browser-Speicher und Login-Antwort entfernen sowie die Gültigkeit des sicheren Cookie-Tokens begrenzen
+- [x] Rate-Limits auf echte tRPC-Pfade ausrichten und führerschein-/Neukunden-Routen serverseitig auf Anmeldung verpflichten
+- [x] Kritische Rechte-, Reset- und Rate-Limitfälle automatisiert absichern und gegen bestehende Portalabläufe prüfen
+- [x] Paginierte Kundenliste rollenbasiert begrenzen, damit Mitarbeitende ausschließlich zugeordnete Kundendaten erhalten
+- [x] Lesezugriffe auf Kundenlisten und Kundendetails datensparsam im Audit-Log protokollieren
+- [x] Wiederholte Mitarbeiterabfragen in Eskalations- und Vertretungsbereinigungsschleifen durch Einmalabfragen ersetzen
+- [x] Kundenzuordnung, Kundenliste und Terminplanung durchgängig prüfen und sicherstellen, dass alle zugeordneten Mitarbeitenden ihre Kunden zuverlässig sehen
+- [x] Alten mitarbeiterbasierten Zuordnungspfad mit dem kundenbasierten Mehrfachzuordnungsmodell vereinheitlichen und Legacy-SQL auf dieselbe Datenquelle umstellen
+- [x] Kern-Fremdschlüssel nach einer fachlich bestätigten Behandlung von 5 verwaisten Kunden- und 6 verwaisten Mitarbeiterverweisen in historischen Einsätzen ergänzen
+- [ ] Verschlüsselung ruhender Bank-, Steuer-, Sozial- und Gesundheitsdaten mit einer kontrollierten Datenmigration sowie vollständigen Lese-/Schreibtests einführen
+- [ ] Gesundheitsdatenfelder in Mitarbeiter- und Kundenstammdaten inventarisieren und schutzwürdig gespeicherte Werte at-rest verschlüsseln
+- [ ] Verschlüsselte sensible Felder über Erstellen, Ändern und Lesen mit rückwärtskompatiblen End-to-End-Tests absichern
 - [x] Einheitliche Rückpfeil-Komponente mit großem mobilen Touchbereich und sicherem Übersichts-Fallback wiederherstellen
 - [x] Rückpfeil auf allen internen Mitarbeiter- und Admin-Unterseiten zentral einbinden und Navigationsvertrag absichern
 - [x] Isoliertes aktives Testkonto für einen End-to-End-Portal-Login erstellen, testen und vollständig bereinigen

@@ -29,9 +29,30 @@ try {
     body: JSON.stringify({ 0: { json: { email, passwort } } }),
   });
   const payload = await antwort.json().catch(() => null);
-  const token = payload?.[0]?.result?.data?.json?.token;
   const cookie = antwort.headers.get("set-cookie") || "";
-  const erfolgreich = antwort.ok && typeof token === "string" && cookie.includes("lb_portal_token=");
+  const antwortDaten = payload?.[0]?.result?.data?.json ?? {};
+  const cookieHeader = cookie.split(";")[0];
+  const profilAntwort = await fetch(`${portalUrl}/api/trpc/portal.me?batch=1&input=${encodeURIComponent(JSON.stringify({ 0: { json: null } }))}`, {
+    headers: { cookie: cookieHeader },
+  });
+  const profil = await profilAntwort.json().catch(() => null);
+  const profilId = profil?.[0]?.result?.data?.json?.id;
+
+  const resetAntwort = await fetch(`${portalUrl}/api/trpc/portal.requestPasswordReset?batch=1`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ 0: { json: { email } } }),
+  });
+  const resetPayload = await resetAntwort.json().catch(() => null);
+  const resetDaten = resetPayload?.[0]?.result?.data?.json ?? {};
+  const erfolgreich = antwort.ok
+    && cookie.includes("lb_portal_token=")
+    && !Object.hasOwn(antwortDaten, "token")
+    && profilAntwort.ok
+    && profilId === mitarbeiterId
+    && resetAntwort.ok
+    && !Object.hasOwn(resetDaten, "resetToken")
+    && !Object.hasOwn(resetDaten, "mitarbeiterName");
 
   console.log(JSON.stringify({
     portal: portalUrl,
@@ -39,12 +60,15 @@ try {
     kontoAktiv: true,
     loginErfolgreich: erfolgreich,
     sitzungscookieGesetzt: cookie.includes("lb_portal_token="),
+    sitzungUeberCookieBestaetigt: profilId === mitarbeiterId,
+    resetTokenImBrowserVersteckt: !Object.hasOwn(resetDaten, "resetToken"),
     klartextpasswortAusgegeben: false,
   }, null, 2));
 
   if (!erfolgreich) throw new Error("Temporärer Portal-Login konnte nicht vollständig verifiziert werden.");
 } finally {
   if (mitarbeiterId) {
+    await db.execute("DELETE FROM passwordResets WHERE mitarbeiterId = ?", [mitarbeiterId]);
     await db.execute("DELETE FROM auditLogs WHERE mitarbeiterId = ?", [mitarbeiterId]);
     await db.execute("DELETE FROM mitarbeiterArbeitsmuster WHERE mitarbeiterId = ?", [mitarbeiterId]);
     await db.execute("DELETE FROM mitarbeiter WHERE id = ?", [mitarbeiterId]);

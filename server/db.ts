@@ -155,6 +155,21 @@ export async function getAllKunden() {
   return db.select().from(kunden).where(eq(kunden.aktiv, 1)).orderBy(kunden.nachname);
 }
 
+export async function getKundenPaginiert(seite: number, proSeite: number) {
+  const db = await getDb();
+  if (!db) return { kunden: [], total: 0 };
+  const start = (seite - 1) * proSeite;
+  const [zaehlung] = await db.select({ total: sql<number>`COUNT(*)` })
+    .from(kunden)
+    .where(eq(kunden.aktiv, 1));
+  const kundenListe = await db.select().from(kunden)
+    .where(eq(kunden.aktiv, 1))
+    .orderBy(kunden.nachname, kunden.vorname)
+    .limit(proSeite)
+    .offset(start);
+  return { kunden: kundenListe, total: Number(zaehlung?.total ?? 0) };
+}
+
 export async function getKundeById(id: number) {
   const db = await getDb();
   if (!db) return null;
@@ -180,10 +195,14 @@ export async function getKundenByMitarbeiter(mitarbeiterId: number) {
   const db = await getDb();
   if (!db) return [];
   const zuordnungen = await db.select({ kundenId: kundenZuordnung.kundenId })
-    .from(kundenZuordnung).where(eq(kundenZuordnung.mitarbeiterId, mitarbeiterId));
+    .from(kundenZuordnung)
+    .innerJoin(kunden, eq(kundenZuordnung.kundenId, kunden.id))
+    .where(and(eq(kundenZuordnung.mitarbeiterId, mitarbeiterId), eq(kunden.aktiv, 1)));
   if (zuordnungen.length === 0) return [];
-  const ids = zuordnungen.map((z) => z.kundenId);
-  return db.select().from(kunden).where(and(eq(kunden.aktiv, 1), sql`${kunden.id} IN (${ids.join(",")})`));
+  const ids = Array.from(new Set(zuordnungen.map((z) => z.kundenId)));
+  return db.select().from(kunden)
+    .where(and(eq(kunden.aktiv, 1), inArray(kunden.id, ids)))
+    .orderBy(asc(kunden.nachname), asc(kunden.vorname));
 }
 
 export type BetreuungsteamEintrag = {
@@ -248,10 +267,46 @@ export async function ergaenzeKundenMitBetreuungsteam<T extends { id: number }>(
 export async function setKundenZuordnung(mitarbeiterId: number, kundenIds: number[]) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.delete(kundenZuordnung).where(eq(kundenZuordnung.mitarbeiterId, mitarbeiterId));
-  if (kundenIds.length > 0) {
-    await db.insert(kundenZuordnung).values(kundenIds.map((kundenId) => ({ mitarbeiterId, kundenId })));
+  const eindeutigeKundenIds = Array.from(new Set(kundenIds));
+  if (eindeutigeKundenIds.length !== kundenIds.length) throw new Error("Ein Kunde wurde mehrfach ausgewählt.");
+  const zielMitarbeiter = await getMitarbeiterById(mitarbeiterId);
+  if (!zielMitarbeiter?.aktiv) throw new Error("Der gewählte Mitarbeiter ist nicht aktiv.");
+  if (eindeutigeKundenIds.length > 0) {
+    const aktiveKunden = await db.select({ id: kunden.id }).from(kunden)
+      .where(and(eq(kunden.aktiv, 1), inArray(kunden.id, eindeutigeKundenIds)));
+    if (aktiveKunden.length !== eindeutigeKundenIds.length) throw new Error("Mindestens ein ausgewählter Kunde ist nicht aktiv oder nicht vorhanden.");
   }
+  await db.transaction(async (tx) => {
+    const bisher = await tx.select({ kundenId: kundenZuordnung.kundenId })
+      .from(kundenZuordnung).where(eq(kundenZuordnung.mitarbeiterId, mitarbeiterId));
+    const bisherigeIds = new Set(bisher.map((eintrag) => eintrag.kundenId));
+    const zuEntfernen = bisher
+      .map((eintrag) => eintrag.kundenId)
+      .filter((kundenId) => !eindeutigeKundenIds.includes(kundenId));
+    const hinzuzufuegen = eindeutigeKundenIds.filter((kundenId) => !bisherigeIds.has(kundenId));
+
+    if (zuEntfernen.length > 0) {
+      await tx.delete(kundenZuordnung).where(and(
+        eq(kundenZuordnung.mitarbeiterId, mitarbeiterId),
+        inArray(kundenZuordnung.kundenId, zuEntfernen),
+      ));
+    }
+    for (const kundenId of hinzuzufuegen) {
+      const bestehendeZuordnungen = await tx.select({
+        prioritaet: kundenZuordnung.prioritaet,
+      }).from(kundenZuordnung).where(eq(kundenZuordnung.kundenId, kundenId));
+      if (bestehendeZuordnungen.length >= 3) {
+        throw new Error("Dieser Kunde hat bereits die maximal drei Betreuungskräfte.");
+      }
+      const naechstePrioritaet = Math.max(0, ...bestehendeZuordnungen.map((eintrag) => Number(eintrag.prioritaet ?? 0))) + 1;
+      await tx.insert(kundenZuordnung).values({
+        mitarbeiterId,
+        kundenId,
+        prioritaet: naechstePrioritaet,
+        rolle: bestehendeZuordnungen.length === 0 ? "hauptbetreuer" : "vertretung",
+      });
+    }
+  });
 }
 
 export async function getZuordnungenForMitarbeiter(mitarbeiterId: number) {
@@ -283,13 +338,25 @@ export async function setZuordnungenForKunde(
   if (zuordnungen.length > 3) throw new Error('Maximal 3 Mitarbeiter pro Kunde erlaubt.');
   const db = await getDb();
   if (!db) throw new Error('DB not available');
-  // Bestehende Zuordnungen für diesen Kunden löschen
-  await db.delete(kundenZuordnung).where(eq(kundenZuordnung.kundenId, kundenId));
-  if (zuordnungen.length > 0) {
-    await db.insert(kundenZuordnung).values(
-      zuordnungen.map(z => ({ kundenId, mitarbeiterId: z.mitarbeiterId, prioritaet: z.prioritaet, rolle: z.rolle, zugeordnetVon }))
-    );
+  const mitarbeiterIds = zuordnungen.map((zuordnung) => zuordnung.mitarbeiterId);
+  if (new Set(mitarbeiterIds).size !== mitarbeiterIds.length) throw new Error('Ein Mitarbeiter wurde mehrfach zugeteilt.');
+  if (new Set(zuordnungen.map((zuordnung) => zuordnung.prioritaet)).size !== zuordnungen.length) throw new Error('Jede Betreuungskraft benötigt eine eindeutige Priorität.');
+  if (zuordnungen.filter((zuordnung) => zuordnung.rolle === 'hauptbetreuer').length > 1) throw new Error('Ein Kunde darf nur einen Hauptbetreuer haben.');
+  const [zielKunde] = await db.select({ id: kunden.id, aktiv: kunden.aktiv }).from(kunden).where(eq(kunden.id, kundenId)).limit(1);
+  if (!zielKunde?.aktiv) throw new Error('Der Kunde ist nicht aktiv oder nicht vorhanden.');
+  if (mitarbeiterIds.length > 0) {
+    const aktiveMitarbeiter = await db.select({ id: mitarbeiter.id }).from(mitarbeiter)
+      .where(and(eq(mitarbeiter.aktiv, 1), inArray(mitarbeiter.id, mitarbeiterIds)));
+    if (aktiveMitarbeiter.length !== mitarbeiterIds.length) throw new Error('Mindestens eine Betreuungskraft ist nicht aktiv oder nicht vorhanden.');
   }
+  await db.transaction(async (tx) => {
+    await tx.delete(kundenZuordnung).where(eq(kundenZuordnung.kundenId, kundenId));
+    if (zuordnungen.length > 0) {
+      await tx.insert(kundenZuordnung).values(
+        zuordnungen.map((zuordnung) => ({ kundenId, mitarbeiterId: zuordnung.mitarbeiterId, prioritaet: zuordnung.prioritaet, rolle: zuordnung.rolle, zugeordnetVon }))
+      );
+    }
+  });
 }
 
 /** Prüft ob ein Mitarbeiter einem Kunden zugeordnet ist. */
@@ -298,7 +365,14 @@ export async function isMitarbeiterZugeordnet(mitarbeiterId: number, kundenId: n
   if (!db) return false;
   const rows = await db.select({ id: kundenZuordnung.id })
     .from(kundenZuordnung)
-    .where(and(eq(kundenZuordnung.mitarbeiterId, mitarbeiterId), eq(kundenZuordnung.kundenId, kundenId)))
+    .innerJoin(mitarbeiter, eq(kundenZuordnung.mitarbeiterId, mitarbeiter.id))
+    .innerJoin(kunden, eq(kundenZuordnung.kundenId, kunden.id))
+    .where(and(
+      eq(kundenZuordnung.mitarbeiterId, mitarbeiterId),
+      eq(kundenZuordnung.kundenId, kundenId),
+      eq(mitarbeiter.aktiv, 1),
+      eq(kunden.aktiv, 1),
+    ))
     .limit(1);
   return rows.length > 0;
 }
@@ -753,6 +827,25 @@ export async function updateFahrtStatus(id: number, status: "offen" | "eingereic
   await db.update(fahrten).set({ abrechnungsStatus: status }).where(eq(fahrten.id, id));
 }
 
+export async function getFahrtById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(fahrten)
+    .where(and(eq(fahrten.id, id), isNull(fahrten.geloeschtAt)))
+    .limit(1);
+  return result[0] ?? null;
+}
+
+/** Blendet eine Fahrt aus den Listen aus, bewahrt den abrechnungsrelevanten Nachweis aber auf. */
+export async function softDeleteFahrt(id: number, geloeschtVon: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(fahrten)
+    .set({ geloeschtAt: new Date(), geloeschtVon })
+    .where(and(eq(fahrten.id, id), isNull(fahrten.geloeschtAt)));
+}
+
+/** @deprecated Nur noch für die Bereinigung eindeutig temporärer Testdaten verwenden. */
 export async function deleteFahrt(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
@@ -1021,14 +1114,18 @@ export async function getPushSubscriptionsByMitarbeiter(mitarbeiterId: number) {
 }
 
 // ── FÜHRERSCHEIN-CHECKS ───────────────────────────────
-export async function getFuehrerscheinChecks(mitarbeiterId?: number) {
+// Ein Vollabruf ist ausschließlich über den expliziten Admin-Modus möglich.
+// Ein fehlender Mitarbeiterbezug darf niemals stillschweigend alle Datensätze
+// liefern, da Führerscheinprüfungen personenbezogene Dokumentdaten enthalten.
+export async function getFuehrerscheinChecks(mitarbeiterId: number | "alle") {
   const db = await getDb();
   if (!db) return [];
-  if (mitarbeiterId) {
-    const r = await db.execute(sql`SELECT * FROM fuehrerschein_checks WHERE mitarbeiterId = ${mitarbeiterId} ORDER BY pruefDatum DESC`);
+  if (mitarbeiterId === "alle") {
+    const r = await db.execute(sql`SELECT * FROM fuehrerschein_checks ORDER BY naechstePruefung ASC`);
     return (r as any)[0] as any[];
   }
-  const r = await db.execute(sql`SELECT * FROM fuehrerschein_checks ORDER BY naechstePruefung ASC`);
+  if (!Number.isInteger(mitarbeiterId) || mitarbeiterId <= 0) return [];
+  const r = await db.execute(sql`SELECT * FROM fuehrerschein_checks WHERE mitarbeiterId = ${mitarbeiterId} ORDER BY pruefDatum DESC`);
   return (r as any)[0] as any[];
 }
 
@@ -1426,10 +1523,11 @@ export async function createNotification(data: InsertNotification) {
   await db.insert(notifications).values(data);
 }
 
-export async function markNotificationRead(id: number) {
+export async function markNotificationRead(id: number, empfaengerId: number) {
   const db = await getDb();
   if (!db) return;
-  await db.update(notifications).set({ gelesen: true }).where(eq(notifications.id, id));
+  await db.update(notifications).set({ gelesen: true })
+    .where(and(eq(notifications.id, id), eq(notifications.empfaengerId, empfaengerId)));
 }
 
 export async function markAllNotificationsRead(mitarbeiterId: number) {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { usePortalAuth, setStoredToken } from "@/contexts/PortalAuthContext";
+import { usePortalAuth } from "@/contexts/PortalAuthContext";
 import PasswordInput from "@/components/PasswordInput";
 
 type View = "login" | "mfa" | "reset-request" | "reset-sent";
@@ -12,7 +12,6 @@ export default function Login() {
   const [otp, setOtp] = useState("");
   const [resetEmail, setResetEmail] = useState("");
   const [error, setError] = useState("");
-  const [resetResult, setResetResult] = useState<{ token?: string; name?: string } | null>(null);
   const { refetch } = usePortalAuth();
 
   // Der QR-Code der Zugangskarte enthält nur den Portal-Link und die E-Mail.
@@ -34,7 +33,6 @@ export default function Login() {
         setError("");
         return;
       }
-      if (data.token) setStoredToken(data.token);
       await new Promise((r) => setTimeout(r, 100));
       await refetch();
     },
@@ -56,8 +54,7 @@ export default function Login() {
 
   // ── Passwort-Reset anfordern ───────────────────────
   const resetMutation = trpc.portal.requestPasswordReset.useMutation({
-    onSuccess: (data) => {
-      setResetResult({ token: data.resetToken, name: data.mitarbeiterName });
+    onSuccess: () => {
       setView("reset-sent");
     },
     onError: (e) => setError(e.message || "Fehler beim Anfordern des Reset-Links."),
@@ -282,45 +279,19 @@ export default function Login() {
 
             <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "14px 16px", marginBottom: 20 }}>
               <p style={{ fontSize: 14, color: "#166534", fontWeight: 600, margin: "0 0 6px 0" }}>
-                ✅ Reset-Link erstellt
+                ✅ Anfrage erhalten
               </p>
               <p style={{ fontSize: 13, color: "#166534", margin: 0, lineHeight: 1.5 }}>
-                {resetResult?.name
-                  ? `Für ${resetResult.name} wurde ein Reset-Link generiert.`
-                  : "Falls die E-Mail registriert ist, wurde ein Reset-Link erstellt."}
+                Falls die E-Mail-Adresse bei uns registriert ist, wurde ein Link zum Zurücksetzen des Passworts versendet. Bitte prüfen Sie auch den Spam-Ordner.
               </p>
             </div>
 
-            {/* Reset-Link anzeigen (Demo – in Produktion per E-Mail) */}
-            {resetResult?.token && (
-              <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, padding: "12px 14px", marginBottom: 20 }}>
-                <p style={{ fontSize: 12, fontWeight: 700, color: "#92400e", margin: "0 0 8px 0", textTransform: "uppercase" }}>
-                  🔑 Reset-Link (Demo-Modus)
-                </p>
-                <p style={{ fontSize: 11, color: "#78350f", margin: "0 0 10px 0", lineHeight: 1.5 }}>
-                  In der Produktion wird dieser Link per E-Mail versendet. Für Demo-Zwecke hier direkt:
-                </p>
-                <a
-                  href={`/reset-passwort?token=${resetResult.token}`}
-                  style={{
-                    display: "block",
-                    background: "#4a8c3f",
-                    color: "#fff",
-                    textAlign: "center",
-                    padding: "10px 14px",
-                    borderRadius: 8,
-                    fontSize: 13,
-                    fontWeight: 700,
-                    textDecoration: "none",
-                  }}
-                >
-                  → Passwort jetzt zurücksetzen
-                </a>
-              </div>
-            )}
+            <p style={{ fontSize: 12, color: "#6b7280", textAlign: "center", margin: "0 0 20px 0", lineHeight: 1.5 }}>
+              Keine E-Mail erhalten? Bitte wenden Sie sich an die Verwaltung. Aus Sicherheitsgründen wird der Link ausschließlich per E-Mail zugestellt.
+            </p>
 
             <button
-              onClick={() => { setView("login"); setResetResult(null); }}
+              onClick={() => { setView("login"); }}
               style={{ ...btnStyle(false), background: "#6b7280" }}
             >
               Zurück zum Login

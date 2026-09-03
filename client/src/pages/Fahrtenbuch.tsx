@@ -513,11 +513,11 @@ export default function Fahrtenbuch() {
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Fahrt wirklich löschen?</AlertDialogTitle>
+            <AlertDialogTitle>Fahrt ausblenden?</AlertDialogTitle>
             <AlertDialogDescription>
               <span className="font-medium text-foreground">{deleteTarget?.label}</span>
               <br />
-              Diese Aktion wird im Audit-Log protokolliert und kann nicht rückgängig gemacht werden.
+              Die Fahrt wird aus Ihren Listen ausgeblendet und revisionssicher archiviert. Die Aktion wird im Audit-Log protokolliert.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -526,7 +526,7 @@ export default function Fahrtenbuch() {
               onClick={confirmDelete}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
-              Endgültig löschen
+              Fahrt ausblenden
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -42,7 +42,7 @@ export async function signPortalToken(mitarbeiterId: number, options?: { mfa?: b
   return new SignJWT({ mitarbeiterId, mfa: options?.mfa ?? true })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime(options?.expiresIn ?? "30d")
+    .setExpirationTime(options?.expiresIn ?? "12h")
     .sign(JWT_SECRET);
 }
 
