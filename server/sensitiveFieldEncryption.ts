@@ -24,11 +24,21 @@ export function entschluessleSensiblesFeld(wert: string | null | undefined): str
 }
 
 const SENSIBLE_MITARBEITERFELDER = ["iban", "steueridentnummer", "sozialversicherungsnummer"] as const;
+const SENSIBLE_MITARBEITER_GESUNDHEITSFELDER = ["krankenversicherungsart", "krankenkasse"] as const;
+const SENSIBLE_KUNDENGESUNDHEITSFELDER = ["pflegegrad", "pflegegradSeit"] as const;
 
 export function verschluessleMitarbeiterStammdaten<T extends Record<string, unknown>>(daten: T): T {
   const kopie: Record<string, unknown> = { ...daten };
   for (const feld of SENSIBLE_MITARBEITERFELDER) {
     if (typeof kopie[feld] === "string" && kopie[feld]) kopie[feld] = verschluessleSensiblesFeld(kopie[feld] as string);
+  }
+  for (const feld of SENSIBLE_MITARBEITER_GESUNDHEITSFELDER) {
+    const wert = kopie[feld];
+    if (wert === null || wert === "") kopie[`${feld}Verschluesselt`] = null;
+    else if (wert !== undefined) {
+      kopie[`${feld}Verschluesselt`] = verschluessleSensiblesFeld(String(wert));
+      kopie[feld] = null;
+    }
   }
   return kopie as T;
 }
@@ -38,5 +48,58 @@ export function entschluessleMitarbeiterStammdaten<T extends Record<string, unkn
   for (const feld of SENSIBLE_MITARBEITERFELDER) {
     if (typeof kopie[feld] === "string" && kopie[feld]) kopie[feld] = entschluessleSensiblesFeld(kopie[feld] as string);
   }
+  for (const feld of SENSIBLE_MITARBEITER_GESUNDHEITSFELDER) {
+    const verschluesselt = kopie[`${feld}Verschluesselt`];
+    const wert = entschluessleSensiblesFeld(typeof verschluesselt === "string" ? verschluesselt : undefined);
+    if (wert !== undefined && wert !== null) kopie[feld] = wert;
+    delete kopie[`${feld}Verschluesselt`];
+  }
   return kopie as T;
 }
+
+/**
+ * Pflegegrad und Beginn sind Gesundheitsdaten. Für neue und geänderte Werte
+ * werden sie daher ausschließlich in verschlüsselten Zusatzfeldern gehalten.
+ * Die bisherigen Spalten bleiben nur als rückwärtskompatible Lesefallbacks.
+ */
+export function verschluessleKundenGesundheitsdaten<T extends Record<string, unknown>>(daten: T): T {
+  const kopie: Record<string, unknown> = { ...daten };
+  const pflegegrad = kopie.pflegegrad;
+  if (pflegegrad === null || pflegegrad === "") {
+    kopie.pflegegradVerschluesselt = null;
+  } else if (pflegegrad !== undefined) {
+    kopie.pflegegradVerschluesselt = verschluessleSensiblesFeld(String(pflegegrad));
+    kopie.pflegegrad = null;
+  }
+  const pflegegradSeit = kopie.pflegegradSeit;
+  if (pflegegradSeit === null || pflegegradSeit === "") {
+    kopie.pflegegradSeitVerschluesselt = null;
+  } else if (pflegegradSeit !== undefined) {
+    const normalisiert = pflegegradSeit instanceof Date
+      ? pflegegradSeit.toISOString().slice(0, 10)
+      : String(pflegegradSeit);
+    kopie.pflegegradSeitVerschluesselt = verschluessleSensiblesFeld(normalisiert);
+    kopie.pflegegradSeit = null;
+  }
+  return kopie as T;
+}
+
+export function entschluessleKundenGesundheitsdaten<T extends Record<string, unknown>>(daten: T): T {
+  const kopie: Record<string, unknown> = { ...daten };
+  const pflegegrad = entschluessleSensiblesFeld(
+    typeof kopie.pflegegradVerschluesselt === "string" ? kopie.pflegegradVerschluesselt : undefined,
+  );
+  if (pflegegrad !== undefined && pflegegrad !== null) {
+    const nummer = Number(pflegegrad);
+    kopie.pflegegrad = Number.isInteger(nummer) ? nummer : null;
+  }
+  const pflegegradSeit = entschluessleSensiblesFeld(
+    typeof kopie.pflegegradSeitVerschluesselt === "string" ? kopie.pflegegradSeitVerschluesselt : undefined,
+  );
+  if (pflegegradSeit !== undefined && pflegegradSeit !== null) kopie.pflegegradSeit = pflegegradSeit;
+  delete kopie.pflegegradVerschluesselt;
+  delete kopie.pflegegradSeitVerschluesselt;
+  return kopie as T;
+}
+
+export const sensibleKundenGesundheitsfelder = SENSIBLE_KUNDENGESUNDHEITSFELDER;

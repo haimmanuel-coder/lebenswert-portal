@@ -10,12 +10,21 @@ const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL ist für die geschützte Zugangskarten-Ausgabe erforderlich.");
 
 const ausgabeOrdner = resolve("/home/ubuntu/zugangskarten-pdf");
-const ausgabeDatei = resolve(ausgabeOrdner, "Zugangskarten_Seniorenassistenz_Bernhardt.pdf");
+const ausgabeDateiname = process.env.ZUGANGSKARTEN_DATEINAME || "Zugangskarten_Seniorenassistenz_Bernhardt.pdf";
+if (!/^[a-zA-Z0-9._-]+\.pdf$/.test(ausgabeDateiname)) throw new Error("Ungültiger Ausgabedateiname.");
+const ausgabeDatei = resolve(ausgabeOrdner, ausgabeDateiname);
 const temporaereDatei = `${ausgabeDatei}.tmp`;
 const portalBasisUrl = "https://portal.lebenswert-betreuung.de/";
 const db = await mysql.createConnection(databaseUrl);
 let browser;
 let transaktionGestartet = false;
+const ausgewaehlteMitarbeiterIds = (process.env.ZUGANGSKARTEN_IDS || "")
+  .split(",")
+  .map((wert) => Number(wert.trim()))
+  .filter((wert) => Number.isInteger(wert) && wert > 0);
+if ((process.env.ZUGANGSKARTEN_IDS || "") && ausgewaehlteMitarbeiterIds.length !== new Set((process.env.ZUGANGSKARTEN_IDS || "").split(",").map((wert) => wert.trim())).size) {
+  throw new Error("Die ausgewählten Mitarbeiter-IDs sind ungültig.");
+}
 
 const esc = (wert) => String(wert ?? "")
   .replace(/&/g, "&amp;")
@@ -54,10 +63,17 @@ async function erstelleKarte(karte) {
 }
 
 try {
+  const idFilter = ausgewaehlteMitarbeiterIds.length > 0
+    ? ` AND id IN (${ausgewaehlteMitarbeiterIds.map(() => "?").join(",")})`
+    : "";
   const [mitarbeitende] = await db.execute(
-    "SELECT id, vorname, nachname, email, rolle FROM mitarbeiter WHERE aktiv = 1 AND rolle <> 'admin' ORDER BY nachname ASC, vorname ASC",
+    `SELECT id, vorname, nachname, email, rolle FROM mitarbeiter WHERE aktiv = 1 AND rolle <> 'admin'${idFilter} ORDER BY nachname ASC, vorname ASC`,
+    ausgewaehlteMitarbeiterIds,
   );
   if (mitarbeitende.length === 0) throw new Error("Es gibt keine aktiven Nicht-Admin-Mitarbeitenden für Zugangskarten.");
+  if (ausgewaehlteMitarbeiterIds.length > 0 && mitarbeitende.length !== ausgewaehlteMitarbeiterIds.length) {
+    throw new Error("Mindestens eines der ausgewählten Mitarbeiterkonten ist nicht aktiv oder nicht ausgabeberechtigt.");
+  }
   const ohneEmail = mitarbeitende.filter((ma) => !String(ma.email ?? "").trim());
   if (ohneEmail.length > 0) {
     throw new Error(`${ohneEmail.length} aktive Mitarbeitende haben keine E-Mail-Adresse; daher wurden keine Passwörter geändert und kein PDF erzeugt.`);

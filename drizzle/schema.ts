@@ -93,7 +93,9 @@ export const mitarbeiter = mysqlTable("mitarbeiter", {
   bankname: varchar("bankname", { length: 100 }),
   // Krankenversicherung
   krankenkasse: varchar("krankenkasse", { length: 100 }),
+  krankenkasseVerschluesselt: text("krankenkasseVerschluesselt"),
   krankenversicherungsart: mysqlEnum("krankenversicherungsart", ["gesetzlich", "privat"]).default("gesetzlich"),
+  krankenversicherungsartVerschluesselt: text("krankenversicherungsartVerschluesselt"),
   // Notfallkontakt
   notfallkontaktName: varchar("notfallkontaktName", { length: 100 }),
   notfallkontaktTelefon: varchar("notfallkontaktTelefon", { length: 50 }),
@@ -159,6 +161,10 @@ export const kunden = mysqlTable("kunden", {
   // Pflegegrad & Paragraph (Modul 2)
   pflegegrad: int("pflegegrad").default(2),
   pflegegradSeit: date("pflegegradSeit"),
+  // AES-GCM-geschützte Gesundheitswerte; die Klartextspalten dienen nur
+  // noch der kontrollierten Rückwärtskompatibilität während der Migration.
+  pflegegradVerschluesselt: text("pflegegradVerschluesselt"),
+  pflegegradSeitVerschluesselt: text("pflegegradSeitVerschluesselt"),
   paragraph: mysqlEnum("paragraph", ["45b", "45a", "39", "privat"]).default("45b"),
   // A1: Mehrfach-Paragraphen (JSON-Array, z.B. ["45b","39","privat"])
   paragraphen: text("paragraphen"),

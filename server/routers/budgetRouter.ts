@@ -16,6 +16,7 @@ import { getDb } from "../db";
 import { jahresbudgets, kunden, einsaetze, controllingSnapshots } from "../../drizzle/schema";
 import { eq, and, sql, desc, lte, gte } from "drizzle-orm";
 import { invokeLLM } from "../_core/llm";
+import { entschluessleKundenGesundheitsdaten } from "../sensitiveFieldEncryption";
 
 // ─── Hilfsfunktionen ──────────────────────────────────────────────────────────
 
@@ -361,10 +362,12 @@ export const budgetRouter = router({
       const heute = new Date().toISOString().slice(0, 10);
 
       // Kundendaten
-      const [kunde] = await db
-        .select({ vorname: kunden.vorname, nachname: kunden.nachname, pflegegrad: kunden.pflegegrad })
+      const [kundeRoh] = await db
+        .select({ vorname: kunden.vorname, nachname: kunden.nachname, pflegegrad: kunden.pflegegrad, pflegegradVerschluesselt: kunden.pflegegradVerschluesselt })
         .from(kunden)
         .where(eq(kunden.id, input.kundenId));
+
+      const kunde = kundeRoh ? entschluessleKundenGesundheitsdaten(kundeRoh) : null;
 
       if (!kunde) throw new Error("Kunde nicht gefunden");
 

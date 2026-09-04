@@ -4,6 +4,7 @@ import { InsertUser, users, mitarbeiter, kunden, einsaetze, leistungen, fahrten,
 import type { InsertMitarbeiter, InsertKunde, InsertEinsatz, InsertLeistung, InsertFahrt, InsertAuditLog, InsertKostentraeger, InsertTextbaustein, InsertEbriefLog, InsertPushSubscription, InsertUrlaubsantrag, InsertKrankmeldung, InsertTour, InsertNotification, InsertRefreshToken } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { STUNDENSATZ, ANFAHRT_PAUSCHALE } from "../shared/leistungssaetze";
+import { entschluessleKundenGesundheitsdaten, entschluessleMitarbeiterStammdaten, verschluessleKundenGesundheitsdaten, verschluessleMitarbeiterStammdaten } from "./sensitiveFieldEncryption";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -69,7 +70,7 @@ export async function getMitarbeiterById(id: number) {
   const db = await getDb();
   if (!db) return null;
   const result = await db.select().from(mitarbeiter).where(eq(mitarbeiter.id, id)).limit(1);
-  return result[0] ?? null;
+  return result[0] ? entschluessleMitarbeiterStammdaten(result[0]) : null;
 }
 
 export async function getAllMitarbeiter() {
@@ -119,25 +120,27 @@ export async function getAllMitarbeiter() {
     bic: (mitarbeiter as any).bic,
     bankname: (mitarbeiter as any).bankname,
     krankenkasse: (mitarbeiter as any).krankenkasse,
+    krankenkasseVerschluesselt: (mitarbeiter as any).krankenkasseVerschluesselt,
     krankenversicherungsart: (mitarbeiter as any).krankenversicherungsart,
+    krankenversicherungsartVerschluesselt: (mitarbeiter as any).krankenversicherungsartVerschluesselt,
     notfallkontaktName: (mitarbeiter as any).notfallkontaktName,
     notfallkontaktTelefon: (mitarbeiter as any).notfallkontaktTelefon,
     notfallkontaktBeziehung: (mitarbeiter as any).notfallkontaktBeziehung,
     createdAt: mitarbeiter.createdAt,
-  }).from(mitarbeiter).orderBy(mitarbeiter.nachname);
+  }).from(mitarbeiter).orderBy(mitarbeiter.nachname).then((liste) => liste.map((ma) => entschluessleMitarbeiterStammdaten(ma)));
 }
 
 export async function createMitarbeiter(data: InsertMitarbeiter) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.insert(mitarbeiter).values(data);
+  const result = await db.insert(mitarbeiter).values(verschluessleMitarbeiterStammdaten(data));
   return Number((result as any)[0]?.insertId ?? (result as any).insertId ?? 0);
 }
 
 export async function updateMitarbeiter(id: number, data: Partial<InsertMitarbeiter>) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(mitarbeiter).set(data).where(eq(mitarbeiter.id, id));
+  await db.update(mitarbeiter).set(verschluessleMitarbeiterStammdaten(data)).where(eq(mitarbeiter.id, id));
 }
 export async function deleteMitarbeiter(id: number) {
   const db = await getDb();
@@ -152,7 +155,8 @@ export async function deleteMitarbeiter(id: number) {
 export async function getAllKunden() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(kunden).where(eq(kunden.aktiv, 1)).orderBy(kunden.nachname);
+  const kundenListe = await db.select().from(kunden).where(eq(kunden.aktiv, 1)).orderBy(kunden.nachname);
+  return kundenListe.map((kunde) => entschluessleKundenGesundheitsdaten(kunde));
 }
 
 export async function getKundenPaginiert(seite: number, proSeite: number) {
@@ -167,27 +171,27 @@ export async function getKundenPaginiert(seite: number, proSeite: number) {
     .orderBy(kunden.nachname, kunden.vorname)
     .limit(proSeite)
     .offset(start);
-  return { kunden: kundenListe, total: Number(zaehlung?.total ?? 0) };
+  return { kunden: kundenListe.map((kunde) => entschluessleKundenGesundheitsdaten(kunde)), total: Number(zaehlung?.total ?? 0) };
 }
 
 export async function getKundeById(id: number) {
   const db = await getDb();
   if (!db) return null;
   const result = await db.select().from(kunden).where(eq(kunden.id, id)).limit(1);
-  return result[0] ?? null;
+  return result[0] ? entschluessleKundenGesundheitsdaten(result[0]) : null;
 }
 
 export async function createKunde(data: InsertKunde): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.insert(kunden).values(data);
+  const result = await db.insert(kunden).values(verschluessleKundenGesundheitsdaten(data));
   return (result as any)[0]?.insertId ?? 0;
 }
 
 export async function updateKunde(id: number, data: Partial<InsertKunde>) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(kunden).set(data).where(eq(kunden.id, id));
+  await db.update(kunden).set(verschluessleKundenGesundheitsdaten(data)).where(eq(kunden.id, id));
 }
 
 // ── KUNDEN-ZUORDNUNG ─────────────────────────────────
@@ -200,9 +204,10 @@ export async function getKundenByMitarbeiter(mitarbeiterId: number) {
     .where(and(eq(kundenZuordnung.mitarbeiterId, mitarbeiterId), eq(kunden.aktiv, 1)));
   if (zuordnungen.length === 0) return [];
   const ids = Array.from(new Set(zuordnungen.map((z) => z.kundenId)));
-  return db.select().from(kunden)
+  const kundenListe = await db.select().from(kunden)
     .where(and(eq(kunden.aktiv, 1), inArray(kunden.id, ids)))
     .orderBy(asc(kunden.nachname), asc(kunden.vorname));
+  return kundenListe.map((kunde) => entschluessleKundenGesundheitsdaten(kunde));
 }
 
 export type BetreuungsteamEintrag = {

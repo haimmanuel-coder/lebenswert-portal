@@ -33,6 +33,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { sql, eq, desc, and, isNotNull, lte, isNull } from "drizzle-orm";
 import { getDb } from "./db";
+import { entschluessleKundenGesundheitsdaten } from "./sensitiveFieldEncryption";
 import { ermittleErsteHilfeStatus } from "./complianceUtils";
 import { bereiteEinsatzUebernahmeVor } from "./mitarbeiterAblauf";
 import { pruefeLeistungsnachweisAbschluss } from "./monatsabschlussService";
@@ -1983,6 +1984,7 @@ export const appRouter = router({
             k.ort,
             k.telefon,
             k.pflegegrad,
+            k.pflegegradVerschluesselt,
             k.paragraph,
             k.aktiv,
             k.createdAt,
@@ -2004,14 +2006,14 @@ export const appRouter = router({
         const daten = (rows as any)[0] as Array<{
           id: number; vorname: string; nachname: string;
           strasse: string | null; plz: string | null; ort: string | null;
-          telefon: string | null; pflegegrad: number | null; paragraph: string | null;
+          telefon: string | null; pflegegrad: number | null; pflegegradVerschluesselt: string | null; paragraph: string | null;
           aktiv: number; createdAt: string; notizen: string | null;
           budget45b: number | null; verbraucht45b: number | null; rest45b: number | null;
           stunden39: number | null; zugeordneterMitarbeiter: string | null;
         }>;
         // DSGVO: Massen-Export personenbezogener Kundendaten (inkl. Pflegegrad, Anschrift) auditieren.
         await createAuditLog({ mitarbeiterId: ctx.adminId, action: "EXPORT", ressource: "kunden", details: `kundenliste zeilen=${daten.length}`, status: "success" });
-        return daten;
+        return daten.map((kunde) => entschluessleKundenGesundheitsdaten(kunde));
       }),
 
   }),

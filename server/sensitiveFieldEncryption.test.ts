@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { entschluessleMitarbeiterStammdaten, entschluessleSensiblesFeld, verschluessleMitarbeiterStammdaten, verschluessleSensiblesFeld } from "./sensitiveFieldEncryption";
+import { entschluessleKundenGesundheitsdaten, entschluessleMitarbeiterStammdaten, entschluessleSensiblesFeld, verschluessleKundenGesundheitsdaten, verschluessleMitarbeiterStammdaten, verschluessleSensiblesFeld } from "./sensitiveFieldEncryption";
 
 describe("Verschlüsselung sensibler Mitarbeiterstammdaten", () => {
   it("verschlüsselt und entschlüsselt einzelne Werte verlustfrei", () => {
@@ -16,5 +16,38 @@ describe("Verschlüsselung sensibler Mitarbeiterstammdaten", () => {
     expect(verschluesselt.iban).toMatch(/^enc:v1:/);
     expect(verschluesselt.name).toBe("Unverändert");
     expect(entschluessleMitarbeiterStammdaten(verschluesselt)).toEqual(daten);
+  });
+
+  it("verschlüsselt Krankenversicherungsart und Krankenkasse und stellt sie für berechtigte Serveraufrufe wieder her", () => {
+    const gespeichert = verschluessleMitarbeiterStammdaten({ krankenversicherungsart: "gesetzlich", krankenkasse: "Musterkasse" });
+    expect(gespeichert.krankenversicherungsart).toBeNull();
+    expect(gespeichert.krankenversicherungsartVerschluesselt).toMatch(/^enc:v1:/);
+    expect(gespeichert.krankenkasse).toBeNull();
+    expect(gespeichert.krankenkasseVerschluesselt).toMatch(/^enc:v1:/);
+    const gelesen = entschluessleMitarbeiterStammdaten(gespeichert);
+    expect(gelesen.krankenversicherungsart).toBe("gesetzlich");
+    expect(gelesen.krankenkasse).toBe("Musterkasse");
+    expect(gelesen).not.toHaveProperty("krankenversicherungsartVerschluesselt");
+    expect(gelesen).not.toHaveProperty("krankenkasseVerschluesselt");
+  });
+
+  it("verschlüsselt Pflegegrad und Pflegegradzeitraum, ohne sie für berechtigte Serveraufrufe zu verlieren", () => {
+    const gespeichert = verschluessleKundenGesundheitsdaten({ pflegegrad: 3, pflegegradSeit: "2026-01-01" });
+    expect(gespeichert.pflegegrad).toBeNull();
+    expect(gespeichert.pflegegradVerschluesselt).toMatch(/^enc:v1:/);
+    const gelesen = entschluessleKundenGesundheitsdaten(gespeichert);
+    expect(gelesen.pflegegrad).toBe(3);
+    expect(gelesen.pflegegradSeit).toBe("2026-01-01");
+  });
+
+  it("entfernt beim bewussten Leeren auch die verschlüsselten Vorgängerwerte", () => {
+    const vorher = verschluessleKundenGesundheitsdaten({ pflegegrad: 2, pflegegradSeit: "2025-12-01" });
+    const geloescht = verschluessleKundenGesundheitsdaten({
+      ...vorher,
+      pflegegrad: null,
+      pflegegradSeit: null,
+    });
+    expect(geloescht.pflegegradVerschluesselt).toBeNull();
+    expect(geloescht.pflegegradSeitVerschluesselt).toBeNull();
   });
 });
