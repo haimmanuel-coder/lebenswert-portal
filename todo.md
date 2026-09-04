@@ -35,6 +35,7 @@
 - [x] Bank-, Steuer- und Sozialdaten nach einer Änderung direkt auf verschlüsselte Speicherung prüfen und bestehende Klartext-Bestandswerte rückwärtskompatibel im Integrationspfad nachweisen
 - [x] Tatsächliche Anmeldefähigkeit von Frau Schmitz und Frau Wagner mit den neu ausgestellten Einmal-Startpasswörtern kontrolliert prüfen, ohne Passwörter offenzulegen
 - [x] Für Frau Schmitz und Frau Wagner neue Einmal-Startpasswörter ausstellen und zwei geschützte Zugangskarten erzeugen
+- [x] Zugangskarten von Frau Schmitz und Frau Wagner über portal.lebenswert-betreuung.de datensparsam anmelden und beide Loginabläufe prüfen
 - [x] Einheitliche Rückpfeil-Komponente mit großem mobilen Touchbereich und sicherem Übersichts-Fallback wiederherstellen
 - [x] Rückpfeil auf allen internen Mitarbeiter- und Admin-Unterseiten zentral einbinden und Navigationsvertrag absichern
 - [x] Isoliertes aktives Testkonto für einen End-to-End-Portal-Login erstellen, testen und vollständig bereinigen
