@@ -37,6 +37,13 @@
 - [x] Für Frau Schmitz und Frau Wagner neue Einmal-Startpasswörter ausstellen und zwei geschützte Zugangskarten erzeugen
 - [x] Zugangskarten von Frau Schmitz und Frau Wagner über portal.lebenswert-betreuung.de datensparsam anmelden und beide Loginabläufe prüfen
 - [x] Dashboard-Kundenansicht von Frau Schmitz und Frau Wagner gegen ihre jeweils aktiven Kundenzuordnungen prüfen und fremde Kunden ausschließen
+- [x] Dashboard-Karte „Meine Kunden“ mit vollständig zugeordneten Kunden und datensparsamen Kerninformationen ergänzen
+- [x] Suche und Filter für die persönliche Kundenübersicht im Mitarbeiter-Dashboard umsetzen
+- [x] Sichtbare In-App-Benachrichtigung bei neuer Kundenzuordnung sicher speichern, nur an betroffene Mitarbeiter ausliefern und lesbar bestätigen
+- [x] Kundenkarte, Suche und Zuweisungsbenachrichtigung mit Rollen-, Mobil- und End-to-End-Tests absichern
+- [x] Rollen-Negativtest ergänzen: Admin, Teamleitung und Buchhaltung sehen keine persönliche Mitarbeiterkarte „Meine Kunden“
+- [x] Benachrichtigungs-Negativtest ergänzen: Nur neu betroffene Mitarbeiter erhalten die Meldung „Neue Kundenzuordnung“
+- [x] Nach den Rollen- und Negativtests Kompilierung, gezielten Browsercheck und vollständige Testsuite erneut ausführen
 - [x] Einheitliche Rückpfeil-Komponente mit großem mobilen Touchbereich und sicherem Übersichts-Fallback wiederherstellen
 - [x] Rückpfeil auf allen internen Mitarbeiter- und Admin-Unterseiten zentral einbinden und Navigationsvertrag absichern
 - [x] Isoliertes aktives Testkonto für einen End-to-End-Portal-Login erstellen, testen und vollständig bereinigen

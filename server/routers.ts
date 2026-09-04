@@ -1894,15 +1894,33 @@ export const appRouter = router({
         })).max(3, 'Maximal 3 Mitarbeiter pro Kunde erlaubt.'),
       }))
       .mutation(async ({ input, ctx }) => {
-        await setZuordnungenForKunde(input.kundenId, input.zuordnungen, ctx.adminId);
+        const zuordnungsErgebnis = await setZuordnungenForKunde(input.kundenId, input.zuordnungen, ctx.adminId);
+        const kunde = await getKundeById(input.kundenId);
+        const kundenname = [kunde?.vorname, kunde?.nachname].filter(Boolean).join(" ") || "Ein Kunde";
+
+        for (const mitarbeiterId of zuordnungsErgebnis.neueMitarbeiterIds) {
+          try {
+            await createNotification({
+              empfaengerId: mitarbeiterId,
+              titel: "Neue Kundenzuordnung",
+              nachricht: `Sie wurden ${kundenname} neu zugeordnet. Der Kunde steht ab sofort in Ihrer persönlichen Kundenübersicht zur Verfügung.`,
+              typ: "erfolg",
+              linkUrl: "/",
+              gelesen: false,
+            });
+          } catch (error) {
+            // Die erfolgreiche Zuordnung bleibt wirksam; ein temporärer Meldungsfehler darf sie nicht zurückdrehen.
+            console.warn("[Kundenzuordnung] In-App-Benachrichtigung konnte nicht erstellt werden:", { kundenId: input.kundenId, mitarbeiterId });
+          }
+        }
         await createAuditLog({
           mitarbeiterId: ctx.adminId,
           action: 'ADMIN',
           ressource: 'kundenZuordnung',
-          details: `kundenId=${input.kundenId} mitarbeiter=${input.zuordnungen.map(z => z.mitarbeiterId).join(',')}`,
+          details: `kundenId=${input.kundenId} mitarbeiter=${input.zuordnungen.map(z => z.mitarbeiterId).join(',')} neu=${zuordnungsErgebnis.neueMitarbeiterIds.join(',') || 'keine'}`,
           status: 'success',
         });
-        return { success: true };
+        return { success: true, neueBenachrichtigungen: zuordnungsErgebnis.neueMitarbeiterIds.length };
       }),
 
     budgetHistorie: adminProcedure
@@ -3362,9 +3380,25 @@ export const appRouter = router({
         kundenIds: z.array(z.number().int().positive()),
       }))
       .mutation(async ({ input, ctx }) => {
-        await setKundenZuordnung(input.mitarbeiterId, input.kundenIds);
-        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "ADMIN", ressource: "zuordnung", details: `ma=${input.mitarbeiterId} kunden=${input.kundenIds.join(",")}`, status: "success" });
-        return { success: true };
+        const zuordnungsErgebnis = await setKundenZuordnung(input.mitarbeiterId, input.kundenIds);
+        for (const kundenId of zuordnungsErgebnis.neueKundenIds) {
+          const kunde = await getKundeById(kundenId);
+          const kundenname = [kunde?.vorname, kunde?.nachname].filter(Boolean).join(" ") || "Ein Kunde";
+          try {
+            await createNotification({
+              empfaengerId: input.mitarbeiterId,
+              titel: "Neue Kundenzuordnung",
+              nachricht: `Sie wurden ${kundenname} neu zugeordnet. Der Kunde steht ab sofort in Ihrer persönlichen Kundenübersicht zur Verfügung.`,
+              typ: "erfolg",
+              linkUrl: "/",
+              gelesen: false,
+            });
+          } catch (error) {
+            console.warn("[Kundenzuordnung] In-App-Benachrichtigung konnte nicht erstellt werden:", { kundenId, mitarbeiterId: input.mitarbeiterId });
+          }
+        }
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "ADMIN", ressource: "zuordnung", details: `ma=${input.mitarbeiterId} kunden=${input.kundenIds.join(",")} neu=${zuordnungsErgebnis.neueKundenIds.join(",") || "keine"}`, status: "success" });
+        return { success: true, neueBenachrichtigungen: zuordnungsErgebnis.neueKundenIds.length };
       }),
 
     statistik: adminProcedure

@@ -281,7 +281,7 @@ export async function setKundenZuordnung(mitarbeiterId: number, kundenIds: numbe
       .where(and(eq(kunden.aktiv, 1), inArray(kunden.id, eindeutigeKundenIds)));
     if (aktiveKunden.length !== eindeutigeKundenIds.length) throw new Error("Mindestens ein ausgewählter Kunde ist nicht aktiv oder nicht vorhanden.");
   }
-  await db.transaction(async (tx) => {
+  const neueKundenIds = await db.transaction(async (tx) => {
     const bisher = await tx.select({ kundenId: kundenZuordnung.kundenId })
       .from(kundenZuordnung).where(eq(kundenZuordnung.mitarbeiterId, mitarbeiterId));
     const bisherigeIds = new Set(bisher.map((eintrag) => eintrag.kundenId));
@@ -311,7 +311,9 @@ export async function setKundenZuordnung(mitarbeiterId: number, kundenIds: numbe
         rolle: bestehendeZuordnungen.length === 0 ? "hauptbetreuer" : "vertretung",
       });
     }
+    return hinzuzufuegen;
   });
+  return { neueKundenIds };
 }
 
 export async function getZuordnungenForMitarbeiter(mitarbeiterId: number) {
@@ -354,14 +356,21 @@ export async function setZuordnungenForKunde(
       .where(and(eq(mitarbeiter.aktiv, 1), inArray(mitarbeiter.id, mitarbeiterIds)));
     if (aktiveMitarbeiter.length !== mitarbeiterIds.length) throw new Error('Mindestens eine Betreuungskraft ist nicht aktiv oder nicht vorhanden.');
   }
-  await db.transaction(async (tx) => {
+  const neueMitarbeiterIds = await db.transaction(async (tx) => {
+    const bisherigeZuordnungen = await tx.select({ mitarbeiterId: kundenZuordnung.mitarbeiterId })
+      .from(kundenZuordnung)
+      .where(eq(kundenZuordnung.kundenId, kundenId));
+    const bisherigeMitarbeiterIds = new Set(bisherigeZuordnungen.map((zuordnung) => Number(zuordnung.mitarbeiterId)));
+    const neuHinzugefuegt = mitarbeiterIds.filter((mitarbeiterId) => !bisherigeMitarbeiterIds.has(mitarbeiterId));
     await tx.delete(kundenZuordnung).where(eq(kundenZuordnung.kundenId, kundenId));
     if (zuordnungen.length > 0) {
       await tx.insert(kundenZuordnung).values(
         zuordnungen.map((zuordnung) => ({ kundenId, mitarbeiterId: zuordnung.mitarbeiterId, prioritaet: zuordnung.prioritaet, rolle: zuordnung.rolle, zugeordnetVon }))
       );
     }
+    return neuHinzugefuegt;
   });
+  return { neueMitarbeiterIds };
 }
 
 /** Prüft ob ein Mitarbeiter einem Kunden zugeordnet ist. */

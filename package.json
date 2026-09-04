@@ -18,6 +18,7 @@
     "test:production-card-login": "node scripts/check-production-card-login.mjs",
     "test:ersatz-zugangskarten-login": "node scripts/check-ersatz-zugangskarten-login.mjs",
     "test:ersatzkarten-dashboard-kunden": "node scripts/check-ersatzkarten-dashboard-kunden.mjs",
+    "test:dashboard-meine-kunden": "node scripts/check-dashboard-meine-kunden.mjs",
     "test:temporary-portal-login": "node scripts/check-temporary-portal-login.mjs",
     "test:authenticated-back-navigation": "node scripts/check-authenticated-back-navigation.mjs",
     "test:admin-personalexport": "node scripts/check-admin-personalexport.mjs",
