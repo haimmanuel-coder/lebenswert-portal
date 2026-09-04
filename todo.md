@@ -13,7 +13,7 @@
 - [x] Geschützten Zugangskarten-PDF-Abruf im Admin-Workflow sichtbar einbinden und gegen unbefugte Rollen testen
 - [x] Geschützten Zugangskarten-PDF-Download im echten Admin-Browser bis zum sichtbaren Button end-to-end prüfen
 - [x] Browser- und HTTP-Test ergänzen: Nicht-Admins erhalten weder einen PDF-Abruf noch einen gültigen Signaturlink
-- [ ] Domain portal.lebenswert-betreuung.de in der App-Verwaltung verknüpfen, erforderliche DNS-Einträge prüfen und HTTPS-Abruf bestätigen
+- [ ] Domain portal.lebenswert-betreuung.de in der App-Verwaltung sichtbar auf erfolgreichen Verknüpfungsstatus prüfen und anschließend DNS sowie HTTPS erneut bestätigen
 - [x] Terminplanung: Kundenauswahl mit vollständigem Vor- und Nachnamen darstellen und für Mitarbeitende strikt auf zugeordnete Kunden begrenzen
 - [x] Bereitgestellte Sicherheits- und Fehlerbehebungsunterlagen inventarisieren, auf Risiken prüfen und konkrete Maßnahmen ableiten
 - [x] Nach Abgleich mit dem Portal nachvollziehbare Sicherheits- und Fehlerkorrekturen implementieren und automatisiert testen
