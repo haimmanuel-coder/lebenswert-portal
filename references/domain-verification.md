@@ -17,3 +17,9 @@ Im Projektbereich „Lebenswert Betreuung“ ist unter „Website“ derzeit noc
 Der Verwaltungsdialog „Add website to project“ zeigt mehrere Websites. Die gesuchte Karte „Lebenswert Betreuung – Mitarbeiter-Portal“ ist dort als nicht veröffentlicht gelistet. Eine abweichende Website wurde im Dialog nur vorübergehend ausgewählt, jedoch **nicht gespeichert**; es wurde keine Projektverknüpfung verändert.
 
 Die in diesem Dialog sichtbaren Auswahlsteuerungen sind in der automatisierten DOM-Ansicht nicht als reguläre Radioelemente zugänglich. Eine verlässliche Auswahl der richtigen aktiven Website kann deshalb nicht ohne Risiko für eine falsche Projektverknüpfung automatisiert gespeichert werden.
+
+## Abschließende öffentliche Prüfung
+
+Am 4. September 2026 wurde `https://portal.lebenswert-betreuung.de/` erneut direkt aufgerufen. Die Adresse liefert über HTTPS die aktive Anmeldeseite „Seniorenassistenz Bernhardt – Mitarbeiter-Portal“ mit E-Mail-/Passwort-Anmeldung, Passwort-Reset, SSL-Hinweis und Cookie-Hinweis aus. Die endgültige öffentliche Portaladresse lautet daher verbindlich `portal.lebenswert-betreuung.de`; die Schreibweise mit großem oder kleinem „B“ ist bei Domains technisch identisch.
+
+Nach der manuellen Speicherung wurde zusätzlich der Projektbereich „Lebenswert Betreuung“ geprüft. Im sichtbaren Bereich „Website“ erscheint jetzt eindeutig „Lebenswert Betreuung – Mitarbeiter-Portal“ mit der verknüpften Adresse `portal.lebenswert-betreuung.de`. Die nicht veröffentlichte Kopie ist nicht mit dieser Domain verknüpft.
