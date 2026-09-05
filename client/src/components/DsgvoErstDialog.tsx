@@ -113,7 +113,7 @@ export default function DsgvoErstDialog({ onClose }: Props) {
   const btnDisabled = zustimmenMut.isPending || (aktuell.pflicht && !checked[aktuell.typ]);
 
   return (
-    <div style={{
+    <div role="dialog" aria-modal="true" aria-labelledby="dsgvo-erstlogin-titel" style={{
       position: "fixed", inset: 0,
       background: "rgba(0,0,0,0.75)",
       zIndex: 9999,
@@ -139,7 +139,7 @@ export default function DsgvoErstDialog({ onClose }: Props) {
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
             <span style={{ fontSize: 26 }}>🔐</span>
             <div>
-              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800, letterSpacing: "-0.3px" }}>
+              <h2 id="dsgvo-erstlogin-titel" style={{ margin: 0, fontSize: 17, fontWeight: 800, letterSpacing: "-0.3px" }}>
                 DSGVO-Einwilligungen
               </h2>
               <p style={{ margin: "2px 0 0", fontSize: 12, opacity: 0.85 }}>

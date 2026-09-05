@@ -161,21 +161,22 @@ export default function PortalApp() {
   }, [mitarbeiter, startPageSet]);
   const { isOnline, offlineCount } = useOfflineSync();
   const { show: showTour, startTour, closeTour } = useOnboardingTour();
+  const passwortwechselOffen = Boolean(mitarbeiter?.passwortWechselErforderlich);
   useSSENotifications(mitarbeiter?.id);
   // Aufgabe 17: Automatischer Sitzungs-Timeout nach 30 Minuten Inaktivität
   useSessionTimeout(logout, !!mitarbeiter);
   // DSGVO-Erstanmeldungs-Dialog
   const { data: dsgvoCheck } = (trpc.datenschutz as any).checkZustimmung.useQuery(
-    undefined, { enabled: !!mitarbeiter }
+    undefined, { enabled: !!mitarbeiter && !passwortwechselOffen }
   );
   const [dsgvoDialogGeschlossen, setDsgvoDialogGeschlossen] = useState(false);
-  const showDsgvoDialog = !!mitarbeiter && !!dsgvoCheck && dsgvoCheck.required && !dsgvoCheck.zugestimmt && !dsgvoDialogGeschlossen;
+  const showDsgvoDialog = !!mitarbeiter && !passwortwechselOffen && !!dsgvoCheck && dsgvoCheck.required && !dsgvoCheck.zugestimmt && !dsgvoDialogGeschlossen;
   // Pflichtprüfung beim Login: alle aktiven Dokumente ohne Zustimmung
   const { data: offenePflichtDokumente } = (trpc.datenschutz as any).checkPflichtZustimmungen.useQuery(
-    undefined, { enabled: !!mitarbeiter && !showDsgvoDialog }
+    undefined, { enabled: !!mitarbeiter && !passwortwechselOffen && !showDsgvoDialog }
   );
   const [pflichtModalGeschlossen, setPflichtModalGeschlossen] = useState(false);
-  const showPflichtModal = !!mitarbeiter && !showDsgvoDialog && !pflichtModalGeschlossen
+  const showPflichtModal = !!mitarbeiter && !passwortwechselOffen && !showDsgvoDialog && !pflichtModalGeschlossen
     && Array.isArray(offenePflichtDokumente) && (offenePflichtDokumente as any[]).length > 0;
   const initials = mitarbeiter
     ? `${mitarbeiter.vorname?.[0] ?? ""}${mitarbeiter.nachname?.[0] ?? ""}`.toUpperCase()
@@ -671,7 +672,7 @@ export default function PortalApp() {
         )}
       </div>
 
-      <OnboardingTour forceShow={showTour} onClose={closeTour} />
+      <OnboardingTour forceShow={showTour && !passwortwechselOffen && !showDsgvoDialog && !showPflichtModal} onClose={closeTour} />
       <PasswortwechselPflichtModal />
       {showDsgvoDialog && <DsgvoErstDialog onClose={() => setDsgvoDialogGeschlossen(true)} />}
       {showPflichtModal && (

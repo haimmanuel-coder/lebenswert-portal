@@ -51,6 +51,10 @@
 - [ ] Login, Suche, Terminsortierung und Animation mobil sowie mit bereinigten Testdaten end-to-end prüfen
 - [x] Erstlogin-Dialog prüfen und beheben: Startpasswort sowie neues persönliches Passwort müssen auf Mobilgeräten und Desktop zuverlässig eingabefähig sein
 - [x] Passwortwechsel für ein temporäres Konto einschließlich Feldfokus, Eingabe und Speichern auf Mobil und Desktop end-to-end testen
+- [x] Live-nahen Fokusblocker im Erstlogin-Dialog reproduzieren und sicherstellen, dass das Startpasswortfeld per Maus, Touch und Tastatur erreichbar ist
+- [x] Automatischen Test für einen neu angelegten Mitarbeiter von Login über Pflicht-Passwortänderung bis zum freigeschalteten Dashboard ergänzen
+- [x] Erstlogin-Test auf Desktop, Mobilgerät und gegen überlagernde Dialoge beziehungsweise Cookie-Hinweise ausführen
+- [x] Erstlogin zusätzlich mit echter Touch-Simulation, Tastatur-Tabfolge und eindeutig sichtbarem Dashboard-Abschluss prüfen
 - [x] Einheitliche Rückpfeil-Komponente mit großem mobilen Touchbereich und sicherem Übersichts-Fallback wiederherstellen
 - [x] Rückpfeil auf allen internen Mitarbeiter- und Admin-Unterseiten zentral einbinden und Navigationsvertrag absichern
 - [x] Isoliertes aktives Testkonto für einen End-to-End-Portal-Login erstellen, testen und vollständig bereinigen
