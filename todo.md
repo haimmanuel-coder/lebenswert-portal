@@ -44,11 +44,13 @@
 - [x] Rollen-Negativtest ergänzen: Admin, Teamleitung und Buchhaltung sehen keine persönliche Mitarbeiterkarte „Meine Kunden“
 - [x] Benachrichtigungs-Negativtest ergänzen: Nur neu betroffene Mitarbeiter erhalten die Meldung „Neue Kundenzuordnung“
 - [x] Nach den Rollen- und Negativtests Kompilierung, gezielten Browsercheck und vollständige Testsuite erneut ausführen
-- [ ] Zugang von Frau Schmitz gegen die Suchfunktion „Meine Kunden“ über die öffentliche Portal-Domain prüfen
+- [x] Zugang von Frau Schmitz gegen die Suchfunktion „Meine Kunden“ über die öffentliche Portal-Domain prüfen
+- [x] Frau Schmitz automatisiert durch Pflicht-Passwortänderung bis zur nutzbaren Kundensuche führen und dabei keine Zugangsdaten protokollieren
+- [x] Nach dem Suchtest ein neues Einmal-Startpasswort ausstellen, eine neue einzelne Zugangskarte erzeugen und deren Login prüfen
 - [x] Karte „Meine Kunden“ um eine auswählbare Sortierung nach dem nächsten anstehenden Termin ergänzen
 - [x] Neue Kundenzuweisungen mit einer dezenten, barrierearmen In-App-Animation sichtbar hervorheben
 - [x] CSS-Animation für neue Kundenzuweisungen einschließlich reduzierter Bewegung nachweisen und erneut prüfen
-- [ ] Login, Suche, Terminsortierung und Animation mobil sowie mit bereinigten Testdaten end-to-end prüfen
+- [x] Login, Suche, Terminsortierung und Animation mobil sowie mit bereinigten Testdaten end-to-end prüfen
 - [x] Erstlogin-Dialog prüfen und beheben: Startpasswort sowie neues persönliches Passwort müssen auf Mobilgeräten und Desktop zuverlässig eingabefähig sein
 - [x] Passwortwechsel für ein temporäres Konto einschließlich Feldfokus, Eingabe und Speichern auf Mobil und Desktop end-to-end testen
 - [x] Live-nahen Fokusblocker im Erstlogin-Dialog reproduzieren und sicherstellen, dass das Startpasswortfeld per Maus, Touch und Tastatur erreichbar ist

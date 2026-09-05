@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { randomUUID } from "node:crypto";
 import { chromium } from "playwright";
 
 const execFileAsync = promisify(execFile);
@@ -54,15 +55,32 @@ const browser = await chromium.launch({
 
 try {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
-  await context.addInitScript(() => window.localStorage.setItem("lebensnah_onboarding_done_v2", "true"));
+  await context.addInitScript(() => {
+    window.localStorage.setItem("lebensnah_onboarding_done_v2", "true");
+    window.localStorage.setItem("lw_cookie_consent", "accepted");
+  });
   await context.addCookies([{ ...cookie, url: portalUrl, httpOnly: true, secure: true, sameSite: "Lax" }]);
   const page = await context.newPage();
   await page.goto(portalUrl, { waitUntil: "networkidle" });
-  const cookieButton = page.getByRole("button", { name: /verstanden.*akzeptieren/i });
-  if (await cookieButton.isVisible().catch(() => false)) await cookieButton.click();
   await page.getByTestId("portal-aktuelle-seite").waitFor({ state: "visible", timeout: 15_000 });
 
-  const erstloginHinweisSichtbar = await page.getByText(/Persönliches Passwort festlegen/i).isVisible().catch(() => false);
+  const passwortDialog = page.getByRole("dialog", { name: "Persönliches Passwort festlegen" });
+  const erstloginHinweisSichtbar = await passwortDialog.isVisible().catch(() => false);
+  if (!erstloginHinweisSichtbar) throw new Error("Der bestätigte Pflicht-Passwortwechsel von Frau Schmitz wird nicht angezeigt.");
+  if (await page.getByRole("dialog").count() !== 1) throw new Error("Während des Pflicht-Passwortwechsels ist ein konkurrierender Dialog geöffnet.");
+
+  const neuesPersoenlichesPasswort = `Neu!${randomUUID().replace(/-/g, "").slice(0, 18)}Aa7`;
+  const startpasswortFeld = page.getByTestId("passwortwechsel-startpasswort");
+  await startpasswortFeld.click();
+  if (!await startpasswortFeld.evaluate((element) => document.activeElement === element)) {
+    throw new Error("Das Startpasswortfeld von Frau Schmitz übernimmt keinen Cursorfokus.");
+  }
+  await startpasswortFeld.fill(passwort);
+  await page.getByTestId("passwortwechsel-neues-passwort").fill(neuesPersoenlichesPasswort);
+  await page.getByTestId("passwortwechsel-wiederholung").fill(neuesPersoenlichesPasswort);
+  await page.getByRole("button", { name: "Passwort speichern und fortfahren" }).click();
+  await passwortDialog.waitFor({ state: "hidden", timeout: 15_000 });
+
   const suche = page.locator("#meine-kunden-suche");
   await suche.waitFor({ state: "visible", timeout: 15_000 }).catch(async () => {
     await page.screenshot({ path: "/home/ubuntu/screenshots/schmitz-meine-kunden-fehler.png", fullPage: true });
@@ -88,6 +106,7 @@ try {
   console.log(JSON.stringify({
     schmitzStartzugangErfolgreich: true,
     erstloginPasswortwechselWirdAngezeigt: erstloginHinweisSichtbar,
+    pflichtPasswortwechselErfolgreich: true,
     meineKundenSichtbar: true,
     serverseitigeKundenlisteAnzahl: serverKundenAnzahl,
     sucheInMeineKundenFunktioniert: true,

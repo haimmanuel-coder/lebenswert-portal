@@ -4,11 +4,15 @@ import { execFile } from "node:child_process";
 const execFileAsync = promisify(execFile);
 const pdfPath = process.env.ACCESS_CARD_PDF;
 if (!pdfPath) throw new Error("ACCESS_CARD_PDF muss auf die Ersatz-Zugangskarten-PDF zeigen.");
+const erwarteteKarten = Number(process.env.EXPECTED_CARD_COUNT || "2");
+if (!Number.isInteger(erwarteteKarten) || erwarteteKarten < 1) throw new Error("EXPECTED_CARD_COUNT muss eine positive ganze Zahl sein.");
 
 const { stdout } = await execFileAsync("pdftotext", [pdfPath, "-"]);
 const emails = [...stdout.matchAll(/[a-z0-9._%+-]+@lebenswert-betreuung\.de/gi)].map((match) => match[0]);
 const passwoerter = [...stdout.matchAll(/Lb![A-Za-z0-9_-]+/g)].map((match) => match[0]);
-if (emails.length !== 2 || passwoerter.length !== 2) throw new Error("Die Ersatz-Zugangskarten enthalten nicht genau zwei vollständige Anmeldedatensätze.");
+if (emails.length !== erwarteteKarten || passwoerter.length !== erwarteteKarten) {
+  throw new Error(`Die Ersatz-Zugangskarten enthalten nicht genau ${erwarteteKarten} vollständige Anmeldedatensätze.`);
+}
 
 const ergebnisse = [];
 for (let index = 0; index < emails.length; index += 1) {
@@ -24,7 +28,7 @@ for (let index = 0; index < emails.length; index += 1) {
 
 console.log(JSON.stringify({
   gepruefteKonten: ergebnisse.length,
-  beideLoginsErfolgreich: ergebnisse.every(Boolean),
+  alleLoginsErfolgreich: ergebnisse.every(Boolean),
   klartextZugangsdatenAusgegeben: false,
 }, null, 2));
 
