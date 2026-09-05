@@ -15,6 +15,14 @@ const teamleitungEmail = `qa-meine-kunden-team-${kennung}@example.invalid`;
 const buchhaltungEmail = `qa-meine-kunden-buch-${kennung}@example.invalid`;
 const unbeteiligteMitarbeiterEmail = `qa-meine-kunden-andere-${kennung}@example.invalid`;
 const kundenName = `Kundenkarte${kennung.slice(0, 5)}`;
+const datumInTagen = (tage) => {
+  const datum = new Date();
+  datum.setHours(12, 0, 0, 0);
+  datum.setDate(datum.getDate() + tage);
+  return datum.toISOString().slice(0, 10);
+};
+const frueherTermin = datumInTagen(1);
+const spaeterTermin = datumInTagen(3);
 
 const db = await mysql.createConnection(databaseUrl);
 let adminId;
@@ -110,6 +118,10 @@ async function erstelleTestdaten() {
     [`Kundenkarte${kennung.slice(0, 5)}`],
   );
   zweiterKundenId = zweiterKunde.insertId;
+  await db.execute(
+    "INSERT INTO einsaetze (mitarbeiterId, kundenId, datum, startzeit, dauerStunden, paragraph, status) VALUES (?, ?, ?, '09:00:00', 1.50, '45b', 'geplant'), (?, ?, ?, '11:00:00', 1.50, '39', 'geplant')",
+    [mitarbeiterId, kundenId, spaeterTermin, mitarbeiterId, zweiterKundenId, frueherTermin],
+  );
 }
 
 async function pruefeKeinePersoenlicheKarte(email) {
@@ -170,15 +182,22 @@ async function pruefeMitarbeiterDashboard() {
   await page.getByTestId("portal-aktuelle-seite").waitFor({ state: "visible", timeout: 15_000 });
 
   await page.getByRole("heading", { name: "Meine Kunden" }).waitFor({ state: "visible", timeout: 10_000 });
-  await page.getByText(`Meine ${kundenName}`, { exact: true }).waitFor({ state: "visible", timeout: 10_000 });
-  await page.getByText(`Zweite Kundenkarte${kennung.slice(0, 5)}`, { exact: true }).waitFor({ state: "visible", timeout: 10_000 });
+  await page.getByTestId("meine-kunden-eintrag").filter({ hasText: `Meine ${kundenName}` }).waitFor({ state: "visible", timeout: 10_000 });
+  await page.getByTestId("meine-kunden-eintrag").filter({ hasText: `Zweite Kundenkarte${kennung.slice(0, 5)}` }).waitFor({ state: "visible", timeout: 10_000 });
   await page.getByText("Neue Kundenzuordnung", { exact: true }).first().waitFor({ state: "visible", timeout: 10_000 });
 
   const suche = page.locator("#meine-kunden-suche");
   await suche.fill("Wuppertal");
-  await page.getByText(`Meine ${kundenName}`, { exact: true }).waitFor({ state: "visible", timeout: 10_000 });
+  await page.getByTestId("meine-kunden-eintrag").filter({ hasText: `Meine ${kundenName}` }).waitFor({ state: "visible", timeout: 10_000 });
   await page.getByRole("button", { name: "§ 45b" }).click();
-  await page.getByText(`Meine ${kundenName}`, { exact: true }).waitFor({ state: "visible", timeout: 10_000 });
+  await page.getByTestId("meine-kunden-eintrag").filter({ hasText: `Meine ${kundenName}` }).waitFor({ state: "visible", timeout: 10_000 });
+  await suche.fill("");
+  await page.getByRole("button", { name: "Alle", exact: true }).click();
+  await page.locator("#meine-kunden-sortierung").selectOption("naechsterTermin");
+  const sortierteNamen = await page.getByTestId("meine-kunden-eintrag").evaluateAll((eintraege) => eintraege.map((eintrag) => eintrag.textContent ?? ""));
+  if (!sortierteNamen[0]?.includes(`Zweite Kundenkarte${kennung.slice(0, 5)}`)) throw new Error("Die Kundenkarte sortiert nicht nach dem nächsten Termin.");
+  const animationsname = await page.getByTestId("neue-kundenzuweisung-hinweis").first().evaluate((element) => getComputedStyle(element).animationName);
+  if (animationsname !== "kundenzuweisung-eintreffen") throw new Error("Die neue Kundenzuweisung wird nicht dezent animiert hervorgehoben.");
   await page.screenshot({ path: "/home/ubuntu/screenshots/dashboard-meine-kunden-mobil.png", fullPage: true });
 
   await context.close();
@@ -197,12 +216,15 @@ try {
     zuweisungsBenachrichtigungSichtbar: true,
     benachrichtigungNurAnNeueBetreuungskraft: true,
     nichtMitarbeiterSehenKeinePersoenlicheKundenkarte: true,
+    naechsteTermineSortierungFunktioniert: true,
+    zuweisungsAnimationSichtbar: true,
     mobilGeprueft: true,
     klartextZugangsdatenAusgegeben: false,
   }, null, 2));
 } finally {
   if (browser) await browser.close();
   if (kundenId) await db.execute("DELETE FROM notifications WHERE empfaengerId IN (?, ?, ?, ?, ?)", [adminId, mitarbeiterId, teamleitungId, buchhaltungId, unbeteiligteMitarbeiterId]);
+  if (kundenId || zweiterKundenId) await db.execute("DELETE FROM einsaetze WHERE kundenId IN (?, ?)", [kundenId ?? 0, zweiterKundenId ?? 0]);
   if (kundenId || zweiterKundenId) await db.execute("DELETE FROM kundenZuordnung WHERE kundenId IN (?, ?)", [kundenId ?? 0, zweiterKundenId ?? 0]);
   if (kundenId || zweiterKundenId) await db.execute("DELETE FROM kunden WHERE id IN (?, ?)", [kundenId ?? 0, zweiterKundenId ?? 0]);
   for (const id of [adminId, mitarbeiterId, teamleitungId, buchhaltungId, unbeteiligteMitarbeiterId]) {

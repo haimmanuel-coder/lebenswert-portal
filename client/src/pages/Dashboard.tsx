@@ -27,7 +27,7 @@ function MitteilungenBereich() {
       {ungelesen.slice(0, 5).map((n: any) => {
         const istNeueZuweisung = n.titel === "Neue Kundenzuordnung";
         return (
-        <div key={n.id} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 0", borderBottom: "1px solid #f3f4f6", background: istNeueZuweisung ? "#f0fdf4" : "transparent", borderRadius: istNeueZuweisung ? 8 : 0 }}>
+        <div key={n.id} data-testid={istNeueZuweisung ? "neue-kundenzuweisung-hinweis" : undefined} className={istNeueZuweisung ? "neue-kundenzuweisung-hinweis" : undefined} role={istNeueZuweisung ? "status" : undefined} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 10px", borderBottom: "1px solid #f3f4f6", background: istNeueZuweisung ? "#f0fdf4" : "transparent", borderRadius: istNeueZuweisung ? 8 : 0 }}>
           <span style={{ fontSize: 16, flexShrink: 0 }}>{n.typ === "warnung" ? "⚠️" : n.typ === "fehler" ? "❌" : n.typ === "erfolg" ? "✅" : "📋"}</span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: n.typ === "warnung" ? "#b45309" : n.typ === "fehler" ? "#dc2626" : n.typ === "erfolg" ? "#166534" : "#111827" }}>{n.titel}</div>
@@ -55,6 +55,11 @@ type DashboardKunde = {
   betreuungsteamText?: string | null;
 };
 
+type KundenTermin = {
+  datum: string;
+  startzeit?: string | null;
+};
+
 function holeParagraphen(kunde: DashboardKunde): string[] {
   if (Array.isArray(kunde.paragraphen)) return kunde.paragraphen.map(String).filter(Boolean);
   if (typeof kunde.paragraphen === "string") {
@@ -66,9 +71,10 @@ function holeParagraphen(kunde: DashboardKunde): string[] {
   return kunde.paragraph ? [String(kunde.paragraph)] : [];
 }
 
-function MeineKundenKarte({ kunden, laedt, navigiere }: { kunden: DashboardKunde[]; laedt: boolean; navigiere: (ziel: SeitenId) => void }) {
+function MeineKundenKarte({ kunden, laedt, navigiere, naechsteTermine }: { kunden: DashboardKunde[]; laedt: boolean; navigiere: (ziel: SeitenId) => void; naechsteTermine: Map<number, KundenTermin> }) {
   const [suche, setSuche] = useState("");
   const [paragraphFilter, setParagraphFilter] = useState("alle");
+  const [sortierung, setSortierung] = useState<"naechsterTermin" | "name">("naechsterTermin");
   const paragraphen = useMemo(() => Array.from(new Set(kunden.flatMap(holeParagraphen))).sort(), [kunden]);
   const gefilterteKunden = useMemo(() => {
     const suchtext = suche.trim().toLocaleLowerCase("de-DE");
@@ -79,6 +85,16 @@ function MeineKundenKarte({ kunden, laedt, navigiere }: { kunden: DashboardKunde
       return passtSuche && passtParagraph;
     });
   }, [kunden, paragraphFilter, suche]);
+  const sortierteKunden = useMemo(() => [...gefilterteKunden].sort((a, b) => {
+    if (sortierung === "name") {
+      return `${a.nachname ?? ""} ${a.vorname ?? ""}`.localeCompare(`${b.nachname ?? ""} ${b.vorname ?? ""}`, "de-DE");
+    }
+    const terminA = naechsteTermine.get(a.id);
+    const terminB = naechsteTermine.get(b.id);
+    const schluesselA = terminA ? `${terminA.datum}T${String(terminA.startzeit ?? "23:59")}` : "9999-12-31T23:59";
+    const schluesselB = terminB ? `${terminB.datum}T${String(terminB.startzeit ?? "23:59")}` : "9999-12-31T23:59";
+    return schluesselA.localeCompare(schluesselB, "de-DE") || `${a.nachname ?? ""} ${a.vorname ?? ""}`.localeCompare(`${b.nachname ?? ""} ${b.vorname ?? ""}`, "de-DE");
+  }), [gefilterteKunden, naechsteTermine, sortierung]);
 
   return (
     <section aria-labelledby="meine-kunden-ueberschrift" style={{ background: "#fff", borderRadius: 14, boxShadow: "0 2px 10px rgba(0,0,0,.08)", padding: 16, marginBottom: 12 }}>
@@ -99,6 +115,17 @@ function MeineKundenKarte({ kunden, laedt, navigiere }: { kunden: DashboardKunde
         style={{ width: "100%", minHeight: 42, boxSizing: "border-box", border: "1px solid #d1d5db", borderRadius: 9, padding: "10px 12px", fontSize: 14, marginBottom: 10 }}
       />
 
+      <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6 }} htmlFor="meine-kunden-sortierung">Kunden sortieren</label>
+      <select
+        id="meine-kunden-sortierung"
+        value={sortierung}
+        onChange={(event) => setSortierung(event.target.value as "naechsterTermin" | "name")}
+        style={{ width: "100%", minHeight: 42, boxSizing: "border-box", border: "1px solid #d1d5db", borderRadius: 9, padding: "10px 12px", fontSize: 14, background: "#fff", marginBottom: 10 }}
+      >
+        <option value="naechsterTermin">Nächster Termin zuerst</option>
+        <option value="name">Name A–Z</option>
+      </select>
+
       {paragraphen.length > 1 && (
         <div aria-label="Nach Abrechnungsparagraph filtern" style={{ display: "flex", gap: 7, overflowX: "auto", paddingBottom: 4, marginBottom: 12 }}>
           {["alle", ...paragraphen].map((paragraph) => {
@@ -108,15 +135,16 @@ function MeineKundenKarte({ kunden, laedt, navigiere }: { kunden: DashboardKunde
         </div>
       )}
 
-      {laedt ? <div style={{ color: "#6b7280", fontSize: 13, padding: "10px 0" }}>Kunden werden geladen …</div> : gefilterteKunden.length === 0 ? (
+      {laedt ? <div style={{ color: "#6b7280", fontSize: 13, padding: "10px 0" }}>Kunden werden geladen …</div> : sortierteKunden.length === 0 ? (
         <div style={{ border: "1px dashed #d1d5db", borderRadius: 10, padding: 16, textAlign: "center", color: "#6b7280", fontSize: 13 }}>
           {kunden.length === 0 ? "Ihnen sind aktuell noch keine Kunden zugeteilt." : "Für diese Suche gibt es keinen passenden Kunden."}
         </div>
       ) : (
         <div style={{ display: "grid", gap: 9 }}>
-          {gefilterteKunden.map((kunde) => {
+          {sortierteKunden.map((kunde) => {
             const paragraphenDesKunden = holeParagraphen(kunde);
-            return <article key={kunde.id} style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 12, background: "#fafff9" }}>
+            const naechsterTermin = naechsteTermine.get(kunde.id);
+            return <article key={kunde.id} data-testid="meine-kunden-eintrag" style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 12, background: "#fafff9" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontWeight: 800, fontSize: 14, color: "#1f2937" }}>{`${kunde.vorname ?? ""} ${kunde.nachname ?? ""}`.trim()}</div>
@@ -127,6 +155,9 @@ function MeineKundenKarte({ kunden, laedt, navigiere }: { kunden: DashboardKunde
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 9 }}>
                 {paragraphenDesKunden.map((paragraph) => <span key={paragraph} style={{ background: "#dcfce7", color: "#166534", borderRadius: 12, padding: "3px 7px", fontSize: 10, fontWeight: 800 }}>§ {paragraph}</span>)}
                 {kunde.betreuungsteamText && <span style={{ color: "#4b5563", fontSize: 11 }}>Betreuungsteam: {kunde.betreuungsteamText}</span>}
+              </div>
+              <div style={{ fontSize: 11, color: naechsterTermin ? "#1f5d1d" : "#6b7280", fontWeight: 700, marginTop: 9 }}>
+                {naechsterTermin ? `Nächster Termin: ${fmtDate(naechsterTermin.datum)} · ${String(naechsterTermin.startzeit ?? "–").slice(0, 5)} Uhr` : "Kein kommender Termin geplant"}
               </div>
             </article>;
           })}
@@ -294,6 +325,18 @@ export default function Dashboard() {
   });
 
   const today = new Date().toISOString().split("T")[0];
+  const naechsteTermineProKunde = useMemo(() => {
+    const termine = new Map<number, KundenTermin>();
+    for (const einsatz of einsaetze) {
+      const datum = typeof einsatz.datum === "string" ? einsatz.datum : (einsatz.datum as Date).toISOString().split("T")[0];
+      if (datum < today || einsatz.status === "abgesagt" || einsatz.status === "abgeschlossen") continue;
+      const bestehend = termine.get(einsatz.kundenId);
+      const neuerSchluessel = `${datum}T${String(einsatz.startzeit ?? "23:59")}`;
+      const alterSchluessel = bestehend ? `${bestehend.datum}T${String(bestehend.startzeit ?? "23:59")}` : "9999-12-31T23:59";
+      if (neuerSchluessel < alterSchluessel) termine.set(einsatz.kundenId, { datum, startzeit: einsatz.startzeit });
+    }
+    return termine;
+  }, [einsaetze, today]);
   const todayE = einsaetze.filter((e) => {
     const d = typeof e.datum === "string" ? e.datum : (e.datum as Date).toISOString().split("T")[0];
     return d === today;
@@ -366,7 +409,7 @@ export default function Dashboard() {
       <MitteilungenWidget />
       <MitteilungenBereich />
 
-      {mitarbeiter?.rolle === "mitarbeiter" && <MeineKundenKarte kunden={kunden as DashboardKunde[]} laedt={kundenLaden} navigiere={navigiere} />}
+      {mitarbeiter?.rolle === "mitarbeiter" && <MeineKundenKarte kunden={kunden as DashboardKunde[]} laedt={kundenLaden} navigiere={navigiere} naechsteTermine={naechsteTermineProKunde} />}
 
       {/* KPI */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
