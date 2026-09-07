@@ -57,6 +57,9 @@
 - [x] Automatischen Test für einen neu angelegten Mitarbeiter von Login über Pflicht-Passwortänderung bis zum freigeschalteten Dashboard ergänzen
 - [x] Erstlogin-Test auf Desktop, Mobilgerät und gegen überlagernde Dialoge beziehungsweise Cookie-Hinweise ausführen
 - [x] Erstlogin zusätzlich mit echter Touch-Simulation, Tastatur-Tabfolge und eindeutig sichtbarem Dashboard-Abschluss prüfen
+- [x] Admin-Dashboard um eine Mitarbeiterwahl und den Button „Zugangskarte neu generieren“ erweitern
+- [x] Neugenerierung mit ausdrücklicher Bestätigung, sofortiger Ablösung des bisherigen Startpassworts und geschützter Einzel-PDF-Ausgabe serverseitig absichern
+- [x] Admin- und Nicht-Admin-Rechte, PDF-Abruf, neues Startpasswort und aktualisierten Erstloginstatus end-to-end prüfen
 - [x] Einheitliche Rückpfeil-Komponente mit großem mobilen Touchbereich und sicherem Übersichts-Fallback wiederherstellen
 - [x] Rückpfeil auf allen internen Mitarbeiter- und Admin-Unterseiten zentral einbinden und Navigationsvertrag absichern
 - [x] Isoliertes aktives Testkonto für einen End-to-End-Portal-Login erstellen, testen und vollständig bereinigen

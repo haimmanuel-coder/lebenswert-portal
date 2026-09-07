@@ -28,6 +28,7 @@
     "test:rollenvergabe": "node scripts/check-rollenvergabe.mjs",
     "test:buchhaltung-kundenrechte": "node scripts/check-buchhaltung-kundenrechte.mjs",
     "test:zugangskarten-pdf-schutz": "node scripts/check-zugangskarten-pdf-schutz.mjs",
+    "test:einzelne-zugangskarte-dashboard": "node scripts/check-einzelne-zugangskarte-dashboard.mjs",
     "test:terminplanung-kundenname": "node scripts/check-terminplanung-kundenname.mjs",
     "test:verschluesselte-kundendaten": "tsx scripts/check-verschluesselte-kundendaten.mjs",
     "test:terminassistent": "tsx scripts/check-terminassistent.mjs",

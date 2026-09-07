@@ -123,6 +123,7 @@ async function startServer() {
   app.use("/api/trpc/portal.resetPassword", passwortLimiter);
   app.use("/api/trpc/portal.changePassword", passwortLimiter);
   app.use("/api/trpc/admin.mitarbeiterPasswortReset", passwortLimiter);
+  app.use("/api/trpc/admin.zugangskarteNeuGenerieren", passwortLimiter);
   app.use("/api/trpc", apiLimiter);
   // ──────────────────────────────────────────────────────────────────────────
 

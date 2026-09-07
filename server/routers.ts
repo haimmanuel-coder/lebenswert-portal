@@ -38,6 +38,7 @@ import { ermittleErsteHilfeStatus } from "./complianceUtils";
 import { bereiteEinsatzUebernahmeVor } from "./mitarbeiterAblauf";
 import { pruefeLeistungsnachweisAbschluss } from "./monatsabschlussService";
 import { generiereEinmaligesStartpasswort, waehleDruckbareMitarbeiter } from "./accessCredentials";
+import { erstelleEinzelneZugangskarte, ZugangskarteValidierungsfehler } from "./accessCardPdfService";
 import { pruefeSicheresPasswort, SICHERES_PASSWORT_HINWEIS, startPasswortLaeuftAb } from "../shared/passwordPolicy";
 import { istAbgeschlossenerStartzugang } from "../shared/erstlogin";
 import { berechneUrlaubsverbrauch, berechneZeitanteiligenJahresurlaub, normalisiereArbeitstage, type Wochentag } from "../shared/urlaubsLogik";
@@ -3181,6 +3182,23 @@ export const appRouter = router({
       }
       return { karten, anzahl: karten.length };
     }),
+    /** Neue einzelne Zugangskarte; bisherige Zugangsdaten werden erst nach gesicherter PDF-Ablage abgelöst. */
+    zugangskarteNeuGenerieren: adminProcedure
+      .input(z.object({ mitarbeiterId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await erstelleEinzelneZugangskarte({ mitarbeiterId: input.mitarbeiterId, erstelltVon: ctx.adminId });
+        } catch (error) {
+          if (error instanceof ZugangskarteValidierungsfehler) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+          }
+          console.error("[Zugangskarte] Sichere Einzelausgabe fehlgeschlagen.");
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Die Zugangskarte konnte nicht sicher erstellt werden. Die bisherigen Zugangsdaten wurden nicht verändert.",
+          });
+        }
+      }),
     /** Die aktuellste Zugangskarten-PDF erhält nur ein angemeldeter Admin als 60-Minuten-Signaturlink. */
     aktuelleZugangskartenPdf: adminProcedure.query(async ({ ctx }) => {
       const db = await getDb();
