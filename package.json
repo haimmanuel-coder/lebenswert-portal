@@ -30,6 +30,7 @@
     "test:zugangskarten-pdf-schutz": "node scripts/check-zugangskarten-pdf-schutz.mjs",
     "test:einzelne-zugangskarte-dashboard": "node scripts/check-einzelne-zugangskarte-dashboard.mjs",
     "test:terminplanung-kundenname": "node scripts/check-terminplanung-kundenname.mjs",
+    "test:kundenprofil-auswertung": "node scripts/check-kundenprofil-auswertung.mjs",
     "test:verschluesselte-kundendaten": "tsx scripts/check-verschluesselte-kundendaten.mjs",
     "test:terminassistent": "tsx scripts/check-terminassistent.mjs",
     "test:date-render": "node scripts/check-react-date-renders.mjs",

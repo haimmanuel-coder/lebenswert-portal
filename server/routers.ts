@@ -47,7 +47,8 @@ import { erstellePersonalaktenHistorienCsv } from "../shared/personalaktenExport
 import { ermittleMitarbeiterDokumentMimeType, pruefeMitarbeiterDokumentUpload } from "./mitarbeiterDokumentUpload";
 import { storageGetSignedUrl } from "./storage";
 import { erfassePortalVersuch, loeschePortalVersuche, pruefePortalRateLimit } from "./portalRateLimit";
-import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, mitarbeiterArbeitsmuster, urlaubsantraege, einsatzAenderungen, kunden as kundenTable, notifications as notificationsTable, ersteHilfeKurse, mitarbeiterBerechtigungen as mbTable, besuchsberichte, fahrten, zugangskartenPdfAusgaben } from "../drizzle/schema";
+import { berechneKundenParagraphenAuswertung } from "./betreuungsAuswertung";
+import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, mitarbeiterArbeitsmuster, urlaubsantraege, einsatzAenderungen, kunden as kundenTable, notifications as notificationsTable, ersteHilfeKurse, mitarbeiterBerechtigungen as mbTable, besuchsberichte, fahrten, zugangskartenPdfAusgaben, jahresbudgets } from "../drizzle/schema";
 import {
   getMitarbeiterByEmail,
   getMitarbeiterById,
@@ -1617,14 +1618,40 @@ export const appRouter = router({
             throw new TRPCError({ code: "FORBIDDEN", message: "Kein Zugriff auf diesen Kunden – nicht zugewiesen." });
           }
         }
-        const [kunde, eis, leis, fahr] = await Promise.all([
+        const heute = new Date().toISOString().slice(0, 10);
+        const db = await getDb();
+        const [kunde, eis, leis, fahr, aktiveBudgets] = await Promise.all([
           getKundeById(input.id),
           getEinsaetzeByKunde(input.id),
           getLeistungenByKunde(input.id),
           getFahrtenByKunde(input.id),
+          db
+            ? db
+                .select({
+                  kundenId: jahresbudgets.kundenId,
+                  leistungsbereich: jahresbudgets.leistungsbereich,
+                  jahresbudgetCent: jahresbudgets.jahresbudgetCent,
+                  verbrauchtCent: jahresbudgets.verbrauchtCent,
+                  stundensatzCent: jahresbudgets.stundensatzCent,
+                })
+                .from(jahresbudgets)
+                .where(
+                  and(
+                    eq(jahresbudgets.kundenId, input.id),
+                    sql`${jahresbudgets.gueltigAb} <= ${heute}`,
+                    sql`${jahresbudgets.gueltigBis} >= ${heute}`,
+                  ),
+                )
+            : Promise.resolve([]),
         ]);
         await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "READ", ressource: "kunde_detail", details: `kundeId=${input.id}`, status: "success" });
-        return { kunde, einsaetze: eis, leistungen: leis, fahrten: fahr };
+        return {
+          kunde,
+          einsaetze: eis,
+          leistungen: leis,
+          fahrten: fahr,
+          paragraphenAuswertung: berechneKundenParagraphenAuswertung(eis, aktiveBudgets),
+        };
       }),
 
     create: roleProcedure(["admin", "buchhaltung"])

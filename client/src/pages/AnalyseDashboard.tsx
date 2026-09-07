@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { usePortalAuth } from "@/contexts/PortalAuthContext";
 
 const TABS = [
   { id: "uebersicht", label: "📊 Übersicht" },
@@ -40,11 +41,17 @@ function SkeletonKarte() {
 
 export default function AnalyseDashboard() {
   const [activeTab, setActiveTab] = useState("uebersicht");
+  const [auswertungMonat, setAuswertungMonat] = useState(() => new Date().toISOString().slice(0, 7));
+  const { mitarbeiter } = usePortalAuth();
+  const darfPersonalAuswerten = mitarbeiter?.rolle === "admin" || mitarbeiter?.rolle === "teamleitung";
 
   // Neue Analyse-Procedures
   const { data: dashData, isLoading: dashLoading } = (trpc as any).analysen.getDashboard.useQuery();
   const { data: auslastung = [], isLoading: auslastungLoading } = (trpc as any).analysen.mitarbeiterAuslastung.useQuery(
-    undefined, { enabled: activeTab === "personal" }
+    undefined, { enabled: activeTab === "personal" && darfPersonalAuswerten }
+  );
+  const { data: betreuungskennzahlen = [], isLoading: betreuungskennzahlenLoading } = (trpc as any).analysen.mitarbeiterBetreuungskennzahlen.useQuery(
+    { monat: auswertungMonat }, { enabled: activeTab === "personal" && darfPersonalAuswerten }
   );
   const { data: kundenzuwachs = [], isLoading: kundenzuwachsLoading } = (trpc as any).analysen.kundenzuwachs.useQuery(
     { monate: 6 }, { enabled: activeTab === "kunden" }
@@ -163,33 +170,62 @@ export default function AnalyseDashboard() {
       {/* Tab: Personal */}
       {activeTab === "personal" && (
         <div>
-          {auslastungLoading ? (
+          {!darfPersonalAuswerten ? (
+            <div style={{ background: "#fff", borderRadius: 12, padding: "18px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", color: "#6b7280", fontSize: 13 }}>
+              Diese Auswertung ist nur für Admins und Teamleitungen freigegeben.
+            </div>
+          ) : auslastungLoading || betreuungskennzahlenLoading ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {[...Array(4)].map((_, i) => <SkeletonKarte key={i} />)}
             </div>
           ) : (
-            <div style={{ background: "#fff", borderRadius: 12, padding: "16px 18px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-              <h3 style={{ fontSize: 14, fontWeight: 700, color: "#1f2937", marginBottom: 12 }}>Mitarbeiter-Auslastung (aktueller Monat)</h3>
-              {(auslastung as any[]).length === 0 ? (
-                <div style={{ fontSize: 13, color: "#9ca3af", fontStyle: "italic" }}>Keine Daten vorhanden</div>
+            <>
+              <section style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 12, padding: "14px 16px", marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "end", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+                  <div>
+                    <h3 style={{ fontSize: 14, fontWeight: 800, color: "#1e3a8a", margin: 0 }}>Besuchs- &amp; Budgetkennzahlen</h3>
+                    <p style={{ fontSize: 11.5, color: "#475569", lineHeight: 1.45, margin: "4px 0 0" }}>Transparente Planungsdaten zu Einsätzen und den betreuten Kunden. Diese Zahlen sind keine automatische Leistungsbewertung.</p>
+                  </div>
+                  <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "#475569", fontWeight: 700 }}>
+                    Auswertungsmonat
+                    <input aria-label="Auswertungsmonat" type="month" value={auswertungMonat} onChange={(e) => setAuswertungMonat(e.target.value)} style={{ padding: "8px 10px", background: "#fff", border: "1px solid #93c5fd", borderRadius: 8, color: "#1e3a8a", fontSize: 13, fontWeight: 700 }} />
+                  </label>
+                </div>
+              </section>
+              {(betreuungskennzahlen as any[]).length === 0 ? (
+                <div style={{ background: "#fff", borderRadius: 12, padding: "18px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", fontSize: 13, color: "#6b7280" }}>Für den ausgewählten Monat liegen keine Besuchsdaten vor.</div>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {(auslastung as any[]).map((ma: any) => (
-                    <div key={ma.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <div style={{ minWidth: 130, fontSize: 13, fontWeight: 600, color: "#374151", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ma.name}</div>
-                      <div style={{ flex: 1, height: 10, background: "#f3f4f6", borderRadius: 5, overflow: "hidden" }}>
-                        <div style={{ height: "100%", borderRadius: 5, width: `${ma.auslastungProzent}%`, background: ma.ampel === "gruen" ? "#4a8c3f" : ma.ampel === "gelb" ? "#f59e0b" : "#dc2626", transition: "width 0.5s" }} />
+                <div data-testid="mitarbeiter-betreuungskennzahlen" style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18 }}>
+                  {(betreuungskennzahlen as any[]).map((ma: any) => (
+                    <section key={ma.mitarbeiterId} style={{ background: "#fff", borderRadius: 12, padding: "14px 16px", boxShadow: "0 1px 6px rgba(0,0,0,0.07)", borderLeft: "4px solid #4a8c3f" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, marginBottom: 10 }}>
+                        <strong style={{ fontSize: 14, color: "#1f2937" }}>{ma.name}</strong>
+                        <span style={{ color: "#475569", fontSize: 11, fontWeight: 700 }}>{ma.kundenAnzahl} betreute Kunden</span>
                       </div>
-                      <span style={{ fontSize: 12, fontWeight: 700, minWidth: 50, textAlign: "right", color: ma.ampel === "gruen" ? "#4a8c3f" : ma.ampel === "gelb" ? "#f59e0b" : "#dc2626" }}>
-                        {ma.auslastungProzent}%
-                      </span>
-                      <span style={{ fontSize: 11, color: "#9ca3af", minWidth: 70 }}>{ma.istStunden}h / {ma.sollStunden}h</span>
-                    </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(122px, 1fr))", gap: 8 }}>
+                        <KennzahlMini label="Einsätze" wert={`${ma.einsaetzeAbgeschlossen} von ${ma.einsaetzeGeplant}`} hint="abgeschlossen / geplant" color="#166534" />
+                        <KennzahlMini label="Abschlussquote" wert={`${ma.abschlussquoteProzent}%`} hint="für geplante Besuche" color="#0891b2" />
+                        <KennzahlMini label="Betreuungsstunden" wert={`${ma.betreuungsstundenAbgeschlossen.toLocaleString("de-DE", { maximumFractionDigits: 2 })} Std.`} hint={`von ${ma.betreuungsstunden.toLocaleString("de-DE", { maximumFractionDigits: 2 })} geplant`} color="#7c3aed" />
+                        <KennzahlMini label="Einsatzwert" wert={ma.budgetwirkungEuro.toLocaleString("de-DE", { style: "currency", currency: "EUR" })} hint="aus geplanten Einsätzen" color="#0f766e" />
+                        <KennzahlMini label="Kundenbudget" wert={`${ma.budgetnutzungDerBetreutenKundenProzent}%`} hint={`${ma.budgetRestEuro.toLocaleString("de-DE", { style: "currency", currency: "EUR" })} noch frei`} color="#b45309" />
+                      </div>
+                    </section>
                   ))}
                 </div>
               )}
-              <div style={{ marginTop: 12, fontSize: 11, color: "#9ca3af" }}>🟢 &lt;60% · 🟡 60–89% · 🔴 ≥90%</div>
-            </div>
+              <div style={{ background: "#fff", borderRadius: 12, padding: "16px 18px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: "#1f2937", marginBottom: 12 }}>Mitarbeiter-Auslastung (aktueller Monat)</h3>
+                {(auslastung as any[]).length === 0 ? <div style={{ fontSize: 13, color: "#9ca3af", fontStyle: "italic" }}>Keine Daten vorhanden</div> : <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>{(auslastung as any[]).map((ma: any) => (
+                  <div key={ma.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ minWidth: 130, fontSize: 13, fontWeight: 600, color: "#374151", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ma.name}</div>
+                    <div style={{ flex: 1, height: 10, background: "#f3f4f6", borderRadius: 5, overflow: "hidden" }}><div style={{ height: "100%", borderRadius: 5, width: `${ma.auslastungProzent}%`, background: ma.ampel === "gruen" ? "#4a8c3f" : ma.ampel === "gelb" ? "#f59e0b" : "#dc2626" }} /></div>
+                    <span style={{ fontSize: 12, fontWeight: 700, minWidth: 50, textAlign: "right", color: ma.ampel === "gruen" ? "#4a8c3f" : ma.ampel === "gelb" ? "#f59e0b" : "#dc2626" }}>{ma.auslastungProzent}%</span>
+                    <span style={{ fontSize: 11, color: "#9ca3af", minWidth: 70 }}>{ma.istStunden}h / {ma.sollStunden}h</span>
+                  </div>
+                ))}</div>}
+                <div style={{ marginTop: 12, fontSize: 11, color: "#9ca3af" }}>🟢 &lt;60% · 🟡 60–89% · 🔴 ≥90%</div>
+              </div>
+            </>
           )}
         </div>
       )}
@@ -287,4 +323,8 @@ export default function AnalyseDashboard() {
       )}
     </div>
   );
+}
+
+function KennzahlMini({ label, wert, hint, color }: { label: string; wert: string; hint: string; color: string }) {
+  return <div style={{ background: "#f8fafc", borderRadius: 9, padding: "9px 10px" }}><div style={{ color: "#64748b", fontSize: 10, fontWeight: 700 }}>{label.toUpperCase()}</div><strong style={{ display: "block", marginTop: 3, color, fontSize: 15 }}>{wert}</strong><div style={{ color: "#6b7280", fontSize: 10, marginTop: 2 }}>{hint}</div></div>;
 }

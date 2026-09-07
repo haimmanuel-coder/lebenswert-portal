@@ -299,7 +299,9 @@ function BudgetHistorieTab({ kundenId, kundenName }: { kundenId: number; kundenN
 function KundenDetailSheet({
   k, onClose, onEdit, onDeactivate, isAdmin, kannKundenBearbeiten,
 }: { k: KundeDetail; onClose: () => void; onEdit: () => void; onDeactivate: () => void; isAdmin: boolean; kannKundenBearbeiten: boolean }) {
-  const [activeTab, setActiveTab] = useState<'info' | 'budget' | 'historie'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'budget' | 'auswertung' | 'historie'>('info');
+  const { data: kundenAuswertung, isLoading: auswertungLaedt } = trpc.kunden.detail.useQuery({ id: k.id });
+  const paragraphenAuswertung = kundenAuswertung?.paragraphenAuswertung ?? [];
   const b45b = toNum(k.budget45b); const v45b = toNum(k.verbraucht45b);
   const b45a = toNum(k.budget45a); const v45a = toNum(k.verbraucht45a);
   const b39 = toNum(k.budget39); const v39 = toNum(k.verbraucht39);
@@ -322,10 +324,10 @@ function KundenDetailSheet({
         </div>
 
         {/* Tab-Navigation */}
-        <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: '#f3f4f6', borderRadius: 12, padding: 4 }}>
-          {(['info', 'budget', 'historie'] as const).map(tab => (
-            <button key={tab} onClick={() => setActiveTab(tab)} style={{ flex: 1, padding: '8px 4px', border: 'none', borderRadius: 9, fontSize: 12, fontWeight: 700, cursor: 'pointer', background: activeTab === tab ? '#4a8c3f' : 'transparent', color: activeTab === tab ? '#fff' : '#6b7280', transition: 'all 0.15s ease' }}>
-              {tab === 'info' ? '📄 Info' : tab === 'budget' ? '💰 Budget' : '📊 Historie'}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: '#f3f4f6', borderRadius: 12, padding: 4, overflowX: 'auto' }}>
+          {(['info', 'budget', 'auswertung', 'historie'] as const).map(tab => (
+            <button key={tab} onClick={() => setActiveTab(tab)} style={{ flex: '1 0 auto', minWidth: 92, padding: '8px 7px', border: 'none', borderRadius: 9, fontSize: 12, fontWeight: 700, cursor: 'pointer', background: activeTab === tab ? '#4a8c3f' : 'transparent', color: activeTab === tab ? '#fff' : '#6b7280', transition: 'all 0.15s ease' }}>
+              {tab === 'info' ? '📄 Info' : tab === 'budget' ? '💰 Budget' : tab === 'auswertung' ? '📊 Auswertung' : '🗂 Historie'}
             </button>
           ))}
         </div>
@@ -446,6 +448,30 @@ function KundenDetailSheet({
           </div>
         )}
 
+        {/* TAB: AUSWERTUNG */}
+        {activeTab === 'auswertung' && (
+          <div data-testid="kunden-paragraphen-auswertung" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 12, padding: '12px 14px' }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#1d4ed8' }}>📊 Stunden &amp; Budget je Paragraph</div>
+              <div style={{ fontSize: 11.5, lineHeight: 1.45, color: '#475569', marginTop: 4 }}>Geplante und abgeschlossene Stunden werden je Paragraph getrennt gezählt. Die Budgetwerte basieren auf dem aktuell gültigen Jahresbudget und helfen bei der Einsatzplanung.</div>
+            </div>
+            {auswertungLaedt ? <div style={{ background: '#fff', borderRadius: 12, padding: 18, color: '#6b7280', fontSize: 13 }}>Auswertung wird geladen …</div> : paragraphenAuswertung.length === 0 ? <div style={{ background: '#fff', borderRadius: 12, padding: 18, color: '#6b7280', fontSize: 13 }}>Noch keine Auswertungsdaten vorhanden.</div> : paragraphenAuswertung.map((auswertung) => {
+              const color = auswertung.paragraph === '39' ? '#7c3aed' : auswertung.paragraph === '45a' ? '#0891b2' : '#4a8c3f';
+              return <section key={auswertung.paragraph} style={{ background: '#fff', borderRadius: 12, padding: '14px 15px', boxShadow: '0 1px 6px rgba(0,0,0,.07)', borderLeft: `4px solid ${color}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline', marginBottom: 10 }}>
+                  <div><strong style={{ color: '#1f2937', fontSize: 14 }}>§{auswertung.paragraph} SGB XI</strong><div style={{ color: '#6b7280', fontSize: 10.5, marginTop: 2 }}>{auswertung.einsaetze} berücksichtigte Einsätze</div></div>
+                  {auswertung.hatJahresbudget ? <strong style={{ color, fontSize: 12 }}>{auswertung.budgetnutzungProzent}% genutzt</strong> : <span style={{ color: '#6b7280', fontSize: 10.5 }}>Kein aktives Budget</span>}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: auswertung.hatJahresbudget ? 10 : 0 }}>
+                  <AuswertungsKachel label="Geplant" wert={`${auswertung.stundenGeplant.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Std.`} color="#1f2937" />
+                  <AuswertungsKachel label="Abgeschlossen" wert={`${auswertung.stundenAbgeschlossen.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Std.`} color="#166534" />
+                </div>
+                {auswertung.hatJahresbudget && <><div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 7 }}><AuswertungsKachel label="Budget" wert={auswertung.jahresbudgetEuro.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })} color="#374151" /><AuswertungsKachel label="Verbraucht" wert={auswertung.verbrauchtEuro.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })} color="#b45309" /><AuswertungsKachel label="Noch frei" wert={auswertung.restbudgetEuro.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })} color={color} /></div><div aria-label={`${auswertung.budgetnutzungProzent}% des Budgets für Paragraph ${auswertung.paragraph} genutzt`} style={{ height: 7, background: '#e5e7eb', borderRadius: 99, marginTop: 10, overflow: 'hidden' }}><div style={{ width: `${auswertung.budgetnutzungProzent}%`, height: '100%', background: color, borderRadius: 99 }} /></div></>}
+              </section>;
+            })}
+          </div>
+        )}
+
         {/* TAB: Historie */}
         {activeTab === 'historie' && (
           <BudgetHistorieTab kundenId={k.id} kundenName={`${k.vorname} ${k.nachname}`} />
@@ -457,6 +483,10 @@ function KundenDetailSheet({
       </div>
     </div>
   );
+}
+
+function AuswertungsKachel({ label, wert, color }: { label: string; wert: string; color: string }) {
+  return <div style={{ background: '#f8fafc', borderRadius: 8, padding: '8px 7px', minWidth: 0 }}><div style={{ color: '#6b7280', fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase' }}>{label}</div><strong style={{ color, display: 'block', fontSize: 12, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{wert}</strong></div>;
 }
 
 // ── ANLEGEN / BEARBEITEN SHEET ────────────────────────────────────────────────

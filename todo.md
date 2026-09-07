@@ -63,6 +63,12 @@
 - [x] Einsatzplanung um eine nachvollziehbare, mehrteilige Aufteilung der Einsatzzeit auf abrechenbare Paragraphen erweitern
 - [x] Mindestdauer von 1,5 Stunden, exakte Zeitsumme, Kundenberechtigung und Budgetfolge serverseitig für Paragraphenaufteilungen absichern
 - [x] Paragraphenaufteilung einschließlich Leistungsnachweis- und Budgetübernahme mobil sowie mit automatisierten Tests abnehmen
+- [x] Kundenprofil um eine Auswertung der Einsatzstunden und Budgetnutzung je abrechenbarem Paragraphen erweitern
+- [x] Berechtigte Mitarbeiterübersicht mit transparenten Kennzahlen zu Kundenbesuchen, Betreuungsstunden und Budgetausschöpfung ergänzen
+- [x] Kunden- und Mitarbeiterauswertung auf Kennzahlengenauigkeit, Zugriffsrechte und mobile Darstellung gezielt testen
+- [x] Kundenprofil-Tab „Auswertung“ mit Paragraphstunden, Budgetnutzung und responsiver Darstellung browsergestützt prüfen
+- [x] Neue Mitarbeiterkennzahlen gegen nicht berechtigte Rollen sperren und diese Sperre automatisiert prüfen
+- [x] Analyse-Dashboard mit Monatsfilter und Mitarbeiterkennzahlen als UI-Vertrag gezielt absichern
 - [x] Einheitliche Rückpfeil-Komponente mit großem mobilen Touchbereich und sicherem Übersichts-Fallback wiederherstellen
 - [x] Rückpfeil auf allen internen Mitarbeiter- und Admin-Unterseiten zentral einbinden und Navigationsvertrag absichern
 - [x] Isoliertes aktives Testkonto für einen End-to-End-Portal-Login erstellen, testen und vollständig bereinigen
