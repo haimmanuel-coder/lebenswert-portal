@@ -643,13 +643,13 @@ export function validierePlanungsEingabe(eingabe: PlanungsEingabe): PlanungsMeld
         text: "Bitte angeben, wie viele Stunden über den zweiten Paragraphen abgerechnet werden.",
         feld: "stunden2",
       });
-    } else if (stunden !== null && stunden2 > stunden) {
+    } else if (stunden !== null && stunden2 >= stunden) {
       meldungen.push({
-        code: "paragraph2_stunden_zu_hoch",
+        code: "paragraph2_anteil_ungueltig",
         schwere: "blockierend",
         text:
-          `Der zweite Paragraph kann höchstens ${formatStunden(stunden)} abdecken – ` +
-          `so lange dauert der Einsatz insgesamt.`,
+          `Beide Paragraphen benötigen einen positiven Stundenanteil. Der zweite Paragraph muss ` +
+          `kleiner als die Einsatzdauer von ${formatStunden(stunden)} sein.`,
         feld: "stunden2",
       });
     }

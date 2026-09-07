@@ -2253,8 +2253,11 @@ export const appRouter = router({
                 const monatLN = e.datum instanceof Date
                   ? e.datum.toISOString().slice(0, 7)
                   : e.datum ? String(e.datum).slice(0, 7) : new Date().toISOString().slice(0, 7);
-                const stunden1 = parseFloat(String(e.dauerStunden ?? 0));
+                // Bei aufgeteilten Einsätzen ist `dauerStunden` die gesamte
+                // Einsatzdauer. Für §1 muss deshalb der explizit gespeicherte
+                // erste Anteil gelten, nicht erneut die Gesamtdauer.
                 const stunden2 = parseFloat(String(e.stunden2 ?? 0));
+                const stunden1 = parseFloat(String(e.stunden1 ?? Math.max(0, parseFloat(String(e.dauerStunden ?? 0)) - stunden2)));
                 const kundeSnapshot = await getKundeById(e.kundenId);
                 const uebernahme = bereiteEinsatzUebernahmeVor({
                   einsatzDatum: e.datum,
@@ -2349,8 +2352,11 @@ export const appRouter = router({
                 const kundeAktuell = await getKundeById(eb.kundenId);
                 if (kundeAktuell) {
                   const budgetUpdate: Record<string, string> = {};
-                  const stunden1 = parseFloat(String(eb.dauerStunden ?? 0));
                   const stunden2 = parseFloat(String((eb as any).stunden2 ?? 0));
+                  // Der erste Anteil ist bei neueren Split-Einsätzen separat
+                  // gespeichert. Für historische Ein-Paragraph-Einsätze wird
+                  // sicher auf die damalige Gesamtdauer zurückgefallen.
+                  const stunden1 = parseFloat(String((eb as any).stunden1 ?? Math.max(0, parseFloat(String(eb.dauerStunden ?? 0)) - stunden2)));
                   // Paragraph 1
                   if (eb.paragraph === '45b' && stunden1 > 0) {
                     const neu = Math.max(0, parseFloat(String((kundeAktuell as any).verbraucht45b ?? 0)) + stunden1);

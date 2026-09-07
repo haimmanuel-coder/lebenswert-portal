@@ -172,6 +172,36 @@ async function pruefeAdminFilterung() {
   }
 }
 
+async function pruefeParagraphenaufteilung() {
+  const test = await anmeldeUndOeffnePlanung(emails.alpha);
+  try {
+    const kundenAusloeser = test.dialog.getByRole("button", { name: /kunden auswählen/i }).last();
+    await kundenAusloeser.click();
+    await test.dialog.getByPlaceholder("Name, Ort, Versicherungsnummer …").fill(kundenName);
+    await test.dialog.getByRole("button", { name: new RegExp(kundenName, "i") }).last().click();
+    const zeiten = test.dialog.locator('input[type="time"]');
+    await zeiten.nth(0).fill("09:00");
+    await zeiten.nth(1).fill("11:30");
+    await test.dialog.getByLabel("Erster Abrechnungsparagraph").selectOption("39");
+    await test.dialog.getByTestId("paragraphenaufteilung-zweiter-paragraph").selectOption("45b");
+    const zweiterAnteil = test.dialog.getByTestId("paragraphenaufteilung-zweiter-anteil");
+    await zweiterAnteil.fill("0.5");
+    const summe = test.dialog.getByTestId("paragraphenaufteilung-summe");
+    await summe.waitFor({ state: "visible", timeout: 10_000 });
+    const summentext = (await summe.textContent() || "").replace(/\s+/g, " ");
+    if (!/§39:\s*2[,.]0{1,2}\s*Std\./.test(summentext) || !/§45b:\s*0[,.]5(?:0)?\s*Std\./.test(summentext) || !/Gesamt:\s*2[,.]5(?:0)?\s*Std\./.test(summentext)) {
+      throw new Error("Die sichtbare Paragraphenaufteilung zeigt nicht 2,0 Std. §39 und 0,5 Std. §45b bei 2,5 Std. Gesamtzeit.");
+    }
+    const dialogBounds = await test.dialog.evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      return { inViewport: bounds.left >= 0 && bounds.right <= window.innerWidth, overflowX: document.documentElement.scrollWidth > window.innerWidth };
+    });
+    if (!dialogBounds.inViewport || dialogBounds.overflowX) throw new Error("Die mobile Paragraphenaufteilung erzeugt einen horizontalen Überlauf.");
+  } finally {
+    await test.context.close();
+  }
+}
+
 try {
   await erstelleTestdaten();
   browser = await chromium.launch({
@@ -183,6 +213,7 @@ try {
   await pruefeZugeordnetenMitarbeiter(emails.beta);
   await pruefeUnzugeordnetenMitarbeiter();
   await pruefeAdminFilterung();
+  await pruefeParagraphenaufteilung();
 
   console.log(JSON.stringify({
     planungsdialogSichtbar: true,
@@ -193,6 +224,8 @@ try {
     adminSiehtBeiMitarbeiterwahlNurDessenKunden: true,
     aktuellesBetreuungsteamSichtbar: true,
     aktuelleTerminBetreuungSichtbar: true,
+    paragraphenaufteilung39und45bSichtbar: true,
+    paragraphenaufteilungMobilOhneHorizontalenUeberlauf: true,
     mobilGeprueft: true,
     klartextpasswortAusgegeben: false,
   }, null, 2));

@@ -60,6 +60,9 @@
 - [x] Admin-Dashboard um eine Mitarbeiterwahl und den Button „Zugangskarte neu generieren“ erweitern
 - [x] Neugenerierung mit ausdrücklicher Bestätigung, sofortiger Ablösung des bisherigen Startpassworts und geschützter Einzel-PDF-Ausgabe serverseitig absichern
 - [x] Admin- und Nicht-Admin-Rechte, PDF-Abruf, neues Startpasswort und aktualisierten Erstloginstatus end-to-end prüfen
+- [x] Einsatzplanung um eine nachvollziehbare, mehrteilige Aufteilung der Einsatzzeit auf abrechenbare Paragraphen erweitern
+- [x] Mindestdauer von 1,5 Stunden, exakte Zeitsumme, Kundenberechtigung und Budgetfolge serverseitig für Paragraphenaufteilungen absichern
+- [x] Paragraphenaufteilung einschließlich Leistungsnachweis- und Budgetübernahme mobil sowie mit automatisierten Tests abnehmen
 - [x] Einheitliche Rückpfeil-Komponente mit großem mobilen Touchbereich und sicherem Übersichts-Fallback wiederherstellen
 - [x] Rückpfeil auf allen internen Mitarbeiter- und Admin-Unterseiten zentral einbinden und Navigationsvertrag absichern
 - [x] Isoliertes aktives Testkonto für einen End-to-End-Portal-Login erstellen, testen und vollständig bereinigen
