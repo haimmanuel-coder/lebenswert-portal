@@ -12,6 +12,7 @@ import {
   AlertTriangle, FolderOpen,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { MODUL_RECHTE } from "@shared/modulRechte";
 
 // ─── Typen ────────────────────────────────────────────────────────────────────
 type ZertifikatStatus = "erhalten" | "angemeldet" | "nicht_angemeldet";
@@ -56,21 +57,8 @@ const DOK_TYP_FARBE: Record<DokTyp, string> = {
   sonstiges:     "bg-gray-100 text-gray-700",
 };
 
-// ─── Modul-Berechtigungen (alle verfügbaren Module) ───────────────────────────
-const ALLE_MODULE = [
-  { key: "einsaetze",          label: "Einsätze einsehen" },
-  { key: "einsaetze_erstellen", label: "Einsätze erstellen/bearbeiten" },
-  { key: "leistungsnachweise", label: "Leistungsnachweise" },
-  { key: "fahrten",            label: "Fahrtennachweise" },
-  { key: "kunden",             label: "Kundenliste" },
-  { key: "tourplanung",        label: "Tourplanung" },
-  { key: "buchhaltung",        label: "Buchhaltung / Abschluss" },
-  { key: "analysen",           label: "Analysen & Berichte" },
-  { key: "sicherheit",         label: "Sicherheitsunterweisungen" },
-  { key: "fuehrerschein",      label: "Führerschein-Checks" },
-  { key: "admin",              label: "Admin-Bereich" },
-  { key: "dsgvo",              label: "DSGVO-Dokumente" },
-];
+// Der zentrale Katalog verhindert, dass Rechte für sichtbare Seiten fehlen.
+const ALLE_MODULE = MODUL_RECHTE;
 
 // ─── Dienstwagen-Karte ────────────────────────────────────────────────────────
 function DienstwagenCard({ mitarbeiterId, ma }: { mitarbeiterId: number; ma: any }) {

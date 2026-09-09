@@ -169,7 +169,7 @@ export default function Besuchsberichte() {
                 onClick={() => navigiere("fahrt")}
                 style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe", borderRadius: 12, padding: "10px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
               >
-                Begleitfahrt erfassen
+                Sonderfahrt erfassen
               </button>
               <button
                 onClick={() => setShowCreate(true)}

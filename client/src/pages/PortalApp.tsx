@@ -56,6 +56,7 @@ import Privatrechnung from "./Privatrechnung";
 import { NavigationProvider, type SeitenId } from "@/contexts/NavigationContext";
 import { ZurueckNavigation } from "@/components/ZurueckNavigation";
 import { naechsterVerlauf, vorherigeSeite } from "@/lib/portalNavigationHistory";
+import { hatStandardModulrecht } from "@shared/modulRechte";
 
 /**
  * Seitenkennungen werden zentral im NavigationContext gepflegt, damit
@@ -130,7 +131,7 @@ export default function PortalApp() {
   const darfModulNutzen = (modul: string): boolean => {
     if (isAdmin) return true;
     const eintrag = (meineBerechtigungen as Array<{ modul: string; zugriff: string }>).find(b => b.modul === modul);
-    if (!eintrag) return true; // kein Eintrag = Standard = erlaubt
+    if (!eintrag) return hatStandardModulrecht(mitarbeiter?.rolle ?? "mitarbeiter", modul);
     return eintrag.zugriff === "erlaubt";
   };
   // Badge-Logik: Admin/Teamleitung sehen Warnungsanzahl, normale MA sehen heutige Einsätze
@@ -243,7 +244,7 @@ export default function PortalApp() {
           ] : []),
           { id: "budget" as PageId, icon: "💰", label: "Budgetverwaltung" },
         ] : []),
-        ...(isAdmin || isTeamleitung ? [{ id: "privatrechnung" as PageId, icon: "🩺", label: "Kundenbegleitungen", adminOnly: true }] : []),
+        { id: "privatrechnung" as PageId, icon: "🚗", label: "Sonderfahrten" },
         { id: "besuchsberichte" as PageId, icon: "📋", label: "Dokumentation" },
         { id: "lnw", icon: "📝", label: "Leistungsnachweise", badge: offenCount > 0 ? offenCount : undefined },
       ],

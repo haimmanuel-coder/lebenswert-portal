@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { usePortalAuth } from "@/contexts/PortalAuthContext";
 
 const KATEGORIEN = [
   { value: "einkauf", label: "🛒 Einkauf" },
@@ -31,6 +32,8 @@ const STATUS_FARBEN: Record<string, string> = {
 };
 
 export default function Privatrechnung() {
+  const { mitarbeiter } = usePortalAuth() as any;
+  const istVerwaltung = ["admin", "teamleitung", "buchhaltung"].includes(mitarbeiter?.rolle ?? "");
   const heute = new Date();
   const [monat, setMonat] = useState(`${heute.getFullYear()}-${String(heute.getMonth() + 1).padStart(2, "0")}`);
   const [selectedKundenId, setSelectedKundenId] = useState<number | null>(null);
@@ -47,9 +50,9 @@ export default function Privatrechnung() {
   );
   const { data: positionen, refetch: refetchPos } = trpc.rechnungsposition.list.useQuery(
     { kundenId: selectedKundenId!, monat },
-    { enabled: !!selectedKundenId }
+    { enabled: !!selectedKundenId && istVerwaltung }
   );
-  const { data: rechnungen, refetch: refetchRechnungen } = trpc.privatrechnung.list.useQuery({});
+  const { data: rechnungen, refetch: refetchRechnungen } = trpc.privatrechnung.list.useQuery({}, { enabled: istVerwaltung });
 
   const sfMutation = trpc.sonderfahrt.create.useMutation({
     onSuccess: () => { refetchSF(); setSfForm({ datum: "", startAdresse: "", zielAdresse: "", kilometer: "", beschreibung: "" }); toast.success("Sonderfahrt gespeichert"); },
@@ -83,16 +86,16 @@ export default function Privatrechnung() {
       <div className="flex items-center gap-3 mb-2">
         <span className="text-2xl">🧾</span>
         <div>
-          <h1 className="text-xl font-bold text-green-800">Kundenbegleitungen & Monatsabrechnung</h1>
-          <p className="text-sm text-gray-500">Arzt- und Einkaufsbegleitungen je Kunde sowie Sonderfahrten und Monatsrechnungen</p>
+          <h1 className="text-xl font-bold text-green-800">Sonderfahrten{istVerwaltung ? " & Monatsabrechnung" : ""}</h1>
+          <p className="text-sm text-gray-500">Arzt- und Einkaufsbegleitungen sind Sonderfahrten und werden je Kunde erfasst.</p>
         </div>
       </div>
 
-      <Tabs defaultValue="begleitungen">
+      <Tabs defaultValue={istVerwaltung ? "begleitungen" : "erfassen"}>
         <TabsList className="w-full">
-          <TabsTrigger value="begleitungen" className="flex-1">Kundenbegleitungen</TabsTrigger>
+          {istVerwaltung && <TabsTrigger value="begleitungen" className="flex-1">Sonderfahrtenübersicht</TabsTrigger>}
           <TabsTrigger value="erfassen" className="flex-1">✏️ Erfassen</TabsTrigger>
-          <TabsTrigger value="rechnungen" className="flex-1">📄 Rechnungen</TabsTrigger>
+          {istVerwaltung && <TabsTrigger value="rechnungen" className="flex-1">📄 Rechnungen</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="begleitungen" className="space-y-4">
@@ -211,8 +214,8 @@ export default function Privatrechnung() {
                 </CardContent>
               </Card>
 
-              {/* Rechnungspositionen */}
-              <Card>
+              {/* Zusatzpositionen sind nur für die Abrechnung sichtbar. */}
+              {istVerwaltung && <Card>
                 <CardHeader>
                   <CardTitle className="text-base flex items-center justify-between">
                     <span>📦 Zusatzleistungen</span>
@@ -251,10 +254,10 @@ export default function Privatrechnung() {
                     </div>
                   )}
                 </CardContent>
-              </Card>
+              </Card>}
 
-              {/* Rechnung erstellen */}
-              <Card className="border-green-300 bg-green-50">
+              {/* Die Rechnungserstellung bleibt getrennt von der Mitarbeitererfassung. */}
+              {istVerwaltung && <Card className="border-green-300 bg-green-50">
                 <CardContent className="pt-4">
                   <div className="flex items-center justify-between">
                     <div>
@@ -268,7 +271,7 @@ export default function Privatrechnung() {
                     </Button>
                   </div>
                 </CardContent>
-              </Card>
+              </Card>}
             </>
           )}
         </TabsContent>

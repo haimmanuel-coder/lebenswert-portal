@@ -77,7 +77,7 @@ export default function Fahrtenbuch() {
   const createSonderfahrt = (trpc as any).sonderfahrt.create.useMutation({
     onSuccess: () => {
       refetchSonderfahrten();
-      toast.success("✅ Begleitfahrt gespeichert");
+      toast.success("✅ Sonderfahrt gespeichert");
       setSonderSheetOpen(false);
       setSonderForm({ datum: today, kundenId: "", startAdresse: "", zielAdresse: "", kilometer: "", bemerkung: "" });
     },
@@ -251,13 +251,13 @@ export default function Fahrtenbuch() {
           onClick={() => openBegleitfahrt("arzt")}
           style={{ padding: "11px 12px", background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer", textAlign: "left" }}
         >
-          Arztbegleitung erfassen
+          Sonderfahrt zum Arzt erfassen
         </button>
         <button
           onClick={() => openBegleitfahrt("einkauf")}
           style={{ padding: "11px 12px", background: "#f0fdf4", color: "#166534", border: "1px solid #bbf7d0", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer", textAlign: "left" }}
         >
-          Einkaufsbegleitung erfassen
+          Sonderfahrt zum Einkauf erfassen
         </button>
       </div>
       {mitarbeiter?.rolle !== "admin" && mitarbeiter?.rolle !== "teamleitung" && (
@@ -468,7 +468,7 @@ export default function Fahrtenbuch() {
 
       <BottomSheet open={sonderSheetOpen} onClose={() => setSonderSheetOpen(false)} title={sonderArt === "arzt" ? "Arztbegleitung erfassen" : "Einkaufsbegleitung erfassen"}>
         <div style={{ marginBottom: 14, padding: "10px 12px", background: sonderArt === "arzt" ? "#eff6ff" : "#f0fdf4", color: sonderArt === "arzt" ? "#1e40af" : "#166534", borderRadius: 10, fontSize: 13, fontWeight: 700 }}>
-          {sonderArt === "arzt" ? "Die Begleitfahrt wird separat für die Kundenabrechnung gespeichert." : "Die Einkaufsbegleitung wird separat für die Kundenabrechnung gespeichert."}
+          {sonderArt === "arzt" ? "Die Sonderfahrt zum Arzt wird separat für die Kundenabrechnung gespeichert." : "Die Sonderfahrt zum Einkauf wird separat für die Kundenabrechnung gespeichert."}
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
           <div>
@@ -505,7 +505,7 @@ export default function Fahrtenbuch() {
         </div>
         <div style={{ display: "flex", gap: 10, marginTop: 20, paddingTop: 16, borderTop: "1px solid #e5e7eb" }}>
           <button onClick={() => setSonderSheetOpen(false)} style={{ flex: 1, padding: 13, background: "#f4f6f3", color: "#6b7280", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>Abbrechen</button>
-          <button onClick={saveBegleitfahrt} disabled={createSonderfahrt.isPending} style={{ flex: 1, padding: 13, background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>{createSonderfahrt.isPending ? "Speichern…" : "Begleitfahrt speichern"}</button>
+          <button onClick={saveBegleitfahrt} disabled={createSonderfahrt.isPending} style={{ flex: 1, padding: 13, background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>{createSonderfahrt.isPending ? "Speichern…" : "Sonderfahrt speichern"}</button>
         </div>
       </BottomSheet>
 
