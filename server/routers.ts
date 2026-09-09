@@ -2271,7 +2271,14 @@ export const appRouter = router({
         } else {
           await updateEinsatzStatus(input.id, ctx.mitarbeiterId, updateData);
         }
-        await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "UPDATE", ressource: "einsatz", details: `id=${input.id} status=${input.status}${input.unterschriftErsatzTyp && input.unterschriftErsatzTyp !== "keine" ? ` unterschriftErsatzTyp=${input.unterschriftErsatzTyp}` : ""}`, status: "success" });
+        try {
+          await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "UPDATE", ressource: "einsatz", details: `id=${input.id} status=${input.status}${input.unterschriftErsatzTyp && input.unterschriftErsatzTyp !== "keine" ? ` unterschriftErsatzTyp=${input.unterschriftErsatzTyp}` : ""}`, status: "success" });
+        } catch (auditFehler) {
+          // Der fachliche Abschluss ist bereits atomar gespeichert. Eine
+          // nachgelagerte Audit-Störung darf nicht fälschlich einen Fehler an
+          // den Mitarbeiter zurückgeben oder eine Wiederholung provozieren.
+          console.warn("[Einsatzabschluss] Audit-Protokollierung fehlgeschlagen:", auditFehler);
+        }
 
         // Bei ausstehender Freigabe: Teamleitung/Admin per Notification informieren.
         if (updateData.unterschriftFreigabeStatus === "ausstehend") {
