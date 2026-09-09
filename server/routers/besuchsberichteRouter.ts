@@ -1,29 +1,124 @@
 import { z } from "zod";
 import { router } from "../_core/trpc";
-import { portalProtected, adminProcedure } from "../portalAuth";
+import { portalProtected, adminProcedure, roleProcedure } from "../portalAuth";
 import { TRPCError } from "@trpc/server";
-import { getDb } from "../db";
+import { checkDoppelbelegung, createEinsatz, createAuditLog, getDb, getKundeById, getMitarbeiterById, isMitarbeiterZugeordnet, updateEinsatzStatus } from "../db";
 import { besuchsberichte, besuchsberichtDateien, formularVorlagen } from "../../drizzle/schema";
 import { eq, desc, and } from "drizzle-orm";
-import { createAuditLog } from "../db";
 import { transcribeAudio } from "../_core/voiceTranscription";
 import { generateBesuchsberichtPdf } from "../pdfGenerator";
 import { sendEmail, buildBesuchsberichtEmail } from "../emailService";
-import { getMitarbeiterById, getKundeById } from "../db";
 import { storagePut } from "../storage";
+import { berechneStunden } from "../../shared/planungsLogik";
+import { ANFAHRT_PAUSCHALE, berechneEinsatzkostenInklPauschale } from "../../shared/leistungssaetze";
+import { fuehreEinsatzabschlussFolgenAus } from "../einsatzAbschlussService";
 
 
 export const besuchsberichteRouter = router({
+  /**
+   * Variante A: Ein manuell erfasster Bericht erzeugt genau einen abgeschlossenen
+   * Einsatz und nutzt danach denselben Folgeprozess wie der Einsatzabschluss.
+   */
+  create: portalProtected
+    .input(z.object({
+      kundenId: z.number().int().positive(),
+      datum: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      startzeit: z.string().regex(/^\d{2}:\d{2}$/),
+      endzeit: z.string().regex(/^\d{2}:\d{2}$/),
+      paragraph: z.enum(["45b", "45a", "39"]),
+      kilometer: z.number().min(0).max(1000).optional(),
+      fahrtVonOrt: z.string().trim().max(200).optional(),
+      fahrtNachOrt: z.string().trim().max(200).optional(),
+      inhalt: z.string().trim().min(1).max(10_000),
+      stimmung: z.enum(["sehr_gut", "gut", "neutral", "besorgniserregend"]).optional(),
+      massnahmen: z.string().trim().max(5_000).optional(),
+      naechsterTermin: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      unterschriftKunde: z.boolean().default(false),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const dauerStunden = berechneStunden(input.startzeit, input.endzeit);
+      if (dauerStunden === null || dauerStunden < 1.5) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Mindestdauer: Jeder Einsatz muss mindestens 1,5 Stunden (90 Minuten) dauern." });
+      }
+      const ma = await getMitarbeiterById(ctx.mitarbeiterId);
+      if (ma?.rolle === "mitarbeiter" && !(await isMitarbeiterZugeordnet(ctx.mitarbeiterId, input.kundenId))) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Besuchsberichte dürfen nur für zugeordnete Kunden angelegt werden." });
+      }
+      const konflikt = await checkDoppelbelegung({
+        datum: input.datum,
+        startzeit: input.startzeit,
+        dauerStunden,
+        mitarbeiterId: ctx.mitarbeiterId,
+        kundenId: input.kundenId,
+      });
+      if (konflikt.mitarbeiterKonflikt || konflikt.kundenKonflikt) {
+        throw new TRPCError({ code: "CONFLICT", message: "Doppelbelegung: Für diesen Zeitpunkt besteht bereits ein Einsatz." });
+      }
+      const kunde = await getKundeById(input.kundenId);
+      if (!kunde) throw new TRPCError({ code: "NOT_FOUND", message: "Kunde nicht gefunden." });
+      const kosten = berechneEinsatzkostenInklPauschale(dauerStunden, input.paragraph);
+      const budget = Number(input.paragraph === "45b" ? kunde.budget45b : input.paragraph === "45a" ? kunde.budget45a : kunde.budget39);
+      const verbraucht = Number(input.paragraph === "45b" ? kunde.verbraucht45b : input.paragraph === "45a" ? kunde.verbraucht45a : kunde.verbraucht39);
+      if (ma?.rolle !== "admin" && kosten > budget - verbraucht) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Das verfügbare Budget dieses Paragraphen reicht für den Einsatz einschließlich 6-€-Anfahrtspauschale nicht aus." });
+      }
+
+      // Der frühere Defekt: Berichte wurden ohne Einsatz gespeichert und lösten
+      // keine Leistungsnachweis- oder Fahrtfolge aus. Der Einsatz ist hier die
+      // einzige Quelle für alle buchungsrelevanten Folgen.
+      const einsatzId = await createEinsatz({
+        mitarbeiterId: ctx.mitarbeiterId,
+        kundenId: input.kundenId,
+        datum: input.datum as any,
+        startzeit: input.startzeit,
+        endzeit: input.endzeit,
+        dauerStunden,
+        paragraph: input.paragraph,
+        anfahrtPauschale: ANFAHRT_PAUSCHALE.toFixed(2),
+        notizen: "Aus Besuchsbericht erzeugter Einsatz",
+      } as any);
+      const tatsaechlicherStart = new Date(`${input.datum}T${input.startzeit}:00.000Z`).toISOString();
+      const tatsaechlichesEnde = new Date(`${input.datum}T${input.endzeit}:00.000Z`).toISOString();
+      await updateEinsatzStatus(einsatzId, ctx.mitarbeiterId, {
+        status: "abgeschlossen",
+        bericht: input.inhalt,
+        bemerkung: input.massnahmen || undefined,
+        unterschriftKunde: input.unterschriftKunde ? "vorhanden" : undefined,
+        tatsaechlicherStart: new Date(tatsaechlicherStart),
+        tatsaechlichesEnde: new Date(tatsaechlichesEnde),
+      });
+      const besonderheiten = [
+        input.stimmung ? `Stimmung: ${input.stimmung}` : null,
+        input.naechsterTermin ? `Nächster Termin: ${input.naechsterTermin}` : null,
+      ].filter(Boolean).join(" · ") || null;
+      const folge = await fuehreEinsatzabschlussFolgenAus({
+        einsatzId,
+        taetigkeiten: input.inhalt,
+        beobachtungen: input.massnahmen,
+        besonderheiten,
+        naechsteSchritte: input.naechsterTermin ? `Nächster Termin: ${input.naechsterTermin}` : undefined,
+        tatsaechlicherStart,
+        tatsaechlichesEnde,
+        fahrtKilometer: input.kilometer,
+        fahrtVonOrt: input.fahrtVonOrt,
+        fahrtNachOrt: input.fahrtNachOrt,
+      });
+      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "CREATE", ressource: "besuchsbericht", details: `einsatzId=${einsatzId}`, status: "success" });
+      return { success: true, einsatzId, berichtId: folge.berichtId };
+    }),
+
   /** Berichte eines Mitarbeiters abrufen */
   list: portalProtected
     .input(z.object({ mitarbeiterId: z.number().optional(), kundenId: z.number().optional() }))
     .query(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) return [];
+      const darfFremdeBerichteSehen = ["admin", "teamleitung"].includes(ctx.portalMitarbeiter.rolle);
+      const zielMitarbeiterId = darfFremdeBerichteSehen ? (input.mitarbeiterId ?? ctx.mitarbeiterId) : ctx.mitarbeiterId;
       const rows = await db
         .select()
         .from(besuchsberichte)
-        .where(eq(besuchsberichte.mitarbeiterId, input.mitarbeiterId ?? ctx.mitarbeiterId))
+        .where(eq(besuchsberichte.mitarbeiterId, zielMitarbeiterId))
         .orderBy(desc(besuchsberichte.createdAt))
         .limit(50);
       return rows;
@@ -40,7 +135,11 @@ export const besuchsberichteRouter = router({
         .from(besuchsberichte)
         .where(eq(besuchsberichte.einsatzId, input.einsatzId))
         .limit(1);
-      return rows[0] ?? null;
+      const bericht = rows[0] ?? null;
+      if (bericht && !["admin", "teamleitung"].includes(ctx.portalMitarbeiter.rolle) && bericht.mitarbeiterId !== ctx.mitarbeiterId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Dieser Besuchsbericht gehört nicht zu Ihrem Konto." });
+      }
+      return bericht;
     }),
 
   /** Bericht erstellen oder aktualisieren */
@@ -240,7 +339,7 @@ export const besuchsberichteRouter = router({
   }),
 
   /** Alle Besuchsberichte abrufen (Admin) */
-  getAlleBerichte: portalProtected.query(async ({ ctx }) => {
+  getAlleBerichte: roleProcedure(["admin", "teamleitung"]).query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) return [];
     return db.select().from(besuchsberichte).orderBy(desc(besuchsberichte.datum)).limit(100);

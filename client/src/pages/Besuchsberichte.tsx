@@ -48,7 +48,11 @@ export default function Besuchsberichte() {
     kundeId: 0,
     datum: new Date().toISOString().split("T")[0],
     startzeit: "09:00",
-    endzeit: "10:00",
+    endzeit: "10:30",
+    paragraph: "45b" as "45b" | "45a" | "39",
+    kilometer: "",
+    fahrtVonOrt: "",
+    fahrtNachOrt: "",
     inhalt: "",
     stimmung: "gut" as "sehr_gut" | "gut" | "neutral" | "besorgniserregend",
     massnahmen: "",
@@ -109,10 +113,20 @@ export default function Besuchsberichte() {
   };
 
   const createBericht = (trpc.besuchsberichte as any).create.useMutation({
-    onSuccess: () => {
+    onSuccess: async (data: any) => {
+      if (data.berichtId && form.fotos.length > 0) {
+        await Promise.all(form.fotos.map((foto) => addDatei.mutateAsync({
+          berichtId: data.berichtId,
+          dateiKey: foto.key,
+          dateiUrl: foto.url,
+          dateiname: foto.name,
+          mimeType: "image/*",
+          kategorie: "foto",
+        })));
+      }
       toast.success("✅ Besuchsbericht gespeichert!");
       setShowCreate(false);
-      setForm({ kundeId: 0, datum: new Date().toISOString().split("T")[0], startzeit: "09:00", endzeit: "10:00", inhalt: "", stimmung: "gut", massnahmen: "", naechsterTermin: "", unterschriftKunde: false, fotos: [] });
+      setForm({ kundeId: 0, datum: new Date().toISOString().split("T")[0], startzeit: "09:00", endzeit: "10:30", paragraph: "45b", kilometer: "", fahrtVonOrt: "", fahrtNachOrt: "", inhalt: "", stimmung: "gut", massnahmen: "", naechsterTermin: "", unterschriftKunde: false, fotos: [] });
       if (tab === "meine") refetchMeine(); else refetchAlle();
     },
     onError: (e: any) => toast.error("❌ " + e.message),
@@ -122,6 +136,13 @@ export default function Besuchsberichte() {
     onSuccess: () => { toast.success("Status aktualisiert"); refetchAlle(); },
     onError: (e: any) => toast.error("❌ " + e.message),
   });
+  const addDatei = (trpc.besuchsberichte as any).addDatei.useMutation();
+  const dauerStunden = (() => {
+    const [sh, sm] = form.startzeit.split(":").map(Number);
+    const [eh, em] = form.endzeit.split(":").map(Number);
+    const minuten = (eh * 60 + em) - (sh * 60 + sm);
+    return minuten > 0 ? minuten / 60 : 0;
+  })();
   const korrekturAnfrage = (trpc.besuchsberichte as any).anfrageKorrektur.useMutation({
     onSuccess: () => { toast.success("Korrekturanfrage wurde an die Teamleitung übergeben."); refetchMeine(); },
     onError: (e: any) => toast.error("Korrekturanfrage fehlgeschlagen: " + e.message),
@@ -163,29 +184,22 @@ export default function Besuchsberichte() {
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          {isAdmin ? (
-            <>
+          <>
+            {isAdmin && (
               <button
-                onClick={() => navigiere("fahrt")}
+                onClick={() => navigiere("privatrechnung")}
                 style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe", borderRadius: 12, padding: "10px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
               >
                 Sonderfahrt erfassen
               </button>
-              <button
-                onClick={() => setShowCreate(true)}
-                style={{ background: "#0d9488", color: "#fff", border: "none", borderRadius: 12, padding: "10px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
-              >
-                Neuer Bericht
-              </button>
-            </>
-          ) : (
+            )}
             <button
-              onClick={() => navigiere("einsaetze")}
-              style={{ background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 12, padding: "10px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+              onClick={() => setShowCreate(true)}
+              style={{ background: "#0d9488", color: "#fff", border: "none", borderRadius: 12, padding: "10px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
             >
-              Besuch dokumentieren
+              Neuer Bericht
             </button>
-          )}
+          </>
         </div>
       </div>
 
@@ -427,7 +441,7 @@ export default function Besuchsberichte() {
                 </select>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
                 <div>
                   <label style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", display: "block", marginBottom: 4 }}>Datum *</label>
                   <input type="date" value={form.datum} onChange={e => setForm(f => ({ ...f, datum: e.target.value }))} style={{ width: "100%", padding: "10px 12px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, boxSizing: "border-box" }} />
@@ -441,6 +455,31 @@ export default function Besuchsberichte() {
                   <input type="time" value={form.endzeit} onChange={e => setForm(f => ({ ...f, endzeit: e.target.value }))} style={{ width: "100%", padding: "10px 12px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, boxSizing: "border-box" }} />
                 </div>
               </div>
+
+              <div style={{ padding: "10px 12px", borderRadius: 10, background: dauerStunden >= 1.5 ? "#f0fdf4" : "#fef2f2", color: dauerStunden >= 1.5 ? "#166534" : "#991b1b", fontSize: 13, fontWeight: 700 }}>
+                Einsatzdauer: {dauerStunden.toFixed(2).replace(".", ",")} Stunden {dauerStunden >= 1.5 ? "✓" : "– mindestens 1,5 Stunden erforderlich"}
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", display: "block", marginBottom: 4 }}>Abrechnungsparagraph *</label>
+                  <select value={form.paragraph} onChange={e => setForm(f => ({ ...f, paragraph: e.target.value as any }))} style={{ width: "100%", padding: "10px 12px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, background: "#fff" }}>
+                    <option value="45b">§45b</option>
+                    <option value="45a">§45a</option>
+                    <option value="39">§39</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", display: "block", marginBottom: 4 }}>Kilometer (optional)</label>
+                  <input type="number" min="0" step="0.1" value={form.kilometer} onChange={e => setForm(f => ({ ...f, kilometer: e.target.value }))} placeholder="z. B. 12,5" style={{ width: "100%", padding: "10px 12px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, boxSizing: "border-box" }} />
+                </div>
+              </div>
+              {form.kilometer && (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+                  <input value={form.fahrtVonOrt} onChange={e => setForm(f => ({ ...f, fahrtVonOrt: e.target.value }))} placeholder="Startadresse (optional)" style={{ width: "100%", padding: "10px 12px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, boxSizing: "border-box" }} />
+                  <input value={form.fahrtNachOrt} onChange={e => setForm(f => ({ ...f, fahrtNachOrt: e.target.value }))} placeholder="Zieladresse (optional)" style={{ width: "100%", padding: "10px 12px", border: "2px solid #e5e7eb", borderRadius: 10, fontSize: 14, boxSizing: "border-box" }} />
+                </div>
+              )}
 
               <div>
                 <label style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", display: "block", marginBottom: 4 }}>Stimmung des Kunden</label>
@@ -567,9 +606,9 @@ export default function Besuchsberichte() {
                   Abbrechen
                 </button>
                 <button
-                  onClick={() => createBericht.mutate(form as any)}
-                  disabled={createBericht.isPending || !form.kundeId || !form.inhalt}
-                  style={{ flex: 2, background: "#0d9488", color: "#fff", border: "none", borderRadius: 10, padding: "12px", fontWeight: 700, fontSize: 14, cursor: "pointer", opacity: (!form.kundeId || !form.inhalt) ? 0.5 : 1 }}
+                  onClick={() => createBericht.mutate({ ...form, kilometer: form.kilometer ? Number(form.kilometer.replace(",", ".")) : undefined })}
+                  disabled={createBericht.isPending || !form.kundeId || !form.inhalt || dauerStunden < 1.5}
+                  style={{ flex: 2, background: "#0d9488", color: "#fff", border: "none", borderRadius: 10, padding: "12px", fontWeight: 700, fontSize: 14, cursor: "pointer", opacity: (!form.kundeId || !form.inhalt || dauerStunden < 1.5) ? 0.5 : 1 }}
                 >
                   {createBericht.isPending ? "Wird gespeichert..." : "💾 Bericht speichern"}
                 </button>

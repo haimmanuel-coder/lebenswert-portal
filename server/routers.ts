@@ -36,6 +36,7 @@ import { getDb } from "./db";
 import { entschluessleKundenGesundheitsdaten } from "./sensitiveFieldEncryption";
 import { ermittleErsteHilfeStatus } from "./complianceUtils";
 import { bereiteEinsatzUebernahmeVor } from "./mitarbeiterAblauf";
+import { fuehreEinsatzabschlussFolgenAus } from "./einsatzAbschlussService";
 import { pruefeLeistungsnachweisAbschluss } from "./monatsabschlussService";
 import { generiereEinmaligesStartpasswort, waehleDruckbareMitarbeiter } from "./accessCredentials";
 import { erstelleEinzelneZugangskarte, ZugangskarteValidierungsfehler } from "./accessCardPdfService";
@@ -2265,155 +2266,25 @@ export const appRouter = router({
           } catch (e) { console.warn("[Entscheidung 15] Freigabe-Benachrichtigung fehlgeschlagen:", e); }
         }
 
-        // Automatischer Push bei Budget-Warnung nach Einsatz-Abschluss
+        // Abschlüsse aus Planung und Besuchsbericht laufen durch dieselbe
+        // Folgefunktion. So gibt es keinen zweiten, abweichenden Buchungsweg.
         if (input.status === "abgeschlossen" && !warBereitsAbgeschlossen) {
-          // A4: Automatischen Leistungsnachweis pro Paragraph erstellen
           try {
-            const dbA4 = await getDb();
-            if (dbA4) {
-              const einsatzRows = await dbA4.select().from(einsaetzeTable).where(eq(einsaetzeTable.id, input.id)).limit(1);
-              if (einsatzRows.length > 0) {
-                const e = einsatzRows[0];
-                const paragraphenLN: Array<"45b" | "45a" | "39"> = [];
-                if (e.paragraph && ["45b","45a","39"].includes(e.paragraph)) paragraphenLN.push(e.paragraph as "45b" | "45a" | "39");
-                if (e.paragraph2 && ["45b","45a","39"].includes(e.paragraph2)) paragraphenLN.push(e.paragraph2 as "45b" | "45a" | "39");
-                const monatLN = e.datum instanceof Date
-                  ? e.datum.toISOString().slice(0, 7)
-                  : e.datum ? String(e.datum).slice(0, 7) : new Date().toISOString().slice(0, 7);
-                // Bei aufgeteilten Einsätzen ist `dauerStunden` die gesamte
-                // Einsatzdauer. Für §1 muss deshalb der explizit gespeicherte
-                // erste Anteil gelten, nicht erneut die Gesamtdauer.
-                const stunden2 = parseFloat(String(e.stunden2 ?? 0));
-                const stunden1 = parseFloat(String(e.stunden1 ?? Math.max(0, parseFloat(String(e.dauerStunden ?? 0)) - stunden2)));
-                const kundeSnapshot = await getKundeById(e.kundenId);
-                const uebernahme = bereiteEinsatzUebernahmeVor({
-                  einsatzDatum: e.datum,
-                  tatsaechlicherStart,
-                  tatsaechlichesEnde,
-                  geplanteStunden: parseFloat(String(e.dauerStunden ?? 0)),
-                });
-                const besuchsberichtDaten: any = {
-                  einsatzId: e.id,
-                  kundenId: e.kundenId,
-                  mitarbeiterId: e.mitarbeiterId,
-                  datum: new Date(`${uebernahme.datum}T12:00:00`),
-                  dauerMinuten: uebernahme.dauerMinuten,
-                  taetigkeiten: input.bericht?.trim() || "Besuch dokumentiert",
-                  beobachtungen: input.bemerkung?.trim() || null,
-                  besonderheiten: input.gesundheit ? `Gesundheitszustand: ${input.gesundheit}` : null,
-                  status: "eingereicht",
-                  pflegegradSnapshot: String((kundeSnapshot as any)?.pflegegrad ?? "nicht hinterlegt"),
-                  fahrtKilometer: fahrtKilometer === undefined ? null : String(fahrtKilometer),
-                  fahrtVonOrt: fahrtVonOrt || null,
-                  fahrtNachOrt: fahrtNachOrt || null,
-                };
-                const vorhandenerBericht = await dbA4
-                  .select({ id: besuchsberichte.id })
-                  .from(besuchsberichte)
-                  .where(eq(besuchsberichte.einsatzId, e.id))
-                  .limit(1);
-                if (vorhandenerBericht.length > 0) {
-                  await dbA4.update(besuchsberichte).set(besuchsberichtDaten).where(eq(besuchsberichte.id, vorhandenerBericht[0].id));
-                } else {
-                  await dbA4.insert(besuchsberichte).values(besuchsberichtDaten);
-                }
-
-                // Fahrt entsteht exakt einmal über einsatzId. Wiederholtes Speichern
-                // aktualisiert den Eintrag statt eine doppelte Fahrt anzulegen.
-                if (fahrtKilometer !== undefined && fahrtVonOrt && fahrtNachOrt) {
-                  const vorhandeneFahrt = await dbA4
-                    .select({ id: fahrten.id })
-                    .from(fahrten)
-                    .where(eq(fahrten.einsatzId, e.id))
-                    .limit(1);
-                  const fahrtDaten = {
-                    kundenId: e.kundenId,
-                    datum: new Date(`${uebernahme.datum}T12:00:00`),
-                    vonOrt: fahrtVonOrt,
-                    nachOrt: fahrtNachOrt,
-                    kilometer: String(fahrtKilometer),
-                    typ: "normal" as const,
-                    zweck: `Automatisch aus Besuchsbericht: ${kundeSnapshot?.vorname ?? ""} ${kundeSnapshot?.nachname ?? ""}`.trim(),
-                    monat: uebernahme.monat,
-                    einsatzId: e.id,
-                  };
-                  if (vorhandeneFahrt.length > 0) {
-                    await dbA4.update(fahrten).set(fahrtDaten).where(eq(fahrten.id, vorhandeneFahrt[0].id));
-                  } else {
-                    const ma = await getMitarbeiterById(e.mitarbeiterId);
-                    await createFahrt({ ...fahrtDaten, mitarbeiterId: e.mitarbeiterId, hatDienstwagen: Boolean((ma as any)?.hatDienstwagen) } as any);
-                  }
-                }
-
-                const { leistungen } = await import('../drizzle/schema');
-                for (let i = 0; i < paragraphenLN.length; i++) {
-                  const para = paragraphenLN[i];
-                  const std = i === 0 ? stunden1 : stunden2;
-                  const existingLN = await dbA4.select({ id: leistungen.id, stunden: leistungen.stunden, anzahlEinsaetze: leistungen.anzahlEinsaetze })
-                    .from(leistungen)
-                    .where(and(eq(leistungen.mitarbeiterId, e.mitarbeiterId), eq(leistungen.kundenId, e.kundenId), eq(leistungen.monat, monatLN), eq(leistungen.paragraph, para)))
-                    .limit(1);
-                  if (existingLN.length > 0) {
-                    const altStd = parseFloat(String(existingLN[0].stunden ?? 0));
-                    const altAnz = existingLN[0].anzahlEinsaetze ?? 1;
-                    await dbA4.update(leistungen).set({ stunden: String(altStd + std), anzahlEinsaetze: altAnz + 1 }).where(eq(leistungen.id, existingLN[0].id));
-                  } else {
-                    await dbA4.insert(leistungen).values({ mitarbeiterId: e.mitarbeiterId, kundenId: e.kundenId, monat: monatLN, paragraph: para, stunden: String(std), anzahlEinsaetze: 1, betrag: String(std * 30), status: 'offen' });
-                  }
-                }
-              }
-            }
-          } catch (lnErr) { console.warn('[A4] Leistungsnachweis-Erstellung fehlgeschlagen:', lnErr); }
-
-          // ── BUDGET-AUTOMATIK: Stunden vom Kundenbudget abziehen ──────────
-          // Wenn ein Einsatz abgeschlossen wird, werden die geleisteten Stunden
-          // automatisch vom jeweiligen Paragraph-Budget des Kunden abgezogen.
-          // Dies entspricht dem Leistungskonzept: "alle erfassten Stunden müssen
-          // automatisch vom zugeteilten Budget abgezogen werden."
-          try {
-            const dbBudget = await getDb();
-            if (dbBudget) {
-              const einsatzBudgetRows = await dbBudget.select().from(einsaetzeTable).where(eq(einsaetzeTable.id, input.id)).limit(1);
-              if (einsatzBudgetRows.length > 0) {
-                const eb = einsatzBudgetRows[0];
-                const kundeAktuell = await getKundeById(eb.kundenId);
-                if (kundeAktuell) {
-                  const budgetUpdate: Record<string, string> = {};
-                  const stunden2 = parseFloat(String((eb as any).stunden2 ?? 0));
-                  // Der erste Anteil ist bei neueren Split-Einsätzen separat
-                  // gespeichert. Für historische Ein-Paragraph-Einsätze wird
-                  // sicher auf die damalige Gesamtdauer zurückgefallen.
-                  const stunden1 = parseFloat(String((eb as any).stunden1 ?? Math.max(0, parseFloat(String(eb.dauerStunden ?? 0)) - stunden2)));
-                  // Paragraph 1
-                  if (eb.paragraph === '45b' && stunden1 > 0) {
-                    const neu = Math.max(0, parseFloat(String((kundeAktuell as any).verbraucht45b ?? 0)) + stunden1);
-                    budgetUpdate.verbraucht45b = String(neu);
-                  } else if (eb.paragraph === '45a' && stunden1 > 0) {
-                    const neu = Math.max(0, parseFloat(String((kundeAktuell as any).verbraucht45a ?? 0)) + stunden1);
-                    budgetUpdate.verbraucht45a = String(neu);
-                  } else if (eb.paragraph === '39' && stunden1 > 0) {
-                    const neu = Math.max(0, parseFloat(String((kundeAktuell as any).verbraucht39 ?? 0)) + stunden1);
-                    budgetUpdate.verbraucht39 = String(neu);
-                  }
-                  // Paragraph 2 (falls vorhanden)
-                  if ((eb as any).paragraph2 === '45b' && stunden2 > 0) {
-                    const basis = budgetUpdate.verbraucht45b ? parseFloat(budgetUpdate.verbraucht45b) : parseFloat(String((kundeAktuell as any).verbraucht45b ?? 0));
-                    budgetUpdate.verbraucht45b = String(Math.max(0, basis + stunden2));
-                  } else if ((eb as any).paragraph2 === '45a' && stunden2 > 0) {
-                    const basis = budgetUpdate.verbraucht45a ? parseFloat(budgetUpdate.verbraucht45a) : parseFloat(String((kundeAktuell as any).verbraucht45a ?? 0));
-                    budgetUpdate.verbraucht45a = String(Math.max(0, basis + stunden2));
-                  } else if ((eb as any).paragraph2 === '39' && stunden2 > 0) {
-                    const basis = budgetUpdate.verbraucht39 ? parseFloat(budgetUpdate.verbraucht39) : parseFloat(String((kundeAktuell as any).verbraucht39 ?? 0));
-                    budgetUpdate.verbraucht39 = String(Math.max(0, basis + stunden2));
-                  }
-                  if (Object.keys(budgetUpdate).length > 0) {
-                    await updateKundeBudget(eb.kundenId, budgetUpdate);
-                    console.log(`[Budget-Automatik] Kunde ${eb.kundenId}: ${JSON.stringify(budgetUpdate)} abgezogen`);
-                  }
-                }
-              }
-            }
-          } catch (budgetErr) { console.warn('[Budget-Automatik] Budgetabzug fehlgeschlagen:', budgetErr); }
+            await fuehreEinsatzabschlussFolgenAus({
+              einsatzId: input.id,
+              taetigkeiten: input.bericht,
+              beobachtungen: input.bemerkung,
+              besonderheiten: input.gesundheit ? `Gesundheitszustand: ${input.gesundheit}` : null,
+              tatsaechlicherStart,
+              tatsaechlichesEnde,
+              fahrtKilometer,
+              fahrtVonOrt,
+              fahrtNachOrt,
+            });
+          } catch (abschlussFehler) {
+            console.warn("[Einsatzabschluss] Folgeprozess fehlgeschlagen:", abschlussFehler);
+            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Der Einsatz wurde abgeschlossen, konnte aber nicht vollständig weiterverarbeitet werden." });
+          }
 
           try {
             const warnungen = await getKundenMitBudgetWarnung();

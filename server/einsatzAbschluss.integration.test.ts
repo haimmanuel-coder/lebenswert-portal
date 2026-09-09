@@ -46,12 +46,15 @@ vi.mock("./db", async (importOriginal) => {
     ...actual,
     getDb: vi.fn(async () => db),
     getEinsatzById: vi.fn(async () => mocks.einsatz),
-    updateEinsatzStatus: vi.fn(async () => undefined),
+    updateEinsatzStatus: vi.fn(async (_id: number, _mitarbeiterId: number, daten: any) => {
+      mocks.einsatz.status = daten.status ?? mocks.einsatz.status;
+    }),
     getKundeById: vi.fn(async () => ({ id: 801, vorname: "Erika", nachname: "Muster", pflegegrad: 3, verbraucht45b: 0 })),
     getMitarbeiterById: vi.fn(async () => ({ id: 701, aktiv: true, rolle: "mitarbeiter", vorname: "Mia", nachname: "Beispiel", hatDienstwagen: false })),
     createAuditLog: vi.fn(async () => undefined),
     createNotification: vi.fn(async () => undefined),
     createFahrt: vi.fn(async (fahrt: any) => { mocks.createdFahrten.push(fahrt); }),
+    updateKundeBudget: vi.fn(async () => undefined),
   };
 });
 
@@ -113,6 +116,7 @@ describe("Einsatzabschluss – automatische Dokumentübernahme", () => {
       monat: "2026-08",
       paragraph: "45b",
       stunden: "1.5",
+      betrag: "60",
     });
   });
 
@@ -142,8 +146,8 @@ describe("Einsatzabschluss – automatische Dokumentübernahme", () => {
       .map((eintrag) => eintrag.values);
     expect(leistungsmonate).toHaveLength(2);
     expect(leistungsmonate).toEqual(expect.arrayContaining([
-      expect.objectContaining({ paragraph: "39", stunden: "2" }),
-      expect.objectContaining({ paragraph: "45b", stunden: "0.5" }),
+      expect.objectContaining({ paragraph: "39", stunden: "2", betrag: "98" }),
+      expect.objectContaining({ paragraph: "45b", stunden: "0.5", betrag: "18" }),
     ]));
     expect(leistungsmonate.reduce((summe, leistung) => summe + Number(leistung.stunden), 0)).toBe(2.5);
   });
