@@ -69,6 +69,8 @@
 - [x] Kundenprofil-Tab „Auswertung“ mit Paragraphstunden, Budgetnutzung und responsiver Darstellung browsergestützt prüfen
 - [x] Neue Mitarbeiterkennzahlen gegen nicht berechtigte Rollen sperren und diese Sperre automatisiert prüfen
 - [x] Analyse-Dashboard mit Monatsfilter und Mitarbeiterkennzahlen als UI-Vertrag gezielt absichern
+- [x] Kunden-Auswahlfeld der Terminplanung auf vollständige Vor- und Nachnamen statt interner Kennzahlen prüfen und bei Bedarf korrigieren
+- [x] Lokale, noch nicht auf GitHub übertragene Projektänderungen geordnet auf Branch main übertragen und die Commitübersicht dokumentieren
 - [x] Einheitliche Rückpfeil-Komponente mit großem mobilen Touchbereich und sicherem Übersichts-Fallback wiederherstellen
 - [x] Rückpfeil auf allen internen Mitarbeiter- und Admin-Unterseiten zentral einbinden und Navigationsvertrag absichern
 - [x] Isoliertes aktives Testkonto für einen End-to-End-Portal-Login erstellen, testen und vollständig bereinigen
