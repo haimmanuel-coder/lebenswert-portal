@@ -36,8 +36,11 @@ export const ROLLEN_STANDARD: Record<Portalrolle, readonly SteuerbaresModul[]> =
   admin: ["privatrechnung"],
 };
 
+// Nur Sonderfahrten wird mit dieser Änderung erstmals zentral gesteuert. Alle
+// übrigen Einträge behalten ihren bisher bestehenden Sichtbarkeitsstandard.
+const STANDARDGEREGELTE_MODULE = ["privatrechnung"] as const;
+
 export function hatStandardModulrecht(rolle: string, modul: string): boolean {
-  const standard = ROLLEN_STANDARD[rolle as Portalrolle];
-  if (!standard) return true;
-  return !MODUL_RECHTE.some((eintrag) => eintrag.key === modul) || standard.includes(modul as SteuerbaresModul);
+  if (!STANDARDGEREGELTE_MODULE.includes(modul as (typeof STANDARDGEREGELTE_MODULE)[number])) return true;
+  return ROLLEN_STANDARD[rolle as Portalrolle]?.includes(modul as SteuerbaresModul) ?? true;
 }

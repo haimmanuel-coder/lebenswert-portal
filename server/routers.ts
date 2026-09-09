@@ -36,7 +36,7 @@ import { getDb } from "./db";
 import { entschluessleKundenGesundheitsdaten } from "./sensitiveFieldEncryption";
 import { ermittleErsteHilfeStatus } from "./complianceUtils";
 import { bereiteEinsatzUebernahmeVor } from "./mitarbeiterAblauf";
-import { fuehreEinsatzabschlussFolgenAus } from "./einsatzAbschlussService";
+import { schliesseEinsatzMitFolgenAtomar } from "./einsatzAbschlussService";
 import { pruefeLeistungsnachweisAbschluss } from "./monatsabschlussService";
 import { generiereEinmaligesStartpasswort, waehleDruckbareMitarbeiter } from "./accessCredentials";
 import { erstelleEinzelneZugangskarte, ZugangskarteValidierungsfehler } from "./accessCardPdfService";
@@ -2212,8 +2212,8 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         const einsatzVorher = await getEinsatzById(input.id);
         if (!einsatzVorher) throw new TRPCError({ code: "NOT_FOUND", message: "Einsatz nicht gefunden." });
-        const warBereitsAbgeschlossen = einsatzVorher.status === "abgeschlossen";
         const {
+          id: _einsatzId,
           fahrtKilometer,
           fahrtVonOrt,
           fahrtNachOrt,
@@ -2247,7 +2247,30 @@ export const appRouter = router({
           }
           updateData.unterschriftFreigabeStatus = "ausstehend";
         }
-        await updateEinsatzStatus(input.id, ctx.mitarbeiterId, updateData);
+        if (input.status === "abgeschlossen") {
+          try {
+            await schliesseEinsatzMitFolgenAtomar({
+              einsatzId: input.id,
+              mitarbeiterId: ctx.mitarbeiterId,
+              einsatzUpdate: updateData,
+              folgen: {
+                taetigkeiten: input.bericht,
+                beobachtungen: input.bemerkung,
+                besonderheiten: input.gesundheit ? `Gesundheitszustand: ${input.gesundheit}` : null,
+                tatsaechlicherStart,
+                tatsaechlichesEnde,
+                fahrtKilometer,
+                fahrtVonOrt,
+                fahrtNachOrt,
+              },
+            });
+          } catch (abschlussFehler) {
+            console.warn("[Einsatzabschluss] Atomarer Folgeprozess fehlgeschlagen:", abschlussFehler);
+            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Der Einsatz wurde nicht abgeschlossen, weil die vollständige Weiterverarbeitung fehlgeschlagen ist. Bitte erneut versuchen." });
+          }
+        } else {
+          await updateEinsatzStatus(input.id, ctx.mitarbeiterId, updateData);
+        }
         await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "UPDATE", ressource: "einsatz", details: `id=${input.id} status=${input.status}${input.unterschriftErsatzTyp && input.unterschriftErsatzTyp !== "keine" ? ` unterschriftErsatzTyp=${input.unterschriftErsatzTyp}` : ""}`, status: "success" });
 
         // Bei ausstehender Freigabe: Teamleitung/Admin per Notification informieren.
@@ -2266,26 +2289,7 @@ export const appRouter = router({
           } catch (e) { console.warn("[Entscheidung 15] Freigabe-Benachrichtigung fehlgeschlagen:", e); }
         }
 
-        // Abschlüsse aus Planung und Besuchsbericht laufen durch dieselbe
-        // Folgefunktion. So gibt es keinen zweiten, abweichenden Buchungsweg.
-        if (input.status === "abgeschlossen" && !warBereitsAbgeschlossen) {
-          try {
-            await fuehreEinsatzabschlussFolgenAus({
-              einsatzId: input.id,
-              taetigkeiten: input.bericht,
-              beobachtungen: input.bemerkung,
-              besonderheiten: input.gesundheit ? `Gesundheitszustand: ${input.gesundheit}` : null,
-              tatsaechlicherStart,
-              tatsaechlichesEnde,
-              fahrtKilometer,
-              fahrtVonOrt,
-              fahrtNachOrt,
-            });
-          } catch (abschlussFehler) {
-            console.warn("[Einsatzabschluss] Folgeprozess fehlgeschlagen:", abschlussFehler);
-            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Der Einsatz wurde abgeschlossen, konnte aber nicht vollständig weiterverarbeitet werden." });
-          }
-
+        if (input.status === "abgeschlossen") {
           try {
             const warnungen = await getKundenMitBudgetWarnung();
             if (warnungen.length > 0) {

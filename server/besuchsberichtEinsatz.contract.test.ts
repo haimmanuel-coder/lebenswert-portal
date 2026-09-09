@@ -28,10 +28,12 @@ describe("Besuchsbericht mit Einsatzfolge", () => {
   });
 
   it("führt Besuchsbericht, Fahrtenbuch, Leistungsnachweis und Budget über dieselbe Abschlussfunktion aus", () => {
-    expect(router).toContain("fuehreEinsatzabschlussFolgenAus({");
+    expect(router).toContain("schliesseEinsatzMitFolgenAtomar({");
+    expect(service).toContain("return db.transaction");
     expect(service).toContain("where(eq(fahrten.einsatzId, einsatz.id))");
     expect(service).toContain("where(eq(besuchsberichte.einsatzId, einsatz.id))");
     expect(service).toContain("anteil.paragraph === einsatz.paragraph ? ANFAHRT_PAUSCHALE : 0");
-    expect(service).toContain("await adjustKundeVerbraucht(einsatz.kundenId, delta.paragraph, delta.betrag");
+    expect(service).toContain("budgetWarBereitsGebucht");
+    expect(service).toContain("await db.insert(budgetTransaktionen)");
   });
 });

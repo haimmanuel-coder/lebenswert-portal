@@ -2,7 +2,7 @@ import { z } from "zod";
 import { router } from "../_core/trpc";
 import { portalProtected, adminProcedure, roleProcedure } from "../portalAuth";
 import { TRPCError } from "@trpc/server";
-import { checkDoppelbelegung, createEinsatz, createAuditLog, getDb, getKundeById, getMitarbeiterById, isMitarbeiterZugeordnet, updateEinsatzStatus } from "../db";
+import { checkDoppelbelegung, createEinsatz, createAuditLog, getDb, getKundeById, getMitarbeiterById, isMitarbeiterZugeordnet } from "../db";
 import { besuchsberichte, besuchsberichtDateien, formularVorlagen } from "../../drizzle/schema";
 import { eq, desc, and } from "drizzle-orm";
 import { transcribeAudio } from "../_core/voiceTranscription";
@@ -11,7 +11,7 @@ import { sendEmail, buildBesuchsberichtEmail } from "../emailService";
 import { storagePut } from "../storage";
 import { berechneStunden } from "../../shared/planungsLogik";
 import { ANFAHRT_PAUSCHALE, berechneEinsatzkostenInklPauschale } from "../../shared/leistungssaetze";
-import { fuehreEinsatzabschlussFolgenAus } from "../einsatzAbschlussService";
+import { schliesseEinsatzMitFolgenAtomar } from "../einsatzAbschlussService";
 
 
 export const besuchsberichteRouter = router({
@@ -79,29 +79,31 @@ export const besuchsberichteRouter = router({
       } as any);
       const tatsaechlicherStart = new Date(`${input.datum}T${input.startzeit}:00.000Z`).toISOString();
       const tatsaechlichesEnde = new Date(`${input.datum}T${input.endzeit}:00.000Z`).toISOString();
-      await updateEinsatzStatus(einsatzId, ctx.mitarbeiterId, {
-        status: "abgeschlossen",
-        bericht: input.inhalt,
-        bemerkung: input.massnahmen || undefined,
-        unterschriftKunde: input.unterschriftKunde ? "vorhanden" : undefined,
-        tatsaechlicherStart: new Date(tatsaechlicherStart),
-        tatsaechlichesEnde: new Date(tatsaechlichesEnde),
-      });
       const besonderheiten = [
         input.stimmung ? `Stimmung: ${input.stimmung}` : null,
         input.naechsterTermin ? `Nächster Termin: ${input.naechsterTermin}` : null,
       ].filter(Boolean).join(" · ") || null;
-      const folge = await fuehreEinsatzabschlussFolgenAus({
+      const folge = await schliesseEinsatzMitFolgenAtomar({
         einsatzId,
-        taetigkeiten: input.inhalt,
-        beobachtungen: input.massnahmen,
-        besonderheiten,
-        naechsteSchritte: input.naechsterTermin ? `Nächster Termin: ${input.naechsterTermin}` : undefined,
-        tatsaechlicherStart,
-        tatsaechlichesEnde,
-        fahrtKilometer: input.kilometer,
-        fahrtVonOrt: input.fahrtVonOrt,
-        fahrtNachOrt: input.fahrtNachOrt,
+        mitarbeiterId: ctx.mitarbeiterId,
+        einsatzUpdate: {
+          bericht: input.inhalt,
+          bemerkung: input.massnahmen || undefined,
+          unterschriftKunde: input.unterschriftKunde ? "vorhanden" : undefined,
+          tatsaechlicherStart: new Date(tatsaechlicherStart),
+          tatsaechlichesEnde: new Date(tatsaechlichesEnde),
+        },
+        folgen: {
+          taetigkeiten: input.inhalt,
+          beobachtungen: input.massnahmen,
+          besonderheiten,
+          naechsteSchritte: input.naechsterTermin ? `Nächster Termin: ${input.naechsterTermin}` : undefined,
+          tatsaechlicherStart,
+          tatsaechlichesEnde,
+          fahrtKilometer: input.kilometer,
+          fahrtVonOrt: input.fahrtVonOrt,
+          fahrtNachOrt: input.fahrtNachOrt,
+        },
       });
       await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "CREATE", ressource: "besuchsbericht", details: `einsatzId=${einsatzId}`, status: "success" });
       return { success: true, einsatzId, berichtId: folge.berichtId };
