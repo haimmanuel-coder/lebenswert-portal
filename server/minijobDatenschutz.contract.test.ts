@@ -17,6 +17,14 @@ describe("Minijobzeitraum und Datenschutzvertrag", () => {
   it("liefert einer einfachen Mitarbeitendenrolle keinen Sammelwert", () => {
     expect(planungRouter).toContain("if (!darfAllesSehen(ctx.portalMitarbeiter.rolle)) return []");
     expect(planungRouter).toContain("? (input.mitarbeiterId ?? ctx.mitarbeiterId)\n        : ctx.mitarbeiterId");
+    expect(planungRouter).toContain("const filterMitarbeiterId = alleSehen ? (input.mitarbeiterId ?? null) : ctx.mitarbeiterId");
+    expect(planungRouter).toContain("alleSehen ? getMonatsLohnkostenAlle(heute) : Promise.resolve([])");
+  });
+
+  it("sperrt sämtliche inventarisierten Teamkennzahlen für einfache Mitarbeitende", () => {
+    const analysen = readFileSync(resolve(process.cwd(), "server/routers/integrationenRouter.ts"), "utf8");
+    expect(analysen).toContain('mitarbeiterAuslastung: roleProcedure(["admin", "teamleitung"])');
+    expect(analysen).toContain('mitarbeiterBetreuungskennzahlen: roleProcedure(["admin", "teamleitung"])');
   });
 
   it("zeigt im eigenen Profil nur persönliche Minijobdaten samt Zeitraum", () => {
