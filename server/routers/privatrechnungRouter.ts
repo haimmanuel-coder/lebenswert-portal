@@ -9,8 +9,8 @@
  */
 import { z } from "zod";
 import { router } from "../_core/trpc";
-import { adminProcedure, portalProtected } from "../portalAuth";
-import { getDb, getMitarbeiterById } from "../db";
+import { adminProcedure, portalProtected, roleProcedure } from "../portalAuth";
+import { getDb, getMitarbeiterById, isMitarbeiterZugeordnet } from "../db";
 import { sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
@@ -94,7 +94,10 @@ export const sonderfahrtRouter = router({
       );
       let list = (rows as any).rows ?? (rows as any[]);
       const aktuellerMitarbeiter = await getMitarbeiterById(ctx.mitarbeiterId);
-      const maId = input.mitarbeiterId ?? (aktuellerMitarbeiter?.rolle === "admin" ? undefined : ctx.mitarbeiterId);
+      const darfFremdeEintraegeSehen = ["admin", "teamleitung", "buchhaltung"].includes(aktuellerMitarbeiter?.rolle ?? "");
+      // Der frühere Defekt: Eine mitgegebene Mitarbeiter-ID konnte fremde
+      // Sonderfahrten offenlegen. Mitarbeitende sehen immer nur eigene Einträge.
+      const maId = darfFremdeEintraegeSehen ? input.mitarbeiterId : ctx.mitarbeiterId;
       if (maId) list = list.filter((r: any) => r.mitarbeiterId === maId);
       if (input.kundenId) list = list.filter((r: any) => r.kundenId === input.kundenId);
       if (input.monat) list = list.filter((r: any) => r.monat === input.monat);
@@ -114,6 +117,10 @@ export const sonderfahrtRouter = router({
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const aktuellerMitarbeiter = await getMitarbeiterById(ctx.mitarbeiterId);
+      if (aktuellerMitarbeiter?.rolle === "mitarbeiter" && !(await isMitarbeiterZugeordnet(ctx.mitarbeiterId, input.kundenId))) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Sonderfahrten dürfen nur für zugeordnete Kunden erfasst werden." });
+      }
       const monat = input.datum.substring(0, 7);
       await db.execute(
         sql`INSERT INTO sonderfahrten (einsatzId, mitarbeiterId, kundenId, datum, startAdresse, zielAdresse, kilometer, beschreibung, monat)
@@ -126,13 +133,17 @@ export const sonderfahrtRouter = router({
 
   monatsSumme: portalProtected
     .input(z.object({ kundenId: z.number().int().positive(), monat: z.string() }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) return { summe: 0, positionen: [] };
       const rows = await db.execute(
         sql`SELECT * FROM sonderfahrten WHERE kundenId = ${input.kundenId} AND monat = ${input.monat} ORDER BY datum`
       );
-      const positionen = (rows as any).rows ?? (rows as any[]);
+      const aktuellerMitarbeiter = await getMitarbeiterById(ctx.mitarbeiterId);
+      const darfFremdeEintraegeSehen = ["admin", "teamleitung", "buchhaltung"].includes(aktuellerMitarbeiter?.rolle ?? "");
+      const positionen = ((rows as any).rows ?? (rows as any[])).filter((eintrag: any) =>
+        darfFremdeEintraegeSehen || eintrag.mitarbeiterId === ctx.mitarbeiterId,
+      );
       const summe = positionen.reduce((s: number, r: any) => s + parseFloat(String(r.kilometer ?? 0)) * 0.35, 0);
       return { summe: Math.round(summe * 100) / 100, positionen };
     }),
@@ -141,7 +152,7 @@ export const sonderfahrtRouter = router({
 // ─── Rechnungspositionen ──────────────────────────────────────────────────────
 
 export const rechnungspositionRouter = router({
-  list: portalProtected
+  list: roleProcedure(["admin", "teamleitung", "buchhaltung"])
     .input(z.object({ kundenId: z.number().int().positive(), monat: z.string() }))
     .query(async ({ input }) => {
       const db = await getDb();
@@ -152,7 +163,7 @@ export const rechnungspositionRouter = router({
       return (rows as any).rows ?? (rows as any[]);
     }),
 
-  create: portalProtected
+  create: roleProcedure(["admin", "teamleitung", "buchhaltung"])
     .input(z.object({
       kundenId: z.number().int().positive(),
       einsatzId: z.number().int().optional(),
@@ -174,7 +185,7 @@ export const rechnungspositionRouter = router({
       return { success: true };
     }),
 
-  delete: portalProtected
+  delete: roleProcedure(["admin", "teamleitung", "buchhaltung"])
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input }) => {
       const db = await getDb();

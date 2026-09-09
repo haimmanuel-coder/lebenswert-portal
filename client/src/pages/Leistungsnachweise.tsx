@@ -131,7 +131,8 @@ export default function Leistungsnachweise() {
   });
 
   const rate = STUNDENSATZ[para];
-  const betragPreview = ((parseFloat(stunden) || 0) * rate + (parseInt(anzahl) || 0) * ANFAHRT_PAUSCHALE).toFixed(2);
+  // Einheitlich zum Server: Gesamtstunden × Paragraphsatz + einmal 6 € Anfahrt.
+  const betragPreview = ((parseFloat(stunden) || 0) * rate + ANFAHRT_PAUSCHALE).toFixed(2);
 
   // Budget-Anzeige für ausgewählten Kunden
   const selectedKunde = kunden.find((k) => String(k.id) === kundenId);

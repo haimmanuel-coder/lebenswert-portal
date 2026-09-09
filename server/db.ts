@@ -456,13 +456,19 @@ export async function getEinsaetzeWithKunden(mitarbeiterId?: number) {
 export async function createEinsatz(data: InsertEinsatz & { mitarbeiterId: number }) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
+  // Der frühere Defekt: Die zentrale Anlagefunktion verwarf Endzeit und
+  // Zusatzdaten. Dadurch konnte ein aus einem Besuchsbericht erzeugter Einsatz
+  // nicht dieselben nachvollziehbaren Zeitdaten wie die Planung erhalten.
   const result = await db.insert(einsaetze).values({
     mitarbeiterId: data.mitarbeiterId,
     kundenId: data.kundenId,
     datum: new Date(data.datum as unknown as string),
     startzeit: data.startzeit as string | undefined,
+    endzeit: data.endzeit as string | undefined,
     dauerStunden: data.dauerStunden != null ? String(data.dauerStunden) : undefined,
     paragraph: data.paragraph,
+    anfahrtPauschale: data.anfahrtPauschale ?? undefined,
+    notizen: data.notizen ?? undefined,
     status: "geplant",
   });
   return Number(result[0].insertId);
@@ -692,10 +698,12 @@ export async function getBudgetHistorie(kundenId: number) {
 export async function createLeistung(data: InsertLeistung & { mitarbeiterId: number }) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  // Stundensatz je Paragraph: §45b = 125 €/h, §39 = 1612 €/Monat (pauschal), §45a = 0
-  const rate = data.paragraph === "39" ? 1612 : data.paragraph === "45a" ? 0 : 125;
+  // Der frühere Defekt: Hier standen 125 € und 1.612 € fest im Code. Die
+  // zentrale Preisquelle liefert alle Paragraphensätze und die Anfahrt korrekt.
+  const { STUNDENSATZ, ANFAHRT_PAUSCHALE } = await import("../shared/leistungssaetze");
+  const rate = STUNDENSATZ[data.paragraph as "45b" | "45a" | "39"];
   const stunden = parseFloat(String(data.stunden ?? 0));
-  const betrag = (stunden * rate).toFixed(2);
+  const betrag = (stunden * rate + ANFAHRT_PAUSCHALE).toFixed(2);
   await db.insert(leistungen).values({
     mitarbeiterId: data.mitarbeiterId,
     kundenId: data.kundenId,

@@ -25,6 +25,7 @@ const DATEI_MIME_TYPES: Record<string, string> = {
 export default function MeinProfil() {
   const { mitarbeiter, refreshAuth } = usePortalAuth() as any;
   const [tab, setTab] = useState<"profil" | "passwort" | "dokumente" | "sicherheit">("profil");
+  const { data: minijobStatus } = (trpc.planung as any).minijobStatus.useQuery({});
 
   // ── 2FA-State ──────────────────────────────────────────────────────────────
   const [twoFASetup, setTwoFASetup] = useState<{ secret: string; qrCodeDataUrl: string } | null>(null);
@@ -293,6 +294,17 @@ export default function MeinProfil() {
             )}
           </div>
           <div style={{ padding: "16px 18px", display: "grid", gap: 14 }}>
+            {mitarbeiter?.beschaeftigungsart === "minijob" && minijobStatus && (
+              <div style={{ padding: "12px", borderRadius: 12, background: minijobStatus.ueberschritten ? "#fef2f2" : "#f0fdf4", border: `1px solid ${minijobStatus.ueberschritten ? "#fecaca" : "#bbf7d0"}` }}>
+                <div style={{ fontWeight: 800, color: "#111827", fontSize: 14 }}>Meine Minijob-Abrechnung</div>
+                <div style={{ color: "#6b7280", fontSize: 12, marginTop: 4 }}>Zeitraum: {minijobStatus.abrechnungszeitraum?.label ?? "16.–15."}</div>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginTop: 10, fontSize: 13 }}>
+                  <span>{Number(minijobStatus.bisherigeLohnkosten ?? 0).toFixed(2).replace(".", ",")} € von {Number(minijobStatus.grenze ?? 0).toFixed(2).replace(".", ",")} €</span>
+                  <strong>{Number(minijobStatus.auslastungProzent ?? 0).toFixed(0)} %</strong>
+                </div>
+                <div style={{ height: 7, borderRadius: 9, background: "#e5e7eb", overflow: "hidden", marginTop: 7 }}><div style={{ width: `${Math.min(100, Number(minijobStatus.auslastungProzent ?? 0))}%`, height: "100%", background: minijobStatus.ueberschritten ? "#dc2626" : "#4a8c3f" }} /></div>
+              </div>
+            )}
             {[
               { label: "Vorname", key: "vorname" },
               { label: "Nachname", key: "nachname" },
