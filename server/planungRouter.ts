@@ -28,6 +28,7 @@ import { TRPCError } from "@trpc/server";
 import { router } from "./_core/trpc";
 import { portalProtected, roleProcedure } from "./portalAuth";
 import { liegtImPlanungsfenster } from "./mitarbeiterAblauf";
+import { berechneAbrechnungszeitraum } from "../shared/abrechnungsZeitraum";
 import {
   createAuditLog,
   createNotification,
@@ -295,10 +296,9 @@ async function pruefeTermin(
 
   // 6. Minijob-Grenze des Mitarbeiters
   const mitarbeiterDatensatz = await getMitarbeiterById(eingabe.mitarbeiterId);
-  const monat = monatsSchluessel(eingabe.datum);
   const bisherigeLohnkosten = await getMonatsLohnkosten({
     mitarbeiterId: eingabe.mitarbeiterId,
-    monat,
+    referenzDatum: eingabe.datum,
     ohneEinsatzId: optionen.bearbeiteterEinsatzId ?? null,
   });
   const minijob = pruefeMinijobGrenze({
@@ -513,14 +513,15 @@ export const planungRouter = router({
 
       // Auslastung je Mitarbeiter im betroffenen Monat
       const monat = monatsSchluessel(von);
+      const abrechnungszeitraum = berechneAbrechnungszeitraum(von);
       const lohnkosten = alleSehen
-        ? await getMonatsLohnkostenAlle(monat)
+        ? await getMonatsLohnkostenAlle(von)
         : [
             {
               mitarbeiterId: ctx.mitarbeiterId,
               name: `${ctx.portalMitarbeiter.vorname} ${ctx.portalMitarbeiter.nachname}`,
               beschaeftigungsart: ctx.portalMitarbeiter.beschaeftigungsart ?? null,
-              lohnkosten: await getMonatsLohnkosten({ mitarbeiterId: ctx.mitarbeiterId, monat }),
+              lohnkosten: await getMonatsLohnkosten({ mitarbeiterId: ctx.mitarbeiterId, referenzDatum: von }),
               stunden: 0,
             },
           ];
@@ -548,6 +549,7 @@ export const planungRouter = router({
         bis,
         ansicht: input.ansicht,
         monat,
+        abrechnungszeitraum,
         termine,
         abwesenheiten,
         touren: tourenListe,
@@ -596,20 +598,23 @@ export const planungRouter = router({
           .string()
           .regex(/^\d{4}-\d{2}$/)
           .optional(),
+        referenzDatum: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
       }),
     )
     .query(async ({ input, ctx }) => {
       const zielId = darfAllesSehen(ctx.portalMitarbeiter.rolle)
         ? (input.mitarbeiterId ?? ctx.mitarbeiterId)
         : ctx.mitarbeiterId;
-      const monat = input.monat ?? monatsSchluessel(new Date());
+      const referenzDatum = input.referenzDatum ?? (input.monat ? `${input.monat}-16` : new Date());
+      const abrechnungszeitraum = berechneAbrechnungszeitraum(referenzDatum);
       const [person, bisherigeLohnkosten] = await Promise.all([
         getMitarbeiterById(zielId),
-        getMonatsLohnkosten({ mitarbeiterId: zielId, monat }),
+        getMonatsLohnkosten({ mitarbeiterId: zielId, referenzDatum }),
       ]);
       return {
         mitarbeiterId: zielId,
-        monat,
+        monat: abrechnungszeitraum.von.slice(0, 7),
+        abrechnungszeitraum,
         ...pruefeMinijobGrenze({
           bisherigeLohnkosten,
           beschaeftigungsart: person?.beschaeftigungsart ?? null,
@@ -619,18 +624,19 @@ export const planungRouter = router({
 
   /** Minijob-Auslastung aller Mitarbeiter (Teamleitung/Admin/Buchhaltung). */
   minijobUebersicht: planungLesen
-    .input(z.object({ monat: z.string().regex(/^\d{4}-\d{2}$/).optional() }).optional())
+    .input(z.object({ monat: z.string().regex(/^\d{4}-\d{2}$/).optional(), referenzDatum: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }).optional())
     .query(async ({ input, ctx }) => {
       if (!darfAllesSehen(ctx.portalMitarbeiter.rolle)) return [];
-      const monat = input?.monat ?? monatsSchluessel(new Date());
-      const alle = await getMonatsLohnkostenAlle(monat);
+      const referenzDatum = input?.referenzDatum ?? (input?.monat ? `${input.monat}-16` : new Date());
+      const abrechnungszeitraum = berechneAbrechnungszeitraum(referenzDatum);
+      const alle = await getMonatsLohnkostenAlle(referenzDatum);
       return alle
         .map((eintrag) => {
           const status = pruefeMinijobGrenze({
             bisherigeLohnkosten: eintrag.lohnkosten,
             beschaeftigungsart: eintrag.beschaeftigungsart,
           });
-          return { ...eintrag, monat, ...status };
+          return { ...eintrag, monat: abrechnungszeitraum.von.slice(0, 7), abrechnungszeitraum, ...status };
         })
         .sort((a, b) => b.lohnkosten - a.lohnkosten);
     }),
@@ -663,7 +669,7 @@ export const planungRouter = router({
       getAbwesenheitenImZeitraum({ von: heute, bis: heute }),
       getTourenImZeitraum({ von: heute, bis: heute, nurMitarbeiterId: filterId }),
       getAbwesenheitenImZeitraum({ von: heute, bis: addTage(heute, 30) }),
-      alleSehen ? getMonatsLohnkostenAlle(monat) : Promise.resolve([]),
+      alleSehen ? getMonatsLohnkostenAlle(heute) : Promise.resolve([]),
       getSatzKonfiguration(),
       getAllMitarbeiter(),
       getWarnungen({ nurOffene: true, mitarbeiterId: alleSehen ? null : ctx.mitarbeiterId, limit: 50 }),

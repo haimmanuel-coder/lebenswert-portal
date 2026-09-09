@@ -17,6 +17,7 @@
 
 import { and, eq, gte, isNull, lte, sql, desc, inArray } from "drizzle-orm";
 import { getDb } from "./db";
+import { berechneAbrechnungszeitraum } from "../shared/abrechnungsZeitraum";
 import {
   einsaetze,
   kunden,
@@ -380,7 +381,7 @@ export async function getAbwesenheitAmTag(
 // ── Lohnkosten / Minijob ────────────────────────────────────────────────────
 
 /**
- * Summiert die Lohnkosten eines Mitarbeiters in einem Monat ("YYYY-MM").
+ * Summiert die Lohnkosten eines Mitarbeiters im Abrechnungszeitraum 16.–15.
  *
  * Berücksichtigt alle nicht abgesagten und nicht gelöschten Einsätze.
  * `ohneEinsatzId` blendet einen Einsatz aus – nötig beim Bearbeiten, damit
@@ -388,13 +389,12 @@ export async function getAbwesenheitAmTag(
  */
 export async function getMonatsLohnkosten(args: {
   mitarbeiterId: number;
-  monat: string;
+  referenzDatum: string | Date;
   ohneEinsatzId?: number | null;
 }): Promise<number> {
   const verbindung = await getDb();
   if (!verbindung) return 0;
-  const von = `${args.monat}-01`;
-  const bis = `${args.monat}-31`;
+  const zeitraum = berechneAbrechnungszeitraum(args.referenzDatum);
   const zeilen = await verbindung
     .select({
       id: einsaetze.id,
@@ -407,8 +407,8 @@ export async function getMonatsLohnkosten(args: {
     .where(
       and(
         eq(einsaetze.mitarbeiterId, args.mitarbeiterId),
-        gte(einsaetze.datum, zuDatumsWert(von)),
-        lte(einsaetze.datum, zuDatumsWert(bis)),
+        gte(einsaetze.datum, zuDatumsWert(zeitraum.von)),
+        lte(einsaetze.datum, zuDatumsWert(zeitraum.bis)),
         isNull(einsaetze.geloeschtAt),
         sql`${einsaetze.status} <> 'abgesagt'`,
       ),
@@ -430,14 +430,13 @@ export async function getMonatsLohnkosten(args: {
   return runde2(summe);
 }
 
-/** Lohnkosten aller Mitarbeiter eines Monats – für Dashboard und Warnliste. */
-export async function getMonatsLohnkostenAlle(monat: string): Promise<
+/** Lohnkosten aller Mitarbeiter im Abrechnungszeitraum 16.–15. – für Dashboard und Warnliste. */
+export async function getMonatsLohnkostenAlle(referenzDatum: string | Date): Promise<
   Array<{ mitarbeiterId: number; name: string; beschaeftigungsart: string | null; lohnkosten: number; stunden: number }>
 > {
   const verbindung = await getDb();
   if (!verbindung) return [];
-  const von = `${monat}-01`;
-  const bis = `${monat}-31`;
+  const zeitraum = berechneAbrechnungszeitraum(referenzDatum);
   const konfiguration = await getSatzKonfiguration();
 
   const alleMitarbeiter = await verbindung
@@ -461,8 +460,8 @@ export async function getMonatsLohnkostenAlle(monat: string): Promise<
     .from(einsaetze)
     .where(
       and(
-        gte(einsaetze.datum, zuDatumsWert(von)),
-        lte(einsaetze.datum, zuDatumsWert(bis)),
+        gte(einsaetze.datum, zuDatumsWert(zeitraum.von)),
+        lte(einsaetze.datum, zuDatumsWert(zeitraum.bis)),
         isNull(einsaetze.geloeschtAt),
         sql`${einsaetze.status} <> 'abgesagt'`,
       ),

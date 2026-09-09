@@ -16,40 +16,18 @@ import { pruefeLeistungsnachweisAbschluss, erstellePflegekassenCsv, erstelleStun
 import { FIRMENDATEN } from "../../shared/firmendaten";
 import JSZip from "jszip";
 import { erstelleSicheresExportpaket, protokolliereSicherenExportversand, sichereExportEmail } from "../secureExportService";
+import { berechneAbrechnungszeitraum } from "../../shared/abrechnungsZeitraum";
 
 // ─── Hilfsfunktionen ────────────────────────────────────────────────────────
 
 /** Berechnet den aktuellen Abrechnungszeitraum (16.–15.) */
 function berechneAktuellenZeitraum(referenz?: Date): { von: Date; bis: Date; label: string } {
-  const heute = referenz ?? new Date();
-  const tag = heute.getDate();
-  const monat = heute.getMonth(); // 0-basiert
-  const jahr = heute.getFullYear();
-
-  let vonJahr: number, vonMonat: number;
-  let bisJahr: number, bisMonat: number;
-
-  if (tag >= 16) {
-    // Aktueller Monat: 16. bis 15. des nächsten Monats
-    vonJahr = jahr;
-    vonMonat = monat;
-    bisJahr = monat === 11 ? jahr + 1 : jahr;
-    bisMonat = monat === 11 ? 0 : monat + 1;
-  } else {
-    // Wir sind vor dem 16.: Vormonat 16. bis 15. dieses Monats
-    vonJahr = monat === 0 ? jahr - 1 : jahr;
-    vonMonat = monat === 0 ? 11 : monat - 1;
-    bisJahr = jahr;
-    bisMonat = monat;
-  }
-
-  const von = new Date(vonJahr, vonMonat, 16);
-  const bis = new Date(bisJahr, bisMonat, 15);
-
-  const monate = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
-  const label = `${String(von.getDate()).padStart(2, "0")}.${monate[von.getMonth()]} ${von.getFullYear()} – ${String(bis.getDate()).padStart(2, "0")}.${monate[bis.getMonth()]} ${bis.getFullYear()}`;
-
-  return { von, bis, label };
+  const zeitraum = berechneAbrechnungszeitraum(referenz ?? new Date());
+  return {
+    von: new Date(`${zeitraum.von}T12:00:00`),
+    bis: new Date(`${zeitraum.bis}T12:00:00`),
+    label: zeitraum.label,
+  };
 }
 
 /** Formatiert ein Datum als YYYY-MM-DD */
