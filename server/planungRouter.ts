@@ -31,10 +31,12 @@ import { liegtImPlanungsfenster } from "./mitarbeiterAblauf";
 import {
   createAuditLog,
   createNotification,
+  ergaenzeKundenMitBetreuungsteam,
   getAllMitarbeiter,
+  getKundenByMitarbeiter,
   getKundeById,
   getMitarbeiterById,
-  getZuordnungenForMitarbeiter,
+  isMitarbeiterZugeordnet,
 } from "./db";
 import {
   aktualisierePlanungsEinsatz,
@@ -425,6 +427,22 @@ export const planungRouter = router({
       }));
   }),
 
+  /**
+   * Kunden, die der im Terminformular gewählten Betreuungskraft zugeteilt sind.
+   * Die Filterung liegt absichtlich auf dem Server: Die Oberfläche darf nie
+   * selbst entscheiden, welche vertraulichen Kunden angezeigt werden.
+   */
+  kundenFuerMitarbeiter: planungLesen
+    .input(z.object({ mitarbeiterId: z.number().int().positive().optional() }).optional())
+    .query(async ({ input, ctx }) => {
+      const zielMitarbeiterId = input?.mitarbeiterId ?? ctx.mitarbeiterId;
+      if (!darfAllesSehen(ctx.portalMitarbeiter.rolle) && zielMitarbeiterId !== ctx.mitarbeiterId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Mitarbeiter dürfen nur ihre zugeordneten Kunden einsehen." });
+      }
+      const zugeordneteKunden = await getKundenByMitarbeiter(zielMitarbeiterId);
+      return ergaenzeKundenMitBetreuungsteam(zugeordneteKunden);
+    }),
+
   /** Ändert einen Verrechnungssatz (nur Admin). */
   setzeSatz: roleProcedure(["admin"])
     .input(
@@ -787,6 +805,12 @@ export const planungRouter = router({
    * Warnungen live während der Planung erscheinen – nicht erst beim Speichern.
    */
   pruefe: planungLesen.input(terminEingabeSchema).query(async ({ input, ctx }) => {
+    if (!darfAllesSehen(ctx.portalMitarbeiter.rolle) && input.mitarbeiterId !== ctx.mitarbeiterId) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Mitarbeiter dürfen nur eigene Termine prüfen." });
+    }
+    if (!await isMitarbeiterZugeordnet(input.mitarbeiterId, input.kundenId)) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Der Kunde ist diesem Mitarbeiter nicht zugeordnet." });
+    }
     const ergebnis = await pruefeTermin(input, {
       istAdmin: ctx.portalMitarbeiter.rolle === "admin",
     });
@@ -804,6 +828,12 @@ export const planungRouter = router({
     .input(terminEingabeSchema.extend({ id: z.number().int().positive() }))
     .query(async ({ input, ctx }) => {
       const { id, ...rest } = input;
+      if (!darfAllesSehen(ctx.portalMitarbeiter.rolle) && rest.mitarbeiterId !== ctx.mitarbeiterId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Mitarbeiter dürfen nur eigene Termine prüfen." });
+      }
+      if (!await isMitarbeiterZugeordnet(rest.mitarbeiterId, rest.kundenId)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Der Kunde ist diesem Mitarbeiter nicht zugeordnet." });
+      }
       const ergebnis = await pruefeTermin(rest, {
         bearbeiteterEinsatzId: id,
         istAdmin: ctx.portalMitarbeiter.rolle === "admin",
@@ -820,6 +850,9 @@ export const planungRouter = router({
 
   /** Legt einen geplanten Termin an und bucht das Budget. */
   erstelle: planungLesen.input(terminEingabeSchema).mutation(async ({ input, ctx }) => {
+    if (ctx.portalMitarbeiter.rolle === "buchhaltung") {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Die Rolle Buchhaltung darf keine Termine planen." });
+    }
     const darfAllePlanen = darfAllesSehen(ctx.portalMitarbeiter.rolle);
     if (!darfAllePlanen) {
       if (input.mitarbeiterId !== ctx.mitarbeiterId) {
@@ -829,13 +862,12 @@ export const planungRouter = router({
       if (!liegtImPlanungsfenster(input.datum, heute)) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Eigene Termine können nur für die kommenden 14 Tage geplant werden." });
       }
-      const zuordnungen = await getZuordnungenForMitarbeiter(ctx.mitarbeiterId);
-      if (!zuordnungen.some((zuordnung: { kundenId: number }) => zuordnung.kundenId === input.kundenId)) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Eigene Termine dürfen nur für zugewiesene Kunden geplant werden.",
-        });
-      }
+    }
+    if (!await isMitarbeiterZugeordnet(input.mitarbeiterId, input.kundenId)) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Termine dürfen nur für Kunden geplant werden, die dem Mitarbeiter zugeordnet sind.",
+      });
     }
     const istAdmin = ctx.portalMitarbeiter.rolle === "admin";
     const pruefung = await pruefeTermin(input, { istAdmin });
@@ -940,6 +972,9 @@ export const planungRouter = router({
     .input(terminEingabeSchema.extend({ id: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {
       const { id, ...eingabe } = input;
+      if (ctx.portalMitarbeiter.rolle === "buchhaltung") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Die Rolle Buchhaltung darf keine Termine ändern." });
+      }
       const alt = await getEinsatzById(id);
       if (!alt) throw new TRPCError({ code: "NOT_FOUND", message: "Termin nicht gefunden." });
       const darfAllePlanen = darfAllesSehen(ctx.portalMitarbeiter.rolle);
@@ -951,6 +986,12 @@ export const planungRouter = router({
         if (!liegtImPlanungsfenster(eingabe.datum, heute)) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Eigene Termine können nur innerhalb der kommenden 14 Tage geändert werden." });
         }
+      }
+      if (!await isMitarbeiterZugeordnet(eingabe.mitarbeiterId, eingabe.kundenId)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Termine dürfen nur für Kunden geplant werden, die dem Mitarbeiter zugeordnet sind.",
+        });
       }
       if (alt.status === "abgeschlossen" && ctx.portalMitarbeiter.rolle !== "admin") {
         throw new TRPCError({

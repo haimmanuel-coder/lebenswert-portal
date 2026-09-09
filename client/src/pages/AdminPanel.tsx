@@ -12,6 +12,7 @@ import LohnkostenTab from "./LohnkostenTab";
 import OnboardingTab from "./OnboardingTab";
 import CsvImportTab from "./CsvImportTab";
 import KundenCsvImportTab from "./KundenCsvImportTab";
+import MitteilungenAdminTab from "./MitteilungenAdminTab";
 import EinstellungenTab from "./EinstellungenTab";
 import SmtpKonfiguration from "./SmtpKonfiguration";
 import { useState, useEffect, useRef } from "react";
@@ -25,7 +26,7 @@ import BottomSheet from "@/components/BottomSheet";
 import PasswordInput from "@/components/PasswordInput";
 import MitarbeiterDetail from "./MitarbeiterDetail";
 
-type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo" | "preise" | "sicherheit" | "fuehrerschein" | "compliance" | "compliance-gesamt" | "arbeitssicherheit" | "as-dashboard" | "unterschriften-archiv" | "lohnkosten" | "onboarding" | "csv-import" | "kunden-import" | "einstellungen" | "smtp" | "systemstatus";
+type AdminTab = "mitarbeiter" | "kunden" | "zuordnung" | "abschluss" | "vorlagen" | "dsgvo" | "preise" | "sicherheit" | "fuehrerschein" | "compliance" | "compliance-gesamt" | "arbeitssicherheit" | "as-dashboard" | "unterschriften-archiv" | "lohnkosten" | "onboarding" | "csv-import" | "kunden-import" | "mitteilungen" | "einstellungen" | "smtp" | "systemstatus";
 type PortalRolle = "mitarbeiter" | "teamleitung" | "buchhaltung" | "admin";
 type Zugangskarte = { id?: number; vorname: string; nachname: string; email: string; rolle?: string; startpasswort: string };
 
@@ -230,6 +231,21 @@ export default function AdminPanel() {
     onSuccess: (data: any) => { const karten = data.karten ?? []; if (karten.length === 0) { direktDruckAngefordert.current = false; toast.error("Es wurden keine Zugangskarten erstellt."); return; } setZugangskarten(karten); refetchMa(); if (direktDruckAngefordert.current) { direktDruckAngefordert.current = false; setAutoDruckKarten(karten); } else { setZugangskartenDialog(true); } toast.success(`${karten.length} Zugangskarten wurden erstellt. Bitte jetzt anzeigen oder drucken.`); },
     onError: (e: any) => { direktDruckAngefordert.current = false; toast.error("❌ Zugangskarten konnten nicht erstellt werden: " + e.message); },
   });
+  const zugangskartenPdfAbruf = (trpc as any).admin.aktuelleZugangskartenPdf.useQuery(undefined, { enabled: false, retry: false });
+  const ladeGeschuetzteZugangskartenPdf = async () => {
+    const ergebnis = await zugangskartenPdfAbruf.refetch();
+    const pdf = ergebnis.data;
+    if (!pdf) { toast.error("Es liegt noch keine geschützte Zugangskarten-PDF vor."); return; }
+    if (ergebnis.error || !pdf.downloadUrl) { toast.error(`PDF konnte nicht bereitgestellt werden: ${ergebnis.error?.message ?? "Unbekannter Fehler"}`); return; }
+    const link = document.createElement("a");
+    link.href = pdf.downloadUrl;
+    link.download = pdf.dateiname;
+    link.rel = "noopener";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    toast.success(`${pdf.kartenAnzahl} Zugangskarten werden heruntergeladen. Der Link gilt 60 Minuten.`);
+  };
   const druckeZugangskarten = async (kartenZumDruck = zugangskarten) => {
     if (kartenZumDruck.length === 0) { toast.error("Es liegen keine druckbereiten Zugangskarten vor."); return; }
     const esc = (wert: string) => wert.replace(/[&<>'"]/g, zeichen => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[zeichen] ?? zeichen));
@@ -466,6 +482,7 @@ export default function AdminPanel() {
           { key: "onboarding" as AdminTab, label: "🎯 Onboarding" },
           { key: "csv-import" as AdminTab, label: "📥 CSV-Import" },
           { key: "kunden-import" as AdminTab, label: "🏠 Kunden-Import" },
+          { key: "mitteilungen" as AdminTab, label: "📢 Mitteilungen" },
           { key: "einstellungen" as AdminTab, label: "⚙️ Einstellungen" },
           { key: "smtp" as AdminTab, label: "📧 SMTP / E-Mail" },
           { key: "systemstatus" as AdminTab, label: "🖥️ Systemstatus" },
@@ -519,6 +536,7 @@ export default function AdminPanel() {
                 <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Passwörter werden aus Sicherheitsgründen nicht angezeigt oder dauerhaft gespeichert.</div>
               </div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                <button data-testid="geschuetzte-zugangskarten-pdf" onClick={() => void ladeGeschuetzteZugangskartenPdf()} disabled={zugangskartenPdfAbruf.isFetching} title="Die zuletzt ausgestellte Zugangskarten-PDF per zeitlich begrenztem Admin-Link herunterladen" style={{ padding: "6px 10px", background: "#1d4ed8", color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 800, cursor: "pointer", opacity: zugangskartenPdfAbruf.isFetching ? .7 : 1 }}>{zugangskartenPdfAbruf.isFetching ? "PDF wird vorbereitet …" : "🔒 Aktuelle PDF herunterladen"}</button>
                 <button onClick={() => { if (druckbareZugangskartenMitarbeiter.length === 0) { toast.error("Keine aktiven Mitarbeiter in der aktuellen Auswahl."); return; } starteDirektdruck(druckbareZugangskartenMitarbeiter.map(ma => ma.id), `${druckbareZugangskartenMitarbeiter.length} aktive sichtbare Mitarbeiter`); }} disabled={startpasswoerterErstellen.isPending} style={{ padding: "6px 10px", background: "#7c3aed", color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 800, cursor: "pointer", opacity: startpasswoerterErstellen.isPending ? .7 : 1 }}>🖨️ Sichtbare Karten direkt drucken</button>
                 {zugangskarten.length > 0 && <button onClick={() => druckeZugangskarten()} title="Aktuell erzeugte Zugangskarten im A4-Ausschneideformat drucken" style={{ padding: "6px 10px", background: "#4a8c3f", color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>🖨️ {zugangskarten.length} Karten drucken</button>}
                 <button onClick={() => setZeigeZugangskartenTabelle(v => !v)} style={{ padding: "6px 10px", background: "#fff", color: "#334155", border: "1px solid #cbd5e1", borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{zeigeZugangskartenTabelle ? "Ausblenden" : "Anzeigen"}</button>
@@ -1168,6 +1186,9 @@ export default function AdminPanel() {
       )}
       {tab === "kunden-import" && (
         <KundenCsvImportTab />
+      )}
+      {tab === "mitteilungen" && (
+        <MitteilungenAdminTab />
       )}
 
       {/* ── EINSTELLUNGEN ── */}

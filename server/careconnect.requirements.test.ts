@@ -6,7 +6,8 @@ const lese = (pfad: string) => readFileSync(new URL(pfad, import.meta.url), "utf
 describe("CareConnect-Anforderungen", () => {
   it("sichert zugewiesene Kunden auch gegen einen manipulierten Planungsaufruf ab", () => {
     const router = lese("./planungRouter.ts");
-    expect(router).toContain("Eigene Termine dürfen nur für zugewiesene Kunden geplant werden.");
+    expect(router).toContain("Termine dürfen nur für Kunden geplant werden, die dem Mitarbeiter zugeordnet sind.");
+    expect(router).toContain("isMitarbeiterZugeordnet(input.mitarbeiterId, input.kundenId)");
   });
 
   it("verwendet in beiden Mitteilungsoberflächen den tatsächlichen Serververtrag", () => {

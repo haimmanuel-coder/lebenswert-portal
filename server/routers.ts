@@ -16,22 +16,39 @@ function entferneGesundheitsdaten<T extends Record<string, any>>(einsatz: T): T 
   return rest as T;
 }
 
+const KANONISCHE_PORTAL_URL = "https://lebensnahhub-ppxappev.manus.space";
+const ERLAUBTE_PORTAL_ORIGINS = new Set([
+  KANONISCHE_PORTAL_URL,
+  "https://portal.lebenswert-betreuung.de",
+]);
+
+function ermittleSicherePortalUrl(req: { headers?: Record<string, unknown> }): string {
+  const origin = typeof req.headers?.origin === "string" ? req.headers.origin.replace(/\/$/, "") : "";
+  return ERLAUBTE_PORTAL_ORIGINS.has(origin) ? origin : KANONISCHE_PORTAL_URL;
+}
+
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { sql, eq, desc, and, isNotNull, lte, isNull } from "drizzle-orm";
 import { getDb } from "./db";
+import { entschluessleKundenGesundheitsdaten } from "./sensitiveFieldEncryption";
 import { ermittleErsteHilfeStatus } from "./complianceUtils";
 import { bereiteEinsatzUebernahmeVor } from "./mitarbeiterAblauf";
 import { pruefeLeistungsnachweisAbschluss } from "./monatsabschlussService";
 import { generiereEinmaligesStartpasswort, waehleDruckbareMitarbeiter } from "./accessCredentials";
+import { erstelleEinzelneZugangskarte, ZugangskarteValidierungsfehler } from "./accessCardPdfService";
 import { pruefeSicheresPasswort, SICHERES_PASSWORT_HINWEIS, startPasswortLaeuftAb } from "../shared/passwordPolicy";
 import { istAbgeschlossenerStartzugang } from "../shared/erstlogin";
 import { berechneUrlaubsverbrauch, berechneZeitanteiligenJahresurlaub, normalisiereArbeitstage, type Wochentag } from "../shared/urlaubsLogik";
 import { normalisiereBundesland } from "../shared/planungsLogik";
 import { erstellePersonalaktenHistorienCsv } from "../shared/personalaktenExport";
-import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, mitarbeiterArbeitsmuster, urlaubsantraege, einsatzAenderungen, kunden as kundenTable, notifications as notificationsTable, ersteHilfeKurse, mitarbeiterBerechtigungen as mbTable, besuchsberichte, fahrten } from "../drizzle/schema";
+import { ermittleMitarbeiterDokumentMimeType, pruefeMitarbeiterDokumentUpload } from "./mitarbeiterDokumentUpload";
+import { storageGetSignedUrl } from "./storage";
+import { erfassePortalVersuch, loeschePortalVersuche, pruefePortalRateLimit } from "./portalRateLimit";
+import { berechneKundenParagraphenAuswertung } from "./betreuungsAuswertung";
+import { einsaetze as einsaetzeTable, mitarbeiterDokumente, vertretungen, mitarbeiter, mitarbeiterArbeitsmuster, urlaubsantraege, einsatzAenderungen, kunden as kundenTable, notifications as notificationsTable, ersteHilfeKurse, mitarbeiterBerechtigungen as mbTable, besuchsberichte, fahrten, zugangskartenPdfAusgaben, jahresbudgets } from "../drizzle/schema";
 import {
   getMitarbeiterByEmail,
   getMitarbeiterById,
@@ -40,10 +57,12 @@ import {
   updateMitarbeiter,
   deleteMitarbeiter,
   getAllKunden,
+  getKundenPaginiert,
   getKundeById,
   createKunde,
   updateKunde,
   getKundenByMitarbeiter,
+  ergaenzeKundenMitBetreuungsteam,
   getEinsatzById,
   getEinsaetzeMitAusstehenderFreigabe,
   setUnterschriftFreigabe,
@@ -68,8 +87,10 @@ import {
   getAllFahrten,
   getFahrtenByKunde,
   getFahrtenByMonat,
+  getFahrtById,
   createFahrt,
   updateFahrtStatus,
+  softDeleteFahrt,
   createAuditLog,
   getAuditLogs,
   getMonatsabschluesse,
@@ -124,7 +145,7 @@ import { pflichtenheftRouter } from "./pflichtenheftRouter";
 import { planungRouter } from "./planungRouter";
 import { VAPID_PUBLIC, sendBudgetWarnungPush } from "./webpush";
 import { twoFactorRouter } from "./routers/twoFactorRouter";
-import { sendEmail, buildSteuerberaterEmail } from "./emailService";
+import { sendEmail, buildPasswortResetEmail, buildSteuerberaterEmail } from "./emailService";
 import { verschluesseleSecret } from "./secretEncryption";
 import { datenschutzRouter } from "./routers/datenschutzRouter";
 import { verfuegbarkeitenRouter } from "./routers/verfuegbarkeitenRouter";
@@ -607,8 +628,8 @@ export const notificationsRouter = router({
   ),
   markRead: portalProtected
     .input(z.object({ id: z.number().int().positive() }))
-    .mutation(async ({ input }) => {
-      await markNotificationRead(input.id);
+    .mutation(async ({ input, ctx }) => {
+      await markNotificationRead(input.id, ctx.mitarbeiterId);
       return { success: true };
     }),
   markAllRead: portalProtected.mutation(async ({ ctx }) => {
@@ -648,35 +669,64 @@ const mitarbeiterakteRouter = router({
     .query(async ({ input, ctx }) => {
       const db = await getDb();
       const targetId = input.mitarbeiterId ?? ctx.mitarbeiterId;
+      const angemeldeterMitarbeiter = await getMitarbeiterById(ctx.mitarbeiterId);
+      if (targetId !== ctx.mitarbeiterId && angemeldeterMitarbeiter?.rolle !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Mitarbeiter dürfen nur ihre eigenen Dokumente einsehen." });
+      }
       return db!.select().from(mitarbeiterDokumente)
         .where(eq(mitarbeiterDokumente.mitarbeiterId, targetId))
         .orderBy(desc(mitarbeiterDokumente.createdAt));
     }),
   addDokument: portalProtected
     .input(z.object({
-      mitarbeiterId: z.number().int().positive().optional(),
       typ: z.enum(["zertifikat", "arbeitsvertrag", "krankmeldung", "fuehrerschein", "erstehilfe", "sonstiges"]),
       bezeichnung: z.string().min(1).max(255),
-      dateiUrl: z.string().optional(),
       dateiname: z.string().optional(),
+      base64: z.string().optional(),
+      mimeType: z.string().optional(),
       ausstellungsdatum: z.string().optional(),
       ablaufdatum: z.string().optional(),
       notizen: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      const targetId = input.mitarbeiterId ?? ctx.mitarbeiterId;
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (Boolean(input.base64) !== Boolean(input.mimeType)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Datei und Dateityp müssen gemeinsam übermittelt werden." });
+      }
+      let dateiUrl: string | undefined;
+      let dateiname: string | undefined;
+      if (input.base64 && input.mimeType) {
+        if (!input.dateiname) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Der Dateiname fehlt." });
+        }
+        let mimeType: string;
+        let buffer: Buffer;
+        try {
+          mimeType = ermittleMitarbeiterDokumentMimeType(input.dateiname, input.mimeType);
+          buffer = pruefeMitarbeiterDokumentUpload(input.base64, mimeType, input.dateiname);
+        } catch (error: any) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+        }
+        const { storagePut } = await import("./storage.js");
+        const sichererDateiname = input.dateiname.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const key = `mitarbeiter-dokumente/ma-${ctx.mitarbeiterId}/${Date.now()}-${sichererDateiname}`;
+        const gespeichert = await storagePut(key, buffer, mimeType);
+        dateiUrl = gespeichert.url;
+        dateiname = input.dateiname;
+      }
       await db!.insert(mitarbeiterDokumente).values({
-        mitarbeiterId: targetId,
+        mitarbeiterId: ctx.mitarbeiterId,
         typ: input.typ,
         bezeichnung: input.bezeichnung,
-        dateiUrl: input.dateiUrl,
-        dateiname: input.dateiname,
+        dateiUrl,
+        dateiname,
         ausstellungsdatum: input.ausstellungsdatum ? new Date(input.ausstellungsdatum) : undefined,
         ablaufdatum: input.ablaufdatum ? new Date(input.ablaufdatum) : undefined,
         notizen: input.notizen,
         hochgeladenVon: ctx.mitarbeiterId,
       });
+      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "CREATE", ressource: "mitarbeiterdokument", details: `selfupload typ=${input.typ}`, status: "success" });
       return { success: true };
     }),
   deleteDokument: portalProtected
@@ -692,18 +742,6 @@ const mitarbeiterakteRouter = router({
       }
       await db!.delete(mitarbeiterDokumente).where(eq(mitarbeiterDokumente.id, input.id));
       return { success: true };
-    }),
-  // Self-Service: Upload-URL für eigene Dokumente generieren
-  getUploadUrl: portalProtected
-    .input(z.object({
-      dateiname: z.string().min(1),
-      contentType: z.string().default('application/pdf'),
-    }))
-    .mutation(async ({ input, ctx }) => {
-      const { storagePut } = await import('./storage');
-      const key = `mitarbeiter-dokumente/ma-${ctx.mitarbeiterId}/${Date.now()}-${input.dateiname}`;
-      const { url } = await storagePut(key, Buffer.from(''), input.contentType);
-      return { uploadUrl: url, key };
     }),
 });
 
@@ -1315,10 +1353,16 @@ export const appRouter = router({
     login: publicProcedure
       .input(z.object({ email: z.string().email(), passwort: z.string().min(1), otp: z.string().regex(/^\d{6}$/).optional() }))
       .mutation(async ({ input, ctx }) => {
+        const email = input.email.trim().toLowerCase();
+        pruefePortalRateLimit("login", ctx.req, email);
         const ma = await getMitarbeiterByEmail(input.email);
-        if (!ma || !ma.aktiv) throw new Error("E-Mail oder Passwort ungültig.");
+        if (!ma || !ma.aktiv) {
+          erfassePortalVersuch("login", ctx.req, email);
+          throw new Error("E-Mail oder Passwort ungültig.");
+        }
         const valid = await bcrypt.compare(input.passwort, ma.passwortHash);
         if (!valid) {
+          erfassePortalVersuch("login", ctx.req, email);
           await createAuditLog({ mitarbeiterId: ma.id, action: "LOGIN", ressource: "portal", status: "failure", details: "Passwortprüfung fehlgeschlagen" });
           throw new Error("E-Mail oder Passwort ungültig.");
         }
@@ -1331,6 +1375,7 @@ export const appRouter = router({
           const secret = decryptSecret(ma.zweiFaktorSecret);
           const totp = new OTPAuth.TOTP({ issuer: "Seniorenassistenz Bernhardt", label: ma.email, algorithm: "SHA1", digits: 6, period: 30, secret: OTPAuth.Secret.fromBase32(secret) });
           if (totp.validate({ token: input.otp, window: 1 }) === null) {
+            erfassePortalVersuch("login", ctx.req, email);
             await createAuditLog({ mitarbeiterId: ma.id, action: "LOGIN_2FA", ressource: "portal", status: "failure" });
             throw new Error("Der Sicherheitscode ist ungültig oder abgelaufen.");
           }
@@ -1340,12 +1385,13 @@ export const appRouter = router({
         ctx.res.cookie(PORTAL_COOKIE, token, {
           httpOnly: true,
           secure: isSecure,
-          sameSite: isSecure ? 'none' : 'lax',
+          sameSite: 'lax',
           path: '/',
-          maxAge: 30 * 24 * 60 * 60 * 1000,
+          maxAge: 12 * 60 * 60 * 1000,
         });
+        loeschePortalVersuche("login", ctx.req, email);
         await createAuditLog({ mitarbeiterId: ma.id, action: ma.zweiFaktorAktiv ? "LOGIN_2FA" : "LOGIN", ressource: "portal", status: "success" });
-        return { requiresTwoFactor: false as const, id: ma.id, vorname: ma.vorname, nachname: ma.nachname, email: ma.email, rolle: ma.rolle, passwortWechselErforderlich: Boolean((ma as any).passwortWechselErforderlich), token };
+        return { requiresTwoFactor: false as const, id: ma.id, vorname: ma.vorname, nachname: ma.nachname, email: ma.email, rolle: ma.rolle, passwortWechselErforderlich: Boolean((ma as any).passwortWechselErforderlich) };
       }),
 
     logout: publicProcedure.mutation(async ({ ctx }) => {
@@ -1367,18 +1413,36 @@ export const appRouter = router({
 
     requestPasswordReset: publicProcedure
       .input(z.object({ email: z.string().email() }))
-      .mutation(async ({ input }) => {
-        const ma = await getMitarbeiterByEmail(input.email.trim().toLowerCase());
-        if (!ma) return { success: true, message: "Falls die E-Mail registriert ist, wurde ein Reset-Link erstellt." };
+      .mutation(async ({ input, ctx }) => {
+        const antwort = { success: true, message: "Falls die E-Mail-Adresse bei uns registriert ist, wurde ein Link zum Zurücksetzen versendet." };
+        const email = input.email.trim().toLowerCase();
+        pruefePortalRateLimit("passwort_reset", ctx.req, email);
+        erfassePortalVersuch("passwort_reset", ctx.req, email);
+        const ma = await getMitarbeiterByEmail(email);
+        if (!ma) return antwort;
         const token = nanoid(64);
         await createPasswordResetToken(ma.id, token);
-        await createAuditLog({ mitarbeiterId: ma.id, action: "PASSWORD_RESET_REQUEST", ressource: "portal", status: "success" });
-        return {
-          success: true,
-          message: "Reset-Link wurde erstellt.",
-          resetToken: token,
-          mitarbeiterName: `${ma.vorname} ${ma.nachname}`,
-        };
+        const portalBasis = ermittleSicherePortalUrl(ctx.req);
+        const link = `${portalBasis}/reset-passwort?token=${encodeURIComponent(token)}`;
+        const versand = await sendEmail({
+          to: ma.email,
+          subject: "Passwort zurücksetzen – Lebenswert Betreuung",
+          html: buildPasswortResetEmail({ name: `${ma.vorname} ${ma.nachname}`, link }),
+        });
+        if (!versand.success) {
+          // Ein nicht zustellbarer Link darf nicht bis zum Ablauf aktiv bleiben.
+          // Die öffentliche Antwort bleibt trotzdem neutral, damit kein Konto
+          // über Fehlerdetails oder Zeitunterschiede ermittelt werden kann.
+          await markPasswordResetTokenUsed(token);
+        }
+        await createAuditLog({
+          mitarbeiterId: ma.id,
+          action: "PASSWORD_RESET_REQUEST",
+          ressource: "portal",
+          details: versand.success ? "Reset-Link per E-Mail versendet" : "Reset-Link angefordert, E-Mail-Versand fehlgeschlagen",
+          status: versand.success ? "success" : "failure",
+        });
+        return antwort;
       }),
 
     validateResetToken: publicProcedure
@@ -1520,12 +1584,27 @@ export const appRouter = router({
     // und tatsächlich zugeordnete Betreuungskräfte beschränkt.
     list: portalProtected.query(async ({ ctx }) => {
       const ma = await getMitarbeiterById(ctx.mitarbeiterId);
-      if (ma?.rolle === "mitarbeiter") return getKundenByMitarbeiter(ctx.mitarbeiterId);
+      if (ma?.rolle === "mitarbeiter") {
+        // Auch bei Mehrfachbetreuung bleibt die Liste auf die tatsächlich
+        // zugeordneten Kunden begrenzt. Namen weiterer Betreuungspersonen
+        // werden nur für diese Kunden zur Einsatzkoordination ergänzt.
+        const kundenListe = await ergaenzeKundenMitBetreuungsteam(await getKundenByMitarbeiter(ctx.mitarbeiterId));
+        await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "READ", ressource: "kunde_liste", details: `anzahl=${kundenListe.length}`, status: "success" });
+        return kundenListe;
+      }
       const alle = await getAllKunden();
-      if (ma?.rolle === "admin") return alle;
-      // Teamleitung und Buchhaltung können Kunden für Disposition bzw.
-      // Abrechnung identifizieren, erhalten jedoch keine Gesundheitsangabe.
-      return alle.map((kunde: any) => ({ ...kunde, pflegegrad: null, pflegegradSeit: null }));
+      if (ma?.rolle === "admin" || ma?.rolle === "buchhaltung") {
+        const kundenListe = await ergaenzeKundenMitBetreuungsteam(alle);
+        await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "READ", ressource: "kunde_liste", details: `anzahl=${kundenListe.length}`, status: "success" });
+        return kundenListe;
+      }
+      // Teamleitung kann Kunden für die Disposition identifizieren, erhält
+      // jedoch keine Gesundheitsangabe.
+      const kundenListe = await ergaenzeKundenMitBetreuungsteam(
+        alle.map((kunde: any) => ({ ...kunde, pflegegrad: null, pflegegradSeit: null })),
+      );
+      await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "READ", ressource: "kunde_liste", details: `anzahl=${kundenListe.length}`, status: "success" });
+      return kundenListe;
     }),
 
     detail: portalProtected
@@ -1539,28 +1618,75 @@ export const appRouter = router({
             throw new TRPCError({ code: "FORBIDDEN", message: "Kein Zugriff auf diesen Kunden – nicht zugewiesen." });
           }
         }
-        const [kunde, eis, leis, fahr] = await Promise.all([
+        const heute = new Date().toISOString().slice(0, 10);
+        const db = await getDb();
+        const [kunde, eis, leis, fahr, aktiveBudgets] = await Promise.all([
           getKundeById(input.id),
           getEinsaetzeByKunde(input.id),
           getLeistungenByKunde(input.id),
           getFahrtenByKunde(input.id),
+          db
+            ? db
+                .select({
+                  kundenId: jahresbudgets.kundenId,
+                  leistungsbereich: jahresbudgets.leistungsbereich,
+                  jahresbudgetCent: jahresbudgets.jahresbudgetCent,
+                  verbrauchtCent: jahresbudgets.verbrauchtCent,
+                  stundensatzCent: jahresbudgets.stundensatzCent,
+                })
+                .from(jahresbudgets)
+                .where(
+                  and(
+                    eq(jahresbudgets.kundenId, input.id),
+                    sql`${jahresbudgets.gueltigAb} <= ${heute}`,
+                    sql`${jahresbudgets.gueltigBis} >= ${heute}`,
+                  ),
+                )
+            : Promise.resolve([]),
         ]);
-        return { kunde, einsaetze: eis, leistungen: leis, fahrten: fahr };
+        await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "READ", ressource: "kunde_detail", details: `kundeId=${input.id}`, status: "success" });
+        return {
+          kunde,
+          einsaetze: eis,
+          leistungen: leis,
+          fahrten: fahr,
+          paragraphenAuswertung: berechneKundenParagraphenAuswertung(eis, aktiveBudgets),
+        };
       }),
 
-    create: adminProcedure
+    create: roleProcedure(["admin", "buchhaltung"])
       .input(z.object({
         vorname: z.string().min(1),
         nachname: z.string().min(1),
         adresse: z.string().optional(),
+        strasse: z.string().optional(),
+        plz: z.string().optional(),
+        ort: z.string().optional(),
         telefon: z.string().optional(),
+        mobil: z.string().optional(),
+        email: z.string().email().optional(),
+        geburtsdatum: z.string().optional(),
         pflegegrad: z.number().int().min(1).max(5).optional(),
         paragraph: z.enum(["45b", "45a", "39", "privat"]).optional(),
+        paragraphen: z.string().optional(),
         kostentraegerId: z.number().int().positive().optional().nullable(),
+        kostentraegerName: z.string().optional(),
         versicherungsnummer: z.string().optional(),
+        beihilfe: z.boolean().optional(),
+        beihilfeProzent: z.number().int().min(0).max(100).optional(),
+        pflegekasseProzent: z.number().int().min(0).max(100).optional(),
+        beihilfeVersicherung: z.string().optional(),
+        beihilfeBemerkungen: z.string().optional(),
+        wunschtag1: z.string().optional(),
+        wunschtag2: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
-        const newId = await createKunde({ ...input, aktiv: 1 });
+        const { geburtsdatum, ...kundenDaten } = input;
+        const newId = await createKunde({
+          ...kundenDaten,
+          geburtsdatum: geburtsdatum ? new Date(geburtsdatum) : undefined,
+          aktiv: 1,
+        } as any);
         // P1: Neukunden-Push an alle Mitarbeiter senden
         if (newId) {
           try { await createNeukundenPushEintraege(newId); } catch (e) { console.warn('[P1] Neukunden-Push fehlgeschlagen:', e); }
@@ -1573,7 +1699,7 @@ export const appRouter = router({
         }
         // DSGVO: Anlage personenbezogener Kundendaten auditieren (greift auch beim CSV-Import,
         // der pro Zeile diese Mutation aufruft).
-        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "CREATE", ressource: "kunde", details: `id=${newId ?? "?"} name=${input.vorname} ${input.nachname}`, status: newId ? "success" : "failure" });
+        await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "CREATE", ressource: "kunde", details: `id=${newId ?? "?"}`, status: newId ? "success" : "failure" });
         return { success: true };
       }),
 
@@ -1665,28 +1791,46 @@ export const appRouter = router({
         return { neu, aktualisiert, fehler, gesamt: input.zeilen.length, ergebnisse };
       }),
 
-    update: adminProcedure
+    update: roleProcedure(["admin", "buchhaltung"])
       .input(z.object({
         id: z.number().int().positive(),
         vorname: z.string().min(1).optional(),
         nachname: z.string().min(1).optional(),
         adresse: z.string().optional(),
+        strasse: z.string().optional(),
+        plz: z.string().optional(),
+        ort: z.string().optional(),
         telefon: z.string().optional(),
+        mobil: z.string().optional(),
+        email: z.string().email().optional(),
+        geburtsdatum: z.string().optional(),
         pflegegrad: z.number().int().min(1).max(5).optional(),
         pflegegradSeit: z.string().nullable().optional(),
         paragraph: z.enum(["45b", "45a", "39", "privat"]).optional(),
+        paragraphen: z.string().optional(),
         aktiv: z.number().int().optional(),
         kostentraegerId: z.number().int().positive().optional().nullable(),
+        kostentraegerName: z.string().optional(),
         versicherungsnummer: z.string().optional(),
+        beihilfe: z.boolean().optional(),
+        beihilfeProzent: z.number().int().min(0).max(100).optional(),
+        pflegekasseProzent: z.number().int().min(0).max(100).optional(),
+        beihilfeVersicherung: z.string().optional(),
+        beihilfeBemerkungen: z.string().optional(),
+        wunschtag1: z.string().optional(),
+        wunschtag2: z.string().optional(),
         vollmachtErteilt: z.boolean().optional(),
         vollmachtDatum: z.string().optional(),
         vollmachtSignatur: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         const { id, ...data } = input;
+        if (ctx.portalMitarbeiter.rolle === "buchhaltung" && data.aktiv !== undefined) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Nur Admins dürfen Kunden aktivieren oder deaktivieren." });
+        }
         await updateKunde(id, data as any);
         // DSGVO: Änderung personenbezogener Kundendaten auditieren.
-        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "UPDATE", ressource: "kunde", details: `id=${id} felder=${Object.keys(data).join(",")}`, status: "success" });
+        await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "UPDATE", ressource: "kunde", details: `id=${id} felder=${Object.keys(data).join(",")}`, status: "success" });
         return { success: true };
       }),
 
@@ -1699,7 +1843,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    updateBudget: adminProcedure
+    updateBudget: roleProcedure(["admin", "buchhaltung"])
       .input(z.object({
         id: z.number().int().positive(),
         budget45b: z.string().optional(),
@@ -1778,15 +1922,33 @@ export const appRouter = router({
         })).max(3, 'Maximal 3 Mitarbeiter pro Kunde erlaubt.'),
       }))
       .mutation(async ({ input, ctx }) => {
-        await setZuordnungenForKunde(input.kundenId, input.zuordnungen, ctx.adminId);
+        const zuordnungsErgebnis = await setZuordnungenForKunde(input.kundenId, input.zuordnungen, ctx.adminId);
+        const kunde = await getKundeById(input.kundenId);
+        const kundenname = [kunde?.vorname, kunde?.nachname].filter(Boolean).join(" ") || "Ein Kunde";
+
+        for (const mitarbeiterId of zuordnungsErgebnis.neueMitarbeiterIds) {
+          try {
+            await createNotification({
+              empfaengerId: mitarbeiterId,
+              titel: "Neue Kundenzuordnung",
+              nachricht: `Sie wurden ${kundenname} neu zugeordnet. Der Kunde steht ab sofort in Ihrer persönlichen Kundenübersicht zur Verfügung.`,
+              typ: "erfolg",
+              linkUrl: "/",
+              gelesen: false,
+            });
+          } catch (error) {
+            // Die erfolgreiche Zuordnung bleibt wirksam; ein temporärer Meldungsfehler darf sie nicht zurückdrehen.
+            console.warn("[Kundenzuordnung] In-App-Benachrichtigung konnte nicht erstellt werden:", { kundenId: input.kundenId, mitarbeiterId });
+          }
+        }
         await createAuditLog({
           mitarbeiterId: ctx.adminId,
           action: 'ADMIN',
           ressource: 'kundenZuordnung',
-          details: `kundenId=${input.kundenId} mitarbeiter=${input.zuordnungen.map(z => z.mitarbeiterId).join(',')}`,
+          details: `kundenId=${input.kundenId} mitarbeiter=${input.zuordnungen.map(z => z.mitarbeiterId).join(',')} neu=${zuordnungsErgebnis.neueMitarbeiterIds.join(',') || 'keine'}`,
           status: 'success',
         });
-        return { success: true };
+        return { success: true, neueBenachrichtigungen: zuordnungsErgebnis.neueMitarbeiterIds.length };
       }),
 
     budgetHistorie: adminProcedure
@@ -1839,12 +2001,20 @@ export const appRouter = router({
     /** Paginierte Kundenliste */
     listPaginiert: portalProtected
       .input(z.object({ seite: z.number().int().min(1).default(1), proSeite: z.number().int().min(5).max(100).default(20) }))
-      .query(async ({ input }) => {
-        const alle = await getAllKunden();
-        const aktive = alle.filter((k: any) => k.aktiv !== 0);
-        const total = aktive.length;
+      .query(async ({ input, ctx }) => {
+        const hatGlobalenKundenzugriff = ["admin", "teamleitung", "buchhaltung"].includes(ctx.portalMitarbeiter.rolle);
+        if (hatGlobalenKundenzugriff) {
+          const result = await getKundenPaginiert(input.seite, input.proSeite);
+          return { ...result, seiten: Math.ceil(result.total / input.proSeite), seite: input.seite };
+        }
+        const zugeordneteKunden = await getKundenByMitarbeiter(ctx.mitarbeiterId);
         const start = (input.seite - 1) * input.proSeite;
-        return { kunden: aktive.slice(start, start + input.proSeite), total, seiten: Math.ceil(total / input.proSeite), seite: input.seite };
+        return {
+          kunden: zugeordneteKunden.slice(start, start + input.proSeite),
+          total: zugeordneteKunden.length,
+          seiten: Math.ceil(zugeordneteKunden.length / input.proSeite),
+          seite: input.seite,
+        };
       }),
 
     export: adminProcedure
@@ -1860,6 +2030,7 @@ export const appRouter = router({
             k.ort,
             k.telefon,
             k.pflegegrad,
+            k.pflegegradVerschluesselt,
             k.paragraph,
             k.aktiv,
             k.createdAt,
@@ -1868,10 +2039,10 @@ export const appRouter = router({
             b45.verbraucht AS verbraucht45b,
             b45.jahresbudget - COALESCE(b45.verbraucht, 0) AS rest45b,
             b39.monatlicheStunden AS stunden39,
-            (SELECT CONCAT(m.vorname, ' ', m.nachname)
-             FROM kunden_zuordnung kz
-             JOIN mitarbeiter m ON m.id = kz.mitarbeiterId
-             WHERE kz.kundenId = k.id AND kz.aktiv = 1
+            (SELECT GROUP_CONCAT(CONCAT(m.vorname, ' ', m.nachname) ORDER BY kz.prioritaet SEPARATOR ', ')
+             FROM kundenZuordnung kz
+             JOIN mitarbeiter m ON m.id = kz.mitarbeiterId AND m.aktiv = 1
+             WHERE kz.kundenId = k.id
              LIMIT 1) AS zugeordneterMitarbeiter
           FROM kunden k
           LEFT JOIN budget_45b b45 ON b45.kundenId = k.id
@@ -1881,14 +2052,14 @@ export const appRouter = router({
         const daten = (rows as any)[0] as Array<{
           id: number; vorname: string; nachname: string;
           strasse: string | null; plz: string | null; ort: string | null;
-          telefon: string | null; pflegegrad: number | null; paragraph: string | null;
+          telefon: string | null; pflegegrad: number | null; pflegegradVerschluesselt: string | null; paragraph: string | null;
           aktiv: number; createdAt: string; notizen: string | null;
           budget45b: number | null; verbraucht45b: number | null; rest45b: number | null;
           stunden39: number | null; zugeordneterMitarbeiter: string | null;
         }>;
         // DSGVO: Massen-Export personenbezogener Kundendaten (inkl. Pflegegrad, Anschrift) auditieren.
         await createAuditLog({ mitarbeiterId: ctx.adminId, action: "EXPORT", ressource: "kunden", details: `kundenliste zeilen=${daten.length}`, status: "success" });
-        return daten;
+        return daten.map((kunde) => entschluessleKundenGesundheitsdaten(kunde));
       }),
 
   }),
@@ -2109,8 +2280,11 @@ export const appRouter = router({
                 const monatLN = e.datum instanceof Date
                   ? e.datum.toISOString().slice(0, 7)
                   : e.datum ? String(e.datum).slice(0, 7) : new Date().toISOString().slice(0, 7);
-                const stunden1 = parseFloat(String(e.dauerStunden ?? 0));
+                // Bei aufgeteilten Einsätzen ist `dauerStunden` die gesamte
+                // Einsatzdauer. Für §1 muss deshalb der explizit gespeicherte
+                // erste Anteil gelten, nicht erneut die Gesamtdauer.
                 const stunden2 = parseFloat(String(e.stunden2 ?? 0));
+                const stunden1 = parseFloat(String(e.stunden1 ?? Math.max(0, parseFloat(String(e.dauerStunden ?? 0)) - stunden2)));
                 const kundeSnapshot = await getKundeById(e.kundenId);
                 const uebernahme = bereiteEinsatzUebernahmeVor({
                   einsatzDatum: e.datum,
@@ -2205,8 +2379,11 @@ export const appRouter = router({
                 const kundeAktuell = await getKundeById(eb.kundenId);
                 if (kundeAktuell) {
                   const budgetUpdate: Record<string, string> = {};
-                  const stunden1 = parseFloat(String(eb.dauerStunden ?? 0));
                   const stunden2 = parseFloat(String((eb as any).stunden2 ?? 0));
+                  // Der erste Anteil ist bei neueren Split-Einsätzen separat
+                  // gespeichert. Für historische Ein-Paragraph-Einsätze wird
+                  // sicher auf die damalige Gesamtdauer zurückgefallen.
+                  const stunden1 = parseFloat(String((eb as any).stunden1 ?? Math.max(0, parseFloat(String(eb.dauerStunden ?? 0)) - stunden2)));
                   // Paragraph 1
                   if (eb.paragraph === '45b' && stunden1 > 0) {
                     const neu = Math.max(0, parseFloat(String((kundeAktuell as any).verbraucht45b ?? 0)) + stunden1);
@@ -2483,8 +2660,13 @@ export const appRouter = router({
     delete: portalProtected
       .input(z.object({ id: z.number().int().positive() }))
       .mutation(async ({ input, ctx }) => {
-        await deleteFahrt(input.id);
-        await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "DELETE", ressource: "fahrt", details: `id=${input.id}`, status: "success" });
+        const fahrt = await getFahrtById(input.id);
+        if (!fahrt) throw new TRPCError({ code: "NOT_FOUND", message: "Fahrt nicht gefunden." });
+        if (fahrt.mitarbeiterId !== ctx.mitarbeiterId && ctx.portalMitarbeiter.rolle !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Sie dürfen nur eigene Fahrten archivieren." });
+        }
+        await softDeleteFahrt(input.id, ctx.mitarbeiterId);
+        await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "DELETE", ressource: "fahrt", details: `id=${input.id} archiviert`, status: "success" });
         return { success: true };
       }),
   }),
@@ -3033,6 +3215,47 @@ export const appRouter = router({
       }
       return { karten, anzahl: karten.length };
     }),
+    /** Neue einzelne Zugangskarte; bisherige Zugangsdaten werden erst nach gesicherter PDF-Ablage abgelöst. */
+    zugangskarteNeuGenerieren: adminProcedure
+      .input(z.object({ mitarbeiterId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await erstelleEinzelneZugangskarte({ mitarbeiterId: input.mitarbeiterId, erstelltVon: ctx.adminId });
+        } catch (error) {
+          if (error instanceof ZugangskarteValidierungsfehler) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+          }
+          console.error("[Zugangskarte] Sichere Einzelausgabe fehlgeschlagen.");
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Die Zugangskarte konnte nicht sicher erstellt werden. Die bisherigen Zugangsdaten wurden nicht verändert.",
+          });
+        }
+      }),
+    /** Die aktuellste Zugangskarten-PDF erhält nur ein angemeldeter Admin als 60-Minuten-Signaturlink. */
+    aktuelleZugangskartenPdf: adminProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Datenbank nicht verfügbar." });
+      const [ausgabe] = await db.select().from(zugangskartenPdfAusgaben)
+        .orderBy(desc(zugangskartenPdfAusgaben.createdAt))
+        .limit(1);
+      if (!ausgabe) return null;
+      const downloadUrl = await storageGetSignedUrl(ausgabe.storageKey);
+      await createAuditLog({
+        mitarbeiterId: ctx.adminId,
+        action: "EXPORT",
+        ressource: "zugangskarten-pdf",
+        details: `abruf ausgabe=${ausgabe.id} karten=${ausgabe.kartenAnzahl}`,
+        status: "success",
+      });
+      return {
+        dateiname: ausgabe.dateiname,
+        kartenAnzahl: ausgabe.kartenAnzahl,
+        erstelltAm: ausgabe.createdAt,
+        downloadUrl,
+        gueltigMinuten: 60,
+      };
+    }),
     /** Mitarbeiterliste als strukturierte Daten für Export */
     mitarbeiterExport: adminProcedure.query(async ({ ctx }) => {
       const allMa = await getAllMitarbeiter();
@@ -3096,6 +3319,47 @@ export const appRouter = router({
         return { success: true };
       }),
 
+    /** Systemrolle und individuelle Ausnahmen gemeinsam, nachvollziehbar speichern. */
+    setRollenKonfiguration: adminProcedure
+      .input(z.object({
+        mitarbeiterId: z.number().int().positive(),
+        rolle: z.enum(["mitarbeiter", "teamleitung", "buchhaltung", "admin"]),
+        berechtigungen: z.array(z.object({
+          modul: z.string().min(1),
+          zugriff: z.enum(["erlaubt", "verweigert"]),
+        })),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const zielMitarbeiter = await getMitarbeiterById(input.mitarbeiterId);
+        if (!zielMitarbeiter) throw new TRPCError({ code: "NOT_FOUND", message: "Mitarbeiter nicht gefunden" });
+        if (input.mitarbeiterId === ctx.adminId && input.rolle !== "admin") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Die eigene Admin-Rolle kann nicht in der laufenden Sitzung entzogen werden." });
+        }
+
+        await db.transaction(async (tx) => {
+          await tx.update(mitarbeiter).set({ rolle: input.rolle }).where(eq(mitarbeiter.id, input.mitarbeiterId));
+          await tx.delete(mbTable).where(eq(mbTable.mitarbeiterId, input.mitarbeiterId));
+          if (input.berechtigungen.length > 0) {
+            await tx.insert(mbTable).values(input.berechtigungen.map((berechtigung) => ({
+              mitarbeiterId: input.mitarbeiterId,
+              modul: berechtigung.modul,
+              zugriff: berechtigung.zugriff,
+              gesetztVonId: ctx.adminId,
+            })));
+          }
+        });
+        await createAuditLog({
+          mitarbeiterId: ctx.adminId,
+          action: "ADMIN",
+          ressource: "rollenvergabe",
+          details: `ma=${input.mitarbeiterId} rolle=${input.rolle} ausnahmen=${input.berechtigungen.length}`,
+          status: "success",
+        });
+        return { success: true, rolle: input.rolle, ausnahmen: input.berechtigungen.length };
+      }),
+
     /** Dokument für beliebigen Mitarbeiter hochladen (Admin) */
     addDokumentAdmin: adminProcedure
       .input(z.object({
@@ -3115,13 +3379,23 @@ export const appRouter = router({
         if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
         let dateiUrl = input.dateiUrl;
         let dateiname = input.dateiname;
+        if (Boolean(input.base64) !== Boolean(input.mimeType)) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Datei und Dateityp müssen gemeinsam übermittelt werden.' });
+        }
         if (input.base64 && input.mimeType) {
           const { storagePut } = await import('./storage.js');
-          const ext = input.mimeType.split('/')[1] ?? 'pdf';
-          const fname = input.dateiname ?? `dokument-${Date.now()}.${ext}`;
+          if (!input.dateiname) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Der Dateiname fehlt.' });
+          let mimeType: string;
+          let buf: Buffer;
+          try {
+            mimeType = ermittleMitarbeiterDokumentMimeType(input.dateiname, input.mimeType);
+            buf = pruefeMitarbeiterDokumentUpload(input.base64, mimeType, input.dateiname);
+          } catch (error: any) {
+            throw new TRPCError({ code: 'BAD_REQUEST', message: error.message });
+          }
+          const fname = input.dateiname;
           const key = `mitarbeiter-dokumente/ma-${input.mitarbeiterId}/${Date.now()}-${fname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-          const buf = Buffer.from(input.base64, 'base64');
-          const res = await storagePut(key, buf, input.mimeType);
+          const res = await storagePut(key, buf, mimeType);
           dateiUrl = res.url;
           dateiname = fname;
         }
@@ -3157,9 +3431,25 @@ export const appRouter = router({
         kundenIds: z.array(z.number().int().positive()),
       }))
       .mutation(async ({ input, ctx }) => {
-        await setKundenZuordnung(input.mitarbeiterId, input.kundenIds);
-        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "ADMIN", ressource: "zuordnung", details: `ma=${input.mitarbeiterId} kunden=${input.kundenIds.join(",")}`, status: "success" });
-        return { success: true };
+        const zuordnungsErgebnis = await setKundenZuordnung(input.mitarbeiterId, input.kundenIds);
+        for (const kundenId of zuordnungsErgebnis.neueKundenIds) {
+          const kunde = await getKundeById(kundenId);
+          const kundenname = [kunde?.vorname, kunde?.nachname].filter(Boolean).join(" ") || "Ein Kunde";
+          try {
+            await createNotification({
+              empfaengerId: input.mitarbeiterId,
+              titel: "Neue Kundenzuordnung",
+              nachricht: `Sie wurden ${kundenname} neu zugeordnet. Der Kunde steht ab sofort in Ihrer persönlichen Kundenübersicht zur Verfügung.`,
+              typ: "erfolg",
+              linkUrl: "/",
+              gelesen: false,
+            });
+          } catch (error) {
+            console.warn("[Kundenzuordnung] In-App-Benachrichtigung konnte nicht erstellt werden:", { kundenId, mitarbeiterId: input.mitarbeiterId });
+          }
+        }
+        await createAuditLog({ mitarbeiterId: ctx.adminId, action: "ADMIN", ressource: "zuordnung", details: `ma=${input.mitarbeiterId} kunden=${input.kundenIds.join(",")} neu=${zuordnungsErgebnis.neueKundenIds.join(",") || "keine"}`, status: "success" });
+        return { success: true, neueBenachrichtigungen: zuordnungsErgebnis.neueKundenIds.length };
       }),
 
     statistik: adminProcedure
@@ -3673,16 +3963,16 @@ export const appRouter = router({
 
   // ── FÜHRERSCHEIN-CHECKS ─────────────────────────────
   fuehrerschein: router({
-    list: portalProcedure.query(async ({ ctx }) => {
-      return getFuehrerscheinChecks(ctx.mitarbeiterId ?? undefined);
+    list: portalProtected.query(async ({ ctx }) => {
+      return getFuehrerscheinChecks(ctx.mitarbeiterId);
     }),
 
     listAll: adminProcedure.query(async () => {
-      const rows = await getFuehrerscheinChecks();
+      const rows = await getFuehrerscheinChecks("alle");
       return (rows as any).rows ?? rows;
     }),
 
-    create: portalProcedure
+    create: portalProtected
       .input(z.object({
         fotoUrl: z.string().optional(),
         fotoKey: z.string().optional(),
@@ -3692,7 +3982,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ input, ctx }) => {
         await createFuehrerscheinCheck({
-          mitarbeiterId: ctx.mitarbeiterId ?? 0,
+          mitarbeiterId: ctx.mitarbeiterId,
           fotoKey: input.fotoKey,
           fotoUrl: input.fotoUrl,
           pruefDatum: input.pruefDatum,
@@ -3775,7 +4065,7 @@ export const appRouter = router({
       return getAllNeukundenaufnahmen();
     }),
 
-    create: portalProcedure
+    create: portalProtected
       .input(z.object({
         vorname: z.string().min(1),
         nachname: z.string().min(1),
@@ -3794,7 +4084,8 @@ export const appRouter = router({
         notizen: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
-        await createNeukundenaufnahme({ ...input, erstelltVon: ctx.mitarbeiterId ?? undefined });
+        await createNeukundenaufnahme({ ...input, erstelltVon: ctx.mitarbeiterId });
+        await createAuditLog({ mitarbeiterId: ctx.mitarbeiterId, action: "CREATE", ressource: "neukundenaufnahme", status: "success" });
         return { success: true };
       }),
 
@@ -3874,6 +4165,7 @@ export const appRouter = router({
       const { getStaleNeukundenPush, eskaliereNeukundenPush } = await import('./db');
       // 24h-Stufe: noch auf Stufe 0 und älter als 24h
       const stale24h = await getStaleNeukundenPush(24 * 60 * 60 * 1000);
+      const admins = (await getAllMitarbeiter()).filter((m: { rolle: string }) => m.rolle === 'admin');
       let eskaliert = 0;
       for (const row of stale24h) {
         const stufe = (row.eskalationsstufe ?? 0) as number;
@@ -3894,8 +4186,6 @@ export const appRouter = router({
         const stufe = (row.eskalationsstufe ?? 0) as number;
         if (stufe === 1) {
           await eskaliereNeukundenPush(row.id, 2);
-          const alleMa = await getAllMitarbeiter();
-          const admins = alleMa.filter((m: { rolle: string }) => m.rolle === 'admin');
           for (const admin of admins) {
             await createNotification({
               empfaengerId: admin.id,
@@ -3950,12 +4240,11 @@ export const appRouter = router({
     bereinigen: adminProcedure.mutation(async ({ ctx }) => {
       const { getAbgelaufeneVertretungen, deaktiviereVertretung } = await import('./db');
       const abgelaufene = await getAbgelaufeneVertretungen();
+      const admins = (await getAllMitarbeiter()).filter((m: { rolle: string }) => m.rolle === 'admin');
       let bereinigt = 0;
       for (const v of abgelaufene) {
         await deaktiviereVertretung(v.id);
         // Admin-Abschluss-Nachricht
-        const alleMa = await getAllMitarbeiter();
-        const admins = alleMa.filter((m: { rolle: string }) => m.rolle === 'admin');
         for (const admin of admins) {
           await createNotification({
             empfaengerId: admin.id,

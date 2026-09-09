@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { router } from "../_core/trpc";
-import { portalProtected, adminProcedure } from "../portalAuth";
+import { portalProtected, adminProcedure, roleProcedure } from "../portalAuth";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
 import {
@@ -13,6 +13,7 @@ import {
   mitarbeiter as mitarbeiterTable,
   fahrten as fahrtenTable,
   leistungen as leistungenTable,
+  jahresbudgets,
 } from "../../drizzle/schema";
 import { eq, desc, sql, gte, and } from "drizzle-orm";
 
@@ -142,7 +143,7 @@ export const analysenRouter = router({
     }),
 
   /** Mitarbeiter-Auslastungsanalyse */
-  mitarbeiterAuslastung: portalProtected.query(async ({ ctx }) => {
+  mitarbeiterAuslastung: roleProcedure(["admin", "teamleitung"]).query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) return [];
     const heute = new Date();
@@ -168,6 +169,55 @@ export const analysenRouter = router({
       };
     });
   }),
+
+  /**
+   * Sachliche Kennzahlen zu Kundenbesuchen und Budgetlage pro Mitarbeiter.
+   * Nur Führungskräfte erhalten die Liste; sie ersetzt keine Leistungs- oder
+   * Verhaltensbewertung einzelner Beschäftigter.
+   */
+  mitarbeiterBetreuungskennzahlen: roleProcedure(["admin", "teamleitung"])
+    .input(z.object({ monat: z.string().regex(/^\d{4}-\d{2}$/).optional() }).optional())
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const monat = input?.monat ?? new Date().toISOString().slice(0, 7);
+      const heute = new Date().toISOString().slice(0, 10);
+      const [personen, monatsEinsaetze, aktiveBudgets] = await Promise.all([
+        db
+          .select({ id: mitarbeiterTable.id, vorname: mitarbeiterTable.vorname, nachname: mitarbeiterTable.nachname })
+          .from(mitarbeiterTable)
+          .where(eq(mitarbeiterTable.aktiv, 1)),
+        db
+          .select({
+            id: einsaetzeTable.id,
+            mitarbeiterId: einsaetzeTable.mitarbeiterId,
+            kundenId: einsaetzeTable.kundenId,
+            status: einsaetzeTable.status,
+            paragraph: einsaetzeTable.paragraph,
+            paragraph2: einsaetzeTable.paragraph2,
+            dauerStunden: einsaetzeTable.dauerStunden,
+            stunden1: einsaetzeTable.stunden1,
+            stunden2: einsaetzeTable.stunden2,
+            kosten1: einsaetzeTable.kosten1,
+            kosten2: einsaetzeTable.kosten2,
+          })
+          .from(einsaetzeTable)
+          .where(and(sql`DATE_FORMAT(${einsaetzeTable.datum}, '%Y-%m') = ${monat}`, sql`${einsaetzeTable.geloeschtAt} IS NULL`)),
+        db
+          .select({
+            kundenId: jahresbudgets.kundenId,
+            leistungsbereich: jahresbudgets.leistungsbereich,
+            jahresbudgetCent: jahresbudgets.jahresbudgetCent,
+            verbrauchtCent: jahresbudgets.verbrauchtCent,
+            stundensatzCent: jahresbudgets.stundensatzCent,
+          })
+          .from(jahresbudgets)
+          .where(and(sql`${jahresbudgets.gueltigAb} <= ${heute}`, sql`${jahresbudgets.gueltigBis} >= ${heute}`)),
+      ]);
+      const { berechneMitarbeiterBetreuungskennzahlen } = await import("../betreuungsAuswertung");
+      return berechneMitarbeiterBetreuungskennzahlen({ mitarbeiter: personen, einsaetze: monatsEinsaetze, budgets: aktiveBudgets })
+        .sort((links, rechts) => links.name.localeCompare(rechts.name, "de"));
+    }),
 
   /** Kundenzuwachs-Analyse */
   kundenzuwachs: portalProtected

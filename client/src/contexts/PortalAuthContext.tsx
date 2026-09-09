@@ -3,12 +3,6 @@ import { trpc } from "@/lib/trpc";
 
 const TOKEN_KEY = "lb_portal_token";
 
-export function getStoredToken(): string | null {
-  try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
-}
-export function setStoredToken(token: string) {
-  try { localStorage.setItem(TOKEN_KEY, token); } catch {}
-}
 export function clearStoredToken() {
   try { localStorage.removeItem(TOKEN_KEY); } catch {}
 }
@@ -41,7 +35,13 @@ export function PortalAuthProvider({ children }: { children: React.ReactNode }) 
     refetchOnMount: true,
   });
 
-  // Abgelaufener oder ungültiger Token – automatisch löschen
+  // Ein möglicher Token aus einer älteren Portalversion wird sofort entfernt.
+  // Die aktuelle Sitzung liegt ausschließlich im httpOnly-Cookie.
+  React.useEffect(() => {
+    clearStoredToken();
+  }, []);
+
+  // Abgelaufener oder ungültiger Cookie-Token – lokale Altlasten entfernen
   React.useEffect(() => {
     if (isError) clearStoredToken();
   }, [isError]);

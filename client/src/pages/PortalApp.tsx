@@ -54,6 +54,8 @@ import BudgetVerwaltung from "./BudgetVerwaltung";
 import FahrtenAbrechnung from "./FahrtenAbrechnung";
 import Privatrechnung from "./Privatrechnung";
 import { NavigationProvider, type SeitenId } from "@/contexts/NavigationContext";
+import { ZurueckNavigation } from "@/components/ZurueckNavigation";
+import { naechsterVerlauf, vorherigeSeite } from "@/lib/portalNavigationHistory";
 
 /**
  * Seitenkennungen werden zentral im NavigationContext gepflegt, damit
@@ -97,6 +99,7 @@ export default function PortalApp() {
   // ── Menü-Suche ───────────────────────────────────────
   const [menuSearch, setMenuSearch] = useState("");
   const [kundenDetailId, setKundenDetailId] = useState<number | null>(null);
+  const [seitenVerlauf, setSeitenVerlauf] = useState<PageId[]>([]);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   const { data: leistungen = [] } = trpc.leistungen.list.useQuery();
@@ -119,6 +122,7 @@ export default function PortalApp() {
   const neukundenPushCount = (neukundenPushOffen as any[]).length;
   const isAdmin = mitarbeiter?.rolle === "admin";
   const isTeamleitung = mitarbeiter?.rolle === "teamleitung";
+  const isBuchhaltung = mitarbeiter?.rolle === "buchhaltung";
   // ── Modul-Berechtigungen: Gesperrte Module aus Navigation ausblenden ──
   const { data: meineBerechtigungen = [] } = (trpc as any).compliance.meineBerechtigungen.useQuery(
     undefined, { enabled: !!mitarbeiter && !isAdmin, staleTime: 60_000 }
@@ -157,21 +161,22 @@ export default function PortalApp() {
   }, [mitarbeiter, startPageSet]);
   const { isOnline, offlineCount } = useOfflineSync();
   const { show: showTour, startTour, closeTour } = useOnboardingTour();
+  const passwortwechselOffen = Boolean(mitarbeiter?.passwortWechselErforderlich);
   useSSENotifications(mitarbeiter?.id);
   // Aufgabe 17: Automatischer Sitzungs-Timeout nach 30 Minuten Inaktivität
   useSessionTimeout(logout, !!mitarbeiter);
   // DSGVO-Erstanmeldungs-Dialog
   const { data: dsgvoCheck } = (trpc.datenschutz as any).checkZustimmung.useQuery(
-    undefined, { enabled: !!mitarbeiter }
+    undefined, { enabled: !!mitarbeiter && !passwortwechselOffen }
   );
   const [dsgvoDialogGeschlossen, setDsgvoDialogGeschlossen] = useState(false);
-  const showDsgvoDialog = !!mitarbeiter && !!dsgvoCheck && dsgvoCheck.required && !dsgvoCheck.zugestimmt && !dsgvoDialogGeschlossen;
+  const showDsgvoDialog = !!mitarbeiter && !passwortwechselOffen && !!dsgvoCheck && dsgvoCheck.required && !dsgvoCheck.zugestimmt && !dsgvoDialogGeschlossen;
   // Pflichtprüfung beim Login: alle aktiven Dokumente ohne Zustimmung
   const { data: offenePflichtDokumente } = (trpc.datenschutz as any).checkPflichtZustimmungen.useQuery(
-    undefined, { enabled: !!mitarbeiter && !showDsgvoDialog }
+    undefined, { enabled: !!mitarbeiter && !passwortwechselOffen && !showDsgvoDialog }
   );
   const [pflichtModalGeschlossen, setPflichtModalGeschlossen] = useState(false);
-  const showPflichtModal = !!mitarbeiter && !showDsgvoDialog && !pflichtModalGeschlossen
+  const showPflichtModal = !!mitarbeiter && !passwortwechselOffen && !showDsgvoDialog && !pflichtModalGeschlossen
     && Array.isArray(offenePflichtDokumente) && (offenePflichtDokumente as any[]).length > 0;
   const initials = mitarbeiter
     ? `${mitarbeiter.vorname?.[0] ?? ""}${mitarbeiter.nachname?.[0] ?? ""}`.toUpperCase()
@@ -184,10 +189,29 @@ export default function PortalApp() {
   }, []);
 
   const navTo = (page: PageId) => {
+    setSeitenVerlauf((verlauf) => naechsterVerlauf(verlauf, activePage, page));
     setKundenDetailId(null);
     setActivePage(page);
     if (isMobile) setSidebarOpen(false);
   };
+
+  const geheZurueck = () => {
+    // Ein geöffnetes Kundendetail gehört zur Kundenliste und schließt sich
+    // deshalb zuerst, ohne den Nutzer aus dem Portal herauszuführen.
+    if (kundenDetailId !== null) {
+      setKundenDetailId(null);
+      return;
+    }
+    const { seite, verbleibenderVerlauf } = vorherigeSeite(seitenVerlauf);
+    setSeitenVerlauf(verbleibenderVerlauf);
+    // Bei einem Direktaufruf ohne Verlauf führt der Pfeil zur passenden
+    // Übersichtsseite, niemals aus der Anwendung heraus.
+    setActivePage(seite ?? (isAdmin || isTeamleitung ? "admindashboard" : "home"));
+    if (isMobile) setSidebarOpen(false);
+  };
+
+  const startSeite: PageId = isAdmin || isTeamleitung ? "admindashboard" : "home";
+  const kannZurueck = kundenDetailId !== null || seitenVerlauf.length > 0 || activePage !== startSeite;
 
   const sections: NavSection[] = [
     // ── 🏠 DASHBOARD ──────────────────────────────────────────────────────
@@ -212,10 +236,12 @@ export default function PortalApp() {
       title: "👥 Kunden",
       items: [
         { id: "kunden", icon: "👥", label: "Kundenliste", badge: warnungen.length > 0 ? warnungen.length : undefined },
-        ...(isAdmin ? [
-          { id: "neukundenaufnahme" as PageId, icon: "➕", label: "Neukundenaufnahme", badge: neukundenPushCount > 0 ? neukundenPushCount : undefined },
-          { id: "pflegekassen" as PageId, icon: "🏥", label: "Pflegekassen", adminOnly: true },
-          { id: "budget" as PageId, icon: "💰", label: "Budgetverwaltung", adminOnly: true },
+        ...(isAdmin || isBuchhaltung ? [
+          ...(isAdmin ? [
+            { id: "neukundenaufnahme" as PageId, icon: "➕", label: "Neukundenaufnahme", badge: neukundenPushCount > 0 ? neukundenPushCount : undefined },
+            { id: "pflegekassen" as PageId, icon: "🏥", label: "Pflegekassen", adminOnly: true },
+          ] : []),
+          { id: "budget" as PageId, icon: "💰", label: "Budgetverwaltung" },
         ] : []),
         ...(isAdmin || isTeamleitung ? [{ id: "privatrechnung" as PageId, icon: "🩺", label: "Kundenbegleitungen", adminOnly: true }] : []),
         { id: "besuchsberichte" as PageId, icon: "📋", label: "Dokumentation" },
@@ -579,9 +605,10 @@ export default function PortalApp() {
               color: "#1a2e1a", fontSize: 22, padding: 4, lineHeight: 1,
             }}>☰</button>
           )}
+          {kannZurueck && <ZurueckNavigation onZurueck={geheZurueck} kompakt={isMobile} />}
           <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
             {!isMobile && <span style={{ fontSize: 12, color: "#9ca3af" }}>Seniorenassistenz Bernhardt /</span>}
-            <span style={{ fontSize: 14, fontWeight: 700, color: "#1f2937" }}>{currentPageLabel}</span>
+            <span data-testid="portal-aktuelle-seite" style={{ fontSize: 14, fontWeight: 700, color: "#1f2937" }}>{currentPageLabel}</span>
           </div>
           {!isOnline && (
             <div style={{ background: "#fef3c7", border: "1px solid #f59e0b", borderRadius: 8, padding: "3px 10px", fontSize: 11, fontWeight: 700, color: "#92400e" }}>
@@ -645,7 +672,7 @@ export default function PortalApp() {
         )}
       </div>
 
-      <OnboardingTour forceShow={showTour} onClose={closeTour} />
+      <OnboardingTour forceShow={showTour && !passwortwechselOffen && !showDsgvoDialog && !showPflichtModal} onClose={closeTour} />
       <PasswortwechselPflichtModal />
       {showDsgvoDialog && <DsgvoErstDialog onClose={() => setDsgvoDialogGeschlossen(true)} />}
       {showPflichtModal && (

@@ -41,7 +41,7 @@ interface Props {
 
 export default function KundenDetail({ kundenId, onBack }: Props) {
   const { data, isLoading } = trpc.kunden.detail.useQuery({ id: kundenId });
-  const [activeTab, setActiveTab] = useState<"uebersicht" | "budget" | "stammdaten">("uebersicht");
+  const [activeTab, setActiveTab] = useState<"uebersicht" | "budget" | "auswertung" | "stammdaten">("uebersicht");
 
   if (isLoading) {
     return (
@@ -55,7 +55,7 @@ export default function KundenDetail({ kundenId, onBack }: Props) {
     return <div style={{ padding: 20, color: "#6b7280" }}>Kunde nicht gefunden.</div>;
   }
 
-  const { kunde, einsaetze, leistungen, fahrten } = data;
+  const { kunde, einsaetze, leistungen, fahrten, paragraphenAuswertung = [] } = data;
   const kundeAny = kunde as Record<string, unknown>;
 
   return (
@@ -124,20 +124,20 @@ export default function KundenDetail({ kundenId, onBack }: Props) {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 16, background: "#f4f6f3", borderRadius: 12, padding: 4 }}>
-        {(["uebersicht", "budget", "stammdaten"] as const).map((t) => (
+      <div style={{ display: "flex", gap: 6, marginBottom: 16, background: "#f4f6f3", borderRadius: 12, padding: 4, overflowX: "auto" }}>
+        {(["uebersicht", "budget", "auswertung", "stammdaten"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setActiveTab(t)}
             style={{
-              flex: 1, padding: "8px 4px", border: "none", borderRadius: 9, cursor: "pointer",
+              flex: "1 0 auto", minWidth: 104, padding: "8px 8px", border: "none", borderRadius: 9, cursor: "pointer",
               fontSize: 11, fontWeight: 700,
               background: activeTab === t ? "#4a8c3f" : "transparent",
               color: activeTab === t ? "#fff" : "#6b7280",
               transition: "all 0.15s",
             }}
           >
-            {t === "uebersicht" ? "📅 Übersicht" : t === "budget" ? "💰 Budget" : "📄 Stammdaten"}
+            {t === "uebersicht" ? "📅 Übersicht" : t === "budget" ? "💰 Budget" : t === "auswertung" ? "📊 Auswertung" : "📄 Stammdaten"}
           </button>
         ))}
       </div>
@@ -280,6 +280,48 @@ export default function KundenDetail({ kundenId, onBack }: Props) {
                 <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>Vers.-Nr.: {kunde.versicherungsnummer}</div>
               )}
             </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB: AUSWERTUNG */}
+      {activeTab === "auswertung" && (
+        <div className="page-enter" data-testid="kunden-paragraphen-auswertung">
+          <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 12, padding: "12px 14px", marginBottom: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#1d4ed8" }}>📊 Stunden &amp; Budget je Paragraph</div>
+            <p style={{ fontSize: 11.5, lineHeight: 1.45, color: "#475569", margin: "5px 0 0" }}>Diese Übersicht zeigt die tatsächlich geplanten und abgeschlossenen Betreuungsstunden. Die Budgetwerte stammen aus dem aktuell hinterlegten Jahresbudget und sind eine Planungshilfe.</p>
+          </div>
+          {paragraphenAuswertung.length === 0 ? (
+            <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 6px rgba(0,0,0,.06)", padding: 18, color: "#6b7280", fontSize: 13 }}>Für diesen Kunden liegen noch keine Auswertungsdaten vor.</div>
+          ) : (
+            paragraphenAuswertung.map((auswertung) => {
+              const color = auswertung.paragraph === "39" ? "#7c3aed" : auswertung.paragraph === "45a" ? "#0891b2" : "#4a8c3f";
+              return (
+                <section key={auswertung.paragraph} style={{ background: "#fff", borderRadius: 14, boxShadow: "0 2px 10px rgba(0,0,0,.08)", padding: 16, marginBottom: 12, borderLeft: `4px solid ${color}` }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: "#1a2e1a" }}>§{auswertung.paragraph} SGB XI</div>
+                      <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>{auswertung.einsaetze} Einsatz{auswertung.einsaetze === 1 ? "" : "e"} berücksichtigt</div>
+                    </div>
+                    {auswertung.hatJahresbudget ? <strong style={{ fontSize: 12, color }}> {auswertung.budgetnutzungProzent}% Budget genutzt</strong> : <span style={{ fontSize: 11, color: "#64748b", textAlign: "right" }}>Kein aktives Jahresbudget hinterlegt</span>}
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8, marginBottom: auswertung.hatJahresbudget ? 12 : 0 }}>
+                    <div style={{ background: "#f8fafc", borderRadius: 9, padding: "9px 10px" }}><div style={{ color: "#64748b", fontSize: 10.5, fontWeight: 700 }}>GEPLANT</div><strong style={{ display: "block", marginTop: 2, color: "#1f2937", fontSize: 17 }}>{auswertung.stundenGeplant.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Std.</strong></div>
+                    <div style={{ background: "#f0fdf4", borderRadius: 9, padding: "9px 10px" }}><div style={{ color: "#166534", fontSize: 10.5, fontWeight: 700 }}>ABGESCHLOSSEN</div><strong style={{ display: "block", marginTop: 2, color: "#166534", fontSize: 17 }}>{auswertung.stundenAbgeschlossen.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Std.</strong></div>
+                  </div>
+                  {auswertung.hatJahresbudget && (
+                    <>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 7, fontSize: 11.5 }}>
+                        <div><span style={{ display: "block", color: "#6b7280", fontSize: 10 }}>Budget</span><strong>{auswertung.jahresbudgetEuro.toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</strong></div>
+                        <div><span style={{ display: "block", color: "#6b7280", fontSize: 10 }}>Verbraucht</span><strong>{auswertung.verbrauchtEuro.toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</strong></div>
+                        <div><span style={{ display: "block", color: "#6b7280", fontSize: 10 }}>Noch frei</span><strong style={{ color: color }}>{auswertung.restbudgetEuro.toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</strong></div>
+                      </div>
+                      <div aria-label={`${auswertung.budgetnutzungProzent}% des Budgets nach Paragraph ${auswertung.paragraph} genutzt`} style={{ marginTop: 10, height: 8, borderRadius: 99, background: "#e5e7eb", overflow: "hidden" }}><div style={{ width: `${auswertung.budgetnutzungProzent}%`, height: "100%", background: color, borderRadius: 99 }} /></div>
+                    </>
+                  )}
+                </section>
+              );
+            })
           )}
         </div>
       )}

@@ -56,17 +56,26 @@ export default function Leistungsnachweise() {
   // tatsächlichen einsaetze-Datensätzen aggregiert.
   const passendeEinsaetze = useMemo(() => {
     if (!kundenId || !monat || !para) return [];
-    return (alleEinsaetze as any[]).filter(
-      (e) =>
-        String(e.kundenId) === kundenId &&
-        e.status === "abgeschlossen" &&
-        typeof e.datum === "string" &&
-        e.datum.slice(0, 7) === monat &&
-        e.paragraph === para
-    );
+    return (alleEinsaetze as any[])
+      .filter(
+        (e) =>
+          String(e.kundenId) === kundenId &&
+          e.status === "abgeschlossen" &&
+          typeof e.datum === "string" &&
+          e.datum.slice(0, 7) === monat,
+      )
+      .flatMap((e) => {
+        const stunden2 = parseFloat(String(e.stunden2 ?? 0)) || 0;
+        const gesamtstunden = parseFloat(String(e.dauerStunden ?? 0)) || 0;
+        const stunden1 = parseFloat(String(e.stunden1 ?? Math.max(0, gesamtstunden - stunden2))) || 0;
+        return [
+          ...(e.paragraph === para ? [{ ...e, anteilStunden: stunden1 }] : []),
+          ...(e.paragraph2 === para && stunden2 > 0 ? [{ ...e, anteilStunden: stunden2 }] : []),
+        ];
+      });
   }, [alleEinsaetze, kundenId, monat, para]);
 
-  const stundenAuto = passendeEinsaetze.reduce((s, e) => s + (parseFloat(String(e.dauerStunden ?? 0)) || 0), 0);
+  const stundenAuto = passendeEinsaetze.reduce((summe, einsatz) => summe + einsatz.anteilStunden, 0);
   const anzahlAuto = passendeEinsaetze.length;
 
   useEffect(() => {
@@ -82,14 +91,7 @@ export default function Leistungsnachweise() {
       setAutoUnterschriftKunde(null);
       return;
     }
-    const einsaetze = (alleEinsaetze as any[]).filter(
-      (e) =>
-        String(e.kundenId) === kundenId &&
-        e.status === "abgeschlossen" &&
-        typeof e.datum === "string" &&
-        e.datum.slice(0, 7) === monat &&
-        e.paragraph === para
-    );
+    const einsaetze = passendeEinsaetze;
     // Neueste Unterschrift des Mitarbeiters aus den Einstätzen nehmen
     const mitSig = einsaetze.find((e) => e.unterschriftMitarbeiter)?.unterschriftMitarbeiter ?? null;
     const kdSig = einsaetze.find((e) => e.unterschriftKunde)?.unterschriftKunde ?? null;
@@ -105,7 +107,7 @@ export default function Leistungsnachweise() {
       setPreviewKunde(kdSig);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kundenId, monat, para, alleEinsaetze.length]);
+  }, [kundenId, monat, para, passendeEinsaetze]);
   const deleteLeistung = trpc.leistungen.delete.useMutation({
     onSuccess: () => { refetch(); toast.success("🗑️ Leistungsnachweis gelöscht"); },
     onError: (e) => toast.error("❌ " + e.message),

@@ -4,7 +4,7 @@
  */
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/_core/hooks/useAuth";
+import { usePortalAuth } from "@/contexts/PortalAuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -49,7 +49,8 @@ const DEFAULT_FORM: BudgetFormData = {
 };
 
 export default function BudgetVerwaltung() {
-  const { user } = useAuth();
+  const { mitarbeiter } = usePortalAuth();
+  const kannBudgetVerwalten = mitarbeiter?.rolle === "admin" || mitarbeiter?.rolle === "buchhaltung";
   const [selectedKundenId, setSelectedKundenId] = useState<number | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<BudgetFormData>(DEFAULT_FORM);
@@ -171,7 +172,7 @@ export default function BudgetVerwaltung() {
         <>
           {/* Aktionsleiste */}
           <div className="flex gap-2 flex-wrap">
-            {user?.role === "admin" && (
+            {kannBudgetVerwalten && (
               <Button onClick={() => setShowForm(true)}>+ Jahresbudget anlegen</Button>
             )}
             <Button variant="outline" onClick={handleKiEmpfehlung}>
@@ -319,7 +320,7 @@ export default function BudgetVerwaltung() {
           )}
 
           {/* Jahresbudgets-Liste (A21, Admin) */}
-          {user?.role === "admin" && (
+          {kannBudgetVerwalten && (
             <div>
               <h2 className="text-lg font-semibold mb-3">Jahresbudgets verwalten</h2>
               {budgetsLoading ? (
@@ -378,7 +379,7 @@ export default function BudgetVerwaltung() {
                               </p>
                             </div>
                           </div>
-                          <Button
+                          {mitarbeiter?.rolle === "admin" && <Button
                             variant="ghost"
                             size="sm"
                             className="text-red-600 hover:text-red-700"
@@ -389,7 +390,7 @@ export default function BudgetVerwaltung() {
                             }}
                           >
                             🗑
-                          </Button>
+                          </Button>}
                         </div>
                       </CardContent>
                     </Card>

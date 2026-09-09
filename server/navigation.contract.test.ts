@@ -56,4 +56,12 @@ describe("Navigationsvertrag", () => {
     ].map((pfad) => readFileSync(resolve(process.cwd(), pfad), "utf8"));
     dashboards.forEach((quelle) => expect(quelle).toContain("Admin-Dashboard ·"));
   });
+
+  it("stellt auf allen zentral gerenderten Unterseiten denselben internen Rückweg bereit", () => {
+    expect(portalApp).toContain('import { ZurueckNavigation } from "@/components/ZurueckNavigation"');
+    expect(portalApp).toContain("const geheZurueck = () =>");
+    expect(portalApp).toContain("const kannZurueck =");
+    expect(portalApp).toContain("{kannZurueck && <ZurueckNavigation onZurueck={geheZurueck}");
+    expect(portalApp).not.toContain("window.history.back()");
+  });
 });

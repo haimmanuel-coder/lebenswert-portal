@@ -10,5 +10,8 @@ describe("Personalaktenexport-Vertrag", () => {
     expect(router).toContain('ressource: "personalakte_arbeitsmuster_urlaub"');
     expect(ui).toContain("export.personalaktenHistorie.useQuery");
     expect(ui).toContain("exportPersonalakte.refetch()");
+    expect(ui).toContain("CSV jetzt herunterladen");
+    expect(ui).toContain("Datei bereit:");
+    expect(ui).toContain("document.body.appendChild(link)");
   });
 });

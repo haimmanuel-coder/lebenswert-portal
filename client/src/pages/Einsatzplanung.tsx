@@ -104,7 +104,6 @@ export default function Einsatzplanung() {
     mitarbeiterId: filterMitarbeiterId,
   });
 
-  const { data: kunden = [] } = trpc.kunden.list.useQuery();
   const { data: feiertagsEinstellung } = (trpc as any).einstellungen.urlaubsBundesland.useQuery();
   const bundesland = feiertagsEinstellung?.bundesland ?? "DE";
   // Eigene Planungsroute: liefert der Teamleitung nur die Basisangaben,
@@ -115,11 +114,31 @@ export default function Einsatzplanung() {
   const darfLoeschen = Boolean(planung?.rechte?.darfLoeschen);
   const darfAlleSehen = Boolean(planung?.rechte?.darfAlleSehen);
 
-  const kundenOptionen = useMemo(() => kundenZuOptionen(kunden as any[]), [kunden]);
+  const zielMitarbeiterId = formular.mitarbeiterId ?? undefined;
+  const {
+    data: zugeordneteKunden,
+    isLoading: kundenLaden,
+  } = (trpc as any).planung.kundenFuerMitarbeiter.useQuery(
+    { mitarbeiterId: zielMitarbeiterId },
+    { enabled: formularOffen && Boolean(zielMitarbeiterId) },
+  );
+  const kundenOptionen = useMemo(
+    () => kundenZuOptionen(zugeordneteKunden as any[] | undefined),
+    [zugeordneteKunden],
+  );
   const mitarbeiterOptionen = useMemo(
     () => mitarbeiterZuOptionen(alleMitarbeiter as any[], getMitarbeiterFarbe),
     [alleMitarbeiter],
   );
+
+  // Wechselt die Planerin oder der Planer den Mitarbeiter, wird ein zuvor
+  // ausgewählter Kunde nur dann behalten, wenn dessen Zuordnung weiterhin gilt.
+  useEffect(() => {
+    if (!formularOffen || !formular.kundenId || !zugeordneteKunden) return;
+    if (!(zugeordneteKunden as any[]).some((kunde) => Number(kunde.id) === formular.kundenId)) {
+      setFormular((vorher) => ({ ...vorher, kundenId: null }));
+    }
+  }, [formularOffen, formular.kundenId, zugeordneteKunden]);
 
   // ── Live-Prüfung des Formulars ───────────────────────────────────────────
   // Wird bei jeder Eingabe neu ausgeführt, damit Warnungen während der
@@ -284,11 +303,13 @@ export default function Einsatzplanung() {
 
   // Bei Wechsel des zweiten Paragraphen sinnvolle Stundenaufteilung vorschlagen
   useEffect(() => {
-    if (!formular.paragraph2) return;
-    if (formular.stunden2 > 0) return;
-    const gesamt = berechneStunden(formular.startzeit, formular.endzeit) ?? 0;
-    if (gesamt > 0) {
-      setFormular((f) => ({ ...f, stunden2: Math.round((gesamt / 2) * 100) / 100 }));
+  if (!formular.paragraph2) return;
+  if (formular.stunden2 > 0) return;
+  const gesamt = berechneStunden(formular.startzeit, formular.endzeit) ?? 0;
+    if (gesamt > 0.25) {
+      // Verständliche Voreinstellung für den häufigen Fall: 2,0 Std. §39
+      // und 0,5 Std. §45b bei einem Einsatz von 2,5 Stunden.
+      setFormular((f) => ({ ...f, stunden2: Math.min(0.5, Math.round((gesamt - 0.25) * 100) / 100) }));
     }
     // Nur beim Aktivieren des zweiten Paragraphen einen Vorschlag machen.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -477,10 +498,7 @@ export default function Einsatzplanung() {
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {heutigeTermine.map((t: any) => {
-                const kunde = (kunden as any[]).find((k: any) => k.id === t.kundenId);
-                const kundeName = kunde
-                  ? `${kunde.vorname ?? ""} ${kunde.nachname ?? ""}`.trim()
-                  : `Kunde #${t.kundenId}`;
+                const kundeName = String(t.kundenName ?? "").trim() || `Kunde #${t.kundenId}`;
                 const sf = STATUS_FARBEN[t.status] ?? STATUS_FARBEN.geplant;
                 return (
                   <div key={t.id} style={{
@@ -733,8 +751,8 @@ export default function Einsatzplanung() {
                       >
                         {termin.startzeit}–{termin.endzeit} · {termin.kundenName}
                       </div>
-                      <div style={{ fontSize: 10.5, color: "#4b5563", marginTop: 2 }}>
-                        {termin.mitarbeiterName}
+                      <div style={{ fontSize: 10.5, color: "#4b5563", marginTop: 2 }} data-testid={`termin-betreuung-${termin.id}`}>
+                        Aktuell eingeteilt: {termin.mitarbeiterName}
                       </div>
                       <div
                         style={{
@@ -876,13 +894,14 @@ export default function Einsatzplanung() {
           formular={formular}
           setFormular={setFormular}
           kundenOptionen={kundenOptionen}
+          kundenLaden={kundenLaden}
           mitarbeiterOptionen={mitarbeiterOptionen}
           berechneteStunden={berechneteStunden}
           pruefung={pruefung}
           pruefungLaeuft={pruefungLaeuft}
           uebersteuern={uebersteuern}
           setUebersteuern={setUebersteuern}
-          istAdmin={mitarbeiter?.rolle === "admin"}
+          istAdmin={darfAlleSehen && darfPlanen}
           speichert={erstellen.isPending || aktualisieren.isPending}
           onSpeichern={speichern}
           onAbbrechen={() => {
@@ -954,6 +973,7 @@ type AssistentProps = {
   formular: FormularZustand;
   setFormular: React.Dispatch<React.SetStateAction<FormularZustand>>;
   kundenOptionen: ReturnType<typeof kundenZuOptionen>;
+  kundenLaden: boolean;
   mitarbeiterOptionen: ReturnType<typeof mitarbeiterZuOptionen>;
   berechneteStunden: number | null;
   pruefung: any;
@@ -971,6 +991,7 @@ function TerminAssistent({
   formular,
   setFormular,
   kundenOptionen,
+  kundenLaden,
   mitarbeiterOptionen,
   berechneteStunden,
   pruefung,
@@ -987,6 +1008,9 @@ function TerminAssistent({
   const warnungen = ((pruefung?.meldungen ?? []) as any[]).filter((m) => m.schwere === "warnung");
   const hinweise = ((pruefung?.meldungen ?? []) as any[]).filter((m) => m.schwere === "hinweis");
   const budgetProblem = blockierend.some((m) => m.code === "budget_nicht_ausreichend");
+  const gesamtstunden = berechneteStunden ?? 0;
+  const zweiterAnteil = formular.paragraph2 ? Math.max(0, formular.stunden2) : 0;
+  const ersterAnteil = Math.max(0, gesamtstunden - zweiterAnteil);
 
   const aendere = <K extends keyof FormularZustand>(feld: K, wert: FormularZustand[K]) =>
     setFormular((f) => ({ ...f, [feld]: wert }));
@@ -1067,12 +1091,16 @@ function TerminAssistent({
           </div>
           <div>
             <label style={feldLabelStil}>Kunde *</label>
+            <div style={{ fontSize: 11, color: "#4b5563", marginBottom: 5 }}>
+              Es werden nur die diesem Mitarbeiter zugeordneten Kunden angezeigt.
+            </div>
             <AuswahlFeld
               optionen={kundenOptionen}
               wert={formular.kundenId}
               onChange={(id) => aendere("kundenId", id)}
               platzhalter="Kunden auswählen …"
               suchPlatzhalter="Name, Ort, Versicherungsnummer …"
+              laedt={kundenLaden}
               pflicht
             />
           </div>
@@ -1128,65 +1156,74 @@ function TerminAssistent({
           </div>
         </div>
 
-        {/* Paragraph 1 & 2 */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12, marginBottom: 14 }}>
-          <div>
-            <label style={feldLabelStil}>Abrechnungsparagraph *</label>
-            <select
-              value={formular.paragraph}
-              onChange={(e) => aendere("paragraph", e.target.value as Paragraph)}
-              style={eingabeStil}
-            >
-              <option value="45b">§45b – Entlastungsbetrag</option>
-              <option value="45a">§45a – Alltagsbegleitung</option>
-              <option value="39">§39 – Verhinderungspflege</option>
-            </select>
+        {/* Paragraphenaufteilung */}
+        <section data-testid="paragraphenaufteilung" style={{ background: "#f8fafc", border: "1px solid #dbe4ee", borderRadius: 12, padding: 12, marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 9, marginBottom: 12 }}>
+            <span aria-hidden="true" style={{ display: "grid", placeItems: "center", width: 28, height: 28, flexShrink: 0, borderRadius: 8, background: "#e8f5e4", fontSize: 15 }}>§</span>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: "#173a1a" }}>Abrechnung aufteilen</div>
+              <div style={{ marginTop: 2, fontSize: 11.5, lineHeight: 1.4, color: "#64748b" }}>Bei Bedarf kann ein Einsatz auf zwei Paragraphen verteilt werden. Die Summe bleibt immer genau so lang wie der geplante Einsatz.</div>
+            </div>
           </div>
-          <div>
-            <label style={feldLabelStil}>
-              Zweiter Paragraph
-              <span style={{ fontWeight: 400, color: "#9ca3af", textTransform: "none" }}> (optional)</span>
-            </label>
-            <select
-              value={formular.paragraph2 ?? ""}
-              onChange={(e) =>
-                setFormular((f) => ({
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12 }}>
+            <div>
+              <label style={feldLabelStil}>Teil 1 · Paragraph *</label>
+              <select
+                aria-label="Erster Abrechnungsparagraph"
+                value={formular.paragraph}
+                onChange={(e) => setFormular((f) => ({
                   ...f,
-                  paragraph2: (e.target.value || null) as Paragraph | null,
-                  stunden2: e.target.value ? f.stunden2 : 0,
-                }))
-              }
-              style={eingabeStil}
-            >
-              <option value="">– kein zweiter Paragraph –</option>
-              {(["45b", "45a", "39"] as Paragraph[])
-                .filter((p) => p !== formular.paragraph)
-                .map((p) => (
-                  <option key={p} value={p}>
-                    §{p}
-                  </option>
-                ))}
-            </select>
+                  paragraph: e.target.value as Paragraph,
+                  paragraph2: f.paragraph2 === e.target.value ? null : f.paragraph2,
+                  stunden2: f.paragraph2 === e.target.value ? 0 : f.stunden2,
+                }))}
+                style={eingabeStil}
+              >
+                <option value="45b">§45b – Entlastungsbetrag</option>
+                <option value="45a">§45a – Alltagsbegleitung</option>
+                <option value="39">§39 – Verhinderungspflege</option>
+              </select>
+              <div style={{ fontSize: 11, color: "#475569", marginTop: 5, fontWeight: 700 }}>Automatisch: {formatStunden(ersterAnteil)}</div>
+            </div>
+            <div>
+              <label style={feldLabelStil}>Teil 2 · Paragraph <span style={{ fontWeight: 400, color: "#64748b", textTransform: "none" }}>(optional)</span></label>
+              <select
+                data-testid="paragraphenaufteilung-zweiter-paragraph"
+                aria-label="Zweiter Abrechnungsparagraph"
+                value={formular.paragraph2 ?? ""}
+                onChange={(e) => setFormular((f) => ({ ...f, paragraph2: (e.target.value || null) as Paragraph | null, stunden2: e.target.value ? f.stunden2 : 0 }))}
+                style={eingabeStil}
+              >
+                <option value="">– keine Aufteilung –</option>
+                {(["45b", "45a", "39"] as Paragraph[]).filter((p) => p !== formular.paragraph).map((p) => <option key={p} value={p}>§{p}</option>)}
+              </select>
+            </div>
+            {formular.paragraph2 && (
+              <div>
+                <label style={feldLabelStil}>Stunden über §{formular.paragraph2} *</label>
+                <input
+                  data-testid="paragraphenaufteilung-zweiter-anteil"
+                  type="number"
+                  min={0.25}
+                  max={Math.max(0.25, gesamtstunden - 0.01)}
+                  step={0.25}
+                  value={formular.stunden2}
+                  onChange={(e) => aendere("stunden2", parseFloat(e.target.value) || 0)}
+                  style={eingabeStil}
+                />
+                <div style={{ fontSize: 10.5, color: "#6b7280", marginTop: 3 }}>Rest automatisch über §{formular.paragraph}: {formatStunden(ersterAnteil)}</div>
+              </div>
+            )}
           </div>
           {formular.paragraph2 && (
-            <div>
-              <label style={feldLabelStil}>Stunden über §{formular.paragraph2}</label>
-              <input
-                type="number"
-                min={0}
-                max={berechneteStunden ?? 24}
-                step={0.25}
-                value={formular.stunden2}
-                onChange={(e) => aendere("stunden2", parseFloat(e.target.value) || 0)}
-                style={eingabeStil}
-              />
-              <div style={{ fontSize: 10.5, color: "#6b7280", marginTop: 3 }}>
-                Rest über §{formular.paragraph}:{" "}
-                {formatStunden(Math.max(0, (berechneteStunden ?? 0) - formular.stunden2))}
-              </div>
+            <div data-testid="paragraphenaufteilung-summe" style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 7, marginTop: 12, padding: "9px 10px", background: "#fff", border: "1px solid #dbe4ee", borderRadius: 9, fontSize: 11.5 }}>
+              <strong style={{ color: "#166534" }}>§{formular.paragraph}: {formatStunden(ersterAnteil)}</strong>
+              <span aria-hidden="true" style={{ color: "#94a3b8", fontWeight: 800 }}>+</span>
+              <strong style={{ color: "#6d28d9", textAlign: "right" }}>§{formular.paragraph2}: {formatStunden(zweiterAnteil)}</strong>
+              <div style={{ gridColumn: "1 / -1", borderTop: "1px solid #e2e8f0", paddingTop: 7, color: "#475569" }}>Gesamt: <strong>{formatStunden(ersterAnteil + zweiterAnteil)}</strong> von {formatStunden(gesamtstunden)} Einsatzzeit</div>
             </div>
           )}
-        </div>
+        </section>
 
         {/* Budgetvorschau */}
         {pruefung?.budgetVorschau?.length > 0 && (

@@ -1,16 +1,19 @@
 import { usePortalAuth } from "@/contexts/PortalAuthContext";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { useState, useRef } from "react";
+import { useMemo, useState, useRef } from "react";
 import MitteilungenWidget from "@/components/MitteilungenWidget";
 
 /** A5: Prioritäts-Mitteilungen-Bereich */
 function MitteilungenBereich() {
   const utils = trpc.useUtils();
   const { data: mitteilungen = [] } = (trpc as any).system.getMitteilungen?.useQuery?.() ?? { data: [] };
-  const { data: notifData } = (trpc as any).notifications?.list?.useQuery?.() ?? {};
+  const { data: notifData } = (trpc as any).notifications?.list?.useQuery?.(undefined, {
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
+  }) ?? {};
   const notifs: any[] = notifData ?? [];
-  const ungelesen = notifs.filter((n: any) => !n.gelesenAt);
+  const ungelesen = notifs.filter((n: any) => !n.gelesen);
   const markRead = (trpc as any).notifications?.markRead?.useMutation?.({ onSuccess: () => (utils as any).notifications?.list?.invalidate?.() });
   const markAllRead = (trpc as any).notifications?.markAllRead?.useMutation?.({ onSuccess: () => (utils as any).notifications?.list?.invalidate?.() });
   if (ungelesen.length === 0) return null;
@@ -20,17 +23,148 @@ function MitteilungenBereich() {
         <span>🔔 Mitteilungen <span style={{ background: "#ef4444", color: "#fff", borderRadius: 20, padding: "2px 7px", fontSize: 11, fontWeight: 800, marginLeft: 6 }}>{ungelesen.length}</span></span>
         <button onClick={() => markAllRead?.mutate?.()} disabled={markAllRead?.isPending} style={{ fontSize: 11, color: "#6b7280", background: "none", border: "none", cursor: markAllRead?.isPending ? "wait" : "pointer", opacity: markAllRead?.isPending ? 0.6 : 1 }}>Alle gelesen</button>
       </div>
-      {ungelesen.slice(0, 5).map((n: any) => (
-        <div key={n.id} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 0", borderBottom: "1px solid #f3f4f6" }}>
-          <span style={{ fontSize: 16, flexShrink: 0 }}>{n.typ === "warnung" ? "⚠️" : n.typ === "fehler" ? "❌" : "📋"}</span>
+      <div aria-live="polite">
+      {ungelesen.slice(0, 5).map((n: any) => {
+        const istNeueZuweisung = n.titel === "Neue Kundenzuordnung";
+        return (
+        <div key={n.id} data-testid={istNeueZuweisung ? "neue-kundenzuweisung-hinweis" : undefined} className={istNeueZuweisung ? "neue-kundenzuweisung-hinweis" : undefined} role={istNeueZuweisung ? "status" : undefined} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 10px", borderBottom: "1px solid #f3f4f6", background: istNeueZuweisung ? "#f0fdf4" : "transparent", borderRadius: istNeueZuweisung ? 8 : 0 }}>
+          <span style={{ fontSize: 16, flexShrink: 0 }}>{n.typ === "warnung" ? "⚠️" : n.typ === "fehler" ? "❌" : n.typ === "erfolg" ? "✅" : "📋"}</span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: n.typ === "warnung" ? "#b45309" : n.typ === "fehler" ? "#dc2626" : "#111827" }}>{n.titel}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: n.typ === "warnung" ? "#b45309" : n.typ === "fehler" ? "#dc2626" : n.typ === "erfolg" ? "#166534" : "#111827" }}>{n.titel}</div>
             <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{n.nachricht}</div>
           </div>
           {markRead && <button onClick={() => markRead.mutate({ id: n.id })} style={{ fontSize: 10, color: "#4a8c3f", background: "none", border: "none", cursor: "pointer", flexShrink: 0 }}>✓</button>}
         </div>
-      ))}
+        );
+      })}
+      </div>
     </div>
+  );
+}
+
+type DashboardKunde = {
+  id: number;
+  vorname?: string | null;
+  nachname?: string | null;
+  strasse?: string | null;
+  plz?: string | null;
+  ort?: string | null;
+  pflegegrad?: number | string | null;
+  paragraph?: string | null;
+  paragraphen?: string | string[] | null;
+  betreuungsteamText?: string | null;
+};
+
+type KundenTermin = {
+  datum: string;
+  startzeit?: string | null;
+};
+
+function holeParagraphen(kunde: DashboardKunde): string[] {
+  if (Array.isArray(kunde.paragraphen)) return kunde.paragraphen.map(String).filter(Boolean);
+  if (typeof kunde.paragraphen === "string") {
+    try {
+      const parsed = JSON.parse(kunde.paragraphen);
+      if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean);
+    } catch { /* Der Einzelwert wird unten als Fallback verwendet. */ }
+  }
+  return kunde.paragraph ? [String(kunde.paragraph)] : [];
+}
+
+function MeineKundenKarte({ kunden, laedt, navigiere, naechsteTermine }: { kunden: DashboardKunde[]; laedt: boolean; navigiere: (ziel: SeitenId) => void; naechsteTermine: Map<number, KundenTermin> }) {
+  const [suche, setSuche] = useState("");
+  const [paragraphFilter, setParagraphFilter] = useState("alle");
+  const [sortierung, setSortierung] = useState<"naechsterTermin" | "name">("naechsterTermin");
+  const paragraphen = useMemo(() => Array.from(new Set(kunden.flatMap(holeParagraphen))).sort(), [kunden]);
+  const gefilterteKunden = useMemo(() => {
+    const suchtext = suche.trim().toLocaleLowerCase("de-DE");
+    return kunden.filter((kunde) => {
+      const nameUndOrt = `${kunde.vorname ?? ""} ${kunde.nachname ?? ""} ${kunde.ort ?? ""}`.toLocaleLowerCase("de-DE");
+      const passtSuche = !suchtext || nameUndOrt.includes(suchtext);
+      const passtParagraph = paragraphFilter === "alle" || holeParagraphen(kunde).includes(paragraphFilter);
+      return passtSuche && passtParagraph;
+    });
+  }, [kunden, paragraphFilter, suche]);
+  const sortierteKunden = useMemo(() => [...gefilterteKunden].sort((a, b) => {
+    if (sortierung === "name") {
+      return `${a.nachname ?? ""} ${a.vorname ?? ""}`.localeCompare(`${b.nachname ?? ""} ${b.vorname ?? ""}`, "de-DE");
+    }
+    const terminA = naechsteTermine.get(a.id);
+    const terminB = naechsteTermine.get(b.id);
+    const schluesselA = terminA ? `${terminA.datum}T${String(terminA.startzeit ?? "23:59")}` : "9999-12-31T23:59";
+    const schluesselB = terminB ? `${terminB.datum}T${String(terminB.startzeit ?? "23:59")}` : "9999-12-31T23:59";
+    return schluesselA.localeCompare(schluesselB, "de-DE") || `${a.nachname ?? ""} ${a.vorname ?? ""}`.localeCompare(`${b.nachname ?? ""} ${b.vorname ?? ""}`, "de-DE");
+  }), [gefilterteKunden, naechsteTermine, sortierung]);
+
+  return (
+    <section aria-labelledby="meine-kunden-ueberschrift" style={{ background: "#fff", borderRadius: 14, boxShadow: "0 2px 10px rgba(0,0,0,.08)", padding: 16, marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
+        <div>
+          <h2 id="meine-kunden-ueberschrift" style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>Meine Kunden</h2>
+          <p style={{ fontSize: 12, color: "#6b7280", margin: "3px 0 0" }}>Ihre aktuell zugeteilten Kunden auf einen Blick.</p>
+        </div>
+        <span aria-label={`${kunden.length} zugeteilte Kunden`} style={{ background: "#e8f5e4", color: "#2d6a27", borderRadius: 20, padding: "5px 9px", fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>{kunden.length}</span>
+      </div>
+
+      <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6 }} htmlFor="meine-kunden-suche">Kunden suchen</label>
+      <input
+        id="meine-kunden-suche"
+        value={suche}
+        onChange={(event) => setSuche(event.target.value)}
+        placeholder="Name oder Ort eingeben"
+        style={{ width: "100%", minHeight: 42, boxSizing: "border-box", border: "1px solid #d1d5db", borderRadius: 9, padding: "10px 12px", fontSize: 14, marginBottom: 10 }}
+      />
+
+      <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6 }} htmlFor="meine-kunden-sortierung">Kunden sortieren</label>
+      <select
+        id="meine-kunden-sortierung"
+        value={sortierung}
+        onChange={(event) => setSortierung(event.target.value as "naechsterTermin" | "name")}
+        style={{ width: "100%", minHeight: 42, boxSizing: "border-box", border: "1px solid #d1d5db", borderRadius: 9, padding: "10px 12px", fontSize: 14, background: "#fff", marginBottom: 10 }}
+      >
+        <option value="naechsterTermin">Nächster Termin zuerst</option>
+        <option value="name">Name A–Z</option>
+      </select>
+
+      {paragraphen.length > 1 && (
+        <div aria-label="Nach Abrechnungsparagraph filtern" style={{ display: "flex", gap: 7, overflowX: "auto", paddingBottom: 4, marginBottom: 12 }}>
+          {["alle", ...paragraphen].map((paragraph) => {
+            const aktiv = paragraphFilter === paragraph;
+            return <button key={paragraph} type="button" aria-pressed={aktiv} onClick={() => setParagraphFilter(paragraph)} style={{ border: `1px solid ${aktiv ? "#2d6a27" : "#d1d5db"}`, background: aktiv ? "#e8f5e4" : "#fff", color: aktiv ? "#1f5d1d" : "#374151", padding: "7px 10px", borderRadius: 20, minHeight: 36, fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>{paragraph === "alle" ? "Alle" : `§ ${paragraph}`}</button>;
+          })}
+        </div>
+      )}
+
+      {laedt ? <div style={{ color: "#6b7280", fontSize: 13, padding: "10px 0" }}>Kunden werden geladen …</div> : sortierteKunden.length === 0 ? (
+        <div style={{ border: "1px dashed #d1d5db", borderRadius: 10, padding: 16, textAlign: "center", color: "#6b7280", fontSize: 13 }}>
+          {kunden.length === 0 ? "Ihnen sind aktuell noch keine Kunden zugeteilt." : "Für diese Suche gibt es keinen passenden Kunden."}
+        </div>
+      ) : (
+        <div style={{ display: "grid", gap: 9 }}>
+          {sortierteKunden.map((kunde) => {
+            const paragraphenDesKunden = holeParagraphen(kunde);
+            const naechsterTermin = naechsteTermine.get(kunde.id);
+            return <article key={kunde.id} data-testid="meine-kunden-eintrag" style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 12, background: "#fafff9" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 800, fontSize: 14, color: "#1f2937" }}>{`${kunde.vorname ?? ""} ${kunde.nachname ?? ""}`.trim()}</div>
+                  <div style={{ fontSize: 12, color: "#6b7280", marginTop: 3 }}>{[kunde.strasse, [kunde.plz, kunde.ort].filter(Boolean).join(" ")].filter(Boolean).join(" · ") || "Adresse wird im Kundenprofil gepflegt"}</div>
+                </div>
+                {kunde.pflegegrad !== null && kunde.pflegegrad !== undefined && <span style={{ borderRadius: 12, padding: "4px 7px", fontSize: 11, fontWeight: 800, background: "#eef2ff", color: "#4338ca", whiteSpace: "nowrap" }}>PG {kunde.pflegegrad}</span>}
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 9 }}>
+                {paragraphenDesKunden.map((paragraph) => <span key={paragraph} style={{ background: "#dcfce7", color: "#166534", borderRadius: 12, padding: "3px 7px", fontSize: 10, fontWeight: 800 }}>§ {paragraph}</span>)}
+                {kunde.betreuungsteamText && <span style={{ color: "#4b5563", fontSize: 11 }}>Betreuungsteam: {kunde.betreuungsteamText}</span>}
+              </div>
+              <div style={{ fontSize: 11, color: naechsterTermin ? "#1f5d1d" : "#6b7280", fontWeight: 700, marginTop: 9 }}>
+                {naechsterTermin ? `Nächster Termin: ${fmtDate(naechsterTermin.datum)} · ${String(naechsterTermin.startzeit ?? "–").slice(0, 5)} Uhr` : "Kein kommender Termin geplant"}
+              </div>
+            </article>;
+          })}
+        </div>
+      )}
+      <button type="button" onClick={() => navigiere("planung")} style={{ width: "100%", minHeight: 42, marginTop: 12, border: "1px solid #2d6a27", background: "#fff", color: "#1f5d1d", borderRadius: 9, fontSize: 13, fontWeight: 800, cursor: "pointer" }}>Termine für meine Kunden planen</button>
+    </section>
   );
 }
 import BottomSheet from "@/components/BottomSheet";
@@ -169,7 +303,7 @@ export default function Dashboard() {
   const sigRef = useRef<import("@/components/SignatureCanvas").SignatureCanvasRef>(null);
 
   const { data: einsaetze = [], refetch } = trpc.einsaetze.list.useQuery();
-  const { data: kunden = [] } = trpc.kunden.list.useQuery();
+  const { data: kunden = [], isLoading: kundenLaden } = trpc.kunden.list.useQuery();
   const getKundeName = (id: number) => { const k = kunden.find((c) => c.id === id); return k ? `${k.vorname} ${k.nachname}` : `Kunde #${id}`; };
   const utils = trpc.useUtils();
   const { data: budgetWarnungenRaw = [] } = trpc.kunden.budgetWarnungen.useQuery();
@@ -191,6 +325,18 @@ export default function Dashboard() {
   });
 
   const today = new Date().toISOString().split("T")[0];
+  const naechsteTermineProKunde = useMemo(() => {
+    const termine = new Map<number, KundenTermin>();
+    for (const einsatz of einsaetze) {
+      const datum = typeof einsatz.datum === "string" ? einsatz.datum : (einsatz.datum as Date).toISOString().split("T")[0];
+      if (datum < today || einsatz.status === "abgesagt" || einsatz.status === "abgeschlossen") continue;
+      const bestehend = termine.get(einsatz.kundenId);
+      const neuerSchluessel = `${datum}T${String(einsatz.startzeit ?? "23:59")}`;
+      const alterSchluessel = bestehend ? `${bestehend.datum}T${String(bestehend.startzeit ?? "23:59")}` : "9999-12-31T23:59";
+      if (neuerSchluessel < alterSchluessel) termine.set(einsatz.kundenId, { datum, startzeit: einsatz.startzeit });
+    }
+    return termine;
+  }, [einsaetze, today]);
   const todayE = einsaetze.filter((e) => {
     const d = typeof e.datum === "string" ? e.datum : (e.datum as Date).toISOString().split("T")[0];
     return d === today;
@@ -262,6 +408,8 @@ export default function Dashboard() {
       {/* Arbeitslogik für Mitarbeiter: zuerst alle neuen Informationen, dann planen. */}
       <MitteilungenWidget />
       <MitteilungenBereich />
+
+      {mitarbeiter?.rolle === "mitarbeiter" && <MeineKundenKarte kunden={kunden as DashboardKunde[]} laedt={kundenLaden} navigiere={navigiere} naechsteTermine={naechsteTermineProKunde} />}
 
       {/* KPI */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>

@@ -315,9 +315,10 @@ describe("Validierung der Planungseingabe", () => {
     expect(meldungen.some((m) => m.code === "paragraph2_stunden_fehlen")).toBe(true);
   });
 
-  it("blockiert mehr Zweitstunden als Gesamtdauer", () => {
+  it("blockiert einen zweiten Anteil ohne positiven Rest für den ersten Paragraphen", () => {
     const meldungen = validierePlanungsEingabe({ ...gueltig, paragraph2: "39", stunden2: 5 });
-    expect(meldungen.some((m) => m.code === "paragraph2_stunden_zu_hoch")).toBe(true);
+    expect(meldungen.some((m) => m.code === "paragraph2_anteil_ungueltig")).toBe(true);
+    expect(hatBlockierendeMeldung(meldungen)).toBe(true);
   });
 });
 
@@ -340,6 +341,15 @@ describe("Stundenverteilung auf zwei Paragraphen", () => {
       { paragraph: "45a", stunden: 3 },
       { paragraph: "39", stunden: 1 },
     ]);
+  });
+
+  it("bildet den praxisnahen Split aus 2,0 Stunden §39 und 0,5 Stunden §45b exakt ab", () => {
+    const anteile = verteileStunden({ gesamtStunden: 2.5, paragraph: "39", paragraph2: "45b", stunden2: 0.5 });
+    expect(anteile).toEqual([
+      { paragraph: "39", stunden: 2 },
+      { paragraph: "45b", stunden: 0.5 },
+    ]);
+    expect(anteile.reduce((summe, anteil) => summe + anteil.stunden, 0)).toBe(2.5);
   });
 
   it("begrenzt den zweiten Anteil auf die Gesamtdauer", () => {

@@ -1,25 +1,132 @@
 # Lebenswert Betreuung – Mitarbeiter-Portal TODO
 
 ## Aktuelle Umsetzung – Unterweisung, Erste Hilfe und DSGVO-Startprozess
-- [ ] Railway als alleinigen Live-Betrieb festlegen und Manus nur als Entwicklungs-/Übergabequelle dokumentieren
-- [ ] GitHub-Branch, Mergekonfliktfreiheit und automatischen Railway-Deploypfad für künftige Aktualisierungen verifizieren
-- [ ] GitHub-CI-Prüfung für den Railway-Cron-Schutz ohne produktives Geheimnis stabilisieren
-- [ ] Manus-exklusive Laufzeitabhängigkeiten für den Railway-Betrieb identifizieren und durch sichere Railway-kompatible Alternativen ersetzen oder klar begrenzen
-- [ ] Railway-sicheren Scheduler-Zugang mit separatem Geheimnis und ohne Manus-Cron-Authentifizierung implementieren
-- [ ] Eigenständigen Railway-Cron-Starter für alle neun wiederkehrenden Aufgaben und nachvollziehbare UTC-Zeitpläne bereitstellen
-- [ ] Railway-Betriebsanleitung mit Variablen, Datenbank-/Dateiablage, Cron-Diensten und Domainumschaltung erstellen
-- [ ] Einfachen, sicheren Updateablauf „Entwicklung → GitHub → Railway“ für künftige Änderungen dokumentieren
-- [ ] Railway-Zielprojekt, GitHub-Repository und vorhandene Zielressourcen für die App-Übernahme prüfen
-- [ ] Sichtbaren persönlichen Railway-Zugriff für die kontrollierte Projektübernahme herstellen
-- [ ] Manus-gebundene Dienste, Umgebungsvariablen und geplante Aufgaben für einen Railway-Betrieb inventarisieren
-- [ ] Railway-kompatible Startkonfiguration, Dienstadressen und Produktionsdokumentation vorbereiten
-- [ ] Verbliebene Merge-Konfliktmarkierungen vor jeder externen Bereitstellung auflösen und Projekt erneut vollständig prüfen
-- [ ] Produktionsdatenbank sowie Dateiablage sicher für den Railway-Betrieb anbinden und validieren
-- [ ] Neun wiederkehrende Systemaufgaben auf einen Railway-kompatiblen Scheduler übertragen und idempotent absichern
-- [ ] Anwendung auf Railway bereitstellen, Admin-Login testen und die Custom Domain erst nach erfolgreichem Test umstellen
-- [ ] Öffentliche Produktionsdomain auf nicht sichtbare Loginoberfläche und Wartungsseite prüfen
-- [ ] Ursache für die nicht erreichbare Loginoberfläche beheben und korrekten öffentlichen Domainzugang wiederherstellen
-- [ ] Produktionslogin und den Admin-Testweg nach der Korrektur browsergestützt verifizieren
+- [x] Dokumenten-Upload in der Mitarbeiterakte auf fehlende Oberfläche, Rechte und Speicheranbindung prüfen
+- [x] Sicheren Upload für Mitarbeiterdokumente mit Dateiauswahl, Validierung, Fortschrittsanzeige und S3-Verweis in der Mitarbeiterakte wiederherstellen
+- [x] tRPC-Uploadlimit für die zugesagten 10-MB-Dokumente auf die Base64-Größe abstimmen und serverseitig Dateigröße sowie Dateityp absichern
+- [x] Mitarbeiterakten-Upload mit temporärem Dokument, Adminrechten und vollständiger Bereinigung end-to-end prüfen
+- [x] Lokale Netzwerkdiagnose um Maskierung deutscher Passwort-, Mitarbeiter- und Dateifelder ergänzen und auf fehlende Klartextwerte prüfen
+- [x] Rollenvergabe in der Mitarbeiterakte dauerhaft speichern, nach Neuladen korrekt anzeigen und mit einem Admin-Test absichern
+- [x] Buchhaltungsrolle um Budgetverwaltung und Bearbeitung der freigegebenen Kundendaten erweitern und serverseitig durchsetzen
+- [x] Geschütztes PDF mit ausschneidbaren Zugangskarten und aktuellen Einmal-Startpasswörtern für alle aktiven Mitarbeitenden erstellen
+- [x] Zugangskarten-PDF als serverseitig zugriffsgeschützte Admin-Ausgabe hinterlegen und zeitlich begrenzten Abruf absichern
+- [x] Geschützten Zugangskarten-PDF-Abruf im Admin-Workflow sichtbar einbinden und gegen unbefugte Rollen testen
+- [x] Geschützten Zugangskarten-PDF-Download im echten Admin-Browser bis zum sichtbaren Button end-to-end prüfen
+- [x] Browser- und HTTP-Test ergänzen: Nicht-Admins erhalten weder einen PDF-Abruf noch einen gültigen Signaturlink
+- [x] Öffentliche Domain portal.lebenswert-betreuung.de per DNS, HTTPS und sichtbarer Anmeldeseite gegen die aktive Live-App prüfen
+- [x] App-Verwaltung der aktiven Portal-Website manuell öffnen und den sichtbaren Verknüpfungsstatus der Domain portal.lebenswert-betreuung.de eindeutig bestätigen sowie dokumentieren
+- [x] Terminplanung: Kundenauswahl mit vollständigem Vor- und Nachnamen darstellen und für Mitarbeitende strikt auf zugeordnete Kunden begrenzen
+- [x] Bereitgestellte Sicherheits- und Fehlerbehebungsunterlagen inventarisieren, auf Risiken prüfen und konkrete Maßnahmen ableiten
+- [x] Nach Abgleich mit dem Portal nachvollziehbare Sicherheits- und Fehlerkorrekturen implementieren und automatisiert testen
+- [x] Passwort-Reset ohne Tokenoffenlegung umstellen, neutral beantworten und ausschließlich per SMTP-Link zustellen
+- [x] Sitzungs-JWT aus Browser-Speicher und Login-Antwort entfernen sowie die Gültigkeit des sicheren Cookie-Tokens begrenzen
+- [x] Rate-Limits auf echte tRPC-Pfade ausrichten und führerschein-/Neukunden-Routen serverseitig auf Anmeldung verpflichten
+- [x] Kritische Rechte-, Reset- und Rate-Limitfälle automatisiert absichern und gegen bestehende Portalabläufe prüfen
+- [x] Paginierte Kundenliste rollenbasiert begrenzen, damit Mitarbeitende ausschließlich zugeordnete Kundendaten erhalten
+- [x] Lesezugriffe auf Kundenlisten und Kundendetails datensparsam im Audit-Log protokollieren
+- [x] Wiederholte Mitarbeiterabfragen in Eskalations- und Vertretungsbereinigungsschleifen durch Einmalabfragen ersetzen
+- [x] Kundenzuordnung, Kundenliste und Terminplanung durchgängig prüfen und sicherstellen, dass alle zugeordneten Mitarbeitenden ihre Kunden zuverlässig sehen
+- [x] Alten mitarbeiterbasierten Zuordnungspfad mit dem kundenbasierten Mehrfachzuordnungsmodell vereinheitlichen und Legacy-SQL auf dieselbe Datenquelle umstellen
+- [x] Kern-Fremdschlüssel nach einer fachlich bestätigten Behandlung von 5 verwaisten Kunden- und 6 verwaisten Mitarbeiterverweisen in historischen Einsätzen ergänzen
+- [x] Verschlüsselung ruhender Bank-, Steuer-, Sozial- und Gesundheitsdaten mit einer kontrollierten Datenmigration sowie vollständigen Lese-/Schreibtests einführen
+- [x] Gesundheitsdatenfelder in Mitarbeiter- und Kundenstammdaten vollständig inventarisieren und einschließlich Krankenkasse at-rest verschlüsseln
+- [x] Krankenversicherungsart der Mitarbeiter kontrolliert verschlüsseln und die Klartextspalte nach erfolgreicher Migration leeren
+- [x] Verschlüsselte sensible Felder über Erstellen, Ändern und Lesen mit rückwärtskompatiblen End-to-End-Tests absichern, einschließlich Bank-, Steuer- und Sozialdaten
+- [x] Bank-, Steuer- und Sozialdaten nach einer Änderung direkt auf verschlüsselte Speicherung prüfen und bestehende Klartext-Bestandswerte rückwärtskompatibel im Integrationspfad nachweisen
+- [x] Tatsächliche Anmeldefähigkeit von Frau Schmitz und Frau Wagner mit den neu ausgestellten Einmal-Startpasswörtern kontrolliert prüfen, ohne Passwörter offenzulegen
+- [x] Für Frau Schmitz und Frau Wagner neue Einmal-Startpasswörter ausstellen und zwei geschützte Zugangskarten erzeugen
+- [x] Zugangskarten von Frau Schmitz und Frau Wagner über portal.lebenswert-betreuung.de datensparsam anmelden und beide Loginabläufe prüfen
+- [x] Dashboard-Kundenansicht von Frau Schmitz und Frau Wagner gegen ihre jeweils aktiven Kundenzuordnungen prüfen und fremde Kunden ausschließen
+- [x] Dashboard-Karte „Meine Kunden“ mit vollständig zugeordneten Kunden und datensparsamen Kerninformationen ergänzen
+- [x] Suche und Filter für die persönliche Kundenübersicht im Mitarbeiter-Dashboard umsetzen
+- [x] Sichtbare In-App-Benachrichtigung bei neuer Kundenzuordnung sicher speichern, nur an betroffene Mitarbeiter ausliefern und lesbar bestätigen
+- [x] Kundenkarte, Suche und Zuweisungsbenachrichtigung mit Rollen-, Mobil- und End-to-End-Tests absichern
+- [x] Rollen-Negativtest ergänzen: Admin, Teamleitung und Buchhaltung sehen keine persönliche Mitarbeiterkarte „Meine Kunden“
+- [x] Benachrichtigungs-Negativtest ergänzen: Nur neu betroffene Mitarbeiter erhalten die Meldung „Neue Kundenzuordnung“
+- [x] Nach den Rollen- und Negativtests Kompilierung, gezielten Browsercheck und vollständige Testsuite erneut ausführen
+- [x] Zugang von Frau Schmitz gegen die Suchfunktion „Meine Kunden“ über die öffentliche Portal-Domain prüfen
+- [x] Frau Schmitz automatisiert durch Pflicht-Passwortänderung bis zur nutzbaren Kundensuche führen und dabei keine Zugangsdaten protokollieren
+- [x] Nach dem Suchtest ein neues Einmal-Startpasswort ausstellen, eine neue einzelne Zugangskarte erzeugen und deren Login prüfen
+- [x] Karte „Meine Kunden“ um eine auswählbare Sortierung nach dem nächsten anstehenden Termin ergänzen
+- [x] Neue Kundenzuweisungen mit einer dezenten, barrierearmen In-App-Animation sichtbar hervorheben
+- [x] CSS-Animation für neue Kundenzuweisungen einschließlich reduzierter Bewegung nachweisen und erneut prüfen
+- [x] Login, Suche, Terminsortierung und Animation mobil sowie mit bereinigten Testdaten end-to-end prüfen
+- [x] Erstlogin-Dialog prüfen und beheben: Startpasswort sowie neues persönliches Passwort müssen auf Mobilgeräten und Desktop zuverlässig eingabefähig sein
+- [x] Passwortwechsel für ein temporäres Konto einschließlich Feldfokus, Eingabe und Speichern auf Mobil und Desktop end-to-end testen
+- [x] Live-nahen Fokusblocker im Erstlogin-Dialog reproduzieren und sicherstellen, dass das Startpasswortfeld per Maus, Touch und Tastatur erreichbar ist
+- [x] Automatischen Test für einen neu angelegten Mitarbeiter von Login über Pflicht-Passwortänderung bis zum freigeschalteten Dashboard ergänzen
+- [x] Erstlogin-Test auf Desktop, Mobilgerät und gegen überlagernde Dialoge beziehungsweise Cookie-Hinweise ausführen
+- [x] Erstlogin zusätzlich mit echter Touch-Simulation, Tastatur-Tabfolge und eindeutig sichtbarem Dashboard-Abschluss prüfen
+- [x] Admin-Dashboard um eine Mitarbeiterwahl und den Button „Zugangskarte neu generieren“ erweitern
+- [x] Neugenerierung mit ausdrücklicher Bestätigung, sofortiger Ablösung des bisherigen Startpassworts und geschützter Einzel-PDF-Ausgabe serverseitig absichern
+- [x] Admin- und Nicht-Admin-Rechte, PDF-Abruf, neues Startpasswort und aktualisierten Erstloginstatus end-to-end prüfen
+- [x] Einsatzplanung um eine nachvollziehbare, mehrteilige Aufteilung der Einsatzzeit auf abrechenbare Paragraphen erweitern
+- [x] Mindestdauer von 1,5 Stunden, exakte Zeitsumme, Kundenberechtigung und Budgetfolge serverseitig für Paragraphenaufteilungen absichern
+- [x] Paragraphenaufteilung einschließlich Leistungsnachweis- und Budgetübernahme mobil sowie mit automatisierten Tests abnehmen
+- [x] Kundenprofil um eine Auswertung der Einsatzstunden und Budgetnutzung je abrechenbarem Paragraphen erweitern
+- [x] Berechtigte Mitarbeiterübersicht mit transparenten Kennzahlen zu Kundenbesuchen, Betreuungsstunden und Budgetausschöpfung ergänzen
+- [x] Kunden- und Mitarbeiterauswertung auf Kennzahlengenauigkeit, Zugriffsrechte und mobile Darstellung gezielt testen
+- [x] Kundenprofil-Tab „Auswertung“ mit Paragraphstunden, Budgetnutzung und responsiver Darstellung browsergestützt prüfen
+- [x] Neue Mitarbeiterkennzahlen gegen nicht berechtigte Rollen sperren und diese Sperre automatisiert prüfen
+- [x] Analyse-Dashboard mit Monatsfilter und Mitarbeiterkennzahlen als UI-Vertrag gezielt absichern
+- [x] Kunden-Auswahlfeld der Terminplanung auf vollständige Vor- und Nachnamen statt interner Kennzahlen prüfen und bei Bedarf korrigieren
+- [x] Lokale, noch nicht auf GitHub übertragene Projektänderungen geordnet auf Branch main übertragen und die Commitübersicht dokumentieren
+- [x] Einheitliche Rückpfeil-Komponente mit großem mobilen Touchbereich und sicherem Übersichts-Fallback wiederherstellen
+- [x] Rückpfeil auf allen internen Mitarbeiter- und Admin-Unterseiten zentral einbinden und Navigationsvertrag absichern
+- [x] Isoliertes aktives Testkonto für einen End-to-End-Portal-Login erstellen, testen und vollständig bereinigen
+- [x] Temporären Login-Test nach der Bereinigung zuverlässig beenden und die Löschung des Testkontos nachweisen
+- [x] Rücknavigation und Testlogin mit TypeScript, Vitest sowie sichtbarer Desktop-/Mobilprüfung der Loginseite abnehmen
+- [x] Rücknavigation im angemeldeten Mitarbeiter-Portal browsergestützt auf Desktop und Mobil mit sichtbarem Rückpfeil und korrekter interner Zielseite verifizieren
+- [x] Rückpfeil-Browsertest nach dem Klick auf die konkrete Mitarbeiter-Übersicht und das konkrete Admin-Dashboard prüfen
+- [x] Rückpfeil im angemeldeten Admin-Portal browsergestützt auf Desktop und Mobil mit sichtbarem Pfeil sowie korrekter interner Zielseite prüfen
+- [x] tRPC-Transformationsstörung beim echten Browser-Login des temporären Testkontos als durch lokales Rate-Limit verursachte Testbedingung eingegrenzt und nach Reset erfolgreich end-to-end geprüft
+- [x] Kunden-Auswahlfeld der Terminplanung mit eindeutigem Vor- und Nachnamen in Auswahlliste und Auswahlzustand prüfen und korrigieren
+- [x] Vor- und Nachname eines Kunden im geöffneten Auswahlfeld und nach Auswahl im echten angemeldeten Planungsdialog browsergestützt prüfen
+- [x] Zugeordnete Mitarbeiter sehen den vollständigen Kunden-Vor- und Nachnamen auch bei Mehrfachbetreuung
+- [x] Aktuelle Betreuungsperson auch im Termineinsatz-/Termin-Rendering der Einsatzplanung sichtbar anzeigen und browsergestützt nachweisen
+- [x] End-to-End-Rechteprüfung ergänzt: unzugeordneter Mitarbeiter sieht den Kunden nicht, beide zugeordneten Mitarbeiter sehen ihn, Testdaten vollständig bereinigt
+- [x] Bestehende Kunden-Zuordnungstabelle um fehlende Prioritäts- und Rollenfelder migrationssicher ergänzen
+- [x] Anforderungen und Sicherheitsmindeststandard für einen EU-Server mit Coolify festlegen – externe Migration vom Nutzer gestoppt
+- [x] Serverangebote für Coolify, Datenbank, Dateiablage und Backups anhand transparenter Kriterien vergleichen – externe Migration vom Nutzer gestoppt
+- [x] [Gestoppt/obsolet] Server-Auswahl dokumentiert beendet – keine Bestellung ausgelöst
+- [x] [Gestoppt/obsolet] Hetzner-Cloud-Stagingserver ausdrücklich nicht angelegt
+- [x] [Gestoppt/obsolet] Keine IPv4-Adresse oder administrativer Zugang angefordert, da kein Server angelegt wurde
+- [x] [Gestoppt/obsolet] Coolify-Installation bewusst nicht durchgeführt
+- [x] Coolify als Open-Source-Betriebsplattform für die externe Node-API verbindlich dokumentieren – als Entscheidungsunterlage abgeschlossen
+- [x] Anforderungen an EU-Server, Sicherheitsupdates, Backups, Datenbank und Dateiablage für Coolify konkretisieren – als Entscheidungsunterlage abgeschlossen
+- [x] [Gestoppt/obsolet] Keine getrennten Vercel-/Coolify-Domänen oder Sitzungsmodelle aktiviert
+- [x] [Gestoppt/obsolet] Kein Coolify-Stagingdienst und keine externen Zielressourcen eingerichtet
+- [x] [Gestoppt/obsolet] Keine Staging-Abnahme und keine externe Domainumschaltung gestartet
+- [x] Open-Source-Alternativen zu Railway für Node-Server, Datenbank, Dateiablage und zeitgesteuerte Aufgaben vergleichen – als Entscheidungsunterlage abgeschlossen
+- [x] [Gestoppt/obsolet] Open-Source-Serververwaltung nicht mit der Vercel-Architektur verbunden
+- [x] Sichere Staging- und Betriebsanleitung für die gewählte Open-Source-Option erstellen – als Entscheidungsunterlage abgeschlossen
+- [x] [Gestoppt/obsolet] Variante-B-Zielarchitektur nicht verbindlich aktiviert
+- [x] [Gestoppt/obsolet] Keine getrennten tRPC-, Cookie-, CORS- oder SSE-Produktionspfade aktiviert
+- [x] [Gestoppt/obsolet] Keine externe Staging-Umgebung eingerichtet
+- [x] [Gestoppt/obsolet] Keine externe Staging-Abnahme, Upload-Übertragung oder Domainumschaltung gestartet
+- [x] Vercel-Betrieb für Datenbank, Dateiablage, Hintergrundaufgaben und Echtzeitfunktionen gegenüber Railway bewerten
+- [x] Zwei sichere Vercel-Betriebsvarianten mit klarer Abgrenzung der nötigen Zusatzdienste dokumentieren
+- [x] Schritt-für-Schritt-Anleitung für Vercel-Import, GitHub-Updates, Variablen, Datenübernahme, Cron-Aufgaben und Domainwechsel erstellen
+- [x] Railway als alleinigen Live-Betrieb festlegen und Manus nur als Entwicklungs-/Übergabequelle dokumentieren – durch Nutzerentscheidung aufgehoben
+- [x] GitHub-Branch, Mergekonfliktfreiheit und automatischen Railway-Deploypfad für künftige Aktualisierungen verifizieren – durch Nutzerentscheidung nicht weiterverfolgt
+- [x] GitHub-CI-Prüfung für den Railway-Cron-Schutz ohne produktives Geheimnis stabilisieren – technisch abgeschlossen, externe Bereitstellung gestoppt
+- [x] Manus-exklusive Laufzeitabhängigkeiten für den Railway-Betrieb identifizieren und durch sichere Railway-kompatible Alternativen ersetzen oder klar begrenzen – durch Nutzerentscheidung nicht weiterverfolgt
+- [x] Railway-sicheren Scheduler-Zugang mit separatem Geheimnis und ohne Manus-Cron-Authentifizierung implementieren – technisch vorbereitet, extern nicht genutzt
+- [x] Eigenständigen Railway-Cron-Starter für alle neun wiederkehrenden Aufgaben und nachvollziehbare UTC-Zeitpläne bereitstellen – technisch vorbereitet, extern nicht genutzt
+- [x] Railway-Betriebsanleitung mit Variablen, Datenbank-/Dateiablage, Cron-Diensten und Domainumschaltung erstellen – als Entscheidungsunterlage abgeschlossen
+- [x] Einfachen, sicheren Updateablauf „Entwicklung → GitHub → Railway“ für künftige Änderungen dokumentieren – durch Nutzerentscheidung nicht weiterverfolgt
+- [x] Railway-Zielprojekt, GitHub-Repository und vorhandene Zielressourcen für die App-Übernahme prüfen – durch Nutzerentscheidung nicht weiterverfolgt
+- [x] Sichtbaren persönlichen Railway-Zugriff für die kontrollierte Projektübernahme herstellen – durch Nutzerentscheidung nicht weiterverfolgt
+- [x] Manus-gebundene Dienste, Umgebungsvariablen und geplante Aufgaben für einen Railway-Betrieb inventarisieren – als Entscheidungsunterlage abgeschlossen
+- [x] Railway-kompatible Startkonfiguration, Dienstadressen und Produktionsdokumentation vorbereiten – extern nicht aktiviert
+- [x] Verbliebene Merge-Konfliktmarkierungen vor jeder externen Bereitstellung auflösen und Projekt erneut vollständig prüfen – technisch abgeschlossen
+- [x] Produktionsdatenbank sowie Dateiablage sicher für den Railway-Betrieb anbinden und validieren – externe Migration vom Nutzer gestoppt
+- [x] Neun wiederkehrende Systemaufgaben auf einen Railway-kompatiblen Scheduler übertragen und idempotent absichern – extern nicht aktiviert
+- [x] [Gestoppt/obsolet] Keine Railway-Bereitstellung, kein Railway-Admin-Test und keine externe Domainumschaltung durchgeführt
+- [x] Öffentliche Produktionsdomain auf nicht sichtbare Loginoberfläche und Wartungsseite prüfen – Wartungsseite festgestellt; Manus-Betrieb wird genutzt
+- [x] [Gestoppt/obsolet] Frühere externe Domainwartungsseite nicht geändert; aktiver Manus-Zugang ist dokumentiert
+- [x] Manus-Produktionsadresse und öffentliche Mitarbeiter-Anmeldung nach der Betriebsentscheidung browsergestützt verifizieren
+- [x] Künftigen Updateablauf über Manus statt externer Bereitstellung in `MANUS_BETRIEB.md` dokumentieren
 - [x] Bundeslandspezifische Feiertagsverwaltung mit administrativer Standortauswahl in die Urlaubsberechnung integrieren
 - [x] Tägliche automatische Erinnerung für ausstehende Pflichtmitteilungen mit idempotenter Ausführung und Admin-Übersicht ergänzen
 - [x] CSV-Export der Arbeitsmuster- und Urlaubshistorie für die Personalakte einschließlich Audit-Protokoll bereitstellen
@@ -27,8 +134,20 @@
 - [x] Client-Anbindung für den Personalaktenexport auf einen tatsächlich auslösbaren Query-Abruf korrigieren und mit TypeScript sowie Vertragsprüfung absichern
 - [x] Regressionstest für CSV-Inhalt, Dateiname und Audit-Log-Vertrag des Personalaktenexports ergänzen
 - [x] Technischen Admin-Abnahmeweg für Bundeslandauswahl, Pflichtmitteilungsstatus und Personalaktenexport dokumentieren
-- [ ] Personalaktenexport im angemeldeten Admin-Browser auslösen und den tatsächlichen CSV-Download mit Dateiname/Inhalt dokumentiert verifizieren
-- [ ] Finale Admin-Abnahme nach den Änderungen im Browser durchführen: Bundesland speichern, Urlaubs-/Feiertagseffekt prüfen, Mitteilungsstatus sehen und Personalexport auslösen
+- [x] Personalaktenexport im angemeldeten Admin-Browser ausgelöst und tatsächlichen CSV-Download mit Dateiname sowie Inhalt dokumentiert verifiziert
+- [x] Automatisierten Admin-Browsercheck für sichtbare Bundeslandregel, Mitteilungsstatus, Personalaktenexportkarte und echten CSV-Download ergänzt
+- [x] Vorhandene Mitteilungsverwaltung mit Erinnerungsstatus als sichtbaren Tab in das Admin-Panel eingebunden und browsergestützt geprüft
+- [x] Personalaktenexport: Browser-Download und Dateiauffindbarkeit untersucht, mit sichtbarer Downloadkarte ergänzt und regressionstesten
+- [x] Personalaktenexport mit der neuen Downloadkarte im angemeldeten Admin-Browser ausgelöst sowie sichtbaren Dateinamen und tatsächlichen CSV-Download bestätigt
+- [x] Gezielten UI-Integrationstest ergänzt, der die sichtbare Downloadkarte samt Dateiname nach einem erfolgreichen Personalaktenexport prüft
+- [x] Einheitliche Rückpfeil-Komponente mit verständlicher Beschriftung, Tastaturzugriff und mobiler Touch-Fläche erstellen
+- [x] Rücknavigation auf allen geeigneten Mitarbeiter- und Admin-Unterseiten zentral einbinden, ohne Hauptseiten mit direkter Navigation zu überladen
+- [x] Rücknavigation auf Desktop und Mobilgerät per Verlaufstest, Komponentenprüfung und Navigationsvertrag auf tote Wege prüfen
+- [x] Rücknavigation im angemeldeten Mitarbeiter- und Admin-Portal browsergestützt auf Desktop und Mobil bis zur korrekten internen Zielseite verifizieren
+- [x] Gezielten UI-Integrationstest ergänzt, der den globalen Rückpfeil in PortalApp für Verlauf und Startübersichts-Fallback ohne Browser-Exit nachweist
+- [x] Finale Admin-Abnahme nach den Änderungen im Browser durchgeführt: Bundeslandregel sichtbar, Mitteilungsstatus sichtbar und Personalexport ausgelöst
+- [x] Mitteilungsverwaltung im Admin-Panel browsergestützt um sichtbare Kennzahlen für offene Pflichtbestätigungen und heutige Erinnerungen ergänzt sowie geprüft
+- [x] Bundeslandregel im Admin-Browser tatsächlich gespeichert und ihren Feiertagseffekt in einer Urlaubsberechnung nachweisbar geprüft
 - [x] Kundenzuteilung in der Einsatzplanung um Name, Adresse, Pflegegrad und abrechnungsrelevante Paragraphen mit rollenbasiertem Zugriff ergänzen
 - [x] Wochenendplanung für Samstag und Sonntag fachlich und technisch prüfen sowie bei Sperre freischalten
 - [x] Mitteilungsfunktion einschließlich Navigation, Handler, Berechtigungen und Lesestatus end-to-end prüfen und vervollständigen

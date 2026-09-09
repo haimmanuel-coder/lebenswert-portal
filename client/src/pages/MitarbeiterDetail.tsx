@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { usePortalAuth } from "@/contexts/PortalAuthContext";
 import { toast } from "sonner";
@@ -18,6 +18,7 @@ type ZertifikatStatus = "erhalten" | "angemeldet" | "nicht_angemeldet";
 type Beschaeftigungsart = "minijob" | "teilzeit" | "vollzeit";
 type AkteTab = "stamm" | "dokumente" | "zertifikat" | "vertrag" | "rechte" | "urlaubkrank" | "erstehilfe";
 type DokTyp = "zertifikat" | "arbeitsvertrag" | "krankmeldung" | "fuehrerschein" | "erstehilfe" | "sonstiges";
+type Systemrolle = "mitarbeiter" | "teamleitung" | "buchhaltung" | "admin";
 
 // ─── Konfigurationen ──────────────────────────────────────────────────────────
 const ZERT_CONFIG: Record<ZertifikatStatus, { label: string; color: string; icon: typeof CheckCircle }> = {
@@ -160,6 +161,7 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
   // Rechte-State
   const [rechteMap, setRechteMap] = useState<Record<string, "erlaubt" | "verweigert" | "standard">>({});
   const [rechteLoaded, setRechteLoaded] = useState(false);
+  const [ausgewaehlteRolle, setAusgewaehlteRolle] = useState<Systemrolle>("mitarbeiter");
 
   // Deaktivierungs-Dialog
   const [showDeaktDialog, setShowDeaktDialog] = useState(false);
@@ -223,6 +225,10 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
     }
   );
 
+  useEffect(() => {
+    setAusgewaehlteRolle((ma?.rolle ?? "mitarbeiter") as Systemrolle);
+  }, [ma?.rolle]);
+
   // ─── Mutations ─────────────────────────────────────────────────────────────
   const updateStamm = trpc.admin.updateStammdaten.useMutation({
     onSuccess: () => {
@@ -257,7 +263,7 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
   const addDokument = (trpc.admin as any).addDokumentAdmin.useMutation({
     onSuccess: () => {
       toast.success("Dokument hinzugefügt");
-      (trpc.mitarbeiterakte as any).listDokumente.invalidate({ mitarbeiterId });
+      utils.mitarbeiterakte.listDokumente.invalidate({ mitarbeiterId });
       utils.admin.mitarbeiterDetail.invalidate({ id: mitarbeiterId });
       setShowDokForm(false);
       setDokForm({ typ: "sonstiges", bezeichnung: "", ausstellungsdatum: "", ablaufdatum: "", notizen: "" });
@@ -268,15 +274,18 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
   const deleteDokument = (trpc.admin as any).deleteDokumentAdmin.useMutation({
     onSuccess: () => {
       toast.success("Dokument gelöscht");
-      (trpc.mitarbeiterakte as any).listDokumente.invalidate({ mitarbeiterId });
+      utils.mitarbeiterakte.listDokumente.invalidate({ mitarbeiterId });
     },
     onError: (e: any) => toast.error(e.message),
   });
 
-  const setBerechtigungen = (trpc.admin as any).setBerechtigungen.useMutation({
-    onSuccess: () => {
-      toast.success("Berechtigungen gespeichert");
-      (trpc.admin as any).getBerechtigungen.invalidate({ mitarbeiterId });
+  const setRollenKonfiguration = (trpc.admin as any).setRollenKonfiguration.useMutation({
+    onSuccess: (ergebnis: { rolle: Systemrolle; ausnahmen: number }) => {
+      toast.success(`Rolle „${ergebnis.rolle}“ und ${ergebnis.ausnahmen} Rechte-Ausnahmen gespeichert`);
+      utils.admin.mitarbeiterDetail.invalidate({ id: mitarbeiterId });
+      utils.admin.mitarbeiterList.invalidate();
+      utils.admin.getBerechtigungen.invalidate({ mitarbeiterId });
+      setRechteLoaded(false);
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -351,13 +360,25 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 10 * 1024 * 1024) { toast.error("Datei max. 10 MB"); return; }
+    const endung = file.name.toLowerCase().split(".").pop();
+    const erlaubteMimeTypes: Record<string, string> = {
+      pdf: "application/pdf", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png",
+      doc: "application/msword", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    };
+    const mimeType = endung ? erlaubteMimeTypes[endung] : undefined;
+    if (!mimeType || (file.type && file.type !== mimeType)) {
+      toast.error("Erlaubt sind PDF-, JPG-, PNG-, DOC- und DOCX-Dateien.");
+      e.target.value = "";
+      return;
+    }
     setDokUploading(true);
     const reader = new FileReader();
     reader.onload = () => {
       const base64 = (reader.result as string).split(",")[1];
-      setDokForm(f => ({ ...f, base64, mimeType: file.type, dateiname: file.name }));
+      setDokForm(f => ({ ...f, base64, mimeType, dateiname: file.name }));
       setDokUploading(false);
     };
+    reader.onerror = () => { setDokUploading(false); toast.error("Datei konnte nicht gelesen werden."); };
     reader.readAsDataURL(file);
   };
 
@@ -370,7 +391,7 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
     const berechtigungen = Object.entries(rechteMap)
       .filter(([, v]) => v !== "standard")
       .map(([modul, zugriff]) => ({ modul, zugriff: zugriff as "erlaubt" | "verweigert" }));
-    setBerechtigungen.mutate({ mitarbeiterId, berechtigungen });
+    setRollenKonfiguration.mutate({ mitarbeiterId, rolle: ausgewaehlteRolle, berechtigungen });
   };
 
   async function exportPersonalbogen(maData: any) {
@@ -918,10 +939,11 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
                     <label className="flex items-center gap-2 cursor-pointer bg-white border rounded-lg px-3 py-2 text-sm hover:bg-gray-50 transition-colors">
                       <Upload className="w-4 h-4 text-primary" />
                       {dokForm.dateiname ? dokForm.dateiname : "Datei auswählen"}
-                      <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" onChange={handleDokFileSelect} />
+                      <input data-testid="mitarbeiterakte-datei" aria-label="Mitarbeiterdokument auswählen" type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" onChange={handleDokFileSelect} />
                     </label>
                     {dokUploading && <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />}
                   </div>
+                  <p className="text-xs text-muted-foreground mt-2">Erlaubt: PDF, JPG, PNG, DOC und DOCX. Dateien werden extern abgelegt; die Akte speichert nur die geschützte Referenz.</p>
                 </div>
                 <div className="flex gap-2">
                   <Button size="sm" onClick={handleDokSave} disabled={addDokument.isPending || dokUploading}>
@@ -1194,11 +1216,11 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="font-semibold text-foreground">Rollenrechte & Berechtigungen</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">Systemrolle: <strong>{ma.rolle ?? "mitarbeiter"}</strong></p>
+                <p className="text-xs text-muted-foreground mt-0.5">Ausgewählte Systemrolle: <strong>{ausgewaehlteRolle}</strong></p>
               </div>
               {isAdmin && (
-                <Button size="sm" onClick={handleRechteSave} disabled={setBerechtigungen.isPending}>
-                  <Save className="w-4 h-4 mr-1" /> Speichern
+                <Button size="sm" onClick={handleRechteSave} disabled={setRollenKonfiguration.isPending}>
+                  <Save className="w-4 h-4 mr-1" /> {setRollenKonfiguration.isPending ? "Speichert …" : "Rolle & Rechte speichern"}
                 </Button>
               )}
             </div>
@@ -1210,9 +1232,10 @@ export default function MitarbeiterDetail({ mitarbeiterId, onBack }: Props) {
                 <div className="grid grid-cols-2 gap-2">
                   {(["mitarbeiter", "teamleitung", "buchhaltung", "admin"] as const).map((rolle) => (
                     <button key={rolle}
-                      onClick={() => updateStamm.mutate({ id: mitarbeiterId, rolle } as any)}
+                      type="button"
+                      onClick={() => setAusgewaehlteRolle(rolle)}
                       className={`py-2 px-3 rounded-lg text-sm font-medium border transition-colors ${
-                        ma.rolle === rolle ? "bg-primary text-white border-primary" : "bg-white text-muted-foreground border-border hover:border-primary"
+                        ausgewaehlteRolle === rolle ? "bg-primary text-white border-primary" : "bg-white text-muted-foreground border-border hover:border-primary"
                       }`}>
                       {rolle === "mitarbeiter" ? "👤 Mitarbeiter" :
                        rolle === "teamleitung" ? "👥 Teamleitung" :

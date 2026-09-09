@@ -370,6 +370,17 @@ canvas.sig-canvas {
 }
 .page-enter { animation: slideUp 0.2s ease; }
 
+/* Neue Kundenzuweisungen werden einmal sanft hervorgehoben, ohne die Arbeit zu unterbrechen. */
+@media (prefers-reduced-motion: no-preference) {
+  .neue-kundenzuweisung-hinweis {
+    animation: kundenzuweisung-eintreffen 240ms var(--ease-out) both;
+  }
+}
+@keyframes kundenzuweisung-eintreffen {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* Pflichtenheft: Kundenansicht mit drei Informationsspalten */
 .kunden-detail-dreispalten {
   display: grid;

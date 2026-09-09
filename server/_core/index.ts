@@ -26,7 +26,7 @@ import { handleMonatsabschlussErinnerung } from "../scheduled/monatsabschlussEri
 import multer from "multer";
 import { storagePut } from "../storage";
 import { PORTAL_COOKIE, verifyPortalToken } from "../portalAuth";
-import { getMitarbeiterById } from "../db";
+import { createAuditLog, getMitarbeiterById } from "../db";
 import { sdk } from "./sdk";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -63,9 +63,10 @@ async function startServer() {
   const server = createServer(app);
   // Trust reverse proxy (Manus gateway) so req.protocol is correctly 'https'
   app.set('trust proxy', 1);
-  // Configure body parser with larger size limit for file uploads
-  app.use(express.json({ limit: "2mb" }));
-  app.use(express.urlencoded({ limit: "2mb", extended: true }));
+  // Dokumente werden vor der Speicherung serverseitig auf maximal 10 MB geprüft.
+  // Base64 benötigt rund ein Drittel mehr Platz, daher muss der tRPC-JSON-Pfad 16 MB annehmen.
+  app.use(express.json({ limit: "16mb" }));
+  app.use(express.urlencoded({ limit: "16mb", extended: true }));
   app.use(cookieParser());
 
   const requirePortalMitarbeiter = async (req: any, res: any, next: any) => {
@@ -114,32 +115,42 @@ async function startServer() {
     message: { error: "Zu viele Anfragen. Bitte kurz warten." },
     skip: (_req: import("express").Request) => process.env.NODE_ENV === "test",
   });
-  // Login-Endpunkte absichern (tRPC batch-kompatibel: URL-Matching)
+  // Login-Endpunkte absichern. Das allgemeine API-Limit darunter schützt auch
+  // gebündelte tRPC-Anfragen; diese Regeln bremsen zusätzlich Direktaufrufe.
   app.use("/api/trpc/portal.login", loginLimiter);
-  app.use("/api/trpc/portal.passwortVergessen", passwortLimiter);
-  app.use("/api/trpc/portal.passwortZuruecksetzen", passwortLimiter);
+  app.use("/api/trpc/portal.requestPasswordReset", passwortLimiter);
+  app.use("/api/trpc/portal.validateResetToken", passwortLimiter);
+  app.use("/api/trpc/portal.resetPassword", passwortLimiter);
+  app.use("/api/trpc/portal.changePassword", passwortLimiter);
   app.use("/api/trpc/admin.mitarbeiterPasswortReset", passwortLimiter);
-  app.use("/api/trpc/admin.mitarbeiterTempPasswort", passwortLimiter);
+  app.use("/api/trpc/admin.zugangskarteNeuGenerieren", passwortLimiter);
   app.use("/api/trpc", apiLimiter);
   // ──────────────────────────────────────────────────────────────────────────
 
   registerStorageProxy(app);
   registerOAuthRoutes(app);
-  // Foto/Audio-Upload-Endpoints
+  // Foto/Audio-Upload-Endpoints: Dateiname und MIME-Typ sind kein Ersatz für
+  // Inhaltprüfung, aber eine erste, serverseitige Grenze gegen beliebige Uploads.
+  const erlaubteFotoMimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+  const erlaubteAudioMimeTypes = new Set(["audio/webm", "audio/mpeg", "audio/wav", "audio/ogg", "audio/mp4", "audio/x-m4a"]);
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 16 * 1024 * 1024 } });
   app.post("/api/upload/foto", requirePortalMitarbeiter, upload.single("file"), async (req: any, res: any) => {
     try {
       if (!req.file) return res.status(400).json({ error: "Keine Datei" });
+      if (!erlaubteFotoMimeTypes.has(req.file.mimetype)) return res.status(400).json({ error: "Erlaubt sind nur JPG-, PNG- oder WebP-Fotos." });
       const key = `fotos/${Date.now()}-${(req.file.originalname as string).replace(/[^a-zA-Z0-9._-]/g, "_")}`;
       const { url } = await storagePut(key, req.file.buffer, req.file.mimetype);
+      await createAuditLog({ mitarbeiterId: req.portalMitarbeiter.id, action: "CREATE", ressource: "foto_upload", details: `typ=${req.file.mimetype} bytes=${req.file.size}`, status: "success" });
       return res.json({ url, key });
     } catch (e: any) { console.error("[Upload/Foto]", e); return res.status(500).json({ error: "Foto konnte nicht gespeichert werden." }); }
   });
   app.post("/api/upload/audio", requirePortalMitarbeiter, upload.single("file"), async (req: any, res: any) => {
     try {
       if (!req.file) return res.status(400).json({ error: "Keine Datei" });
+      if (!erlaubteAudioMimeTypes.has(req.file.mimetype)) return res.status(400).json({ error: "Erlaubt sind nur WebM-, MP3-, WAV-, OGG- oder M4A-Audiodateien." });
       const key = `audio/${Date.now()}-${(req.file.originalname as string).replace(/[^a-zA-Z0-9._-]/g, "_")}`;
       const { url } = await storagePut(key, req.file.buffer, req.file.mimetype);
+      await createAuditLog({ mitarbeiterId: req.portalMitarbeiter.id, action: "CREATE", ressource: "audio_upload", details: `typ=${req.file.mimetype} bytes=${req.file.size}`, status: "success" });
       return res.json({ url, key });
     } catch (e: any) { console.error("[Upload/Audio]", e); return res.status(500).json({ error: "Audio konnte nicht gespeichert werden." }); }
   });

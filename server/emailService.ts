@@ -91,6 +91,31 @@ export async function sendEmail(opts: EmailOptions): Promise<{ success: boolean;
   }
 }
 
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>'"]/g, (zeichen) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;",
+  })[zeichen] ?? zeichen);
+}
+
+/** Baut ausschließlich den E-Mail-Inhalt; das einmalige Token wird nie an den Browser zurückgegeben. */
+export function buildPasswortResetEmail(data: { name: string; link: string }): string {
+  const name = escapeHtml(data.name);
+  const link = escapeHtml(data.link);
+  return `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+      <div style="background:#1a5c38;color:#fff;padding:20px;border-radius:8px 8px 0 0">
+        <h2 style="margin:0">Lebenswert Betreuung</h2>
+        <p style="margin:4px 0 0">Passwort zurücksetzen</p>
+      </div>
+      <div style="background:#f9f9f9;padding:20px;border:1px solid #e0e0e0">
+        <p>Hallo ${name},</p>
+        <p>Für Ihr Konto im Mitarbeiter-Portal wurde das Zurücksetzen des Passworts angefordert.</p>
+        <p style="text-align:center;margin:24px 0"><a href="${link}" style="background:#4a8c3f;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:bold;display:inline-block">Neues Passwort festlegen</a></p>
+        <p style="font-size:12px;color:#666">Der Link ist einmalig und zeitlich begrenzt gültig. Falls Sie diese Anforderung nicht gestellt haben, ignorieren Sie diese E-Mail.</p>
+      </div>
+    </div>`;
+}
+
 export function buildBesuchsberichtEmail(data: {
   kundeVorname: string; kundeNachname: string;
   mitarbeiterVorname: string; mitarbeiterNachname: string;

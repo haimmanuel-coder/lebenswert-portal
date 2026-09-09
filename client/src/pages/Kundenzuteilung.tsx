@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 export default function Kundenzuteilung() {
   const { mitarbeiter } = usePortalAuth();
   const isAdmin = mitarbeiter?.rolle === "admin";
+  const utils = trpc.useUtils();
 
   const [selectedMaId, setSelectedMaId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
@@ -32,7 +33,11 @@ export default function Kundenzuteilung() {
     onSuccess: () => {
       toast.success("✅ Zuteilung gespeichert!");
       refetchZuordnungen();
+      utils.kunden.list.invalidate();
+      (utils as any).planung.kundenFuerMitarbeiter.invalidate();
       setSaving(false);
+      setLocalToggled(new Set());
+      setLocalUntoggled(new Set());
     },
     onError: (e) => {
       toast.error("❌ " + e.message);
@@ -84,8 +89,6 @@ export default function Kundenzuteilung() {
       mitarbeiterId: selectedMaId,
       kundenIds: Array.from(effectiveIds),
     });
-    setLocalToggled(new Set());
-    setLocalUntoggled(new Set());
   }
 
   // Kunden-Filter

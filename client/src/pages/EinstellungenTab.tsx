@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import * as React from "react";
+import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { BUNDESLAENDER } from "@shared/planungsLogik";
@@ -20,19 +21,29 @@ export default function EinstellungenTab() {
   const [werte, setWerte] = useState<Record<string, string>>({});
   const [testMaId, setTestMaId] = useState<number | "">("");
   const [saving, setSaving] = useState<string | null>(null);
+  const [exportDownload, setExportDownload] = useState<{ url: string; dateiName: string; zeilen: number } | null>(null);
+  const exportUrlRef = useRef<string | null>(null);
+  const bundeslandRef = useRef("DE");
+
+  useEffect(() => () => {
+    if (exportUrlRef.current) URL.revokeObjectURL(exportUrlRef.current);
+  }, []);
 
   useEffect(() => {
     if (alleEinstellungen.length > 0) {
       const map: Record<string, string> = {};
       for (const e of alleEinstellungen) map[e.schluessel] = e.wert ?? "";
       setWerte(map);
+      bundeslandRef.current = map.urlaubs_bundesland || "DE";
     }
   }, [alleEinstellungen]);
 
-  const handleSave = async (schluessel: string) => {
+  const handleSave = async (schluessel: string, wertOverride?: string) => {
     setSaving(schluessel);
     try {
-      await setEinstellung.mutateAsync({ schluessel, wert: werte[schluessel] ?? "" });
+      const wert = wertOverride ?? werte[schluessel] ?? "";
+      await setEinstellung.mutateAsync({ schluessel, wert });
+      setWerte((prev) => ({ ...prev, [schluessel]: wert }));
       toast.success("✅ Gespeichert");
       refetch();
     } catch (e: any) {
@@ -57,12 +68,17 @@ export default function EinstellungenTab() {
       const { data: result } = await exportPersonalakte.refetch();
       if (!result) throw new Error("Exportdaten konnten nicht geladen werden.");
       const url = URL.createObjectURL(new Blob([result.csv], { type: "text/csv;charset=utf-8" }));
+      if (exportUrlRef.current) URL.revokeObjectURL(exportUrlRef.current);
+      exportUrlRef.current = url;
+      setExportDownload({ url, dateiName: result.dateiName, zeilen: result.zeilen });
       const link = document.createElement("a");
       link.href = url;
       link.download = result.dateiName;
+      link.style.display = "none";
+      document.body.appendChild(link);
       link.click();
-      URL.revokeObjectURL(url);
-      toast.success(`✅ ${result.zeilen} Historienzeilen exportiert`);
+      document.body.removeChild(link);
+      toast.success(`✅ CSV erstellt: ${result.dateiName}. Falls kein Download-Fenster erscheint, nutzen Sie die Downloadkarte unten.`);
     } catch (e: any) {
       toast.error("Export fehlgeschlagen: " + e.message);
     }
@@ -109,14 +125,17 @@ export default function EinstellungenTab() {
         </p>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <select
-            value={werte.urlaubs_bundesland ?? "DE"}
-            onChange={e => setWerte(prev => ({ ...prev, urlaubs_bundesland: e.target.value }))}
+            value={werte.urlaubs_bundesland || "DE"}
+            onChange={e => {
+              bundeslandRef.current = e.target.value;
+              setWerte(prev => ({ ...prev, urlaubs_bundesland: e.target.value }));
+            }}
             style={{ flex: 1, minWidth: 220, padding: "8px 12px", border: "1px solid #93c5fd", borderRadius: 8, fontSize: 13, background: "#fff" }}
           >
             {BUNDESLAENDER.map((bundesland) => <option key={bundesland.code} value={bundesland.code}>{bundesland.label}</option>)}
           </select>
           <button
-            onClick={() => handleSave("urlaubs_bundesland")}
+            onClick={() => handleSave("urlaubs_bundesland", bundeslandRef.current)}
             disabled={saving === "urlaubs_bundesland"}
             style={{ padding: "8px 14px", background: saving === "urlaubs_bundesland" ? "#9ca3af" : "#1d4ed8", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
           >
@@ -179,6 +198,23 @@ export default function EinstellungenTab() {
         >
           {exportPersonalakte.isFetching ? "⏳ Export wird erstellt…" : "⬇️ Arbeitsmuster- & Urlaubshistorie (CSV)"}
         </button>
+        {exportDownload && (
+          <div role="status" style={{ marginTop: 14, padding: 14, background: "#ecfdf5", border: "1px solid #86efac", borderRadius: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#166534", overflowWrap: "anywhere" }}>
+              ✅ Datei bereit: {exportDownload.dateiName}
+            </div>
+            <p style={{ fontSize: 12, color: "#166534", margin: "6px 0 10px" }}>
+              {exportDownload.zeilen} Zeilen wurden erstellt. Die Datei liegt normalerweise im Browserordner „Downloads“.
+            </p>
+            <a
+              href={exportDownload.url}
+              download={exportDownload.dateiName}
+              style={{ display: "inline-block", padding: "8px 12px", color: "#fff", background: "#166534", borderRadius: 7, fontSize: 12, fontWeight: 700, textDecoration: "none" }}
+            >
+              ⬇️ CSV jetzt herunterladen
+            </a>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -84,16 +84,18 @@ export const mitarbeiter = mysqlTable("mitarbeiter", {
   kuendigungsfrist: int("kuendigungsfrist").default(4),
   arbeitszeitmodell: mysqlEnum("arbeitszeitmodell", ["flexibel", "fest", "schicht"]).default("flexibel"),
   // Sozialversicherung & Steuer
-  sozialversicherungsnummer: varchar("sozialversicherungsnummer", { length: 20 }),
+  sozialversicherungsnummer: varchar("sozialversicherungsnummer", { length: 255 }),
   steuerklasse: int("steuerklasse").default(1),
-  steueridentnummer: varchar("steueridentnummer", { length: 20 }),
+  steueridentnummer: varchar("steueridentnummer", { length: 255 }),
   // Bankdaten
-  iban: varchar("iban", { length: 34 }),
+  iban: varchar("iban", { length: 255 }),
   bic: varchar("bic", { length: 11 }),
   bankname: varchar("bankname", { length: 100 }),
   // Krankenversicherung
   krankenkasse: varchar("krankenkasse", { length: 100 }),
+  krankenkasseVerschluesselt: text("krankenkasseVerschluesselt"),
   krankenversicherungsart: mysqlEnum("krankenversicherungsart", ["gesetzlich", "privat"]).default("gesetzlich"),
+  krankenversicherungsartVerschluesselt: text("krankenversicherungsartVerschluesselt"),
   // Notfallkontakt
   notfallkontaktName: varchar("notfallkontaktName", { length: 100 }),
   notfallkontaktTelefon: varchar("notfallkontaktTelefon", { length: 50 }),
@@ -159,6 +161,10 @@ export const kunden = mysqlTable("kunden", {
   // Pflegegrad & Paragraph (Modul 2)
   pflegegrad: int("pflegegrad").default(2),
   pflegegradSeit: date("pflegegradSeit"),
+  // AES-GCM-geschützte Gesundheitswerte; die Klartextspalten dienen nur
+  // noch der kontrollierten Rückwärtskompatibilität während der Migration.
+  pflegegradVerschluesselt: text("pflegegradVerschluesselt"),
+  pflegegradSeitVerschluesselt: text("pflegegradSeitVerschluesselt"),
   paragraph: mysqlEnum("paragraph", ["45b", "45a", "39", "privat"]).default("45b"),
   // A1: Mehrfach-Paragraphen (JSON-Array, z.B. ["45b","39","privat"])
   paragraphen: text("paragraphen"),
@@ -211,8 +217,8 @@ export type InsertKunde = typeof kunden.$inferInsert;
 // Eindeutiger Composite-Index auf (kundenId, mitarbeiterId) verhindert Doppelzuordnungen.
 export const kundenZuordnung = mysqlTable("kundenZuordnung", {
   id: int("id").autoincrement().primaryKey(),
-  mitarbeiterId: int("mitarbeiterId").notNull(),
-  kundenId: int("kundenId").notNull(),
+  mitarbeiterId: int("mitarbeiterId").notNull().references(() => mitarbeiter.id, { onDelete: "restrict", onUpdate: "restrict" }),
+  kundenId: int("kundenId").notNull().references(() => kunden.id, { onDelete: "restrict", onUpdate: "restrict" }),
   // Priorität 1 = Hauptbetreuer, 2 = erster Vertreter, 3 = zweiter Vertreter
   prioritaet: int("prioritaet").default(1).notNull(),
   // Rolle zur semantischen Unterscheidung
@@ -242,8 +248,10 @@ export type InsertTextbaustein = typeof textbausteine.$inferInsert;
 // Einsätze – erweitert mit Kunden-Unterschrift (Modul 3)
 export const einsaetze = mysqlTable("einsaetze", {
   id: int("id").autoincrement().primaryKey(),
-  mitarbeiterId: int("mitarbeiterId").notNull(),
-  kundenId: int("kundenId").notNull(),
+  // Historische verwaiste Einsätze werden vor der FK-Absicherung in eine
+  // getrennte Archivkopie verschoben. Neue Einsätze bleiben zwingend vollständig.
+  mitarbeiterId: int("mitarbeiterId").notNull().references(() => mitarbeiter.id, { onDelete: "restrict", onUpdate: "restrict" }),
+  kundenId: int("kundenId").notNull().references(() => kunden.id, { onDelete: "restrict", onUpdate: "restrict" }),
   datum: date("datum").notNull(),
   startzeit: time("startzeit"),
   dauerStunden: decimal("dauerStunden", { precision: 4, scale: 2 }),
@@ -324,8 +332,8 @@ export type InsertEinsatz = typeof einsaetze.$inferInsert;
 // Leistungsnachweise – erweitert mit Kunden-Unterschrift (Modul 3)
 export const leistungen = mysqlTable("leistungen", {
   id: int("id").autoincrement().primaryKey(),
-  mitarbeiterId: int("mitarbeiterId").notNull(),
-  kundenId: int("kundenId").notNull(),
+  mitarbeiterId: int("mitarbeiterId").notNull().references(() => mitarbeiter.id, { onDelete: "restrict", onUpdate: "restrict" }),
+  kundenId: int("kundenId").notNull().references(() => kunden.id, { onDelete: "restrict", onUpdate: "restrict" }),
   monat: varchar("monat", { length: 7 }).notNull(), // YYYY-MM
   paragraph: mysqlEnum("paragraph", ["45b", "45a", "39"]).default("45b").notNull(),
   stunden: decimal("stunden", { precision: 5, scale: 2 }).default("0"),
@@ -355,8 +363,8 @@ export type InsertLeistung = typeof leistungen.$inferInsert;
 // ── MODUL 4: FAHRTKOSTEN-ABRECHNUNG ──────────────────────────────
 export const fahrten = mysqlTable("fahrten", {
   id: int("id").autoincrement().primaryKey(),
-  mitarbeiterId: int("mitarbeiterId").notNull(),
-  kundenId: int("kundenId"),
+  mitarbeiterId: int("mitarbeiterId").notNull().references(() => mitarbeiter.id, { onDelete: "restrict", onUpdate: "restrict" }),
+  kundenId: int("kundenId").references(() => kunden.id, { onDelete: "restrict", onUpdate: "restrict" }),
   datum: date("datum").notNull(),
   vonOrt: varchar("vonOrt", { length: 200 }).notNull(),
   nachOrt: varchar("nachOrt", { length: 200 }).notNull(),
@@ -371,7 +379,7 @@ export const fahrten = mysqlTable("fahrten", {
   abrechnungsStatus: mysqlEnum("abrechnungsStatus", ["offen", "eingereicht", "erstattet"]).default("offen"),
   monat: varchar("monat", { length: 7 }), // YYYY-MM für Monatsabrechnung
   // Verknüpfung zum Einsatz, falls die Fahrt zu einem geplanten Termin gehört
-  einsatzId: int("einsatzId"),
+  einsatzId: int("einsatzId").references(() => einsaetze.id, { onDelete: "restrict", onUpdate: "restrict" }),
   // Soft-Delete (Phase 31)
   geloeschtAt: timestamp("geloeschtAt"),
   geloeschtVon: int("geloeschtVon"),
@@ -415,6 +423,19 @@ export const auditLogs = mysqlTable("auditLogs", {
 
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = typeof auditLogs.$inferInsert;
+
+// Zugangskarten-PDF: Es werden ausschließlich Ablagemetadaten gespeichert.
+// Vertrauliche Startpasswörter werden nie in der Datenbank abgelegt.
+export const zugangskartenPdfAusgaben = mysqlTable("zugangskartenPdfAusgaben", {
+  id: int("id").autoincrement().primaryKey(),
+  storageKey: varchar("storageKey", { length: 500 }).notNull(),
+  dateiname: varchar("dateiname", { length: 255 }).notNull(),
+  kartenAnzahl: int("kartenAnzahl").notNull(),
+  erstelltVon: int("erstelltVon"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ZugangskartenPdfAusgabe = typeof zugangskartenPdfAusgaben.$inferSelect;
 
 // Monatsabschlüsse
 export const monatsabschluesse = mysqlTable("monatsabschluesse", {

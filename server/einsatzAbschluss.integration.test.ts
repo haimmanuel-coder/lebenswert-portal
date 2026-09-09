@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
     paragraph: "45b",
     paragraph2: null,
     dauerStunden: "1.50",
+    stunden1: "1.50",
     stunden2: "0",
     anfahrtPauschale: 6,
   } as any,
@@ -62,6 +63,11 @@ describe("Einsatzabschluss – automatische Dokumentübernahme", () => {
     mocks.inserted.length = 0;
     mocks.createdFahrten.length = 0;
     mocks.einsatz.status = "geplant";
+    mocks.einsatz.paragraph = "45b";
+    mocks.einsatz.paragraph2 = null;
+    mocks.einsatz.dauerStunden = "1.50";
+    mocks.einsatz.stunden1 = "1.50";
+    mocks.einsatz.stunden2 = "0";
   });
 
   it("erzeugt beim Abschluss den Besuchsbericht, die Einsatzfahrt und den Leistungsmonat aus einem Datensatz", async () => {
@@ -108,5 +114,37 @@ describe("Einsatzabschluss – automatische Dokumentübernahme", () => {
       paragraph: "45b",
       stunden: "1.5",
     });
+  });
+
+  it("übernimmt einen gesplitteten Einsatz mit den exakten Stundenanteilen in getrennte Leistungsnachweise", async () => {
+    mocks.einsatz.paragraph = "39";
+    mocks.einsatz.paragraph2 = "45b";
+    mocks.einsatz.dauerStunden = "2.50";
+    mocks.einsatz.stunden1 = "2.00";
+    mocks.einsatz.stunden2 = "0.50";
+    const token = await signPortalToken(701);
+    const caller = appRouter.createCaller({
+      req: { cookies: { [PORTAL_COOKIE]: token }, headers: {} },
+      res: {} as any,
+      user: null,
+    } as any);
+
+    await caller.einsaetze.updateStatus({
+      id: 811,
+      status: "abgeschlossen",
+      bericht: "Gesplitteter Einsatz dokumentiert.",
+      tatsaechlicherStart: "2026-08-13T09:00:00.000Z",
+      tatsaechlichesEnde: "2026-08-13T11:30:00.000Z",
+    });
+
+    const leistungsmonate = mocks.inserted
+      .filter((eintrag) => eintrag.table === leistungen)
+      .map((eintrag) => eintrag.values);
+    expect(leistungsmonate).toHaveLength(2);
+    expect(leistungsmonate).toEqual(expect.arrayContaining([
+      expect.objectContaining({ paragraph: "39", stunden: "2" }),
+      expect.objectContaining({ paragraph: "45b", stunden: "0.5" }),
+    ]));
+    expect(leistungsmonate.reduce((summe, leistung) => summe + Number(leistung.stunden), 0)).toBe(2.5);
   });
 });
