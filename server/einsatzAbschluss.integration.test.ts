@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { besuchsberichte, einsaetze, fahrten, leistungen } from "../drizzle/schema";
+import { besuchsberichte, einsaetze, fahrten, kunden, leistungen, mitarbeiter } from "../drizzle/schema";
 
 const mocks = vi.hoisted(() => ({
   inserted: [] as Array<{ table: unknown; values: any }>,
@@ -17,6 +17,8 @@ const mocks = vi.hoisted(() => ({
     stunden2: "0",
     anfahrtPauschale: 6,
   } as any,
+  kunde: { id: 801, vorname: "Erika", nachname: "Muster", pflegegrad: 3, verbraucht45b: 0, verbraucht45a: 0, verbraucht39: 0 } as any,
+  mitarbeiter: { id: 701, aktiv: true, rolle: "mitarbeiter", vorname: "Mia", nachname: "Beispiel", hatDienstwagen: false } as any,
 }));
 
 vi.mock("./webpush", () => ({
@@ -30,7 +32,7 @@ vi.mock("./db", async (importOriginal) => {
     select: () => ({
       from: (table: unknown) => ({
         where: () => ({
-          limit: async () => table === einsaetze ? [mocks.einsatz] : [],
+        limit: async () => table === einsaetze ? [mocks.einsatz] : table === kunden ? [mocks.kunde] : table === mitarbeiter ? [mocks.mitarbeiter] : [],
         }),
       }),
     }),
@@ -49,8 +51,8 @@ vi.mock("./db", async (importOriginal) => {
     updateEinsatzStatus: vi.fn(async (_id: number, _mitarbeiterId: number, daten: any) => {
       mocks.einsatz.status = daten.status ?? mocks.einsatz.status;
     }),
-    getKundeById: vi.fn(async () => ({ id: 801, vorname: "Erika", nachname: "Muster", pflegegrad: 3, verbraucht45b: 0 })),
-    getMitarbeiterById: vi.fn(async () => ({ id: 701, aktiv: true, rolle: "mitarbeiter", vorname: "Mia", nachname: "Beispiel", hatDienstwagen: false })),
+    getKundeById: vi.fn(async () => mocks.kunde),
+    getMitarbeiterById: vi.fn(async () => mocks.mitarbeiter),
     createAuditLog: vi.fn(async () => undefined),
     createNotification: vi.fn(async () => undefined),
     createFahrt: vi.fn(async (fahrt: any) => { mocks.createdFahrten.push(fahrt); }),
@@ -104,7 +106,8 @@ describe("Einsatzabschluss – automatische Dokumentübernahme", () => {
       pflegegradSnapshot: "3",
       fahrtKilometer: "8.5",
     });
-    expect(mocks.createdFahrten[0]).toMatchObject({
+    const fahrt = mocks.inserted.find((eintrag) => eintrag.table === fahrten)?.values;
+    expect(fahrt).toMatchObject({
       einsatzId: 811,
       kundenId: 801,
       kilometer: "8.5",
